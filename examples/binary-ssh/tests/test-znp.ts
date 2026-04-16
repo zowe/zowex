@@ -11,7 +11,7 @@
 
 import { readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { parse } from "node:path";
-import { B64String, ZSshClient, ZSshUtils } from "zowe-native-proto-sdk/src";
+import { B64String, ZSshClient, ZSshUtils } from "zowex-sdk/src";
 import * as utils from "./utils";
 const userConfig = require("./config.json");
 const testPrefix = parse(__filename).name;

@@ -1,5 +1,5 @@
 {
-  "name": "zowe-native-proto-cli",
+  "name": "zowex-cli",
   "version": "0.4.0",
   "main": "lib/index.js",
   "scripts": {
@@ -12,7 +12,7 @@
   "keywords": [],
   "author": "Zowe",
   "license": "EPL-2.0",
-  "description": "Zowe Native Proto plug-in for Zowe CLI",
+  "description": "Zowe Remote SSH plug-in for Zowe CLI",
   "files": [
     "lib",
     "npm-shrinkwrap.json"
@@ -23,7 +23,7 @@
   "dependencies": {
     "@zowe/zos-uss-for-zowe-sdk": "^8.24.0",
     "terminal-kit": "^3.1.2",
-    "zowe-native-proto-sdk": "0.4.0"
+    "zowex-sdk": "0.4.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.7",

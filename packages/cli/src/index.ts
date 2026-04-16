@@ -9,4 +9,4 @@
  *
  */
 
-export * from "zowe-native-proto-sdk";
+export * from "zowex-sdk";

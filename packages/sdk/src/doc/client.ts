@@ -47,7 +47,7 @@ export interface ClientOptions {
     responseTimeout?: number;
 
     /**
-     * Remote path of the Zowe Native Proto server
+     * Remote path of the Zowe Remote SSH server
      * (default: `~/.zowe-server`)
      */
     serverPath?: string;

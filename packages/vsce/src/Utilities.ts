@@ -14,18 +14,18 @@ import * as path from "node:path";
 import type { SshSession } from "@zowe/zos-uss-for-zowe-sdk";
 import { Gui, imperative, ZoweExplorerApiType, ZoweVsCodeExtension } from "@zowe/zowe-explorer-api";
 import * as vscode from "vscode";
-import { ZSshUtils } from "zowe-native-proto-sdk";
+import { ZSshUtils } from "zowex-sdk";
 import { ConfigUtils, VscePromptApi } from "./ConfigUtils";
 import { SshClientCache } from "./SshClientCache";
 import { SshErrorHandler } from "./SshErrorHandler";
 
-const EXTENSION_NAME = "zowe-native-proto-vsce";
+const EXTENSION_NAME = "zowex-vsce";
 
 export function deployWithProgress(session: SshSession, serverPath: string): Thenable<boolean> {
     return Gui.withProgress(
         {
             location: vscode.ProgressLocation.Notification,
-            title: "Deploying Zowe SSH server...",
+            title: "Deploying Zowe Remote SSH server...",
         },
         async (progress) => {
             // Create error callback that uses error correlations
@@ -90,7 +90,7 @@ export function registerCommands(context: vscode.ExtensionContext): vscode.Dispo
             }
 
             await ConfigUtils.showSessionInTree(profile.name!, true);
-            const infoMsg = `Installed Zowe SSH server on ${profile.profile.host ?? profile.name}`;
+            const infoMsg = `Installed Zowe Remote SSH server on ${profile.profile.host ?? profile.name}`;
             imperative.Logger.getAppLogger().info(infoMsg);
             await Gui.showMessage(infoMsg);
         }),
@@ -103,16 +103,16 @@ export function registerCommands(context: vscode.ExtensionContext): vscode.Dispo
             await SshClientCache.inst.connect(profile, { restart: true, retryRequests: false });
 
             imperative.Logger.getAppLogger().info(
-                `Restarted Zowe SSH server on ${profile.profile?.host ?? profile.name}`,
+                `Restarted Zowe Remote SSH server on ${profile.profile?.host ?? profile.name}`,
             );
-            const statusMsg = Gui.setStatusBarMessage("Restarted Zowe SSH server");
+            const statusMsg = Gui.setStatusBarMessage("Restarted Zowe Remote SSH server");
             setTimeout(() => statusMsg.dispose(), 5000);
         }),
         vscode.commands.registerCommand(`${EXTENSION_NAME}.showLog`, async () => {
             imperative.Logger.getAppLogger().trace("Running showLog command");
             await vscode.commands.executeCommand(
                 "vscode.open",
-                vscode.Uri.file(path.join(context.logUri.fsPath, "zowe-native-proto.log")),
+                vscode.Uri.file(path.join(context.logUri.fsPath, "zowex.log")),
             );
             await vscode.commands.executeCommand("workbench.action.files.setActiveEditorReadonlyInSession");
         }),
@@ -135,7 +135,7 @@ export function registerCommands(context: vscode.ExtensionContext): vscode.Dispo
                 onError: errorCallback,
             });
 
-            const infoMsg = `Uninstalled Zowe SSH server from ${profile.profile.host ?? profile.name}`;
+            const infoMsg = `Uninstalled Zowe Remote SSH server from ${profile.profile.host ?? profile.name}`;
             imperative.Logger.getAppLogger().info(infoMsg);
             await Gui.showMessage(infoMsg);
         }),

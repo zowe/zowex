@@ -95,7 +95,7 @@ int interactive_mode(const plugin::InvocationContext &context)
 
 int handle_version(plugin::InvocationContext &context)
 {
-  context.output_stream() << "Zowe Native Protocol CLI (zowex)" << std::endl;
+  context.output_stream() << "Zowe Remote SSH CLI (zowex)" << std::endl;
   context.output_stream() << "Version: " << g_version << std::endl;
   context.output_stream() << "Build Date: " << BUILD_DATE << " " << BUILD_TIME << std::endl;
   context.output_stream() << "Copyright Contributors to the Zowe Project." << std::endl;
@@ -206,7 +206,7 @@ int execute_command(int argc, char *argv[])
 
 Command &setup_root_command(char *argv[])
 {
-  g_arg_parser = std::make_shared<ArgumentParser>(argv[0], "Zowe Native CLI");
+  g_arg_parser = std::make_shared<ArgumentParser>(argv[0], "Zowe Remote SSH CLI");
   auto &root_command = g_arg_parser->get_root_command();
 
   root_command.add_keyword_arg("interactive",

@@ -1,6 +1,6 @@
-# Adding a New Command to Zowe Native Protocol
+# Adding a New Command to Zowe Remote SSH
 
-This guide walks you through creating a new command for the Zowe Native Protocol stack, from the low-level C++ implementation through the middleware layer to the SDK. We'll use a simple `ping` command as an example that takes an optional message and returns a pong response with a timestamp.
+This guide walks you through creating a new command for the Zowe Remote SSH stack, from the low-level C++ implementation through the middleware layer to the SDK. We'll use a simple `ping` command as an example that takes an optional message and returns a pong response with a timestamp.
 
 > **💡 Example Source Code**: For a complete working example, see the [`examples/add-new-command`](../examples/add-new-command) directory, which demonstrates adding commands across all layers of the stack (C++ backend, middleware, SDK, CLI, and VS Code extension).
 
@@ -350,7 +350,7 @@ Create a test script to verify your command works end-to-end:
 **`test-ping.ts`:**
 
 ```typescript
-import { ZSshClient } from "zowe-native-proto-sdk/src/ZSshClient";
+import { ZSshClient } from "zowex-sdk/src/ZSshClient";
 import { ProfileInfo } from "@zowe/imperative";
 
 async function main() {
@@ -389,7 +389,7 @@ async function main() {
     // Test 3: Another custom message
     console.log("\nTest 3: Another Custom Message");
     const anotherResponse = await client.sample.ping({
-      message: "Zowe Native Protocol rocks!",
+      message: "Zowe Remote SSH rocks!",
     });
     console.log("  Data:", anotherResponse.data);
     console.log("  Timestamp:", anotherResponse.timestamp);
@@ -435,7 +435,7 @@ Test 2: Custom Message
   Timestamp: Mon Oct  6 14:23:46 2025
 
 Test 3: Another Custom Message
-  Data: PONG: Zowe Native Protocol rocks!
+  Data: PONG: Zowe Remote SSH rocks!
   Timestamp: Mon Oct  6 14:23:47 2025
 
 ✅ All tests passed!
@@ -446,7 +446,7 @@ Disconnected from server
 
 ## Summary
 
-You've successfully added a new command to the Zowe Native Protocol stack! Here's what you did:
+You've successfully added a new command to the Zowe Remote SSH stack! Here's what you did:
 
 1. **Created a low-level C++ command** in `native/c/commands/` that can be invoked directly via `zowex`
 2. **Tested it locally** on z/OS using the zowex CLI

@@ -1,4 +1,4 @@
-# Zowe Native Protocol
+# Zowe Remote SSH
 
 An open-source, native protocol for z/OS mainframe operations via SSH with minimal server-side configuration.
 
@@ -64,7 +64,7 @@ To test server changes without having to download artifacts and re-deploy them e
       "type": "ssh",
       "properties": {
         ...
-        "serverPath": "~/zowe-native-proto/c/build-out"
+        "serverPath": "~/zowex/c/build-out"
       }
     }
   }
@@ -115,7 +115,7 @@ We use a custom build tool for interacting with z/OS that defines the following 
 >
 >   another:
 >     sshProfile: ssh2
->     deployDir: /tmp/zowe-native-proto
+>     deployDir: /tmp/zowex
 > ```
 
 ## Architecture
@@ -144,9 +144,9 @@ graph LR
   cpp-->uss
   cpp-->jobs
   end
-  click sdk "https://github.com/zowe/zowe-native-proto/blob/main/doc/client/architecture.md#sdk-package"
-  click cli "https://github.com/zowe/zowe-native-proto/blob/main/doc/client/architecture.md#cli-plug-in"
-  click vsce "https://github.com/zowe/zowe-native-proto/blob/main/doc/client/architecture.md#vs-code-extension"
-  click ioserver "https://github.com/zowe/zowe-native-proto/blob/main/doc/backend/server_architecture.md"
-  click zowex "https://github.com/zowe/zowe-native-proto/blob/main/doc/backend/zowex_architecture.md"
+  click sdk "https://github.com/zowe/zowex/blob/main/doc/client/architecture.md#sdk-package"
+  click cli "https://github.com/zowe/zowex/blob/main/doc/client/architecture.md#cli-plug-in"
+  click vsce "https://github.com/zowe/zowex/blob/main/doc/client/architecture.md#vs-code-extension"
+  click ioserver "https://github.com/zowe/zowex/blob/main/doc/backend/server_architecture.md"
+  click zowex "https://github.com/zowe/zowex/blob/main/doc/backend/zowex_architecture.md"
 ```

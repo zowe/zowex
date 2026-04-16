@@ -12,7 +12,7 @@
 import { createReadStream, createWriteStream } from "node:fs";
 import type * as zosfiles from "@zowe/zos-files-for-zowe-sdk";
 import { imperative, type MainframeInteraction, type Types } from "@zowe/zowe-explorer-api";
-import { B64String, type uss } from "zowe-native-proto-sdk";
+import { B64String, type uss } from "zowex-sdk";
 import { SshCommonApi } from "./SshCommonApi";
 
 export class SshUssApi extends SshCommonApi implements MainframeInteraction.IUss {

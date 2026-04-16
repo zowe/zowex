@@ -246,9 +246,9 @@ void zusf_tests()
                   rc = zusf_list_uss_file_path(&zusf, dest_dir, list_response, all_long_list_opts, false);
                   Expect(rc).ToBe(0);
                   // chmod hack won't work here, can't modify symlink permissions
-                  // Expect(list_response).ToContain("lrwxr-xr-x"); //TODO: https://github.com/zowe/zowe-native-proto/issues/791
+                  // Expect(list_response).ToContain("lrwxr-xr-x"); //TODO: https://github.com/zowe/zowex/issues/791
                   // rc = zusf_delete_uss_item(&zusf, dest_dir, true);
-                  // Expect(rc).ToBe(-1); // TODO: https://github.com/zowe/zowe-native-proto/issues/792
+                  // Expect(rc).ToBe(-1); // TODO: https://github.com/zowe/zowex/issues/792
 
                   execute_command_with_output("rm -rf " + dest_dir, cmd_output);
 

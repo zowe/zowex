@@ -1,10 +1,10 @@
 {
-  "name": "zowe-native-proto-vsce",
+  "name": "zowex-vsce",
   "displayName": "Zowe Remote SSH",
-  "description": "Zowe Native Proto VS Code Extension for Zowe Explorer",
+  "description": "Zowe Remote SSH VS Code Extension for Zowe Explorer",
   "version": "0.4.0",
   "publisher": "Zowe",
-  "repository": "https://github.com/zowe/zowe-native-proto-vsce/tree/main/packages/vsce",
+  "repository": "https://github.com/zowe/zowex-vsce/tree/main/packages/vsce",
   "engines": {
     "vscode": "^1.79.0"
   },
@@ -19,31 +19,31 @@
   "contributes": {
     "commands": [
       {
-        "command": "zowe-native-proto-vsce.connect",
+        "command": "zowex-vsce.connect",
         "title": "Zowe-SSH: Connect to Host..."
       },
       {
-        "command": "zowe-native-proto-vsce.restart",
+        "command": "zowex-vsce.restart",
         "title": "Zowe-SSH: Restart Zowe Server on Host..."
       },
       {
-        "command": "zowe-native-proto-vsce.showLog",
+        "command": "zowex-vsce.showLog",
         "title": "Zowe-SSH: Show Log"
       },
       {
-        "command": "zowe-native-proto-vsce.uninstall",
+        "command": "zowex-vsce.uninstall",
         "title": "Zowe-SSH: Uninstall Zowe Server from Host..."
       }
     ],
     "configuration": {
-      "title": "zowe-native-proto-vsce",
+      "title": "zowex-vsce",
       "properties": {
-        "zowe-native-proto-vsce.keepAliveInterval": {
+        "zowex-vsce.keepAliveInterval": {
           "type": "number",
           "default": 30,
           "description": "Number of seconds between keep-alive messages to keep connection active. Set to 0 to disable keep-alive."
         },
-        "zowe-native-proto-vsce.logLevel": {
+        "zowex-vsce.logLevel": {
           "type": "string",
           "default": "INFO",
           "description": "Sets logging level of the extension. Requires extension restart to take effect.",
@@ -56,45 +56,45 @@
             "FATAL"
           ]
         },
-        "zowe-native-proto-vsce.serverAutoUpdate": {
+        "zowex-vsce.serverAutoUpdate": {
           "type": "boolean",
           "default": true,
-          "description": "Automatically re-deploys the Zowe SSH server if out of date."
+          "description": "Automatically re-deploys the Zowe Remote SSH server if out of date."
         },
-        "zowe-native-proto-vsce.serverInstallPath": {
+        "zowex-vsce.serverInstallPath": {
           "type": "object",
           "description": "Mapping of SSH hostname to server install path for that host. Defaults to '~/.zowe-server'.",
           "additionalProperties": {
             "type": "string"
           }
         },
-        "zowe-native-proto-vsce.workerCount": {
+        "zowex-vsce.workerCount": {
           "type": "number",
           "default": 3,
           "minimum": 1,
           "maximum": 50,
-          "description": "Number of worker threads for the Zowe SSH server. Each worker runs as a separate process in its own address space."
+          "description": "Number of worker threads for the Zowe Remote SSH server. Each worker runs as a separate process in its own address space."
         },
-        "zowe-native-proto-vsce.responseTimeout": {
+        "zowex-vsce.responseTimeout": {
           "type": "number",
           "default": 60,
           "minimum": 1,
           "maximum": 600,
           "description": "Response timeout in seconds before the originating request is forcibly timed out. Set to a higher value if responses are expected to take longer to complete."
         },
-        "zowe-native-proto-vsce.requestTimeout": {
+        "zowex-vsce.requestTimeout": {
           "type": "number",
           "default": 60,
           "minimum": 1,
           "maximum": 600,
           "description": "Request timeout in seconds before a worker is restarted. Set to a higher value if requests are expected to take longer to complete."
         },
-        "zowe-native-proto-vsce.experimentalNativeSsh": {
+        "zowex-vsce.experimentalNativeSsh": {
           "type": "boolean",
           "default": false,
           "description": "Use an experimental native SSH client for improved performance. Not yet fully tested."
         },
-        "zowe-native-proto-vsce.defaultHandshakeTimeout": {
+        "zowex-vsce.defaultHandshakeTimeout": {
           "type": "number",
           "description": "Time in milliseconds to wait for the SSH handshake to complete.",
           "default": 30000,
@@ -124,7 +124,7 @@
     "@zowe/core-for-zowe-sdk": "^8.11.0",
     "@zowe/zowe-explorer-api": "^3.3.0",
     "ssh2": "^1.16.0",
-    "zowe-native-proto-sdk": "0.4.0"
+    "zowex-sdk": "0.4.0"
   },
   "devDependencies": {
     "@rspack/cli": "^1.7.6",

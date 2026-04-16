@@ -12,7 +12,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { type IHandlerParameters, IO, type ITaskWithStatus, TaskStage } from "@zowe/imperative";
-import type { uss, ZSshClient } from "zowe-native-proto-sdk";
+import type { uss, ZSshClient } from "zowex-sdk";
 import { SshBaseHandler } from "../../SshBaseHandler";
 
 export default class DownloadUssFileHandler extends SshBaseHandler {

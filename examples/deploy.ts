@@ -28,12 +28,12 @@ import { AsciiToEbcdicTransform } from "../scripts/buildTools";
  *
  * Arguments:
  *   ssh-profile   Name of a Zowe SSH profile
- *   deploy-dir    USS directory for the deploy (e.g. ~/zowe-native-proto)
+ *   deploy-dir    USS directory for the deploy (e.g. ~/zowex)
  *   example...    Optional list of examples to deploy (default: all)
  *
  * Examples:
- *   npx tsx examples/deploy.ts myssh ~/zowe-native-proto
- *   npx tsx examples/deploy.ts myssh ~/zowe-native-proto pong-server jsonrpc-ssh
+ *   npx tsx examples/deploy.ts myssh ~/zowex
+ *   npx tsx examples/deploy.ts myssh ~/zowex pong-server jsonrpc-ssh
  */
 
 const ALL_EXAMPLES = ["pong-server", "jsonrpc-ssh", "binary-ssh"];
@@ -166,7 +166,7 @@ async function main() {
         console.error("Usage: npx tsx examples/deploy.ts <ssh-profile> <deploy-dir> [example...]");
         console.error("");
         console.error("  ssh-profile   Name of a Zowe SSH profile");
-        console.error("  deploy-dir    USS directory for the deploy (e.g. ~/zowe-native-proto)");
+        console.error("  deploy-dir    USS directory for the deploy (e.g. ~/zowex)");
         console.error("  example...    Optional: pong-server, jsonrpc-ssh, binary-ssh (default: all)");
         process.exit(1);
     }

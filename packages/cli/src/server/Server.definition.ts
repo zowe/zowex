@@ -18,8 +18,8 @@ import { ServerUninstallDefinition } from "./uninstall/Uninstall.definition";
 const ServerDefinition: ICommandDefinition = {
     name: "server",
     aliases: ["srv"],
-    summary: "Manage the Zowe SSH server",
-    description: "Manage the Zowe SSH server",
+    summary: "Manage the Zowe Remote SSH server",
+    description: "Manage the Zowe Remote SSH server",
     type: "group",
     children: [ServerInstallDefinition, ServerUninstallDefinition],
     passOn: [

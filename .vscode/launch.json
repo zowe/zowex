@@ -15,7 +15,7 @@
       "preLaunchTask": "npm: watch"
     },
     {
-      "name": "Debug Zowe SSH Command",
+      "name": "Debug Zowe Remote SSH Command",
       "type": "node",
       "request": "launch",
       "runtimeExecutable": "zowe",

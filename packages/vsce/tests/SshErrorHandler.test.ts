@@ -179,7 +179,7 @@ describe("SshErrorHandler", () => {
 
             await errorHandler.handleError(testError, ZoweExplorerApiType.All, "Operation");
 
-            expect(mockCreateOutputChannel).toHaveBeenCalledWith("Zowe SSH");
+            expect(mockCreateOutputChannel).toHaveBeenCalledWith("Zowe Remote SSH");
             expect(mockOutputChannel.appendLine).toHaveBeenCalledWith("Error: Detailed error");
             expect(mockOutputChannel.appendLine).toHaveBeenCalledWith(
                 "Stack: Error: Detailed error\n    at test.js:1:1",

@@ -1,6 +1,6 @@
-# Zowe Native Protocol for Zowe Explorer
+# Zowe Remote SSH for Zowe Explorer
 
-The Zowe Native Protocol extension for Zowe Explorer offers several features powered by the Zowe Native Protocol, enabling developers to interact with mainframe resources directly from their IDE.
+The Zowe Remote SSH extension for Zowe Explorer offers several features, enabling developers to interact with mainframe resources over SSH directly from their IDE.
 
 ## Features
 
@@ -28,7 +28,7 @@ The extension is installed and ready to use.
 
 ## Usage
 
-To deploy an instance of the Zowe Native Protocol server, run the `Zowe-SSH: Connect to Host...` command from the command palette. Select an SSH profile from the list of profiles to start the deployment and connection process. Once complete, the SSH profile is added to the Zowe Explorer tree views.
+To deploy an instance of the Zowe Remote SSH server, run the `Zowe-SSH: Connect to Host...` command from the command palette. Select an SSH profile from the list of profiles to start the deployment and connection process. Once complete, the SSH profile is added to the Zowe Explorer tree views.
 
 In the event that the server is unresponsive, you can restart the server with the `Zowe-SSH: Restart Zowe Server on Host...` command. 
 

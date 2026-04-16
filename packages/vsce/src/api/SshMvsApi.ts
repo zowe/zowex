@@ -22,7 +22,7 @@ import {
     imperative,
     type MainframeInteraction,
 } from "@zowe/zowe-explorer-api";
-import { B64String, type Dataset, type DatasetAttributes, type ds } from "zowe-native-proto-sdk";
+import { B64String, type Dataset, type DatasetAttributes, type ds } from "zowex-sdk";
 import { SshCommonApi } from "./SshCommonApi";
 
 class SshAttributesProvider implements IAttributesProvider {

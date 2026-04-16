@@ -12,7 +12,7 @@
 import { imperative, ZoweVsCodeExtension } from "@zowe/zowe-explorer-api";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as vscode from "vscode";
-import { ZSshClient, ZSshUtils } from "zowe-native-proto-sdk";
+import { ZSshClient, ZSshUtils } from "zowex-sdk";
 import { SshClientCache } from "../src/SshClientCache";
 import { deployWithProgress, getVsceConfig } from "../src/Utilities";
 
@@ -61,7 +61,7 @@ vi.mock("@zowe/zowe-explorer-api", () => {
     };
 });
 
-vi.mock("zowe-native-proto-sdk", () => {
+vi.mock("zowex-sdk", () => {
     return {
         ZSshClient: {
             create: vi.fn(),

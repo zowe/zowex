@@ -1,5 +1,5 @@
 {
-  "name": "zowe-native-proto-sdk",
+  "name": "zowex-sdk",
   "version": "0.4.0",
   "main": "lib/index.js",
   "scripts": {
@@ -15,7 +15,7 @@
   "keywords": [],
   "author": "Zowe",
   "license": "EPL-2.0",
-  "description": "Zowe Native Proto APIs for Zowe SDK",
+  "description": "Zowe Remote SSH APIs for Zowe SDK",
   "files": [
     "bin",
     "lib"

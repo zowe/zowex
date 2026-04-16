@@ -40,7 +40,7 @@ module.exports = (_env, argv) => {
       // support reading TypeScript and JavaScript files, 📖 -> https://github.com/TypeStrong/ts-loader
       extensions: ['.ts', '.js'],
       alias: {
-        'zowe-native-proto-sdk': path.resolve(__dirname, '..', 'sdk', 'src'),
+        'zowex-sdk': path.resolve(__dirname, '..', 'sdk', 'src'),
         'cpu-features': false,
         './crypto/build/Release/sshcrypto.node': false,
       }

@@ -1,10 +1,10 @@
 {
     "chunkSize": 32768,
-    "serverPath": "/u/users/ibmuser/zowe-native-proto/c/build-out",
+    "serverPath": "/u/users/ibmuser/zowex/c/build-out",
     "sshProfile": "ssh",
     "testCount": 5,
     "testFile": "resources/test1m.bin",
-    "ussDir": "/tmp/zowe-native-proto",
+    "ussDir": "/tmp/zowex",
     "verboseSsh": false,
     "zosmfProfile": "zosmf"
 }

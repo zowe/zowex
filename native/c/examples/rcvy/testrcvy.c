@@ -12,6 +12,7 @@
 #include "ihasdwa.h"
 #include "zmetal.h"
 #include "zrecovery.h"
+#include "zsetjmp.h"
 #include "zwto.h"
 #include "zecb.h"
 
@@ -34,29 +35,85 @@ void PERCEXIT(void *perc_exit_data)
 int main()
 {
 
+  // ------------------------------------------------------------
+
+  // ZSETJMP_ENV zenv = {0};
+  // int rc = zsetjmp(&zenv);
+  // if (rc == 0)
+  // {
+  //   zwto_debug("zsetjmp returned 0");
+  // }
+  // else
+  // {
+  //   zwto_debug("zsetjmp returned %d", rc);
+  // }
+  // if (rc == 0)
+  // {
+  //   zwto_debug("zlongjmp called");
+  //   zlongjmp(&zenv);
+  // }
+  // else
+  // {
+  //   zwto_debug("zlongjmp not called");
+  // }
+  // return 0;
+
+  // ------------------------------------------------------------
+
+  // ZRCVY_ENV zenv = {0};
+  // zenv.abexit = ABEXIT;
+  // zenv.perc_exit = PERCEXIT;
+  // int i = 7;
+  // zenv.abexit_data = &i;
+
+  // zwto_debug("@TEST main");
+
+  // if (0 == enable_recovery(&zenv))
+  // {
+  //   zwto_debug("@TEST in if");
+  //   s0c3_abend(2);
+  // }
+  // else
+  // {
+  //   zwto_debug("@TEST in else");
+  //   // s0c3_abend(2);
+  // }
+  // zwto_debug("@TEST outside of if/else");
+
+  // disable_recovery(&zenv);
+
+  // zwto_debug("@TEST exiting");
+
+  // ------------------------------------------------------------
+
   ZRCVY_ENV zenv = {0};
   zenv.abexit = ABEXIT;
   zenv.perc_exit = PERCEXIT;
   int i = 7;
   zenv.abexit_data = &i;
 
-  zwto_debug("@TEST main");
+  // zwto_debug("@TEST main");
 
   if (0 == enable_recovery(&zenv))
   {
-    zwto_debug("@TEST in if");
+    // disable_recovery(&zenv);
     s0c3_abend(2);
   }
   else
   {
     zwto_debug("@TEST in else");
-    // s0c3_abend(2);
+    // disable_recovery(&zenv);
+    return 1;
+    // s0c3_abend(3);
   }
-  zwto_debug("@TEST outside of if/else");
 
+  // zwto_debug("@TEST outside of if/else");
+  // s0c3_abend(2);
+
+  // zwto_debug("@TEST before disable recovery");
   disable_recovery(&zenv);
 
-  zwto_debug("@TEST exiting");
+  zwto_debug("@TEST after disable recovery");
 
   return 0;
 }

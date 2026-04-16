@@ -13,7 +13,7 @@ node_modules
 prebuilds
 out
 typedoc*
-zowe-native-proto-package
+zowex-package
 
 # Files
 .DS_Store

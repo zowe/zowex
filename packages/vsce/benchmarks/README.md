@@ -1,4 +1,4 @@
-# Zowe Native Proto VSCE Benchmarks
+# Zowe Remote SSH VSCE Benchmarks
 
 This directory contains performance benchmarks comparing the traditional z/OSMF REST APIs against the new native SSH APIs.
 

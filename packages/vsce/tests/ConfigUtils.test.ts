@@ -14,12 +14,7 @@ import type { IProfile } from "@zowe/imperative";
 import { Gui, ZoweVsCodeExtension } from "@zowe/zowe-explorer-api";
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import * as vscode from "vscode";
-import {
-    type AbstractConfigManager,
-    MESSAGE_TYPE,
-    type PrivateKeyWarningOptions,
-    ZSshClient,
-} from "zowe-native-proto-sdk";
+import { type AbstractConfigManager, MESSAGE_TYPE, type PrivateKeyWarningOptions, ZSshClient } from "zowex-sdk";
 import { ConfigUtils, VscePromptApi } from "../src/ConfigUtils";
 import { getVsceConfig } from "../src/Utilities";
 

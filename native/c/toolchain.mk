@@ -6,7 +6,7 @@
 #
 #  SPDX-License-Identifier: EPL-2.0
 #
-#  Shared toolchain definitions for Zowe native components.
+#  Shared toolchain definitions for the native Zowe Remote SSH components.
 #
 
 CXX=ibm-clang++64

@@ -52,7 +52,7 @@ jobs:
                 port: 65522
                 user: "${{ secrets.SSH_MARIST_ZNP_ID }}"
                 password: "${{ secrets.SSH_MARIST_ZNP_PASS }}"
-              deployDir: "/ZOWE/tmp/zowe-native-proto"
+              deployDir: "/ZOWE/tmp/zowex"
               preBuildCmd: "export PATH=/usr/lpp/IBM/cnw/v2r1/openxl/bin:$PATH"
           EOF
 

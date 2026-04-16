@@ -13,7 +13,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type { IHandlerParameters } from "@zowe/imperative";
 import { IO } from "@zowe/imperative";
-import { B64String, type jobs, type ZSshClient } from "zowe-native-proto-sdk";
+import { B64String, type jobs, type ZSshClient } from "zowex-sdk";
 import { SshBaseHandler } from "../../SshBaseHandler";
 
 export default class DownloadJobJclHandler extends SshBaseHandler {

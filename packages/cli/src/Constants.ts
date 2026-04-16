@@ -10,14 +10,14 @@
  */
 
 import type { ICommandOptionDefinition } from "@zowe/imperative";
-import { ZSshClient } from "zowe-native-proto-sdk";
+import { ZSshClient } from "zowex-sdk";
 
 // biome-ignore lint/complexity/noStaticOnlyClass: Constants class has static properties
 export class Constants {
     public static readonly OPT_SERVER_PATH: ICommandOptionDefinition = {
         name: "server-path",
         aliases: ["sp"],
-        description: `The remote path of the Zowe SSH server. Defaults to '${ZSshClient.DEFAULT_SERVER_PATH}'.`,
+        description: `The path to the deployed Zowe Remote SSH server instance. Defaults to '${ZSshClient.DEFAULT_SERVER_PATH}'.`,
         type: "string",
         required: false,
     };

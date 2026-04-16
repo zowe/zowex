@@ -11,7 +11,7 @@
 
 import * as fs from "node:fs";
 import { type IHandlerParameters, type ITaskWithStatus, TaskStage } from "@zowe/imperative";
-import type { uss, ZSshClient } from "zowe-native-proto-sdk";
+import type { uss, ZSshClient } from "zowex-sdk";
 import { SshBaseHandler } from "../../SshBaseHandler";
 
 export default class UploadFileToUssFileHandler extends SshBaseHandler {

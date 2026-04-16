@@ -259,7 +259,7 @@ void CommandBuilder::apply_input_transforms(MiddlewareContext &context) const
           }
           long long stream_id = *stream_id_ptr;
 
-          // Create pipe path: /tmp/zowe-native-proto_{uid}_{pid}_{stream_id}_fifo
+          // Create pipe path: /tmp/zowex_{uid}_{pid}_{stream_id}_fifo
           const char *tmp_dir = std::getenv("TMPDIR");
           if (tmp_dir == nullptr || tmp_dir[0] == '\0')
           {
@@ -267,7 +267,7 @@ void CommandBuilder::apply_input_transforms(MiddlewareContext &context) const
           }
 
           std::ostringstream pipe_path_stream;
-          pipe_path_stream << tmp_dir << "/zowe-native-proto_"
+          pipe_path_stream << tmp_dir << "/zowex_"
                            << geteuid() << "_"
                            << getpid() << "_"
                            << stream_id << "_fifo";
