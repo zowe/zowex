@@ -145,7 +145,7 @@ static std::vector<std::string> get_member_names(const std::string &pds_dsn)
   return names;
 }
 
-static bool member_exists_in_pds(const std::string &pds_dsn, const std::string &member_name)
+bool member_exists_in_pds(const std::string &pds_dsn, const std::string &member_name)
 {
   std::vector<std::string> names = get_member_names(pds_dsn);
   for (auto it = names.begin(); it != names.end(); ++it)
@@ -278,12 +278,12 @@ static int copy_partitioned(ZDS *zds, ZDSTypeInfo &sourceInfo, ZDSTypeInfo &targ
     if (targetIsPds)
     {
       zds->diag.e_msg_len = sprintf(zds->diag.e_msg,
-                                    "Target data set '%s' already exists. Use --replace (-r) flag to replace like-named members or --overwrite to replace the entire partitioned data set", targetInfo.base_dsn.c_str());
+                                    "Target data set '%s' exists. Use --replace (-r) flag to replace like-named members or --overwrite to replace the entire partitioned data set", targetInfo.base_dsn.c_str());
     }
     else
     {
       zds->diag.e_msg_len = sprintf(zds->diag.e_msg,
-                                    "Target member '%s' already exists. Use --replace (-r) flag to replace the target's contents", targetInfo.member_name.c_str());
+                                    "Target member '%s' exists. Use --replace (-r) flag to replace the member's contents", targetInfo.member_name.c_str());
     }
     return RTNCD_FAILURE;
   }
@@ -387,10 +387,19 @@ int zds_copy_dsn(ZDS *zds, const std::string &dsn1, const std::string &dsn2, ZDS
       target_type = info1.type;
   }
 
-  if (!info1.exists)
+  if (!zds_dataset_exists(info1.base_dsn))
   {
     zds->diag.e_msg_len = sprintf(zds->diag.e_msg, "Source data set '%s' not found", info1.base_dsn.c_str());
     return RTNCD_FAILURE;
+  }
+
+  if (!info1.member_name.empty())
+  {
+    if (!member_exists_in_pds(info1.base_dsn, info1.member_name))
+    {
+      zds->diag.e_msg_len = sprintf(zds->diag.e_msg, "Source member '%s' not found", info1.member_name.c_str());
+      return RTNCD_FAILURE;
+    }
   }
 
   // PDS -> Member is not supported
@@ -476,7 +485,7 @@ bool zds_dataset_exists(const std::string &dsn)
   return false;
 }
 
-bool zds_member_exists(const std::string &dsn, const std::string &member_before)
+static bool zds_member_exists(const std::string &dsn, const std::string &member_before)
 {
   std::string mem_before = "//'" + dsn + "(" + member_before + ")'";
   FILE *fp = fopen(mem_before.c_str(), "r");
