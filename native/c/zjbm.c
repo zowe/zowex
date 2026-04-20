@@ -87,7 +87,7 @@ static void init_stat(STAT *stat)
 
 #pragma prolog(ZJBSYMB, " ZWEPROLG NEWDSA=(YES,128) ")
 #pragma epilog(ZJBSYMB, " ZWEEPILG ")
-int ZJBSYMB(ZJB *zjb, const char *symbol, char *value, int value_size)
+int ZJBSYMB(ZJB *zjb, const char *symbol, char *value, int *value_size)
 {
   int rc = 0;
 
@@ -126,11 +126,11 @@ int ZJBSYMB(ZJB *zjb, const char *symbol, char *value, int value_size)
   JSYENTRY *jsymbolEntry = (JSYENTRY *)(p + jsymbolOutput.jsymbolTable.jsytent1); // --> first entry
 
   // Validate buffer size to prevent overflow
-  if (jsymbolEntry->jsyevals >= value_size)
+  if (jsymbolEntry->jsyevals >= *value_size)
   {
     strcpy(zjb->diag.service_name, "ZJBSYMB");
     ZDIAG_SET_MSG(&zjb->diag, "Symbol value size (%d) exceeds buffer capacity (%d) for symbol '%.32s'",
-                  jsymbolEntry->jsyevals, value_size, symbol);
+                  jsymbolEntry->jsyevals, *value_size, symbol);
     zjb->diag.detail_rc = ZJB_RTNCD_INSUFFICIENT_BUFFER;
     return RTNCD_FAILURE;
   }
@@ -139,7 +139,7 @@ int ZJBSYMB(ZJB *zjb, const char *symbol, char *value, int value_size)
   memcpy(value, p, jsymbolEntry->jsyevals);
 
   // Null-terminate the string if there's space
-  if (jsymbolEntry->jsyevals < value_size)
+  if (jsymbolEntry->jsyevals < *value_size)
   {
     value[jsymbolEntry->jsyevals] = '\0';
   }

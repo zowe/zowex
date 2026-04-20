@@ -40,12 +40,12 @@ extern "C"
 
   int ZJBMVIEW(ZJB *PTR64, ZJB_JOB_INFO **PTR64, int *PTR64);
   int ZJBMLIST(ZJB *PTR64, ZJB_JOB_INFO **PTR64, int *PTR64);
-  int ZJBMGJQ(ZJB *, SSOB *, STAT *, STATJQ * PTR32 * PTR32);
+  int ZJBMGJQ(ZJB *, SSOB *, STAT *, STATJQ *PTR32 *PTR32);
   int ZJBMEMSG(ZJB *, STAT *PTR64, SSOB *PTR64, int);
   int ZJBMTCOM(ZJB *PTR64, STAT *PTR64 stat, ZJB_JOB_INFO **PTR64, int *PTR64);
   int ZJBMLSDS(ZJB *PTR64, STATSEVB **PTR64, int *PTR64);
   int ZJBMLPRC(ZJB *PTR64, char *buffer, int *buffer_size, int *entries);
-  int ZJBSYMB(ZJB *PTR64, const char *PTR64, char *PTR64, int value_size);
+  int ZJBSYMB(ZJB *PTR64, const char *PTR64, char *PTR64, int *value_size);
   int ZJBMPRG(ZJB *PTR64);
   int ZJBMCNL(ZJB *PTR64, int flags);
   int ZJBMHLD(ZJB *PTR64);

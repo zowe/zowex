@@ -508,7 +508,8 @@ int zjb_submit(ZJB *zjb, const std::string &contents, std::string &jobid)
 
   char cjobid[8 + 1] = {0};
   // https://www.ibm.com/docs/en/zos/3.1.0?topic=iazsymbl-jes-system-symbols
-  rc = ZJBSYMB(zjb, "SYS_LASTJOBID", cjobid, sizeof(cjobid));
+  int jobid_size = sizeof(cjobid);
+  rc = ZJBSYMB(zjb, "SYS_LASTJOBID", cjobid, &jobid_size);
 
   if (0 != rc)
   {
@@ -528,7 +529,8 @@ int zjb_submit(ZJB *zjb, const std::string &contents, std::string &jobid)
   }
 
   char ccorrelator[64 + 1] = {0};
-  rc = ZJBSYMB(zjb, "SYS_CORR_LASTJOB", ccorrelator, sizeof(ccorrelator));
+  int correlator_size = sizeof(ccorrelator);
+  rc = ZJBSYMB(zjb, "SYS_CORR_LASTJOB", ccorrelator, &correlator_size);
 
   if (0 != rc)
   {
