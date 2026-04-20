@@ -497,7 +497,8 @@ int zjb_submit(ZJB *zjb, const std::string &contents, std::string &jobid)
     return RTNCD_FAILURE;
   }
 
-  rc = zds_write_to_dd(&zds, ddname, contents);
+  ZDSWriteOpts write_opts{.zds = &zds, .ddname = ddname};
+  rc = zds_write(write_opts, contents);
   if (0 != rc)
   {
     memcpy(&zjb->diag, &zds.diag, sizeof(ZDIAG));

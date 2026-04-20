@@ -155,6 +155,35 @@ struct ZDSReadOpts
 };
 
 /**
+ * @brief Options for writing to a z/OS data set or DD
+ */
+struct ZDSWriteOpts
+{
+  ZDS *zds = nullptr;
+  std::string ddname;
+  std::string dsname;
+};
+
+/**
+ * @brief Write data to a z/OS data set or DD.
+ *
+ * @param opts write options containing ZDS state and either a dsname or ddname. If both ddname and dsname are provided, ddname takes precedence.
+ * @param data data to write
+ * @return int RTNCD_SUCCESS on success; RTNCD_FAILURE on failure
+ */
+int zds_write(const ZDSWriteOpts &opts, const std::string &data);
+
+/**
+ * @brief Write data to a z/OS data set or DD in streaming mode.
+ *
+ * @param opts write options containing ZDS state and either a dsname or ddname. If both ddname and dsname are provided, ddname takes precedence.
+ * @param pipe name of the input pipe
+ * @param content_len pointer where the length of the data set contents will be stored
+ * @return int RTNCD_SUCCESS on success; RTNCD_FAILURE on failure
+ */
+int zds_write_streamed(const ZDSWriteOpts &opts, const std::string &pipe, size_t *content_len);
+
+/**
  * @brief Read data from a z/OS data set or DD.
  *
  * @param opts read options containing ZDS state and either a dsname or ddname. If both ddname and dsname are provided, ddname takes precedence.
@@ -162,16 +191,6 @@ struct ZDSReadOpts
  * @return int 0 for success; non zero otherwise
  */
 int zds_read(const ZDSReadOpts &opts, std::string &response);
-
-/**
- * @brief Write data to a z/OS data set name
- *
- * @param zds data set returned attributes and error information
- * @param dsn data set name to write to
- * @param data data to write
- * @return int 0 for success; non zero otherwise
- */
-int zds_write_to_dsn(ZDS *zds, const std::string &dsn, std::string &data);
 
 /**
  * @brief Open a data set for using BPAM mode
@@ -269,16 +288,6 @@ int zds_list_data_sets(ZDS *zds, std::string dsn, std::vector<ZDSEntry> &dataset
 int zds_read_vsam(ZDS *zds, std::string ddname, std::string &response);
 
 /**
- * @brief Write data to a DDNAME
- *
- * @param zds data set returned attributes and error information
- * @param ddname DDNAME to write to
- * @param data data to write
- * @return int 0 for success; non zero otherwise
- */
-int zds_write_to_dd(ZDS *zds, std::string ddname, const std::string &data);
-
-/**
  * @brief Create a data set
  *
  * @param zds data set returned attributes and error information
@@ -338,16 +347,5 @@ int zdsReadDynalloc(const std::string &, const std::string &, const std::string 
  * @return int 0 for success; non zero otherwise
  */
 int zds_read_streamed(const ZDSReadOpts &opts, const std::string &pipe, size_t *content_len);
-
-/**
- * @brief Write data to a z/OS data set in streaming mode
- *
- * @param zds data set returned attributes and error information
- * @param dsn data set name to write to
- * @param pipe name of the input pipe
- * @param content_len pointer where the length of the data set contents will be stored
- * @return int 0 for success; non zero otherwise
- */
-int zds_write_to_dsn_streamed(ZDS *zds, const std::string &dsn, const std::string &pipe, size_t *content_len);
 
 #endif
