@@ -272,7 +272,7 @@ static int note_member(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc, NOTE_RESPONSE *PTR
 }
 
 #define MAX_SYSLOG_LRECL 256
-int open_input_vsam(ZDIAG *PTR32 diag, IO_CTRL *PTR32 *PTR32 ioc, const char *PTR32 ddname)
+int open_input_vsam(ZDIAG *PTR32 diag, IO_CTRL * PTR32 * PTR32 ioc, const char *PTR32 ddname)
 {
   int rc = 0;
   int rsn = 0;
@@ -430,7 +430,7 @@ int close_input_vsam(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
   return rc;
 }
 
-int open_output_bpam(ZDIAG *PTR32 diag, IO_CTRL *PTR32 *PTR32 ioc, const char *PTR32 ddname)
+int open_output_bpam(ZDIAG *PTR32 diag, IO_CTRL * PTR32 * PTR32 ioc, const char *PTR32 ddname)
 {
   int rc = 0;
   IO_CTRL *PTR32 ioc31 = NULL;
@@ -1215,6 +1215,10 @@ int ZAMDEXIT(DCB_ABEND_PL *PTR32 plist)
     // If ignoring is not possible, we can sometimes delay the abend until all the DCBs in the same OPEN or CLOSE macro are opened or closed
     rc = DCB_ABEND_RC_DELAY;
   }
+
+  // Restore the R8 register to value saved before the exit
+  unsigned long long save8 = ZAM24R();
+  __asm(" LG   8,%0\n" : "+m"(save8)::"r8");
 
   return rc;
 }

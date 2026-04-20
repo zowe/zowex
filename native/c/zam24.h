@@ -16,5 +16,6 @@
 
 int ZAM24();
 int ZAM24Q();
+int ZAM24R();
 
 #endif
