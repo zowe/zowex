@@ -341,7 +341,7 @@ static int copy_partitioned(ZDS *zds, ZDSTypeInfo &sourceInfo, ZDSTypeInfo &targ
   wopts.zds = zds;
   wopts.ddname = "sysin";
 
-  rc = zds_write_to_dd(wopts, control_stmt);
+  rc = zds_write(wopts, control_stmt);
   if (rc != 0)
   {
     zut_free_dynalloc_dds(zds->diag, dds);
