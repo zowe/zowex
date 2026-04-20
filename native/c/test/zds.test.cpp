@@ -13,6 +13,7 @@
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
+#include "../zbase64.h"
 #include <vector>
 #include <thread>
 #include <chrono>
@@ -73,6 +74,76 @@ struct ListMembersTestContext : DataSetTestContextBase
     write_to_dsn(pds_dsn + "(ABC2)", "data 2");
     write_to_dsn(pds_dsn + "(XYZ1)", "data 3");
     write_to_dsn(pds_dsn + "(TEST)", "data 4");
+  }
+};
+
+// Test context for DD allocation and management
+struct DDTestContext : DataSetTestContextBase
+{
+  std::vector<std::string> allocated_dds;
+
+  explicit DDTestContext(std::vector<std::string> &list)
+      : DataSetTestContextBase(list)
+  {
+  }
+
+  void allocate_fb_dd(const std::string &ddname, int lrecl, int blksize = 0)
+  {
+    if (blksize == 0)
+      blksize = lrecl;
+    std::string alloc_cmd = "alloc dd(" + ddname + ") lrecl(" + std::to_string(lrecl) +
+                            ") recfm(f,b) blksize(" + std::to_string(blksize) + ")";
+
+    std::vector<std::string> single_dd;
+    single_dd.push_back(alloc_cmd);
+    allocated_dds.push_back(alloc_cmd);
+
+    ZDIAG diag{};
+    int rc = zut_loop_dynalloc(diag, single_dd);
+    if (rc != 0)
+    {
+      throw std::runtime_error("Failed to allocate DD " + ddname + ": " + std::string(diag.e_msg));
+    }
+  }
+
+  void allocate_vb_dd(const std::string &ddname, int lrecl)
+  {
+    std::string alloc_cmd = "alloc dd(" + ddname + ") lrecl(" + std::to_string(lrecl) +
+                            ") recfm(v,b) blksize(" + std::to_string(lrecl + 4) + ")";
+
+    std::vector<std::string> single_dd;
+    single_dd.push_back(alloc_cmd);
+    allocated_dds.push_back(alloc_cmd);
+
+    ZDIAG diag{};
+    int rc = zut_loop_dynalloc(diag, single_dd);
+    if (rc != 0)
+    {
+      throw std::runtime_error("Failed to allocate VB DD " + ddname + ": " + std::string(diag.e_msg));
+    }
+  }
+
+  void allocate_sysprint_dd()
+  {
+    allocate_fb_dd("SYSPRINT", 80);
+  }
+
+  bool verify_dd_content(const std::string &ddname, const std::string &expected)
+  {
+    ZDS read_zds{};
+    ZDSReadOpts read_opts{.zds = &read_zds, .ddname = ddname};
+    std::string content;
+    int rc = zds_read(read_opts, content);
+    return (rc == 0) && (content.find(expected) != std::string::npos);
+  }
+
+  ~DDTestContext()
+  {
+    if (!allocated_dds.empty())
+    {
+      ZDIAG diag{};
+      zut_free_dynalloc_dds(diag, allocated_dds);
+    }
   }
 };
 
@@ -1152,7 +1223,8 @@ void zds_tests()
                              created_dsns.push_back(ds);
                              int rc = zds_create_dsn(&zds, ds, attr, response);
                              std::string empty = "";
-                             rc = zds_write_to_dsn(&zds, ds + "(M1)", empty);
+                             ZDSWriteOpts write_opts{.zds = &zds, .dsname = ds + "(M1)"};
+                             rc = zds_write(write_opts, empty);
                              Expect(rc).ToBe(0);
                              rc = zds_rename_members(&zds, ds, M1, longName);
                              Expect(rc).ToBe(RTNCD_FAILURE);
@@ -1191,10 +1263,12 @@ void zds_tests()
                              int rc = zds_create_dsn(&zds, ds, attr, response);
 
                              std::string empty = "";
-                             rc = zds_write_to_dsn(&zds, ds + "(M1)", empty);
+                             ZDSWriteOpts write_opts{.zds = &zds, .dsname = ds + "(M1)"};
+                             rc = zds_write(write_opts, empty);
                              Expect(rc).ToBe(0);
                              memset(zds.etag, 0, 8);
-                             rc = zds_write_to_dsn(&zds, ds + "(M2)", empty);
+                             ZDSWriteOpts write_opts2{.zds = &zds, .dsname = ds + "(M2)"};
+                             rc = zds_write(write_opts2, empty);
                              Expect(rc).ToBe(0);
 
                              rc = zds_rename_members(&zds, ds, M1, M2);
@@ -1211,7 +1285,8 @@ void zds_tests()
                              int rc = zds_create_dsn(&zds, ds, attr, response);
 
                              std::string empty = "";
-                             rc = zds_write_to_dsn(&zds, ds + "(M1)", empty);
+                             ZDSWriteOpts write_opts{.zds = &zds, .dsname = ds + "(M1)"};
+                             rc = zds_write(write_opts, empty);
                              Expect(rc).ToBe(0);
 
                              rc = zds_rename_members(&zds, ds, M1, "M3");
@@ -1228,7 +1303,8 @@ void zds_tests()
                              int rc = zds_create_dsn(&zds, ds, attr, response);
 
                              std::string empty = "";
-                             rc = zds_write_to_dsn(&zds, ds + "(M1)", empty);
+                             ZDSWriteOpts write_opts{.zds = &zds, .dsname = ds + "(M1)"};
+                             rc = zds_write(write_opts, empty);
                              Expect(rc).ToBe(0);
 
                              rc = zds_rename_members(&zds, ds, M1, "123");
@@ -1618,7 +1694,8 @@ void zds_tests()
                              create_seq(&zds, dsn);
 
                              std::string data = "etag test data";
-                             int rc = zds_write_to_dsn(&zds, dsn, data);
+                             ZDSWriteOpts write_opts{.zds = &zds, .dsname = dsn};
+                             int rc = zds_write(write_opts, data);
                              ExpectWithContext(rc, zds.diag.e_msg).ToBe(0);
                              std::string write_etag(zds.etag);
                              Expect(write_etag.empty()).ToBe(false);
@@ -1644,21 +1721,24 @@ void zds_tests()
                              create_seq(&zds, dsn);
 
                              std::string data = "original content";
-                             int rc = zds_write_to_dsn(&zds, dsn, data);
+                             ZDSWriteOpts write_opts{.zds = &zds, .dsname = dsn};
+                             int rc = zds_write(write_opts, data);
                              ExpectWithContext(rc, zds.diag.e_msg).ToBe(0);
                              std::string valid_etag(zds.etag);
 
                              // Overwrite with new content (changes the actual etag on disk)
                              ZDS zds2 = {0};
                              std::string data2 = "modified content";
-                             rc = zds_write_to_dsn(&zds2, dsn, data2);
+                             ZDSWriteOpts write_opts2{.zds = &zds2, .dsname = dsn};
+                             rc = zds_write(write_opts2, data2);
                              ExpectWithContext(rc, zds2.diag.e_msg).ToBe(0);
 
                              // Attempt to write using the stale (first) etag — should fail
                              ZDS zds3 = {0};
                              strcpy(zds3.etag, valid_etag.c_str());
                              std::string data3 = "conflicting write";
-                             rc = zds_write_to_dsn(&zds3, dsn, data3);
+                             ZDSWriteOpts write_opts3{.zds = &zds3, .dsname = dsn};
+                             rc = zds_write(write_opts3, data3);
                              Expect(rc).Not().ToBe(0);
                              Expect(std::string(zds3.diag.e_msg)).ToContain("Etag mismatch");
                            });
@@ -1735,7 +1815,8 @@ void zds_tests()
                              ExpectWithContext(rc, diag.e_msg).ToBe(0);
 
                              ZDS write_zds{};
-                             rc = zds_write_to_dd(&write_zds, "SYSPRINT", expected);
+                             ZDSWriteOpts write_opts{.zds = &write_zds, .ddname = "SYSPRINT"};
+                             rc = zds_write(write_opts, expected);
                              ExpectWithContext(rc, write_zds.diag.e_msg).ToBe(0);
 
                              ZDS read_zds{};
@@ -1747,6 +1828,400 @@ void zds_tests()
 
                              zut_free_dynalloc_dds(diag, dds);
                            });
+
+                        describe("DD write operations",
+                                 [&]() -> void
+                                 {
+                                   describe("basic operations",
+                                            [&]() -> void
+                                            {
+                                              it("should write text to FB LRECL=80 DD (SYSPRINT pattern)",
+                                                 [&]() -> void
+                                                 {
+                                                   DDTestContext ctx(created_dsns);
+                                                   ctx.allocate_sysprint_dd();
+
+                                                   std::string test_data = "Line 1: Basic text content\nLine 2: More test data\nLine 3: Final line";
+                                                   ZDS write_zds{};
+                                                   ZDSWriteOpts write_opts{.zds = &write_zds, .ddname = "SYSPRINT"};
+                                                   int rc = zds_write(write_opts, test_data);
+                                                   ExpectWithContext(rc, write_zds.diag.e_msg).ToBe(0);
+
+                                                   bool has_line1 = ctx.verify_dd_content("SYSPRINT", "Line 1: Basic text content");
+                                                   bool has_line2 = ctx.verify_dd_content("SYSPRINT", "Line 2: More test data");
+                                                   bool has_line3 = ctx.verify_dd_content("SYSPRINT", "Line 3: Final line");
+                                                   Expect(has_line1).ToBe(true);
+                                                   Expect(has_line2).ToBe(true);
+                                                   Expect(has_line3).ToBe(true);
+                                                 });
+
+                                              it("should write binary data to VB DD",
+                                                 [&]() -> void
+                                                 {
+                                                   DDTestContext ctx(created_dsns);
+                                                   ctx.allocate_vb_dd("BINDD", 255);
+
+                                                   std::string binary_data = "Binary\x00\x01\x02test\xFF\xFE data";
+                                                   ZDS write_zds{};
+                                                   write_zds.encoding_opts.data_type = eDataTypeBinary;
+                                                   ZDSWriteOpts write_opts{.zds = &write_zds, .ddname = "BINDD"};
+                                                   int rc = zds_write(write_opts, binary_data);
+                                                   ExpectWithContext(rc, write_zds.diag.e_msg).ToBe(0);
+
+                                                   ZDS read_zds{};
+                                                   read_zds.encoding_opts.data_type = eDataTypeBinary;
+                                                   ZDSReadOpts read_opts{.zds = &read_zds, .ddname = "BINDD"};
+                                                   std::string content;
+                                                   rc = zds_read(read_opts, content);
+                                                   ExpectWithContext(rc, read_zds.diag.e_msg).ToBe(0);
+                                                   Expect(content.find("Binary") != std::string::npos).ToBe(true);
+                                                 });
+
+                                              it("should write empty content to DD",
+                                                 [&]() -> void
+                                                 {
+                                                   DDTestContext ctx(created_dsns);
+                                                   ctx.allocate_fb_dd("EMPTYDD", 80);
+
+                                                   std::string empty_data = "";
+                                                   ZDS write_zds{};
+                                                   ZDSWriteOpts write_opts{.zds = &write_zds, .ddname = "EMPTYDD"};
+                                                   int rc = zds_write(write_opts, empty_data);
+                                                   ExpectWithContext(rc, write_zds.diag.e_msg).ToBe(0);
+
+                                                   ZDS read_zds{};
+                                                   ZDSReadOpts read_opts{.zds = &read_zds, .ddname = "EMPTYDD"};
+                                                   std::string content;
+                                                   rc = zds_read(read_opts, content);
+                                                   ExpectWithContext(rc, read_zds.diag.e_msg).ToBe(0);
+                                                   Expect(content.empty()).ToBe(true);
+                                                 });
+
+                                              it("should handle single-line vs multi-line content",
+                                                 [&]() -> void
+                                                 {
+                                                   DDTestContext ctx(created_dsns);
+                                                   ctx.allocate_fb_dd("TESTDD", 80);
+
+                                                   // Test single line without newline
+                                                   std::string single_line = "Single line without newline";
+                                                   ZDS write_zds{};
+                                                   ZDSWriteOpts write_opts{.zds = &write_zds, .ddname = "TESTDD"};
+                                                   int rc = zds_write(write_opts, single_line);
+                                                   ExpectWithContext(rc, write_zds.diag.e_msg).ToBe(0);
+
+                                                   bool has_single_line = ctx.verify_dd_content("TESTDD", "Single line without newline");
+                                                   Expect(has_single_line).ToBe(true);
+                                                 });
+
+                                              it("should verify content round-trip accuracy",
+                                                 [&]() -> void
+                                                 {
+                                                   DDTestContext ctx(created_dsns);
+                                                   ctx.allocate_fb_dd("ROUNDDD", 133);
+
+                                                   std::string test_content = "Round-trip test line 1\nRound-trip test line 2\nSpecial chars: !@#$%^&*()";
+                                                   ZDS write_zds{};
+                                                   ZDSWriteOpts write_opts{.zds = &write_zds, .ddname = "ROUNDDD"};
+                                                   int rc = zds_write(write_opts, test_content);
+                                                   ExpectWithContext(rc, write_zds.diag.e_msg).ToBe(0);
+
+                                                   ZDS read_zds{};
+                                                   ZDSReadOpts read_opts{.zds = &read_zds, .ddname = "ROUNDDD"};
+                                                   std::string content;
+                                                   rc = zds_read(read_opts, content);
+                                                   ExpectWithContext(rc, read_zds.diag.e_msg).ToBe(0);
+                                                   Expect(content.find("Round-trip test line 1") != std::string::npos).ToBe(true);
+                                                   Expect(content.find("Special chars: !@#$%^&*()") != std::string::npos).ToBe(true);
+                                                 });
+                                            });
+
+                                   describe("record format support",
+                                            [&]() -> void
+                                            {
+                                              it("should handle FB with various LRECL values",
+                                                 [&]() -> void
+                                                 {
+                                                   DDTestContext ctx(created_dsns);
+
+                                                   // Test LRECL=80 (standard)
+                                                   ctx.allocate_fb_dd("FB80", 80);
+                                                   std::string data80 = "Standard 80-character record for typical mainframe usage";
+                                                   ZDS zds80{};
+                                                   ZDSWriteOpts opts80{.zds = &zds80, .ddname = "FB80"};
+                                                   int rc = zds_write(opts80, data80);
+                                                   ExpectWithContext(rc, zds80.diag.e_msg).ToBe(0);
+
+                                                   // Test LRECL=133 (wide reports)
+                                                   ctx.allocate_fb_dd("FB133", 133);
+                                                   std::string data133 = "Wide format record for reports that need more than 80 characters per line - this is commonly used for listings";
+                                                   ZDS zds133{};
+                                                   ZDSWriteOpts opts133{.zds = &zds133, .ddname = "FB133"};
+                                                   rc = zds_write(opts133, data133);
+                                                   ExpectWithContext(rc, zds133.diag.e_msg).ToBe(0);
+
+                                                   // Test LRECL=255 (maximum for FB)
+                                                   ctx.allocate_fb_dd("FB255", 255);
+                                                   std::string data255 = "Maximum length fixed-block record that can contain up to 255 characters of data which is useful for very wide reports or data transfer operations that need the maximum capacity available in fixed-block format";
+                                                   ZDS zds255{};
+                                                   ZDSWriteOpts opts255{.zds = &zds255, .ddname = "FB255"};
+                                                   rc = zds_write(opts255, data255);
+                                                   ExpectWithContext(rc, zds255.diag.e_msg).ToBe(0);
+
+                                                   bool has_fb80 = ctx.verify_dd_content("FB80", "Standard 80-character");
+                                                   bool has_fb133 = ctx.verify_dd_content("FB133", "Wide format record");
+                                                   bool has_fb255 = ctx.verify_dd_content("FB255", "Maximum length fixed-block");
+                                                   Expect(has_fb80).ToBe(true);
+                                                   Expect(has_fb133).ToBe(true);
+                                                   Expect(has_fb255).ToBe(true);
+                                                 });
+
+                                              it("should handle VB with various LRECL values",
+                                                 [&]() -> void
+                                                 {
+                                                   DDTestContext ctx(created_dsns);
+
+                                                   // Test VB with LRECL=80
+                                                   ctx.allocate_vb_dd("VB80", 80);
+                                                   std::string vb_data = "Variable block record\nShorter line\nThis is a longer line that demonstrates variable length";
+                                                   ZDS vb_zds{};
+                                                   ZDSWriteOpts vb_opts{.zds = &vb_zds, .ddname = "VB80"};
+                                                   int rc = zds_write(vb_opts, vb_data);
+                                                   ExpectWithContext(rc, vb_zds.diag.e_msg).ToBe(0);
+
+                                                   // Test VB with LRECL=1000 (large but reasonable)
+                                                   ctx.allocate_vb_dd("VB1K", 1000);
+                                                   std::string large_vb = "Large variable block record that can handle very long lines";
+                                                   ZDS large_zds{};
+                                                   ZDSWriteOpts large_opts{.zds = &large_zds, .ddname = "VB1K"};
+                                                   rc = zds_write(large_opts, large_vb);
+                                                   ExpectWithContext(rc, large_zds.diag.e_msg).ToBe(0);
+
+                                                   bool has_vb80 = ctx.verify_dd_content("VB80", "Variable block record");
+                                                   bool has_vb1k = ctx.verify_dd_content("VB1K", "Large variable block");
+                                                   Expect(has_vb80).ToBe(true);
+                                                   Expect(has_vb1k).ToBe(true);
+                                                 });
+
+                                              it("should return out-of-space failure if contents are too long",
+                                                 [&]() -> void
+                                                 {
+                                                   DDTestContext ctx(created_dsns);
+                                                   ctx.allocate_fb_dd("TRUNCDD", 40);
+
+                                                   std::string long_line = "This line is much longer than 40 characters and should be truncated by the system";
+                                                   ZDS trunc_zds{};
+                                                   ZDSWriteOpts trunc_opts{.zds = &trunc_zds, .ddname = "TRUNCDD"};
+                                                   int rc = zds_write(trunc_opts, long_line);
+                                                   ExpectWithContext(rc, trunc_zds.diag.e_msg).ToBe(RTNCD_FAILURE);
+                                                   Expect(std::string(trunc_zds.diag.e_msg)).ToContain("Failed to write all contents to 'DD:TRUNCDD' (possibly out of space)");
+
+                                                   // Verify truncation occurred (should only contain first 40 chars)
+                                                   ZDS read_zds{};
+                                                   ZDSReadOpts read_opts{.zds = &read_zds, .ddname = "TRUNCDD"};
+                                                   std::string content;
+                                                   rc = zds_read(read_opts, content);
+                                                   ExpectWithContext(rc, read_zds.diag.e_msg).ToBe(0);
+                                                   Expect(content.find("This line is much longer than 40 char") != std::string::npos).ToBe(true);
+                                                   Expect(content.find("should be truncated by the system") == std::string::npos).ToBe(true);
+                                                 });
+                                            });
+
+                                   describe("encoding support",
+                                            [&]() -> void
+                                            {
+                                              it("should handle text mode with default encoding",
+                                                 [&]() -> void
+                                                 {
+                                                   DDTestContext ctx(created_dsns);
+                                                   ctx.allocate_fb_dd("TEXTDD", 80);
+
+                                                   std::string text_data = "Text mode content with UTF-8 characters";
+                                                   ZDS text_zds{};
+                                                   text_zds.encoding_opts.data_type = eDataTypeText;
+                                                   ZDSWriteOpts text_opts{.zds = &text_zds, .ddname = "TEXTDD"};
+                                                   int rc = zds_write(text_opts, text_data);
+                                                   ExpectWithContext(rc, text_zds.diag.e_msg).ToBe(0);
+
+                                                   bool has_text_content = ctx.verify_dd_content("TEXTDD", "Text mode content");
+                                                   Expect(has_text_content).ToBe(true);
+                                                 });
+
+                                              it("should handle binary mode without conversion",
+                                                 [&]() -> void
+                                                 {
+                                                   DDTestContext ctx(created_dsns);
+                                                   ctx.allocate_vb_dd("BINDD", 100);
+
+                                                   std::string binary_data = "Binary\x00\x01\x02\x03\xFF\xFE\xFD\xFC data";
+                                                   ZDS binary_zds{};
+                                                   binary_zds.encoding_opts.data_type = eDataTypeBinary;
+                                                   ZDSWriteOpts binary_opts{.zds = &binary_zds, .ddname = "BINDD"};
+                                                   int rc = zds_write(binary_opts, binary_data);
+                                                   ExpectWithContext(rc, binary_zds.diag.e_msg).ToBe(0);
+
+                                                   // Read back in binary mode
+                                                   ZDS read_zds{};
+                                                   read_zds.encoding_opts.data_type = eDataTypeBinary;
+                                                   ZDSReadOpts read_opts{.zds = &read_zds, .ddname = "BINDD"};
+                                                   std::string content;
+                                                   rc = zds_read(read_opts, content);
+                                                   ExpectWithContext(rc, read_zds.diag.e_msg).ToBe(0);
+                                                   Expect(content.find("Binary") != std::string::npos).ToBe(true);
+                                                 });
+
+                                              it("should handle mixed content scenarios",
+                                                 [&]() -> void
+                                                 {
+                                                   DDTestContext ctx(created_dsns);
+                                                   ctx.allocate_fb_dd("MIXEDDD", 120);
+
+                                                   std::string mixed_data = "Text content\nWith special chars: áéíóú\nAnd numbers: 12345";
+                                                   ZDS mixed_zds{};
+                                                   mixed_zds.encoding_opts.data_type = eDataTypeText;
+                                                   ZDSWriteOpts mixed_opts{.zds = &mixed_zds, .ddname = "MIXEDDD"};
+                                                   int rc = zds_write(mixed_opts, mixed_data);
+                                                   ExpectWithContext(rc, mixed_zds.diag.e_msg).ToBe(0);
+
+                                                   bool has_mixed_text = ctx.verify_dd_content("MIXEDDD", "Text content");
+                                                   bool has_mixed_numbers = ctx.verify_dd_content("MIXEDDD", "And numbers: 12345");
+                                                   Expect(has_mixed_text).ToBe(true);
+                                                   Expect(has_mixed_numbers).ToBe(true);
+                                                 });
+                                            });
+
+                                   describe("streaming operations",
+                                            [&]() -> void
+                                            {
+                                              it("should handle zds_write_streamed with pipe input",
+                                                 [&]() -> void
+                                                 {
+                                                   DDTestContext ctx(created_dsns);
+                                                   ctx.allocate_fb_dd("STREAMDD", 80);
+
+                                                   // Create a temporary file to simulate pipe input
+                                                   std::string temp_file = "/tmp/zds_stream_test_" + std::to_string(getpid());
+                                                   std::string content = "Streamed line 1\nStreamed line 2\nStreamed line 3\n";
+                                                   std::string encoded_content = zbase64::encode(content);
+                                                   std::ofstream temp_out(temp_file);
+                                                   temp_out << encoded_content;
+                                                   temp_out.close();
+
+                                                   size_t content_len = 0;
+                                                   ZDS stream_zds{};
+                                                   ZDSWriteOpts stream_opts{.zds = &stream_zds, .ddname = "STREAMDD"};
+                                                   int rc = zds_write_streamed(stream_opts, temp_file, &content_len);
+                                                   ExpectWithContext(rc, stream_zds.diag.e_msg).ToBe(0);
+
+                                                   // Verify content length was set
+                                                   Expect(content_len > 0).ToBe(true);
+
+                                                   // Verify content was written
+                                                   bool has_stream_line1 = ctx.verify_dd_content("STREAMDD", "Streamed line 1");
+                                                   bool has_stream_line3 = ctx.verify_dd_content("STREAMDD", "Streamed line 3");
+                                                   Expect(has_stream_line1).ToBe(true);
+                                                   Expect(has_stream_line3).ToBe(true);
+
+                                                   // Cleanup
+                                                   unlink(temp_file.c_str());
+                                                 });
+
+                                              it("should validate content length parameter",
+                                                 [&]() -> void
+                                                 {
+                                                   DDTestContext ctx(created_dsns);
+                                                   ctx.allocate_vb_dd("LENDD", 255);
+
+                                                   std::string temp_file = "/tmp/zds_len_test_" + std::to_string(getpid());
+                                                   std::string test_content = "Content length validation test data\nSecond line for length check\n";
+                                                   std::string encoded_content = zbase64::encode(test_content);
+                                                   std::ofstream temp_out(temp_file);
+                                                   temp_out << encoded_content;
+                                                   temp_out.close();
+
+                                                   size_t content_len = 0;
+                                                   ZDS len_zds{};
+                                                   ZDSWriteOpts len_opts{.zds = &len_zds, .ddname = "LENDD"};
+                                                   int rc = zds_write_streamed(len_opts, temp_file, &content_len);
+                                                   ExpectWithContext(rc, len_zds.diag.e_msg).ToBe(0);
+
+                                                   // Content length should match expected decoded size
+                                                   Expect(content_len).ToBe(test_content.length());
+
+                                                   unlink(temp_file.c_str());
+                                                 });
+
+                                              it("should handle large data efficiently",
+                                                 [&]() -> void
+                                                 {
+                                                   DDTestContext ctx(created_dsns);
+                                                   ctx.allocate_vb_dd("LARGEDD", 1000);
+
+                                                   // Create larger test data
+                                                   std::string temp_file = "/tmp/zds_large_test_" + std::to_string(getpid());
+                                                   std::stringstream content_stream;
+                                                   for (int i = 0; i < 1000; i++)
+                                                   {
+                                                     content_stream << "Large data test line " << i << " with substantial content to test streaming efficiency\n";
+                                                   }
+                                                   std::string content = content_stream.str();
+                                                   std::string encoded_content = zbase64::encode(content);
+                                                   std::ofstream temp_out(temp_file);
+                                                   temp_out << encoded_content;
+                                                   temp_out.close();
+
+                                                   size_t content_len = 0;
+                                                   ZDS large_zds{};
+                                                   ZDSWriteOpts large_opts{.zds = &large_zds, .ddname = "LARGEDD"};
+                                                   int rc = zds_write_streamed(large_opts, temp_file, &content_len);
+                                                   ExpectWithContext(rc, large_zds.diag.e_msg).ToBe(0);
+
+                                                   Expect(content_len > 5000).ToBe(true); // Should be substantial content (reduced from 100 lines)
+                                                   bool has_large_line0 = ctx.verify_dd_content("LARGEDD", "Large data test line 0");
+                                                   bool has_large_line999 = ctx.verify_dd_content("LARGEDD", "Large data test line 999");
+                                                   ExpectWithContext(has_large_line0, "Line 0 is missing in written DD contents").ToBe(true);
+                                                   ExpectWithContext(has_large_line999, "Line 999 is missing in written DD contents").ToBe(true);
+
+                                                   unlink(temp_file.c_str());
+                                                 });
+                                            });
+
+                                   describe("error handling",
+                                            [&]() -> void
+                                            {
+                                              it("should reject empty DD names",
+                                                 [&]() -> void
+                                                 {
+                                                   std::string test_data = "Test data for empty DD name";
+                                                   ZDS error_zds{};
+                                                   ZDSWriteOpts error_opts{.zds = &error_zds, .ddname = ""};
+                                                   int rc = zds_write(error_opts, test_data);
+
+                                                   Expect(rc).Not().ToBe(0);
+                                                   Expect(std::string(error_zds.diag.e_msg).length() > 0).ToBe(true);
+                                                 });
+
+                                              it("should handle null content_len pointer in streamed operations",
+                                                 [&]() -> void
+                                                 {
+                                                   std::string temp_file = "/tmp/zds_null_test_" + std::to_string(getpid());
+                                                   std::string content = "Test data for null pointer\n";
+                                                   std::string encoded_content = zbase64::encode(content);
+                                                   std::ofstream temp_out(temp_file);
+                                                   temp_out << encoded_content;
+                                                   temp_out.close();
+
+                                                   ZDS null_zds{};
+                                                   ZDSWriteOpts null_opts{.zds = &null_zds, .ddname = "TESTDD"};
+                                                   int rc = zds_write_streamed(null_opts, temp_file, nullptr);
+
+                                                   Expect(rc).Not().ToBe(0);
+                                                   Expect(std::string(null_zds.diag.e_msg).find("content_len") != std::string::npos).ToBe(true);
+
+                                                   unlink(temp_file.c_str());
+                                                 });
+                                            });
+                                 });
                       });
 
              describe("DCB abend",
@@ -1770,7 +2245,7 @@ void zds_tests()
                              Expect(sizeof(DCB_ABEND_PL)).ToBe(16);
                            });
 
-                        it("should catch abend when using zds_write_to_dsn (BPAM) to a PDS past its max space",
+                        it("should catch abend when writing past max space of a PDS",
                            [&]() -> void
                            {
                              ZDS zds = {0};
@@ -1802,10 +2277,12 @@ void zds_tests()
                                large_data += std::string(80, 'A') + "\n";
                              }
 
+                             ZDSWriteOpts write_opts{.zds = &zds, .dsname = ds + "(M1)"};
+
                              // This should fail with an abend. DCB abend exit runs as part of the member write process - no mocking available so we can't test the DCB exit itself,
                              // this just verifies that the abend is percolated and handled by recovery
                              Expect([&]()
-                                    { rc = zds_write_to_dsn(&zds, ds + "(M1)", large_data); })
+                                    { rc = zds_write(write_opts, large_data); })
                                  .ToAbend();
                            });
                       });
