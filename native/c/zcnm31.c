@@ -119,7 +119,7 @@ MGCRE_MODEL(mgcre_model);
 #define MGCRE(id, message, cart, authcmdx, plist)
 #endif
 
-// MGCETXT	Command text - Table 2 "MGCRE mapping", structure "MGCETEXT" https://www.ibm.com/docs/en/zos/2.5.0?topic=rqe-mgcre-information
+// MGCETXT	Command text - Table 2 "MGCRE mapping", structure "MGCETEXT" https://www.ibm.com/docs/en/zos/3.2.0?topic=rqe-mgcre-information
 #ifndef MGCRTEXT
 #define MGCRTEXT 126
 #endif

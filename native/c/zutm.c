@@ -259,7 +259,7 @@ int ZUTRUN(ZDIAG *diag, const char *program, const char *parms)
   PARMS pstruct = {0};
   if (parms)
   {
-    pstruct.len = sprintf(pstruct.parms, "%.99s", parms);
+    pstruct.len = sprintf(pstruct.parms, "%.*s", (int)(sizeof(pstruct.parms) - 1), parms);
   }
 
   PARMS *pptr = &pstruct;
