@@ -44,7 +44,8 @@ int process_data_set_create_result(InvocationContext &context, ZDS *zds, int rc,
   {
     std::string member_name = dsn.substr(start + 1, end - start - 1);
     std::string data = "";
-    rc = zds_write_to_dsn(zds, dsn, data);
+    ZDSWriteOpts write_opts{.zds = zds, .dsname = dsn};
+    rc = zds_write(write_opts, data);
     if (0 != rc)
     {
       context.output_stream() << "Error: could not write to data set: '" << dsn << "' rc: '" << rc << "'" << std::endl;
@@ -311,7 +312,8 @@ int handle_data_set_create_member(InvocationContext &context)
     }
 
     std::string data = "";
-    rc = zds_write_to_dsn(&zds, dsn, data);
+    ZDSWriteOpts write_opts{.zds = &zds, .dsname = dsn};
+    rc = zds_write(write_opts, data);
     if (0 != rc)
     {
       context.output_stream() << "Error: could not write to data set: '" << dsn << "' rc: '" << rc << "'" << std::endl;
@@ -728,13 +730,15 @@ int handle_data_set_write(InvocationContext &context)
 
   if (has_pipe_path && !pipe_path.empty())
   {
-    rc = zds_write_to_dsn_streamed(&zds, dsn, pipe_path, &content_len);
+    ZDSWriteOpts write_opts{.zds = &zds, .dsname = dsn};
+    rc = zds_write_streamed(write_opts, pipe_path, &content_len);
     result->set("contentLen", i64(content_len));
   }
   else
   {
     std::string data = zut_read_input(context.input_stream());
-    rc = zds_write_to_dsn(&zds, dsn, data);
+    ZDSWriteOpts write_opts{.zds = &zds, .dsname = dsn};
+    rc = zds_write(write_opts, data);
   }
 
   if (dds.size() > 0)
@@ -913,7 +917,9 @@ int handle_data_set_compress(InvocationContext &context)
 
   // write control statements
   ZDS zds{};
-  rc = zds_write_to_dd(&zds, "sysin", "        COPY OUTDD=B,INDD=A");
+  ZDSWriteOpts write_opts{.zds = &zds, .ddname = "sysin"};
+  std::string copy_stmt = "        COPY OUTDD=B,INDD=A";
+  rc = zds_write(write_opts, copy_stmt);
   if (0 != rc)
   {
     context.error_stream() << "Error: could not write to dd: '" << "sysin" << "' rc: '" << rc << "'" << std::endl;
