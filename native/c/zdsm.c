@@ -216,6 +216,31 @@ int ZDSRIVSM(ZDS *zds, IO_CTRL *ioc)
   ZDS zds31 = {0};
   memcpy(&zds31, zds, sizeof(ZDS));
   rc = read_input_vsam(&zds31.diag, ioc);
+
+  if (0 == rc)
+  {
+    TIME_STRUCT time_struct = {0};
+    memcpy(&time_struct.time, &ioc->dsinf.dsinstke, sizeof(ioc->dsinf.dsinstke));
+    memcpy(&time_struct.date, &ioc->dsinf.dsinstke, sizeof(ioc->dsinf.dsinstke));
+
+    etod_t etod = {0};
+    memcpy(&etod[0], &ioc->dsinf.dsinstke, sizeof(ioc->dsinf.dsinstke));
+    int stck_rc = stckeconv(&etod, &time_struct);
+    if (0 != stck_rc)
+    {
+      zds31.diag.detail_rc = ZDS_RTNCD_SERVICE_FAILURE;
+      zds31.diag.service_rc = stck_rc;
+      strcpy(zds31.diag.service_name, "STCKECONV");
+      zds31.diag.e_msg_len = sprintf(zds31.diag.e_msg, "Failed to STCKECONV rc was: %d", stck_rc);
+      return RTNCD_FAILURE;
+    }
+
+    unsigned char ebcdic_date[8] = {0};
+    __unpk(ebcdic_date, sizeof(ebcdic_date), &time_struct.date.yyyymmdd.year[0], sizeof(time_struct.date));
+    memcpy(zds->ebcdic_date, ebcdic_date, sizeof(zds->ebcdic_date));
+    memcpy(&zds->ts_binary, &time_struct.time, sizeof(zds->ts_binary));
+  }
+
   memcpy(zds, &zds31, sizeof(ZDS));
   return rc;
 }

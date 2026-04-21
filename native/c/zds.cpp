@@ -838,6 +838,11 @@ int zds_read_vsam(ZDS *zds, std::string ddname, std::string &response)
       response.append(ioc->buffer, ioc->ifgacb.acblrecl);
       response.append(1, '\n');
       lines_read++;
+      if (lines_read >= zds->max_lines)
+      {
+        zds->has_more = 1;
+        break;
+      }
     }
     else if (rc == RTNCD_WARNING)
     {
@@ -848,22 +853,11 @@ int zds_read_vsam(ZDS *zds, std::string ddname, std::string &response)
       ZDSCIVSM(zds, ioc);
       return rc;
     }
-    if (lines_read >= zds->max_lines)
-    {
-      zds->has_more = 1;
-      break;
-    }
   }
 
   zds->returned_lines = lines_read;
 
-  rc = ZDSCIVSM(zds, ioc);
-  if (rc != RTNCD_SUCCESS)
-  {
-    return rc;
-  }
-
-  return RTNCD_SUCCESS;
+  return ZDSCIVSM(zds, ioc);
 }
 
 /**
