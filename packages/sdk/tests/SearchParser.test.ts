@@ -13,7 +13,7 @@ import { describe, expect, it } from "vitest";
 import { parseSearchOutput } from "../src/utils/tools/SearchParser";
 
 describe("parseSearchOutput", () => {
-    it("parses PDS member search when SRCH DSN includes member in parentheses (zowex#941)", () => {
+    it("properly parses PDS member search", () => {
         const output = [
             "\f  ASMFSUPC    -     MVS FILE/LINE/WORD/BYTE/SFOR COMPARE UTILITY- V1R6M0  (2021/11/01)  2026/04/21   8.49    PAGE     1",
             " LINE-#  SOURCE SECTION                    SRCH DSN: SYS1.SAMPLIB(IEANTCOB)",
@@ -46,21 +46,21 @@ describe("parseSearchOutput", () => {
         expect(result.summary.membersWithLines).toBe(1);
     });
 
-    it("still parses full-PDS search with STRING(S) FOUND member sections", () => {
+    it("should parse PDS search with multiple members", () => {
         const output = [
             "\f  ASMFSUPC    -     MVS FILE/LINE/WORD/BYTE/SFOR COMPARE UTILITY- V1R6M0  (2021/11/01)  2026/04/21   8.53    PAGE     1",
-            " LINE-#  SOURCE SECTION                    SRCH DSN: DKELOSKY.JCL",
+            " LINE-#  SOURCE SECTION                    SRCH DSN: IBMUSER.JCL",
             "",
             "",
             " GDG                         --------- STRING(S) FOUND -------------------",
             "",
-            "      1  //IEFBR14$ JOB (IZUACCT),'Dan Kelosky',REGION=0M                        JOB00730",
+            "      1  //IEFBR14$ JOB (IZUACCT),'mainframer',REGION=0M                        JOB00730",
             "      *  //*",
             " IEFBR14                     --------- STRING(S) FOUND -------------------",
             "",
             "      4  //EXEC     EXEC PGM=IEFBR14",
             "\f  ASMFSUPC    -     MVS FILE/LINE/WORD/BYTE/SFOR COMPARE UTILITY- V1R6M0  (2021/11/01)  2026/04/21   8.53    PAGE     3",
-            "     SEARCH-FOR SUMMARY SECTION            SRCH DSN: DKELOSKY.JCL",
+            "     SEARCH-FOR SUMMARY SECTION            SRCH DSN: IBMUSER.JCL",
             "",
             "LINES-FOUND  LINES-PROC  MEMBERS-W/LNS  MEMBERS-WO/LNS  COMPARE-COLS  LONGEST-LINE",
             "       10          937            8             37           1:80           80",
