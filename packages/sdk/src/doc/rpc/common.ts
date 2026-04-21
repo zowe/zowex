@@ -9,6 +9,8 @@
  *
  */
 
+import type { Readable, Writable } from "node:stream";
+
 // Base Request/Response interfaces
 
 /**
@@ -50,6 +52,13 @@ export interface RpcResponse {
     result?: any;
     error?: ErrorDetails;
     id: number;
+}
+
+export interface ReadableStreamRpc {
+    stream?: () => Readable;
+}
+export interface WritableStreamRpc {
+    stream?: () => Writable;
 }
 
 export interface CommandRequest<CommandT extends string = string> {

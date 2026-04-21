@@ -22,7 +22,7 @@ import {
     imperative,
     type MainframeInteraction,
 } from "@zowe/zowe-explorer-api";
-import { B64String, type Dataset, type DatasetAttributes, type ds } from "zowe-native-proto-sdk";
+import { B64String, type Dataset, type DatasetAttributes, type ds } from "zowex-sdk";
 import { SshCommonApi } from "./SshCommonApi";
 
 class SshAttributesProvider implements IAttributesProvider {
@@ -156,7 +156,7 @@ export class SshMvsApi extends SshCommonApi implements MainframeInteraction.IMvs
             dsname: dataSetName,
             encoding: options.binary ? "binary" : options.encoding,
             // Pass stream if file is provided, otherwise use buffer to read into memory
-            stream: options.file ? writeStream : undefined,
+            stream: options.file ? () => writeStream : undefined,
         });
         if (options.stream != null) {
             options.stream.write(B64String.decode(response.data));
@@ -198,7 +198,7 @@ export class SshMvsApi extends SshCommonApi implements MainframeInteraction.IMvs
         const response = await (await this.client).ds.writeDataset({
             dsname,
             encoding: options?.encoding,
-            stream: createReadStream(inputFilePath),
+            stream: () => createReadStream(inputFilePath),
             etag: options?.etag,
         });
         return this.buildZosFilesResponse({ etag: response.etag });
@@ -300,6 +300,7 @@ export class SshMvsApi extends SshCommonApi implements MainframeInteraction.IMvs
         try {
             response = await (await this.client).ds.createMember({
                 dsname: dataSetName,
+                overwrite: true, // Overwrite detection already handled on client side
             });
             if (!response.success) {
                 Gui.errorMessage(`Failed to create data set member: ${dataSetName}`);

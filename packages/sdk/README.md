@@ -1,6 +1,6 @@
-# Zowe Native Protocol SDK
+# Zowe Remote SSH SDK
 
-The Zowe Native Protocol SDK is a TypeScript library to interact with the Zowe Native Protocol, enabling developers to interact with mainframe resources directly from their custom Node.js application.
+The Zowe Remote SSH SDK is a TypeScript library that enables developers to interact with mainframe resources over SSH, directly from their custom Node.js application.
 
 ## Building from source
 

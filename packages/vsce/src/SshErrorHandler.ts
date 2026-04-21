@@ -12,7 +12,7 @@
 import { ImperativeError } from "@zowe/imperative";
 import { type ZoweExplorerApiType, ZoweVsCodeExtension } from "@zowe/zowe-explorer-api";
 import * as vscode from "vscode";
-import { RpcErrorCode, SshErrors } from "zowe-native-proto-sdk";
+import { RpcErrorCode, SshErrors } from "zowex-sdk";
 
 /**
  * Enhanced error handling utility for SSH operations using Zowe Explorer's ErrorCorrelator
@@ -64,7 +64,7 @@ export class SshErrorHandler {
         const response = await vscode.window.showErrorMessage(`${contextPrefix}${errorMessage}`, ...actions);
 
         if (response === "Show Details") {
-            const outputChannel = vscode.window.createOutputChannel("Zowe SSH");
+            const outputChannel = vscode.window.createOutputChannel("Zowe Remote SSH");
             outputChannel.appendLine(`Error: ${errorMessage}`);
             if (error instanceof Error && error.stack) {
                 outputChannel.appendLine(`Stack: ${error.stack}`);

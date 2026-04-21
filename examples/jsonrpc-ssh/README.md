@@ -1,4 +1,7 @@
-# JsonRPC SSH Demo
+# JSON-RPC SSH Demo
+
+Demonstrates a JSON-RPC 2.0 server over SSH using a self-contained naive JSON
+parser (no external dependencies beyond C++17 standard library).
 
 ```mermaid
 sequenceDiagram
@@ -8,14 +11,17 @@ sequenceDiagram
   Server--)Client: Response 1
 ```
 
-## Server
+## Deploy & Build
 
-* `zowe files upload dtu tools/jsonrpc-ssh <ussDir> --binary`
-* `go build -o jsonrpc-server jsonrpc.go` (on z/OS)
+Upload the example to z/OS and build with `make`:
+
+```bash
+npx tsx examples/deploy.ts <ssh-profile> <deploy-dir> jsonrpc-ssh
+```
 
 ## Client
 
-* `cd tools/jsonrpc-ssh && npm install` (once)
-* `npx tsx client.ts ibmuser@<zosHost> <serverCmd>`
-  * `zosHost` - hostname of z/OS server
-  * `serverCmd` - command to run Go binary
+```bash
+cd examples/jsonrpc-ssh && npm install
+npx tsx client.ts <user>@<host> <deploy-dir>/examples/jsonrpc-ssh/server
+```

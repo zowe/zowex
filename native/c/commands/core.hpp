@@ -20,7 +20,9 @@ namespace core
 {
 parser::Command &setup_root_command(char *argv[]);
 int execute_command(int argc, char *argv[]);
+int handle_version(plugin::InvocationContext &context);
 void set_plugin_manager(plugin::PluginManager *manager);
 plugin::PluginManager *get_plugin_manager();
 void set_version(const std::string &version);
+const std::string &get_version();
 } // namespace core

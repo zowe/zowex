@@ -21,6 +21,7 @@
 #include <string>
 #include <thread>
 #include <unistd.h>
+#include "core.hpp"
 #include "server.hpp"
 #include "../zjson.hpp"
 #include "../zusf.hpp"
@@ -115,6 +116,7 @@ void ZServer::print_ready_message()
     checksums_obj.add_to_object(pair.first, zjson::Value(pair.second));
   }
   data.add_to_object("checksums", checksums.empty() ? zjson::Value() : checksums_obj);
+  data.add_to_object("version", zjson::Value(core::get_version()));
 
   StatusMessage status_msg{
       .status = "ready",
@@ -252,7 +254,7 @@ static int handle_server(plugin::InvocationContext &context)
 
 void register_commands(Command &root_command)
 {
-  auto server_cmd = std::make_shared<Command>("server", "start the Zowe native IO server");
+  auto server_cmd = std::make_shared<Command>("server", "start the Zowe Remote SSH I/O server");
   server_cmd->add_keyword_arg("num-workers",
                               make_aliases("-w", "--num-workers"),
                               "number of worker threads",

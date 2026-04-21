@@ -11,7 +11,7 @@
 
 import { readFileSync } from "node:fs";
 import { type IHandlerParameters, ImperativeError } from "@zowe/imperative";
-import { B64String, type jobs, type ZSshClient } from "zowe-native-proto-sdk";
+import { B64String, type jobs, type ZSshClient } from "zowex-sdk";
 import { SshBaseHandler } from "../../SshBaseHandler";
 
 export default class SubmitLocalFileHandler extends SshBaseHandler {

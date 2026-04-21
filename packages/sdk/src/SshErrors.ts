@@ -26,6 +26,7 @@ export const SshErrors: Record<string, ISshErrorDefinition> = {
             "Try increasing the request timeout in your client configuration.",
             "Check if the mainframe system is under heavy load or experiencing performance issues.",
             "For long-running operations, consider breaking them into smaller tasks.",
+            "Try reloading your connection to the server using the VSCode Command Palette: Zowe-SSH: Restart Zowe Server on Host...",
             "Contact your system administrator if timeouts persist.",
         ],
     },
@@ -52,6 +53,22 @@ export const SshErrors: Record<string, ISshErrorDefinition> = {
             {
                 href: "https://www.ibm.com/docs/en/zos/2.5.0?topic=openssh-setting-up-user-authentication",
                 title: "IBM z/OS OpenSSH - Setting up user authentication",
+            },
+        ],
+    },
+    FOTS1668: {
+        summary:
+            "Your password has expired on the remote z/OS system. SSH commands cannot execute until the password is changed.",
+        matches: ["FOTS1668", "FOTS1669", "Your password has expired", "Password change required but no TTY available"],
+        tips: [
+            "Log in to the z/OS system via a 3270 terminal or TSO to change your password.",
+            "Contact your system administrator if you cannot access a TTY-capable session.",
+            "After changing your password, retry the operation with the new credentials.",
+        ],
+        resources: [
+            {
+                href: "https://www.ibm.com/docs/en/zos/2.5.0?topic=messages-fots1668",
+                title: "IBM z/OS OpenSSH Messages - FOTS1668",
             },
         ],
     },

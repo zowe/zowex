@@ -56,6 +56,7 @@ int handle_uss_create_file(InvocationContext &context)
   std::string file_path = context.get<std::string>("file-path", "");
 
   long long mode = context.get<long long>("mode", 644);
+  bool overwrite = context.get<bool>("overwrite", false);
 
   if (mode == 0)
   {
@@ -78,12 +79,16 @@ int handle_uss_create_file(InvocationContext &context)
   }
 
   ZUSF zusf{};
-  rc = zusf_create_uss_file_or_dir(&zusf, file_path, cf_mode, false);
-  if (0 != rc)
+  rc = zusf_create_uss_file_or_dir(&zusf, file_path, cf_mode, CreateOptions(false, overwrite));
+  if (RTNCD_WARNING == rc)
+  {
+    context.error_stream() << "Warning: " << zusf.diag.e_msg << std::endl;
+    return RTNCD_WARNING;
+  }
+  else if (0 != rc)
   {
     context.error_stream() << "Error: could not create USS file: '" << file_path << "' rc: '" << rc << "'" << std::endl;
-    context.error_stream() << "  Details:\n"
-                           << zusf.diag.e_msg << std::endl;
+    context.error_stream() << "  Details: " << zusf.diag.e_msg << std::endl;
     return RTNCD_FAILURE;
   }
 
@@ -120,12 +125,11 @@ int handle_uss_create_dir(InvocationContext &context)
   }
 
   ZUSF zusf{};
-  rc = zusf_create_uss_file_or_dir(&zusf, file_path, cf_mode, true);
+  rc = zusf_create_uss_file_or_dir(&zusf, file_path, cf_mode, CreateOptions(true));
   if (0 != rc)
   {
     context.error_stream() << "Error: could not create USS directory: '" << file_path << "' rc: '" << rc << "'" << std::endl;
-    context.error_stream() << "  Details:\n"
-                           << zusf.diag.e_msg << std::endl;
+    context.error_stream() << "  Details: " << zusf.diag.e_msg << std::endl;
     return RTNCD_FAILURE;
   }
 
@@ -145,8 +149,7 @@ int handle_uss_move(InvocationContext &context)
   if (0 != rc)
   {
     context.error_stream() << "Error: could not move USS file or directory: '" << source << "' to '" << target << "' rc: '" << rc << "'" << std::endl;
-    context.error_stream() << "  Details:\n"
-                           << zusf.diag.e_msg << std::endl;
+    context.error_stream() << "  Details: " << zusf.diag.e_msg << std::endl;
     return RTNCD_FAILURE;
   }
   context.output_stream() << "USS file or directory '" << source << "' moved to '" << target << "'" << std::endl;
@@ -457,8 +460,7 @@ int handle_uss_chmod(InvocationContext &context)
   if (0 != rc)
   {
     context.error_stream() << "Error: could not chmod USS path: '" << file_path << "' rc: '" << rc << "'" << std::endl;
-    context.error_stream() << "  Details:\n"
-                           << zusf.diag.e_msg << std::endl;
+    context.error_stream() << "  Details: " << zusf.diag.e_msg << std::endl;
     return RTNCD_FAILURE;
   }
 
@@ -479,8 +481,7 @@ int handle_uss_chown(InvocationContext &context)
   if (0 != rc)
   {
     context.error_stream() << "Error: could not chown USS path: '" << path << "' rc: '" << rc << "'" << std::endl;
-    context.error_stream() << "  Details:\n"
-                           << zusf.diag.e_msg << std::endl;
+    context.error_stream() << "  Details: " << zusf.diag.e_msg << std::endl;
     return RTNCD_FAILURE;
   }
 
@@ -512,12 +513,37 @@ int handle_uss_chtag(InvocationContext &context)
   if (0 != rc)
   {
     context.error_stream() << "Error: could not chtag USS path: '" << path << "' rc: '" << rc << "'" << std::endl;
-    context.error_stream() << "  Details:\n"
-                           << zusf.diag.e_msg << std::endl;
+    context.error_stream() << "  Details: " << zusf.diag.e_msg << std::endl;
     return RTNCD_FAILURE;
   }
 
   context.output_stream() << "USS path '" << path << "' tag changed to '" << tag << "'" << std::endl;
+
+  return rc;
+}
+
+int handle_uss_issue_cmd(InvocationContext &context)
+{
+  std::string command = context.get<std::string>("command", "");
+  std::string stdout_response;
+  std::string stderr_response;
+
+  // Command output may differ from an interactive shell session: the child
+  // process receives a pipe as stdout (not a TTY), so programs that check
+  // isatty(1) to control formatting (e.g. `ls` multi-column layout, `grep`
+  // color) will use their non-interactive defaults. This is expected behavior.
+  int rc = zut_spawn_shell_command(command, stdout_response, stderr_response);
+
+  if (0 != rc)
+  {
+    context.error_stream() << "Error running command, rc '" << rc << "'" << std::endl;
+    if (!stderr_response.empty())
+    {
+      context.error_stream() << "  Details: " << stderr_response << std::endl;
+    }
+  }
+
+  context.output_stream() << stdout_response << '\n';
 
   return rc;
 }
@@ -542,6 +568,7 @@ void register_commands(parser::Command &root_command)
   auto uss_create_file_cmd = command_ptr(new Command("create-file", "create a USS file"));
   uss_create_file_cmd->add_positional_arg(FILE_PATH);
   uss_create_file_cmd->add_keyword_arg("mode", make_aliases("--mode"), "permissions", ArgType_Single, false);
+  uss_create_file_cmd->add_keyword_arg("overwrite", make_aliases("--overwrite", "--ow"), "overwrite existing file", ArgType_Flag, false, ArgValue(false));
   uss_create_file_cmd->set_handler(handle_uss_create_file);
   uss_group->add_command(uss_create_file_cmd);
 
@@ -624,6 +651,12 @@ void register_commands(parser::Command &root_command)
   uss_chtag_cmd->add_keyword_arg(RECURSIVE);
   uss_chtag_cmd->set_handler(handle_uss_chtag);
   uss_group->add_command(uss_chtag_cmd);
+
+  // Issue subcommand
+  auto uss_issue_cmd = std::make_shared<Command>("issue", "issue a UNIX command");
+  uss_issue_cmd->add_positional_arg("command", "command to issue", ArgType_Single, true);
+  uss_issue_cmd->set_handler(handle_uss_issue_cmd);
+  uss_group->add_command(uss_issue_cmd);
 
   root_command.add_command(uss_group);
 }

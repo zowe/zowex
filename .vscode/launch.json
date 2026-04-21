@@ -15,16 +15,16 @@
       "preLaunchTask": "npm: watch"
     },
     {
-      "name": "Debug Zowe SSH Command",
+      "name": "Debug Zowe Remote SSH Command",
       "type": "node",
       "request": "launch",
-      "program": "${workspaceFolder}/node_modules/@zowe/cli/lib/main.js",
+      "runtimeExecutable": "zowe",
       "args": ["zssh", "-h"],
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen"
     },
     {
-      "name": "Debug Vitest",
+      "name": "Debug Vitest: SDK",
       "type": "node",
       "request": "launch",
       "program": "${workspaceFolder}/node_modules/vitest/vitest.mjs",
@@ -34,6 +34,19 @@
       "args": ["run" /*"${file}"*/],
       "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
       "cwd": "${workspaceFolder}/packages/sdk",
+      "runtimeVersion": "22"
+    },
+        {
+      "name": "Debug Vitest: VSCE",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/node_modules/vitest/vitest.mjs",
+      "console": "integratedTerminal",
+      "autoAttachChildProcesses": true,
+      // Uncomment to only run the focused test file
+      "args": ["run" /*"${file}"*/],
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "cwd": "${workspaceFolder}/packages/vsce",
       "runtimeVersion": "22"
     }
   ]

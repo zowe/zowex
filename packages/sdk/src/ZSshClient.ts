@@ -10,27 +10,26 @@
  */
 
 import { posix } from "node:path";
-import { Stream } from "node:stream";
+import type { Stream } from "node:stream";
 import { ImperativeError, Logger } from "@zowe/imperative";
 import type { SshSession } from "@zowe/zos-uss-for-zowe-sdk";
-import { Client, type ClientChannel } from "ssh2";
 import type {
     ClientOptions,
     CommandRequest,
     CommandResponse,
+    ExistingClientRequest,
     RpcNotification,
-    RpcPromise,
     RpcRequest,
     RpcResponse,
     StatusMessage,
 } from "./doc";
 import { RpcClientApi } from "./RpcClientApi";
 import { RpcStreamManager } from "./RpcStreamManager";
+import { type Client, type ClientChannel, createClient } from "./ssh-rs";
 import { ZSshUtils } from "./ZSshUtils";
 
 export class ZSshClient extends RpcClientApi implements Disposable {
     public static readonly DEFAULT_SERVER_PATH = "~/.zowe-server";
-
     private mErrHandler: ClientOptions["onError"];
     private mResponseTimeout: number;
     private mServerInfo: { checksums?: Record<string, string> };
@@ -39,7 +38,7 @@ export class ZSshClient extends RpcClientApi implements Disposable {
     private mStreamMgr: RpcStreamManager;
     private mPartialStderr = "";
     private mPartialStdout = "";
-    private readonly mPromiseMap: Map<number, RpcPromise> = new Map();
+    private readonly mRequestMap: Map<number, ExistingClientRequest> = new Map();
     // biome-ignore lint/correctness/noUnusedPrivateClassMembers: Linter Error: this.mRequestId is used
     private mRequestId = 0;
 
@@ -58,7 +57,7 @@ export class ZSshClient extends RpcClientApi implements Disposable {
         const client = new ZSshClient();
         client.mErrHandler = opts.onError ?? ZSshClient.defaultErrHandler;
         client.mResponseTimeout = opts.responseTimeout ? opts.responseTimeout * 1000 : 60e3;
-        client.mSshClient = new Client();
+        client.mSshClient = createClient(opts.useNativeSsh);
         client.mSshStream = await new Promise((resolve, reject) => {
             client.mSshClient.on("error", (err) => {
                 Logger.getAppLogger().error(`Error connecting to SSH: ${err}`);
@@ -86,11 +85,52 @@ export class ZSshClient extends RpcClientApi implements Disposable {
             client.mSshClient.connect(ZSshUtils.buildSshConfig(session, { keepaliveInterval: keepAliveMsec }));
         });
         client.mStreamMgr = new RpcStreamManager(client.mSshClient);
+
+        if (opts.requests != null) {
+            for (const req of opts.requests) {
+                client.request(req.command).then(req.rpc.resolve, req.rpc.reject);
+            }
+        }
+
         return client;
     }
 
-    public dispose(): void {
+    /**
+     * Collects all currently pending RPC requests. Can be used to pause, replay, or inspect inflight requests.
+     * * @param silence - If true, silences the requests. They will no longer trigger their resolve or reject methods in normal operation (timeout, server response). The caller assumes responsibility for these resolve and rejects.
+     * @returns A set of existing client requests currently pending resolution.
+     */
+    public collectAllRequests(silence: boolean = false): Set<ExistingClientRequest> {
+        const replayRequests: Set<ExistingClientRequest> = new Set();
+        this.mRequestMap.forEach((req) => {
+            req.silenced = silence;
+            replayRequests.add(req);
+            if (req.timeoutId) {
+                // don't wait for timeout
+                clearTimeout(req.timeoutId);
+            }
+        });
+        return replayRequests;
+    }
+
+    /**
+     * Cleans up the SSH client by ending the SSH connection and rejecting pending requests
+     * that have not been silenced. If you want to silence requests, see {@link collectAllRequests}
+     * * @param isRestart - Indicates if the disposal is part of a server restart sequence
+     * (changes the rejection message sent to pending requests).
+     */
+    public dispose(isRestart: boolean = false): void {
         Logger.getAppLogger().debug("Stopping SSH client");
+        this.mRequestMap.forEach((req) => {
+            let rejMsg = "Shutting down ZRS. No action is required.";
+            if (isRestart) {
+                rejMsg = "Restarting ZRS";
+            }
+            if (!req.silenced) {
+                req.rpc.reject(new ImperativeError({ msg: rejMsg, suppressDump: true }));
+            }
+        });
+        this.mRequestMap.clear();
         this.mSshClient?.end();
     }
 
@@ -116,10 +156,16 @@ export class ZSshClient extends RpcClientApi implements Disposable {
                 id: ++this.mRequestId,
             };
             timeoutId = setTimeout(() => {
-                this.mPromiseMap.delete(rpcRequest.id);
-                reject(new ImperativeError({ msg: "Request timed out", errorCode: "ETIMEDOUT" }));
+                const thisReq = this.mRequestMap.get(rpcRequest.id);
+                if (thisReq) {
+                    this.mRequestMap.delete(rpcRequest.id);
+                    if (!thisReq.silenced) {
+                        this.mErrHandler(new Error("Request timed out")); // our hook provides better error message and action
+                        reject(new ImperativeError({ msg: "Request timed out", errorCode: "ETIMEDOUT" }));
+                    }
+                }
             }, this.mResponseTimeout);
-            if ("stream" in request && request.stream instanceof Stream) {
+            if ("stream" in request && this.isStreamFunction(request.stream)) {
                 this.mStreamMgr.registerStream(
                     rpcRequest,
                     request.stream,
@@ -132,7 +178,12 @@ export class ZSshClient extends RpcClientApi implements Disposable {
                     },
                 );
             }
-            this.mPromiseMap.set(rpcRequest.id, { resolve, reject });
+            this.mRequestMap.set(rpcRequest.id, {
+                command: request,
+                rpc: { resolve, reject },
+                silenced: false,
+                timeoutId,
+            });
             const requestStr = JSON.stringify(rpcRequest);
             Logger.getAppLogger().trace(`Sending request: ${requestStr}`);
             this.mSshStream.stdin.write(`${requestStr}\n`);
@@ -199,7 +250,7 @@ export class ZSshClient extends RpcClientApi implements Disposable {
     }
 
     private onErrData(chunk: Buffer) {
-        if (this.mPromiseMap.size === 0) {
+        if (this.mRequestMap.size === 0) {
             const errMsg = Logger.getAppLogger().error("Error from server: %s", chunk.toString());
             this.mErrHandler(new Error(errMsg));
             return;
@@ -229,7 +280,7 @@ export class ZSshClient extends RpcClientApi implements Disposable {
             }
 
             const responseId: number = "id" in response ? response.id : response.params?.id;
-            if (!this.mPromiseMap.has(responseId)) {
+            if (!this.mRequestMap.has(responseId)) {
                 const errMsg = Logger.getAppLogger().error("Missing promise for response ID: %d", responseId);
                 this.mErrHandler(new Error(errMsg));
                 continue;
@@ -245,14 +296,14 @@ export class ZSshClient extends RpcClientApi implements Disposable {
     }
 
     private handleNotification(notif: RpcNotification): void {
-        const rpcPromise = this.mPromiseMap.get(notif.params?.id as number);
+        const rpcPromise = this.mRequestMap.get(notif.params?.id as number);
         try {
             switch (notif.method) {
                 case "receiveStream":
-                    this.mStreamMgr.linkStreamToPromise(rpcPromise, notif, "GET");
+                    this.mStreamMgr.linkStreamToPromise(rpcPromise.rpc, notif, "GET");
                     break;
                 case "sendStream":
-                    this.mStreamMgr.linkStreamToPromise(rpcPromise, notif, "PUT");
+                    this.mStreamMgr.linkStreamToPromise(rpcPromise.rpc, notif, "PUT");
                     break;
                 default:
                     throw new Error(`unknown method ${notif.method}`);
@@ -264,9 +315,17 @@ export class ZSshClient extends RpcClientApi implements Disposable {
     }
 
     private handleResponse(response: RpcResponse): void {
+        const request = this.mRequestMap.get(response.id);
+
+        if (request.silenced) {
+            // Requests that are silenced have already been collected.
+            this.mRequestMap.delete(response.id);
+            return;
+        }
+
         if (response.error != null) {
             Logger.getAppLogger().error(`Error for response ID: ${response.id}\n${JSON.stringify(response.error)}`);
-            this.mPromiseMap.get(response.id).reject(
+            this.mRequestMap.get(response.id).rpc.reject(
                 new ImperativeError({
                     msg: response.error.message,
                     errorCode: response.error.code.toString(),
@@ -274,8 +333,18 @@ export class ZSshClient extends RpcClientApi implements Disposable {
                 }),
             );
         } else {
-            this.mPromiseMap.get(response.id).resolve(response.result);
+            this.mRequestMap.get(response.id).rpc.resolve(response.result);
         }
-        this.mPromiseMap.delete(response.id);
+
+        this.mRequestMap.delete(response.id);
+    }
+
+    /**
+     * Type guard to verify if an incoming request parameter contains a function that returns a Node.js Stream.
+     * * @param req - The unknown property to inspect.
+     * @returns True if `req` is a function, and asserts it as a stream generator function.
+     */
+    private isStreamFunction(req: unknown): req is () => Stream {
+        return typeof req === "function";
     }
 }

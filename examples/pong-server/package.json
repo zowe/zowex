@@ -1,14 +1,8 @@
 {
   "name": "pong-server",
   "version": "1.0.0",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
+  "private": true,
+  "description": "Pong server demo with EBCDIC conversion over SSH",
   "dependencies": {
     "ssh2": "^1.16.0"
   },

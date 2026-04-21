@@ -31,7 +31,7 @@ CPP_FLAGS+=$(DEBUGGER_FLAGS) $(OTHER_C_FLAGS)
 MTL_FLAGS+=$(DEBUGGER_FLAGS) $(OTHER_C_FLAGS)
 MTL_FLAGS64+=$(DEBUGGER_FLAGS) $(OTHER_C_FLAGS)
 ASM_FLAGS+=--verbose
-.ELIF $(BuildType) == RELEASE
+.ELSIF $(BuildType) == RELEASE
 CPP_BND_FLAGS=$(CPP_BND_BASE_FLAGS)
 CPP_BND_FLAGS_AUTH=$(CPP_BND_BASE_FLAGS_AUTH)
 DLL_BND_FLAGS=$(DLL_BND_BASE_FLAGS)
@@ -138,13 +138,13 @@ LIBZUT_LOGGER_OBJ=$(OUT_DIR)/zlogger_metal.o
 LIBZUT_LOGGER_OBJ=
 .END
 
-$(OUT_DIR)/libzut.so: $(OUT_DIR)/zut.o $(OUT_DIR)/zutm.o $(OUT_DIR)/zam.o $(OUT_DIR)/zutm31.o $(LIBZUT_LOGGER_OBJ)
+$(OUT_DIR)/libzut.so: $(OUT_DIR)/zut.o $(OUT_DIR)/zutm.o $(OUT_DIR)/zam.o $(OUT_DIR)/zam24.o $(OUT_DIR)/zutm31.o $(LIBZUT_LOGGER_OBJ)
 	@echo 'Building $(OUT_DIR)/libzut.so'
 	$(CXX) $(DLL_BND_FLAGS) -o $@ $^
 
 libzut.so: $(OUT_DIR) $(OUT_DIR)/libzut.so
 
-$(OUT_DIR)/libzut.a: $(OUT_DIR)/zut.o $(OUT_DIR)/zutm.o $(OUT_DIR)/zam.o $(OUT_DIR)/zutm31.o $(LIBZUT_LOGGER_OBJ)
+$(OUT_DIR)/libzut.a: $(OUT_DIR)/zut.o $(OUT_DIR)/zutm.o $(OUT_DIR)/zam.o $(OUT_DIR)/zam24.o $(OUT_DIR)/zutm31.o $(LIBZUT_LOGGER_OBJ)
 	@echo 'Building $(OUT_DIR)/libzut.a'
 	ar -rv $@ $^
 
@@ -177,13 +177,13 @@ $(OUT_DIR_SWIG)/zds.o: $(OUT_DIR_SWIG) zds.cpp
 	@echo 'Building $(OUT_DIR_SWIG)/zds.o with SWIG macro'
 	$(CXX) $(SWIG_FLAGS) -o $@ zds.cpp
 
-$(OUT_DIR)/libzds.so: $(OUT_DIR)/zds.o $(OUT_DIR)/zdsm.o $(OUT_DIR)/zam.o $(OUT_DIR)/libzut.a
+$(OUT_DIR)/libzds.so: $(OUT_DIR)/zds.o $(OUT_DIR)/zdsm.o $(OUT_DIR)/zam.o $(OUT_DIR)/zam24.o $(OUT_DIR)/libzut.a
 	@echo 'Building $(OUT_DIR)/libzds.so'
 	$(CXX) $(DLL_BND_FLAGS) -o $@ $^
 
 libzds.so: $(OUT_DIR) $(OUT_DIR)/libzds.so
 
-$(OUT_DIR)/libzds.a: $(OUT_DIR)/zds.o $(OUT_DIR)/zdsm.o $(OUT_DIR)/zam.o
+$(OUT_DIR)/libzds.a: $(OUT_DIR)/zds.o $(OUT_DIR)/zdsm.o $(OUT_DIR)/zam.o $(OUT_DIR)/zam24.o
 	@echo 'Building $(OUT_DIR)/libzds.a'
 	ar -rv $@ $^
 
@@ -325,6 +325,13 @@ $(OUT_DIR)/zjsonm.s: zjsonm.c
 
 $(OUT_DIR)/zjsonm.o: $(OUT_DIR)/zjsonm.s
 	@echo 'Building $(OUT_DIR)/zjsonm.o'
+	$(ASM) $(ASM_FLAGS) -a=$*.s.lst $(MACLIBS) -o $@ $^
+
+#
+# ZAM24
+#
+$(OUT_DIR)/zam24.o: zam24.s
+	@echo 'Building $(OUT_DIR)/zam24.o'
 	$(ASM) $(ASM_FLAGS) -a=$*.s.lst $(MACLIBS) -o $@ $^
 
 #

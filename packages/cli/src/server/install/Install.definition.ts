@@ -16,15 +16,15 @@ export const ServerInstallDefinition: ICommandDefinition = {
     type: "command",
     name: "install",
     aliases: ["up"],
-    summary: "Install Zowe SSH server on z/OS host",
-    description: "Install Zowe SSH server on z/OS host",
+    summary: "Install Zowe Remote SSH server on z/OS host",
+    description: "Install Zowe Remote SSH server on z/OS host",
     examples: [
         {
-            description: "Install Zowe SSH server in the default location",
+            description: "Install Zowe Remote SSH server in the default location",
             options: "",
         },
         {
-            description: 'Install Zowe SSH server in the directory "/tmp/zowe-server"',
+            description: 'Install Zowe Remote SSH server in the directory "/tmp/zowe-server"',
             options: '--server-path "/tmp/zowe-server"',
         },
     ],

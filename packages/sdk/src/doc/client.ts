@@ -10,7 +10,7 @@
  */
 
 import type { CommandRequest, CommandResponse } from "./rpc/common";
-import type { ProgressCallback } from "./types";
+import type { ProgressCallback, RpcPromise } from "./types";
 
 export interface ClientOptions {
     /**
@@ -47,16 +47,36 @@ export interface ClientOptions {
     responseTimeout?: number;
 
     /**
-     * Remote path of the Zowe Native Proto server
+     * Remote path of the Zowe Remote SSH server
      * (default: `~/.zowe-server`)
      */
     serverPath?: string;
+
+    /**
+     * Use experimental native SSH client for improved performance
+     * (default: false)
+     */
+    useNativeSsh?: boolean;
 
     /**
      * Enable verbose logging from the server
      * (default: false)
      */
     verbose?: boolean;
+
+    /**
+     * A set of requests to run after the client starts.
+     * Typically previously failed requests queued for re-run.
+     * (default: empty)
+     */
+    requests?: Set<ExistingClientRequest>;
+}
+
+export interface ExistingClientRequest {
+    command: CommandRequest;
+    rpc: RpcPromise;
+    silenced: boolean;
+    timeoutId: NodeJS.Timeout;
 }
 
 export interface IRpcClient {

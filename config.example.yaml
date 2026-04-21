@@ -14,7 +14,7 @@ profiles:
     #   # password: password  # Use password instead of private key
 
     # USS directory on z/OS where native code is built
-    deployDir: ~/zowe-native-proto
+    deployDir: ~/zowex
 
     # Command to run before building the native code
     # preBuildCmd: '. ~/entrypoint.sh'  # Run script to configure build environment

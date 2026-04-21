@@ -9,7 +9,7 @@
  *
  */
 
-import { createReadStream, createWriteStream, existsSync, statSync, unlinkSync } from "node:fs";
+import { createReadStream, createWriteStream, statSync, unlinkSync } from "node:fs";
 import { dirname, parse } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Base64Decode, Base64Encode } from "base64-stream";

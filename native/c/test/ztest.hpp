@@ -42,8 +42,8 @@
 // TODO(Kelosky): handle test not run
 // TODO(Kelosky): handle running individual test and/or suite
 
-#define Expect(x) [&]() -> RESULT_CHECK<typename std::remove_reference<decltype(x)>::type> { EXPECT_CONTEXT ctx = {__LINE__, __FILE__}; return expect(x, ctx); }()
-#define ExpectWithContext(x, context) [&]() -> RESULT_CHECK<typename std::remove_reference<decltype(x)>::type> { EXPECT_CONTEXT ctx = {__LINE__, __FILE__, std::string(context), true}; return expect(x, ctx); }()
+#define Expect(x) expect((x), EXPECT_CONTEXT{__LINE__, __FILE__, "", false})
+#define ExpectWithContext(x, context) expect((x), EXPECT_CONTEXT{__LINE__, __FILE__, std::string(context), true})
 #define TestLog(message) Globals::get_instance().test_log(message)
 #define TrimChars(str) Globals::get_instance().trim_chars(str)
 
@@ -360,12 +360,11 @@ private:
 
     if (!context.empty())
     {
-      // Print exactly (current_nesting * 2 + 2) spaces for context
-      for (int i = 0; i < current_nesting * 2 + 2; i++)
-      {
-        std::cout << " ";
-      }
-      std::cout << context.substr(1) << std::endl;
+      std::string indent = get_indent(current_nesting + 1);
+      std::istringstream lines(context.substr(1));
+      std::string line;
+      while (std::getline(lines, line))
+        std::cout << indent << line << std::endl;
     }
   }
 
@@ -821,40 +820,86 @@ class RESULT_CHECK
   bool inverse;
   EXPECT_CONTEXT ctx;
 
-public:
-  void ToBe(T val)
+  void fail_if(bool condition, const std::string &msg)
+  {
+    if (condition)
+      throw std::runtime_error(msg + append_error_details());
+  }
+
+  static const size_t LARGE_STRING = 80;
+
+  static bool verbose_strings()
+  {
+    return std::getenv("ZTEST_VERBOSE_STRINGS") != nullptr;
+  }
+
+  std::string string_diff_hint(const std::string &expected, const std::string &actual)
+  {
+    std::stringstream out;
+    out << "sizes: expected=" << expected.size() << " actual=" << actual.size();
+    out << "\nfirst 5 differences (byte offset: expected -> actual):";
+    size_t len = std::max(expected.size(), actual.size());
+    int found = 0;
+    for (size_t i = 0; i < len && found < 5; ++i)
+    {
+      char ce = i < expected.size() ? expected[i] : '\0';
+      char ca = i < actual.size() ? actual[i] : '\0';
+      if (ce != ca)
+      {
+        out << "\n  [" << i << "]: "
+            << (int)(unsigned char)ce << " (0x" << std::hex << (int)(unsigned char)ce << std::dec << ")"
+            << " -> "
+            << (int)(unsigned char)ca << " (0x" << std::hex << (int)(unsigned char)ca << std::dec << ")";
+        ++found;
+      }
+    }
+    if (found == 0)
+      out << "\n  (strings are equal up to shorter length)";
+    return out.str();
+  }
+
+  static std::string type_name_of()
   {
     int status;
     char *demangled = abi::__cxa_demangle(typeid(T).name(), nullptr, nullptr, &status);
     std::string name = (status == 0) ? demangled : typeid(T).name();
     if (demangled)
       free(demangled);
+    return name;
+  }
 
-    if (inverse)
+public:
+  void ToBe(T val)
+  {
+    if constexpr (std::is_same<T, std::string>::value)
     {
-      if (result == val)
+      bool large = !verbose_strings() && (result.size() >= LARGE_STRING || val.size() >= LARGE_STRING);
+      if (inverse)
       {
-        std::stringstream ss;
-        ss << result;
-        std::stringstream ss2;
-        ss2 << val;
-        std::string error = std::string("expected ") + name + " '" + ss.str() + "' NOT to be '" + ss2.str() + "'";
-        error += append_error_details();
-        throw std::runtime_error(error);
+        if (!large)
+          fail_if(result == val, "expected string '" + result + "' NOT to be '" + val + "'");
+        else
+          fail_if(result == val, "strings unexpectedly equal\n" + string_diff_hint(val, result));
+      }
+      else
+      {
+        if (!large)
+          fail_if(result != val, "expected string '" + result + "' to be '" + val + "'");
+        else if (result != val)
+          fail_if(true, "strings differ (too large to print)\n" + string_diff_hint(val, result));
       }
     }
     else
     {
-      if (result != val)
-      {
-        std::stringstream ss;
-        ss << result;
-        std::stringstream ss2;
-        ss2 << val;
-        std::string error = std::string("expected ") + name + " '" + ss.str() + "' to be '" + ss2.str() + "'";
-        error += append_error_details();
-        throw std::runtime_error(error);
-      }
+      std::string name = type_name_of();
+      std::stringstream ss;
+      ss << result;
+      std::stringstream ss2;
+      ss2 << val;
+      if (inverse)
+        fail_if(result == val, "expected " + name + " '" + ss.str() + "' NOT to be '" + ss2.str() + "'");
+      else
+        fail_if(result != val, "expected " + name + " '" + ss.str() + "' to be '" + ss2.str() + "'");
     }
   }
 
@@ -862,184 +907,75 @@ public:
   typename std::enable_if<std::is_pointer<U>::value>::type
   ToBeNull()
   {
-    if (!inverse)
-    {
-      if (nullptr != result)
-      {
-        std::stringstream ss;
-        ss << result;
-        std::string error = "expected pointer '" + ss.str() + "' to be null";
-        error += append_error_details();
-        throw std::runtime_error(error);
-      }
-    }
+    std::stringstream ss;
+    ss << result;
+    if (inverse)
+      fail_if(nullptr == result, "expected '" + ss.str() + "' NOT to be null");
     else
-    {
-      if (nullptr == result)
-      {
-        std::stringstream ss;
-        ss << result;
-        std::string error = "expected '" + ss.str() + "' NOT to be null";
-        error += append_error_details();
-        throw std::runtime_error(error);
-      }
-    }
+      fail_if(nullptr != result, "expected pointer '" + ss.str() + "' to be null");
   }
 
   template <typename U = T>
   typename std::enable_if<std::is_arithmetic<U>::value>::type
   ToBeGreaterThan(U val)
   {
+    std::string name = type_name_of();
+    std::stringstream ss;
+    ss << result;
+    std::stringstream ss2;
+    ss2 << val;
     if (inverse)
-    {
-      if (result > val)
-      {
-        int status;
-        char *demangled = abi::__cxa_demangle(typeid(T).name(), nullptr, nullptr, &status);
-        std::string type_name = (status == 0) ? demangled : typeid(T).name();
-        if (demangled)
-          free(demangled);
-
-        std::stringstream ss;
-        ss << result;
-        std::stringstream ss2;
-        ss2 << val;
-        std::string error = "expected " + type_name + " '" + ss.str() + "' to NOT to be greater than '" + ss2.str() + "'";
-        error += append_error_details();
-        throw std::runtime_error(error);
-      }
-    }
+      fail_if(result > val, "expected " + name + " '" + ss.str() + "' NOT to be greater than '" + ss2.str() + "'");
     else
-    {
-      if (result <= val)
-      {
-        int status;
-        char *demangled = abi::__cxa_demangle(typeid(T).name(), nullptr, nullptr, &status);
-        std::string type_name = (status == 0) ? demangled : typeid(T).name();
-        if (demangled)
-          free(demangled);
-
-        std::stringstream ss;
-        ss << result;
-        std::stringstream ss2;
-        ss2 << val;
-        std::string error = "expected " + type_name + " '" + ss.str() + "' to be greater than '" + ss2.str() + "'";
-        error += append_error_details();
-        throw std::runtime_error(error);
-      }
-    }
+      fail_if(result <= val, "expected " + name + " '" + ss.str() + "' to be greater than '" + ss2.str() + "'");
   }
 
   template <typename U = T>
   typename std::enable_if<std::is_arithmetic<U>::value>::type
   ToBeGreaterThanOrEqualTo(U val)
   {
+    std::string name = type_name_of();
+    std::stringstream ss;
+    ss << result;
+    std::stringstream ss2;
+    ss2 << val;
     if (inverse)
-    {
-      if (result >= val)
-      {
-        int status;
-        char *demangled = abi::__cxa_demangle(typeid(T).name(), nullptr, nullptr, &status);
-        std::string type_name = (status == 0) ? demangled : typeid(T).name();
-        if (demangled)
-          free(demangled);
-
-        std::stringstream ss;
-        ss << result;
-        std::stringstream ss2;
-        ss2 << val;
-        std::string error = "expected " + type_name + " '" + ss.str() + "' to NOT to be greater than or equal to '" + ss2.str() + "'";
-        error += append_error_details();
-        throw std::runtime_error(error);
-      }
-    }
+      fail_if(result >= val, "expected " + name + " '" + ss.str() + "' NOT to be greater than or equal to '" + ss2.str() + "'");
     else
-    {
-      if (result < val)
-      {
-        int status;
-        char *demangled = abi::__cxa_demangle(typeid(T).name(), nullptr, nullptr, &status);
-        std::string type_name = (status == 0) ? demangled : typeid(T).name();
-        if (demangled)
-          free(demangled);
-
-        std::stringstream ss;
-        ss << result;
-        std::stringstream ss2;
-        ss2 << val;
-        std::string error = "expected " + type_name + " '" + ss.str() + "' to be greater than or equal to '" + ss2.str() + "'";
-        error += append_error_details();
-        throw std::runtime_error(error);
-      }
-    }
+      fail_if(result < val, "expected " + name + " '" + ss.str() + "' to be greater than or equal to '" + ss2.str() + "'");
   }
 
   template <typename U = T>
   typename std::enable_if<std::is_arithmetic<U>::value>::type
   ToBeLessThan(U val)
   {
+    std::string name = type_name_of();
+    std::stringstream ss;
+    ss << result;
+    std::stringstream ss2;
+    ss2 << val;
     if (inverse)
-    {
-      if (result < val)
-      {
-        int status;
-        char *demangled = abi::__cxa_demangle(typeid(T).name(), nullptr, nullptr, &status);
-        std::string type_name = (status == 0) ? demangled : typeid(T).name();
-        if (demangled)
-          free(demangled);
-
-        std::stringstream ss;
-        ss << result;
-        std::stringstream ss2;
-        ss2 << val;
-        std::string error = "expected " + type_name + " '" + ss.str() + "' to NOT be less than '" + ss2.str() + "'";
-        error += append_error_details();
-        throw std::runtime_error(error);
-      }
-    }
+      fail_if(result < val, "expected " + name + " '" + ss.str() + "' NOT to be less than '" + ss2.str() + "'");
     else
-    {
-      if (result >= val)
-      {
-        int status;
-        char *demangled = abi::__cxa_demangle(typeid(T).name(), nullptr, nullptr, &status);
-        std::string type_name = (status == 0) ? demangled : typeid(T).name();
-        if (demangled)
-          free(demangled);
-
-        std::stringstream ss;
-        ss << result;
-        std::stringstream ss2;
-        ss2 << val;
-        std::string error = "expected " + type_name + " '" + ss.str() + "' to be less than '" + ss2.str() + "'";
-        error += append_error_details();
-        throw std::runtime_error(error);
-      }
-    }
+      fail_if(result >= val, "expected " + name + " '" + ss.str() + "' to be less than '" + ss2.str() + "'");
   }
 
   template <typename U = T>
   typename std::enable_if<std::is_same<U, std::string>::value>::type
   ToContain(const std::string &substring)
   {
+    bool large = !verbose_strings() && result.size() >= LARGE_STRING;
+    std::string snippet = large ? result.substr(0, LARGE_STRING) : result;
+    std::string escaped;
+    for (char c : snippet)
+      escaped += (c == '\n') ? "\\n" : std::string(1, c);
+    std::string haystack = large
+                               ? escaped + "...(truncated, total " + std::to_string(result.size()) + " chars)"
+                               : escaped;
     if (inverse)
-    {
-      if (result.find(substring) != std::string::npos)
-      {
-        std::string error = "expected string '" + result + "' to NOT contain '" + substring + "'";
-        error += append_error_details();
-        throw std::runtime_error(error);
-      }
-    }
+      fail_if(result.find(substring) != std::string::npos, "expected string '" + haystack + "' to NOT contain '" + substring + "'");
     else
-    {
-      if (result.find(substring) == std::string::npos)
-      {
-        std::string error = "expected string '" + result + "' to contain '" + substring + "'";
-        error += append_error_details();
-        throw std::runtime_error(error);
-      }
-    }
+      fail_if(result.find(substring) == std::string::npos, "expected string '" + haystack + "' to contain '" + substring + "'");
   }
 
   std::string append_error_details()
@@ -1056,16 +992,58 @@ public:
     return error;
   }
 
+  template <typename U = T>
+  auto ToAbend() -> decltype(std::declval<U>()(), void())
+  {
+    Globals &g = Globals::get_instance();
+    jmp_buf old_buf;
+    std::memcpy(old_buf, g.get_jmp_buf(), sizeof(jmp_buf));
+
+    bool abend = false;
+
+    if (0 != setjmp(g.get_jmp_buf()))
+    {
+      if (g.get_timeout_occurred())
+      {
+        std::memcpy(g.get_jmp_buf(), old_buf, sizeof(jmp_buf));
+        std::string error = "expected to ABEND, but timed out instead";
+        error += append_error_details();
+        throw std::runtime_error(error);
+      }
+      abend = true;
+    }
+
+    if (!abend)
+    {
+      result();
+    }
+
+    std::memcpy(g.get_jmp_buf(), old_buf, sizeof(jmp_buf));
+
+    if (inverse && abend)
+    {
+      std::string error = "expected NOT to ABEND";
+      error += append_error_details();
+      throw std::runtime_error(error);
+    }
+    else if (!abend)
+    {
+      std::string error = "expected to ABEND";
+      error += append_error_details();
+      throw std::runtime_error(error);
+    }
+  }
+
   RESULT_CHECK Not()
   {
-    RESULT_CHECK copy;
+    RESULT_CHECK copy(result);
     copy.set_inverse(true);
-    copy.result = result;
     set_inverse(false);
     copy.set_context(ctx);
     return copy;
   }
-  RESULT_CHECK()
+  RESULT_CHECK(T r)
+      : result(std::move(r)), inverse(false)
   {
   }
   ~RESULT_CHECK()
@@ -1232,13 +1210,11 @@ void itif(const std::string &description, Callable test, TEST_OPTIONS &opts, boo
 }
 
 template <typename T>
-RESULT_CHECK<T> expect(T val, EXPECT_CONTEXT ctx = {0})
+RESULT_CHECK<T> expect(T val, EXPECT_CONTEXT ctx = {0, "", "", false})
 {
-  RESULT_CHECK<T> result;
-  result.set_result(val);
-  result.set_inverse(false);
-  result.set_context(ctx);
-  return result;
+  RESULT_CHECK<T> res(std::move(val));
+  res.set_context(ctx);
+  return res;
 }
 
 // Hook registration functions
@@ -1403,7 +1379,22 @@ inline void print_failed_tests()
           std::cout << "  " << colors.red << colors.cross << " FAIL " << test.description << colors.reset << std::endl;
           if (!test.fail_message.empty())
           {
-            std::cout << "    " << colors.arrow << " " << test.fail_message << std::endl;
+            std::string main_error = test.fail_message;
+            std::string context;
+            size_t nl = main_error.find("\n");
+            if (nl != std::string::npos)
+            {
+              context = main_error.substr(nl + 1);
+              main_error = main_error.substr(0, nl);
+            }
+            std::cout << "    " << colors.arrow << " " << main_error << std::endl;
+            if (!context.empty())
+            {
+              std::istringstream ctx_lines(context);
+              std::string ctx_line;
+              while (std::getline(ctx_lines, ctx_line))
+                std::cout << "      " << ctx_line << std::endl;
+            }
           }
         }
       }

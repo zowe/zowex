@@ -174,6 +174,23 @@ void zowex_server_tests()
 
                   unlink(checksums_file.c_str());
                 });
+             it("should print ready message with version",
+                []() -> void
+                {
+                  ServerHandle server = start_server(zowex_server_command);
+                  std::string response = read_line_from_server(server);
+                  stop_server(server);
+
+                  static const std::regex re(R"("version"\s*:\s*\"([^"]*)\")");
+                  std::smatch m;
+
+                  Expect(std::regex_search(response, m, re)).ToBe(true);
+                  const std::string version = m[1].str();
+
+                  Expect(version.length()).ToBeGreaterThanOrEqualTo(5); // X.X.X at minimum
+                  Expect(response).ToContain("\"message\":\"zowex server is ready to accept input\"");
+                  Expect(response).ToContain("\"status\":\"ready\"");
+                });
              it("should return error message for invalid JSON input",
                 []() -> void
                 {
@@ -184,6 +201,46 @@ void zowex_server_tests()
 
                   Expect(response).ToContain("\"code\":-32700");
                   Expect(response).ToContain("\"message\":\"Failed to parse command request\"");
+                });
+             it("should execute unixCommand and return output",
+                []() -> void
+                {
+                  ServerHandle server = start_server(zowex_server_command, true);
+                  write_to_server(server, "{\"jsonrpc\":\"2.0\",\"method\":\"unixCommand\",\"params\":{\"commandText\":\"whoami\"},\"id\":1}\n");
+                  std::string response = read_line_from_server(server);
+                  stop_server(server);
+
+                  Expect(response).ToContain("\"success\":true");
+                  Expect(response).ToContain("\"data\":");
+                });
+
+             it("should execute getInfo and return output",
+                []() -> void
+                {
+                  ServerHandle server = start_server(zowex_server_command, true);
+                  write_to_server(server, "{\"jsonrpc\":\"2.0\",\"method\":\"getInfo\",\"params\":{},\"id\":1}\n");
+                  std::string response = read_line_from_server(server);
+                  stop_server(server);
+
+                  Expect(response).ToContain("\"success\":true");
+
+                  // Version information
+                  static const std::regex rev(R"("version"\s*:\s*\"([^"]*)\")");
+                  std::smatch mv;
+
+                  Expect(std::regex_search(response, mv, rev)).ToBe(true);
+                  const std::string version = mv[1].str();
+
+                  Expect(version.length()).ToBeGreaterThanOrEqualTo(5); // X.X.X at minimum
+
+                  // Build date information
+                  static const std::regex red(R"("buildDate"\s*:\s*\"([^"]*)\")");
+                  std::smatch md;
+
+                  Expect(std::regex_search(response, md, red)).ToBe(true);
+                  const std::string buildDate = md[1].str();
+
+                  Expect(buildDate.length()).ToBeGreaterThanOrEqualTo(11); // MMM DD YYYY at minimum
                 });
            });
 }

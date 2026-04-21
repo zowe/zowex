@@ -314,11 +314,13 @@ function generateHeaderFile(interfaces: ExtractedInterface[], fileName: string):
     // Generate all schemas
     for (const iface of toGenerate) {
         const schemaFields = generateSchemaFields(iface);
+        content += `struct ${iface.name} {};\n`;
         if (schemaFields.length > 0) {
-            content += `struct ${iface.name} {};\n`;
             content += `ZJSON_SCHEMA(${iface.name},\n`;
             content += `    ${schemaFields.join(",\n    ")}\n`;
             content += `);\n\n`;
+        } else {
+            content += `\n`;
         }
     }
 

@@ -45,12 +45,12 @@ int main()
   // data.push_back("012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789abcdefghijkl");
   // data.push_back("          0123456789012345678901234567890123456789012345678901234567890123456789");
   // data.push_back("0123456789          012345678901234567890123456789012345678901234567890123456789");
-  data.push_back(" hey workld");
+  data.push_back(" hey world");
   data.push_back(" one more");
 
   ZDS zds = {0};
   IO_CTRL *ioc = nullptr;
-  rc = zds_open_output_bpam(&zds, "DKELOSKY.IO.O.FB80(data)", ioc);
+  rc = zds_open_output_bpam(&zds, "ZOWETEST.IO.O.FB80(data)", ioc);
   // rc = zds_open_output_bpam(&zds, "DKELOSKY.IO.O.V25(OMGNESS)", ioc);
   // rc = zds_open_output_bpam(&zds, "DKELOSKY.IO.O.V256(OMGNESS)", ioc);
   // rc = zds_open_output_bpam(&zds, "DKELOSKY.IO.O.VB256(OMGNESS)", ioc);
@@ -62,7 +62,7 @@ int main()
     return -1;
   }
 
-  for (const auto &line : data)
+  for (std::string &line : data)
   {
     rc = zds_write_output_bpam(&zds, ioc, line);
     if (0 != rc)
@@ -81,5 +81,16 @@ int main()
     return -1;
   }
 
+  std::cout << "zds_close_output_bpam success" << std::endl;
+  std::cout << "  Data set: ZOWETEST.IO.O.FB80(data)" << std::endl;
+  // Run command to view data set
+  std::string command = "../../build-out/zowex ds view 'ZOWETEST.IO.O.FB80(data)'";
+  std::cout << "  Run: " << command << std::endl;
+  rc = system(command.c_str());
+  if (0 != rc)
+  {
+    std::cout << "Failed to run command: " << command << std::endl;
+    return -1;
+  }
   return 0;
 }

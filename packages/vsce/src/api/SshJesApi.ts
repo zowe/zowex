@@ -11,7 +11,7 @@
 
 import type * as zosjobs from "@zowe/zos-jobs-for-zowe-sdk";
 import type { MainframeInteraction } from "@zowe/zowe-explorer-api";
-import { B64String } from "zowe-native-proto-sdk";
+import { B64String } from "zowex-sdk";
 import { SshCommonApi } from "./SshCommonApi";
 
 export class SshJesApi extends SshCommonApi implements MainframeInteraction.IJes {

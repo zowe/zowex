@@ -10,7 +10,7 @@
  */
 
 import type { IHandlerParameters } from "@zowe/imperative";
-import type { DatasetAttributes, ds, ZSshClient } from "zowe-native-proto-sdk";
+import type { DatasetAttributes, ds, ZSshClient } from "zowex-sdk";
 import { SshBaseHandler } from "../../SshBaseHandler";
 import { CreateDefaults } from "../CreateDefaults";
 

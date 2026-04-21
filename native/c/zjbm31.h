@@ -31,7 +31,7 @@
 #define IAZSYMBL(jsym, rc)                                    \
   __asm(                                                      \
       "*                                                  \n" \
-      " LGHI  2,0       Clear                             \n" \
+      " SLGR  2,2       Init register                     \n" \
       " TAM   ,         AMODE64??                         \n" \
       " JM    *+4+4+2   No, skip switching                \n" \
       " OILH  2,X'8000' Set AMODE31 flag                  \n" \

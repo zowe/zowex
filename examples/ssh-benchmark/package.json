@@ -1,0 +1,17 @@
+{
+  "name": "ssh-benchmark",
+  "version": "1.0.0",
+  "description": "Minimal benchmarks that measure SSH connection and command execution time across three implementations.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "russh": "^0.1.35",
+    "ssh2": "^1.17.0"
+  }
+}

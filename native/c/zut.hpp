@@ -59,6 +59,15 @@ int zut_run_program(const std::string &program, const std::vector<std::string> &
 int zut_run_program(const std::string &program, const std::vector<std::string> &args, std::string &stdout_response, std::string &stderr_response);
 
 /**
+ * @brief Runs a shell command using spawn() with _BPX_SHAREAS=YES for efficient same-address-space execution.
+ * @param command The shell command to execute (passed to /bin/sh -c)
+ * @param stdout_response Reference to a string where the command's stdout will be stored
+ * @param stderr_response Reference to a string where the command's stderr will be stored
+ * @returns The exit code from the shell command, or non-zero for spawn/wait errors
+ */
+int zut_spawn_shell_command(const std::string &command, std::string &stdout_response, std::string &stderr_response);
+
+/**
  * @brief Search for a specific string
  * @param input The string to search for
  * @return Return code (0 for success, non-zero for error)

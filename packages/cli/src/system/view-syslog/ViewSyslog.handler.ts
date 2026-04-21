@@ -10,14 +10,11 @@
  */
 
 import type { IHandlerParameters } from "@zowe/imperative";
-import type { system, ZSshClient } from "zowe-native-proto-sdk";
+import type { system, ZSshClient } from "zowex-sdk";
 import { SshBaseHandler } from "../../SshBaseHandler";
 
 export default class ViewSyslogHandler extends SshBaseHandler {
-    public async processWithClient(
-        params: IHandlerParameters,
-        client: ZSshClient,
-    ): Promise<system.ViewSyslogResponse> {
+    public async processWithClient(params: IHandlerParameters, client: ZSshClient): Promise<system.ViewSyslogResponse> {
         const response = await client.system.viewSyslog({
             date: params.arguments.date,
             time: params.arguments.time,

@@ -223,6 +223,7 @@ export abstract class AbstractConfigManager {
         const trimmed = input.trim();
         if (!trimmed) return "Path cannot be empty.";
         if (trimmed.length > 1024) return "Path is longer than the USS max path length of 1024.";
+        if (trimmed.endsWith("/c/build-out")) return "Cannot deploy on top of a dev build. Choose another location.";
 
         return path.isAbsolute(trimmed.replace(/^~/, ""))
             ? null
