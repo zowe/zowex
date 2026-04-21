@@ -254,9 +254,17 @@ static int copy_sequential(ZDS *zds, const std::string &dsn1, const std::string 
     ZDSReadOpts ropts{.zds = zds, .ddname = "SYSPRINT"};
     zds_read(ropts, output);
 
-    zds->diag.e_msg_len = sprintf(zds->diag.e_msg,
-                                  "IEBGENER failed with RC=%d. SYSPRINT:\n%s",
-                                  rc, output.c_str());
+    char truncated_detail[128];
+    strncpy(truncated_detail, output.c_str(), sizeof(truncated_detail) - 1);
+    truncated_detail[sizeof(truncated_detail) - 1] = '\0';
+
+    zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
+                                   "IEBGENER failed with RC=%d. SYSPRINT: %s",
+                                   rc, truncated_detail);
+
+    if (zds->diag.e_msg_len >= sizeof(zds->diag.e_msg)) {
+        zds->diag.e_msg_len = sizeof(zds->diag.e_msg) - 1;
+    }
     rc = RTNCD_FAILURE;
   }
   else
@@ -318,7 +326,7 @@ static int copy_partitioned(ZDS *zds, ZDSTypeInfo &sourceInfo, ZDSTypeInfo &targ
 
   if (!sourceInfo.member_name.empty() && !targetInfo.member_name.empty())
   {
-    if (!member_exists_in_pds(targetInfo.base_dsn, targetInfo.member_name))
+    if (!zds_member_exists(targetInfo.base_dsn, targetInfo.member_name))
     {
       options->member_created = true;
     }
@@ -356,9 +364,17 @@ static int copy_partitioned(ZDS *zds, ZDSTypeInfo &sourceInfo, ZDSTypeInfo &targ
     ZDSReadOpts ropts{.zds = zds, .ddname = "SYSPRINT"};
     zds_read(ropts, output);
     {
-      zds->diag.e_msg_len = sprintf(zds->diag.e_msg,
-                                    "IEBCOPY failed with RC=%d. SYSPRINT:\n%s",
-                                    rc, output.c_str());
+      char truncated_detail[128];
+      strncpy(truncated_detail, output.c_str(), sizeof(truncated_detail) - 1);
+      truncated_detail[sizeof(truncated_detail) - 1] = '\0';
+
+      zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
+                                    "IEBCOPY failed with RC=%d. SYSPRINT: %s",
+                                    rc, truncated_detail);
+
+      if (zds->diag.e_msg_len >= sizeof(zds->diag.e_msg)) {
+          zds->diag.e_msg_len = sizeof(zds->diag.e_msg) - 1;
+      }
     }
     zut_free_dynalloc_dds(zds->diag, dds);
     return RTNCD_FAILURE;
@@ -395,7 +411,7 @@ int zds_copy_dsn(ZDS *zds, const std::string &dsn1, const std::string &dsn2, ZDS
 
   if (!info1.member_name.empty())
   {
-    if (!member_exists_in_pds(info1.base_dsn, info1.member_name))
+    if (!zds_member_exists(info1.base_dsn, info1.member_name))
     {
       zds->diag.e_msg_len = sprintf(zds->diag.e_msg, "Source member '%s' not found", info1.member_name.c_str());
       return RTNCD_FAILURE;
