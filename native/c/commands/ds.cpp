@@ -319,7 +319,6 @@ int handle_data_set_create_member(InvocationContext &context)
     }
 
     std::string data = "";
-    fprintf(stdout, "DSN to write: %s\n", dsn.c_str());
     ZDSWriteOpts write_opts{.zds = &zds, .dsname = dsn};
     rc = zds_write(write_opts, data);
     if (0 != rc)

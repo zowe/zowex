@@ -485,7 +485,7 @@ bool zds_dataset_exists(const std::string &dsn)
   return false;
 }
 
-static bool zds_member_exists(const std::string &dsn, const std::string &member_before)
+bool zds_member_exists(const std::string &dsn, const std::string &member_before)
 {
   std::string mem_before = "//'" + dsn + "(" + member_before + ")'";
   FILE *fp = fopen(mem_before.c_str(), "r");
