@@ -48,8 +48,8 @@ int process_data_set_create_result(InvocationContext &context, ZDS *zds, int rc,
     rc = zds_write(write_opts, data);
     if (0 != rc)
     {
-      context.output_stream() << "Error: could not write to data set: '" << dsn << "' rc: '" << rc << "'" << std::endl;
-      context.output_stream() << "  Details: " << zds->diag.e_msg << std::endl;
+      context.error_stream() << "Error: could not write to data set: '" << dsn << "' rc: '" << rc << "'" << std::endl;
+      context.error_stream() << "  Details: " << zds->diag.e_msg << std::endl;
       return RTNCD_FAILURE;
     }
     context.output_stream() << "Data set and/or member created: '" << dsn << "'" << std::endl;
@@ -305,10 +305,16 @@ int handle_data_set_create_member(InvocationContext &context)
     rc = zds_list_data_sets(&zds, dataset_name, entries);
     if (RTNCD_WARNING < rc || entries.size() == 0)
     {
-      context.output_stream() << "Error: could not create data set member: '" << dataset_name << "' rc: '" << rc << "'" << std::endl;
-      context.output_stream() << "  Details:\n"
-                              << zds.diag.e_msg << std::endl;
+      context.error_stream() << "Error: could not create data set member: '" << dataset_name << "' rc: '" << rc << "'" << std::endl;
+      context.error_stream() << "  Details: " << zds.diag.e_msg << std::endl;
       return RTNCD_FAILURE;
+    }
+
+    bool overwrite = context.get<bool>("overwrite", false);
+    if (!overwrite && zds_member_exists(dataset_name, member_name))
+    {
+      context.error_stream() << "Warning: Data set member already exists: '" << dsn << "'" << std::endl;
+      return RTNCD_WARNING;
     }
 
     std::string data = "";
@@ -316,15 +322,15 @@ int handle_data_set_create_member(InvocationContext &context)
     rc = zds_write(write_opts, data);
     if (0 != rc)
     {
-      context.output_stream() << "Error: could not write to data set: '" << dsn << "' rc: '" << rc << "'" << std::endl;
-      context.output_stream() << "  Details: " << zds.diag.e_msg << std::endl;
+      context.error_stream() << "Error: could not write to data set: '" << dsn << "' rc: '" << rc << "'" << std::endl;
+      context.error_stream() << "  Details: " << zds.diag.e_msg << std::endl;
       return RTNCD_FAILURE;
     }
     context.output_stream() << "Data set and/or member created: '" << dsn << "'" << std::endl;
   }
   else
   {
-    context.output_stream() << "Error: could not find member name in dsn: '" << dsn << "'" << std::endl;
+    context.error_stream() << "Error: could not find member name in dsn: '" << dsn << "'" << std::endl;
     return RTNCD_FAILURE;
   }
 
@@ -1072,6 +1078,7 @@ void register_commands(parser::Command &root_command)
   auto ds_create_member_cmd = command_ptr(new Command("create-member", "create member in data set"));
   ds_create_member_cmd->add_alias("cre-m");
   ds_create_member_cmd->add_positional_arg("dsn", "data set name with member specified", ArgType_Single, true);
+  ds_create_member_cmd->add_keyword_arg("overwrite", make_aliases("--overwrite", "--ow"), "overwrite existing member", ArgType_Flag, false, ArgValue(false));
   ds_create_member_cmd->set_handler(handle_data_set_create_member);
   data_set_cmd->add_command(ds_create_member_cmd);
 

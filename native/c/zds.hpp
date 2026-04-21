@@ -145,6 +145,15 @@ int zds_copy_dsn(ZDS *zds, const std::string &dsn1, const std::string &dsn2, ZDS
 bool zds_dataset_exists(const std::string &dsn);
 
 /**
+ * @brief Check if a data set member exists
+ *
+ * @param dsn data set name
+ * @param member member name
+ * @return true if it exists; false otherwise
+ */
+bool zds_member_exists(const std::string &dsn, const std::string &member);
+
+/**
  * @brief Options for reading a z/OS data set or DD
  */
 struct ZDSReadOpts
