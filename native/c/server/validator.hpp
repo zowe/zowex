@@ -13,6 +13,7 @@
 #define VALIDATOR_HPP
 
 #include <string>
+#include <string_view>
 #include <functional>
 
 /**
@@ -58,29 +59,29 @@ enum class FieldType
  */
 struct FieldDescriptor
 {
-  std::string name;
+  std::string_view name;
   FieldType type;
   bool required;
   FieldType array_element_type;
   const FieldDescriptor *nested_schema = nullptr;
   size_t nested_schema_count = 0;
 
-  FieldDescriptor(const std::string &n, FieldType t, bool req)
+  constexpr FieldDescriptor(std::string_view n, FieldType t, bool req)
       : name(n), type(t), required(req), array_element_type(FieldType::TYPE_ANY)
   {
   }
 
-  FieldDescriptor(const std::string &n, FieldType t, bool req, FieldType array_elem_type)
+  constexpr FieldDescriptor(std::string_view n, FieldType t, bool req, FieldType array_elem_type)
       : name(n), type(t), required(req), array_element_type(array_elem_type)
   {
   }
 
-  FieldDescriptor(const std::string &n, FieldType t, bool req, const FieldDescriptor *nested, size_t nested_count)
+  constexpr FieldDescriptor(std::string_view n, FieldType t, bool req, const FieldDescriptor *nested, size_t nested_count)
       : name(n), type(t), required(req), array_element_type(FieldType::TYPE_ANY), nested_schema(nested), nested_schema_count(nested_count)
   {
   }
 
-  FieldDescriptor(const std::string &n, FieldType t, bool req, FieldType array_elem_type, const FieldDescriptor *nested, size_t nested_count)
+  constexpr FieldDescriptor(std::string_view n, FieldType t, bool req, FieldType array_elem_type, const FieldDescriptor *nested, size_t nested_count)
       : name(n), type(t), required(req), array_element_type(array_elem_type), nested_schema(nested), nested_schema_count(nested_count)
   {
   }
@@ -92,16 +93,9 @@ struct FieldDescriptor
 template <typename T>
 struct SchemaRegistry
 {
-  static const FieldDescriptor *fields;
-  static size_t field_count;
+  inline static constexpr const FieldDescriptor *fields = nullptr;
+  inline static constexpr size_t field_count = 0;
 };
-
-// Default values for unspecialized types
-template <typename T>
-const FieldDescriptor *SchemaRegistry<T>::fields = nullptr;
-
-template <typename T>
-size_t SchemaRegistry<T>::field_count = 0;
 
 /**
  * Validation result type
@@ -168,13 +162,13 @@ ValidationResult validate_schema(const zjson::Value &params,
 #define ZJSON_SCHEMA(StructType, ...)                              \
   namespace validator                                              \
   {                                                                \
-  static const FieldDescriptor StructType##_schema_array[] = {     \
+  inline constexpr FieldDescriptor StructType##_schema_array[] = { \
       __VA_ARGS__};                                                \
   template <>                                                      \
-  const FieldDescriptor *SchemaRegistry<StructType>::fields =      \
+  inline constexpr const FieldDescriptor *SchemaRegistry<StructType>::fields = \
       StructType##_schema_array;                                   \
   template <>                                                      \
-  size_t SchemaRegistry<StructType>::field_count =                 \
+  inline constexpr size_t SchemaRegistry<StructType>::field_count = \
       sizeof(StructType##_schema_array) / sizeof(FieldDescriptor); \
   }
 

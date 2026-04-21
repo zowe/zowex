@@ -30,7 +30,7 @@ int handle_tso_issue(InvocationContext &context)
     context.error_stream() << "  Details: " << response << std::endl;
   }
 
-  context.output_stream() << response;
+  context.output_stream() << response << '\n';
 
   return rc;
 }

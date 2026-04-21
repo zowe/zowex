@@ -102,15 +102,15 @@ jobs:
       - name: Publish Snapshot to Artifactory
         if: ${{ !inputs.dry-run && env.TRAIN == 'Nightly' }}
         run: |
-          jfrog rt u --detailed-summary dist/*cli*.tgz libs-snapshot-local/org/zowe/zowe-native-proto/CLI/$TRAIN/zowe-native-proto-cli-$NEW_VERSION_SUFFIX.tgz
-          jfrog rt u --detailed-summary dist/*sdk*.tgz libs-snapshot-local/org/zowe/zowe-native-proto/SDK/$TRAIN/zowe-native-proto-sdk-$NEW_VERSION_SUFFIX.tgz
-          jfrog rt u --detailed-summary dist/*.vsix libs-snapshot-local/org/zowe/zowe-native-proto/VSCode/$TRAIN/zowe-native-proto-vsce-$NEW_VERSION_SUFFIX.vsix
-          jfrog rt u --detailed-summary dist/*.pax.Z libs-snapshot-local/org/zowe/zowe-native-proto/Server/$TRAIN/zowe-server-$NEW_VERSION_SUFFIX.pax.Z
+          jfrog rt u --detailed-summary dist/*cli*.tgz libs-snapshot-local/org/zowe/zowex/CLI/$TRAIN/zowex-cli-$NEW_VERSION_SUFFIX.tgz
+          jfrog rt u --detailed-summary dist/*sdk*.tgz libs-snapshot-local/org/zowe/zowex/SDK/$TRAIN/zowex-sdk-$NEW_VERSION_SUFFIX.tgz
+          jfrog rt u --detailed-summary dist/*.vsix libs-snapshot-local/org/zowe/zowex/VSCode/$TRAIN/zowex-vsce-$NEW_VERSION_SUFFIX.vsix
+          jfrog rt u --detailed-summary dist/*.pax.Z libs-snapshot-local/org/zowe/zowex/Server/$TRAIN/zowe-server-$NEW_VERSION_SUFFIX.pax.Z
 
       - name: Publish Release to Artifactory
         if: ${{ !inputs.dry-run && env.TRAIN == 'Release' }}
         run: |
-          jfrog rt u --detailed-summary dist/*cli*.tgz libs-release-local/org/zowe/zowe-native-proto/$NEW_VERSION_SUFFIX/zowe-native-proto-cli-$NEW_VERSION_SUFFIX.tgz
-          jfrog rt u --detailed-summary dist/*sdk*.tgz libs-release-local/org/zowe/zowe-native-proto/$NEW_VERSION_SUFFIX/zowe-native-proto-sdk-$NEW_VERSION_SUFFIX.tgz
-          jfrog rt u --detailed-summary dist/*.vsix libs-release-local/org/zowe/zowe-native-proto/$NEW_VERSION_SUFFIX/zowe-native-proto-vsce-$NEW_VERSION_SUFFIX.vsix
-          jfrog rt u --detailed-summary dist/*.pax.Z libs-release-local/org/zowe/zowe-native-proto/$NEW_VERSION_SUFFIX/zowe-server-$NEW_VERSION_SUFFIX.pax.Z
+          jfrog rt u --detailed-summary dist/*cli*.tgz libs-release-local/org/zowe/zowex/$NEW_VERSION_SUFFIX/zowex-cli-$NEW_VERSION_SUFFIX.tgz
+          jfrog rt u --detailed-summary dist/*sdk*.tgz libs-release-local/org/zowe/zowex/$NEW_VERSION_SUFFIX/zowex-sdk-$NEW_VERSION_SUFFIX.tgz
+          jfrog rt u --detailed-summary dist/*.vsix libs-release-local/org/zowe/zowex/$NEW_VERSION_SUFFIX/zowex-vsce-$NEW_VERSION_SUFFIX.vsix
+          jfrog rt u --detailed-summary dist/*.pax.Z libs-release-local/org/zowe/zowex/$NEW_VERSION_SUFFIX/zowe-server-$NEW_VERSION_SUFFIX.pax.Z

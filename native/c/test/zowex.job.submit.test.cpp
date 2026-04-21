@@ -675,5 +675,21 @@ void zowex_job_submit_tests(std::vector<std::string> &_jobs, std::vector<std::st
                   Expect(rc).Not().ToBe(0);
                   Expect(stderr_output).ToContain("cannot wait for unknown status");
                 });
+
+             it("should successfully submit JCL with CRLF line endings",
+                [&]()
+                {
+                  std::string jcl_crlf = "//CRLFJOB JOB (IZUACCT),TEST,CLASS=A\\r\\n//STEP1 EXEC PGM=IEFBR14\\r\\n";
+
+                  std::string stdout_output, stderr_output;
+                  std::string command = "printf \"" + jcl_crlf + "\" | " + zowex_command + " job submit-jcl --only-jobid";
+
+                  int rc = execute_command(command, stdout_output, stderr_output);
+                  std::string jobid = TrimChars(stdout_output);
+
+                  ExpectWithContext(rc, stderr_output).ToBe(0);
+                  Expect(jobid).Not().ToBe("");
+                  _jobs.push_back(jobid);
+                });
            });
 }

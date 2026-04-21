@@ -19,21 +19,18 @@ if [ ! -f "config.json" ]; then
   exit
 fi
 
-# Deploy Golang test scripts and build them
+# Deploy C++ test sources and build them
 ussDir=$(jq -r .ussDir config.json)
 zosmfProfile=$(jq -r .zosmfProfile config.json)
-npx zowe files upload ftu ../go.mod ${ussDir}/go.mod --binary --zosmf-p $zosmfProfile
-npx zowe files upload ftu ../go.sum ${ussDir}/go.sum --binary --zosmf-p $zosmfProfile
-npx zowe files upload ftu testb64.go ${ussDir}/testb64.go --binary --zosmf-p $zosmfProfile
-npx zowe files upload ftu testb85.go ${ussDir}/testb85.go --binary --zosmf-p $zosmfProfile
-npx zowe files upload ftu testraw.go ${ussDir}/testraw.go --binary --zosmf-p $zosmfProfile
-sshCmd="cd ${ussDir}; for f in testb64 testb85 testraw; do go build -o \$f \$f.go; done"
+npx zowe files upload ftu testb64.cpp ${ussDir}/testb64.cpp --binary --zosmf-p $zosmfProfile
+npx zowe files upload ftu testb85.cpp ${ussDir}/testb85.cpp --binary --zosmf-p $zosmfProfile
+npx zowe files upload ftu testraw.cpp ${ussDir}/testraw.cpp --binary --zosmf-p $zosmfProfile
+sshCmd="cd ${ussDir}; for f in testb64 testb85 testraw; do ibm-clang++64 -std=c++17 -o \$f \$f.cpp; done"
 sshProfile=$(jq -r .sshProfile config.json)
 if [ "$sshProfile" != "null" ]; then
-  npx zowe uss issue ssh "cd ${ussDir}; for f in testb64 testb85 testraw; do go build -v -o \$f \$f.go; done" --ssh-p $sshProfile
+  npx zowe uss issue ssh "$sshCmd" --ssh-p $sshProfile
 else
   echo
   echo "Connect to the ${zosmfProfile} system and run this command:"
   echo "  $sshCmd"
 fi
-# NOTE: you may need to export env vars: GOINSECURE="*" GOPROXY=direct

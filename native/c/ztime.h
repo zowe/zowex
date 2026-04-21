@@ -61,7 +61,7 @@ STCKCONV_MODEL(stckconv_model);
 #define STCKCONV(output, tod, plist, rc, format)              \
   __asm(                                                      \
       "*                                                  \n" \
-      " LGHI  2,0       Clear                             \n" \
+      " SLGR  2,2       Init register                     \n" \
       " TAM   ,         AMODE64??                         \n" \
       " JM    *+4+4+2   No, skip switching                \n" \
       " OILH  2,X'8000' Set AMODE31 flag                  \n" \
@@ -110,7 +110,7 @@ CONVTOD_MODEL(convtod_model);
 #define CONVTOD(tod, input, plist, rc, format)                \
   __asm(                                                      \
       "*                                                  \n" \
-      " LGHI  2,0       Clear                             \n" \
+      " SLGR  2,2       Init register                     \n" \
       " TAM   ,         AMODE64??                         \n" \
       " JM    *+4+4+2   No, skip switching                \n" \
       " OILH  2,X'8000' Set AMODE31 flag                  \n" \
@@ -146,7 +146,7 @@ CONVTOD_MODEL(convtod_model);
 #define CONVETOD(tod, input, plist, rc, format)               \
   __asm(                                                      \
       "*                                                  \n" \
-      " LGHI  2,0       Clear                             \n" \
+      " SLGR  2,2       Init register                     \n" \
       " TAM   ,         AMODE64??                         \n" \
       " JM    *+4+4+2   No, skip switching                \n" \
       " OILH  2,X'8000' Set AMODE31 flag                  \n" \

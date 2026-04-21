@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Suggest an idea for Zowe Native Protocol
+about: Suggest an idea for Zowe Remote SSH
 labels: enhancement
 ---
 

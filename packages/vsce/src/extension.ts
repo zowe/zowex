@@ -12,6 +12,7 @@
 import { imperative, ZoweVsCodeExtension } from "@zowe/zowe-explorer-api";
 import * as vscode from "vscode";
 import { SshCommandApi, SshJesApi, SshMvsApi, SshUssApi } from "./api";
+import { watchNativeSshSetting } from "./NativeSshHelper";
 import { SshClientCache } from "./SshClientCache";
 import { registerSshErrorCorrelations } from "./SshErrorCorrelations";
 import { initLogger, registerCommands } from "./Utilities";
@@ -30,6 +31,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(...registerCommands(context));
     context.subscriptions.push(SshClientCache.inst);
+    context.subscriptions.push(watchNativeSshSetting(context));
     zoweExplorerApi.registerMvsApi(new SshMvsApi(zoweExplorerApi.getDataSetAttrProvider?.()));
     zoweExplorerApi.registerUssApi(new SshUssApi());
     zoweExplorerApi.registerJesApi(new SshJesApi());

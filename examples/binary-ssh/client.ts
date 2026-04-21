@@ -27,8 +27,6 @@ async function main() {
     sshClient.on("ready", () => {
         console.log("SSH connection established.");
 
-        // sshClient.shell(
-        //     { modes: { ECHO: 0, ECHONL: 0, ICANON: 0, IEXTEN: 0, ISIG: 0 } },
         sshClient.exec(
             remoteBinary,
             { pty: { modes: { ECHO: 0, ECHONL: 0, ICANON: 0, IEXTEN: 0, ISIG: 0 } } },
@@ -39,20 +37,18 @@ async function main() {
                     return;
                 }
 
-                // stream.write(remoteBinary + "\n");
-                // console.log("Remote binary started.");
-                stream.stderr.on("data", (data) => {
+                stream.stderr.on("data", (data: Buffer) => {
                     console.error("STDERR:", data.toString());
                 });
-                stream.stdout.on("data", (data) => {
+                stream.stdout.on("data", (data: Buffer) => {
                     console.error("STDOUT:", data);
                     require("fs").writeFileSync("stdout.txt", data);
                 });
-                stream.on("error", (error) => {
+                stream.on("error", (error: Error) => {
                     console.error("Stream error:", error);
                     sshClient.end();
                 });
-                stream.on("close", (code, signal) => {
+                stream.on("close", (code: number, signal: string) => {
                     console.log(`Stream closed with code: ${code}, signal: ${signal}`);
                     sshClient.end();
                 });
@@ -63,7 +59,7 @@ async function main() {
         );
     });
 
-    sshClient.on("error", (err) => {
+    sshClient.on("error", (err: Error) => {
         console.error("SSH connection error:", err);
     });
 

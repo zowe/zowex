@@ -40,7 +40,7 @@ module.exports = (_env, argv) => {
       // support reading TypeScript and JavaScript files, 📖 -> https://github.com/TypeStrong/ts-loader
       extensions: ['.ts', '.js'],
       alias: {
-        'zowe-native-proto-sdk': path.resolve(__dirname, '..', 'sdk', 'src'),
+        'zowex-sdk': path.resolve(__dirname, '..', 'sdk', 'src'),
         'cpu-features': false,
         './crypto/build/Release/sshcrypto.node': false,
       }
@@ -59,7 +59,13 @@ module.exports = (_env, argv) => {
               target: 'es2022'
             },
           },
-        }
+        },
+        {
+          // Patch russh/lib/native.js to load .node binaries from prebuilds/
+          // using __non_webpack_require__ so rspack doesn't try to bundle them.
+          test: /russh[\\/]lib[\\/]native\.js$/,
+          loader: path.resolve(__dirname, 'russh-native-loader.js'),
+        },
       ]
     },
     plugins: [

@@ -118,6 +118,10 @@ export interface CreateFileRequest extends common.CommandRequest<"createFile"> {
      * Whether to create a directory (true) or a file (false)
      */
     isDir?: boolean;
+    /**
+     * Whether to overwrite existing file
+     */
+    overwrite?: boolean;
 }
 
 export type CreateFileResponse = common.CommandResponse;
@@ -165,7 +169,7 @@ export interface ListFilesResponse extends common.CommandResponse {
     returnedRows: number;
 }
 
-export interface ReadFileRequest extends common.CommandRequest<"readFile"> {
+export interface ReadFileRequest extends common.CommandRequest<"readFile">, common.WritableStreamRpc {
     /**
      * Desired encoding for the file (optional)
      */
@@ -181,7 +185,7 @@ export interface ReadFileRequest extends common.CommandRequest<"readFile"> {
     /**
      * Stream to write contents to
      */
-    stream?: Writable;
+    stream?: () => Writable;
 }
 
 export interface ReadFileResponse extends common.CommandResponse {
@@ -203,7 +207,7 @@ export interface ReadFileResponse extends common.CommandResponse {
     contentLen?: number;
 }
 
-export interface WriteFileRequest extends common.CommandRequest<"writeFile"> {
+export interface WriteFileRequest extends common.CommandRequest<"writeFile">, common.ReadableStreamRpc {
     /**
      * Desired encoding for the file (optional)
      */
@@ -227,7 +231,7 @@ export interface WriteFileRequest extends common.CommandRequest<"writeFile"> {
     /**
      * Stream to read contents from
      */
-    stream?: Readable;
+    stream?: () => Readable;
     /**
      * Length of file contents in bytes (only used for streaming)
      */

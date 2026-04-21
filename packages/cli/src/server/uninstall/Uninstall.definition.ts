@@ -16,15 +16,15 @@ export const ServerUninstallDefinition: ICommandDefinition = {
     type: "command",
     name: "uninstall",
     aliases: ["rm"],
-    summary: "Uninstall Zowe SSH server on z/OS host",
-    description: "Uninstall Zowe SSH server on z/OS host",
+    summary: "Uninstall Zowe Remote SSH server on z/OS host",
+    description: "Uninstall Zowe Remote SSH server on z/OS host",
     examples: [
         {
-            description: "Uninstall Zowe SSH server from the default location",
+            description: "Uninstall Zowe Remote SSH server from the default location",
             options: "",
         },
         {
-            description: 'Uninstall Zowe SSH server from the directory "/tmp/zowe-server"',
+            description: 'Uninstall Zowe Remote SSH server from the directory "/tmp/zowe-server"',
             options: '--server-path "/tmp/zowe-server"',
         },
     ],

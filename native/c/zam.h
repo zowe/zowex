@@ -91,7 +91,9 @@ int close_input_vsam(ZDIAG *PTR32, IO_CTRL *PTR32) ATTRIBUTE(amode31);
 #pragma map(read_output_jfcb, "ROJFCB")
 #endif
 
+// TODO: This function needs to be reworked to address some issues around opening a JFCB for input. Avoid using for now
 int read_input_jfcb(IO_CTRL *ioc) ATTRIBUTE(amode31);
+
 int read_output_jfcb(IO_CTRL *ioc) ATTRIBUTE(amode31);
 
 int bldl(IO_CTRL *, BLDL_PL *, int *rsn) ATTRIBUTE(amode31);
@@ -120,6 +122,7 @@ enum AMS_ERR
 static IO_CTRL *PTR32 new_io_ctrl()
 {
   IO_CTRL *ioc = storage_obtain24(sizeof(IO_CTRL));
+  memcpy(ioc->eye, EYE, strlen(EYE));
   memset(ioc, 0x00, sizeof(IO_CTRL));
   return ioc;
 }

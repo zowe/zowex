@@ -58,22 +58,22 @@ jobs:
         id: cli-artifact-upload
         if: ${{ matrix.os == 'ubuntu' }}
         with:
-          name: zowe-native-proto-cli
-          path: dist/zowe-native-proto-cli-*.tgz
+          name: zowex-cli
+          path: dist/zowex-cli-*.tgz
 
       - uses: actions/upload-artifact@v4
         id: vsce-artifact-upload
         if: ${{ matrix.os == 'ubuntu' }}
         with:
-          name: zowe-native-proto-vsce
+          name: zowex-vsce
           path: dist/*.vsix
 
       - uses: actions/upload-artifact@v4
         id: sdk-artifact-upload
         if: ${{ matrix.os == 'ubuntu' }}
         with:
-          name: zowe-native-proto-sdk
-          path: dist/zowe-native-proto-sdk-*.tgz
+          name: zowex-sdk
+          path: dist/zowex-sdk-*.tgz
 
       - name: Comment on PR
         if: ${{ github.event_name == 'pull_request' && matrix.os == 'ubuntu' && github.event.pull_request.head.repo.full_name == github.repository }}

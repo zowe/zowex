@@ -35,11 +35,52 @@ void zowex_tests()
                 {
                   int rc = 0;
                   std::string response;
-                  rc = execute_command_with_output(zowex_command + " --version", response);
+                  rc = execute_command_with_output(zowex_command + " version", response);
                   ExpectWithContext(rc, response).ToBe(0);
                   Expect(response).ToContain("zowex");
-                  Expect(response).ToContain("Version");
+                  Expect(response).ToContain("Version:");
+
+                  // Version information
+                  static const std::regex rev(R"(Version:\s*(\S+))");
+                  std::smatch mv;
+
+                  Expect(std::regex_search(response, mv, rev)).ToBe(true);
+                  const std::string version = mv[1].str();
+
+                  Expect(version.length()).ToBeGreaterThanOrEqualTo(5); // X.X.X at minimum
+
+                  Expect(response).ToContain("Build Date:");
+
+                  // Build date information
+                  static const std::regex red(R"(Build Date:\s*([^\r\n]+))");
+                  std::smatch md;
+
+                  Expect(std::regex_search(response, md, red)).ToBe(true);
+                  const std::string buildDate = md[1].str();
+
+                  Expect(buildDate.length()).ToBeGreaterThanOrEqualTo(11); // MMM DD YYYY at minimum
+
                   Expect(response).Not().ToContain("unknown");
+                });
+             it("should list a short version of the tool",
+                []() -> void
+                {
+                  int rc = 0;
+                  std::string response;
+                  rc = execute_command_with_output(zowex_command + " --version", response);
+                  ExpectWithContext(rc, response).ToBe(0);
+                  Expect(response).Not().ToContain("zowex");
+                  Expect(response).Not().ToContain("Version");
+                  Expect(response).Not().ToContain("Build Date");
+                  Expect(response).Not().ToContain("unknown");
+
+                  static const std::regex rev(R"(^\s*(\d+\.\d+\.\d+)(?:[-+][^\r\n]*)?\s*$)");
+                  std::smatch mv;
+
+                  Expect(std::regex_search(response, mv, rev)).ToBe(true);
+                  const std::string version = mv[1].str();
+
+                  Expect(version.length()).ToBeGreaterThanOrEqualTo(5); // X.X.X at minimum
                 });
 #ifdef RELEASE_BUILD
              it("should remain less than 10mb in size",

@@ -6,7 +6,7 @@
 #
 #  SPDX-License-Identifier: EPL-2.0
 #
-#  Shared toolchain definitions for Zowe native components.
+#  Shared toolchain definitions for the native Zowe Remote SSH components.
 #
 
 CXX=ibm-clang++64
@@ -78,6 +78,6 @@ LOG_FLAGS=-DZLOG_ENABLE
 LOG_FLAGS=-DZLOG_ENABLE
 DEBUGGER_FLAGS=-g
 OTHER_C_FLAGS=-H -dM
-.ELIF $(BuildType) == RELEASE
+.ELSIF $(BuildType) == RELEASE
 RELEASE_FLAGS=-g0 -O2
 .END

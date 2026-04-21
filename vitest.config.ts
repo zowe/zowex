@@ -23,7 +23,15 @@ export default defineConfig({
         coverage: {
             provider: "v8",
             reporter: ["text", "lcov", "html", "json"],
-            exclude: ["lib/**", "tests/**", "**/*.d.ts", "**/*.test.ts", "**/node_modules/**", "**/*.js"],
+            exclude: [
+                "benchmarks/**",
+                "lib/**",
+                "tests/**",
+                "**/*.d.ts",
+                "**/*.test.ts",
+                "**/node_modules/**",
+                "**/*.js",
+            ],
         },
         include: ["tests/**/*.test.ts"],
         testTimeout: 10000,

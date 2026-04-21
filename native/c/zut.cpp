@@ -19,15 +19,19 @@
 #include <cstdio>
 #include <cstring>
 #include <csignal>
+#include <fcntl.h>
 #include <iostream>
 #include <string>
 #include <algorithm>
 #include <unistd.h>
 #include "zut.hpp"
+#include "zlogger.hpp"
 #include "zutm.h"
 #include <ios>
 #include "zuttype.h"
 #include <vector>
+#include <array>
+#include <spawn.h>
 #include <sys/wait.h>
 #include <poll.h>
 #include <_Nascii.h>
@@ -41,9 +45,12 @@ void zut_strip_final_newline(std::string &input)
   }
 }
 
+static void zut_private_drain_fd(struct pollfd &pfd, std::string &output, pid_t pid);
+static void zut_private_drain_pipes(std::array<struct pollfd, 2> &fds, std::string &stdout_response, std::string &stderr_response, pid_t pid);
+static std::vector<const char *> zut_private_build_env(const std::string &command);
+
 int zut_private_run_program(const std::string &program, const std::vector<std::string> &args, std::string &stdout_response, std::string &stderr_response, bool merge_streams)
 {
-
   stdout_response.clear();
   stderr_response.clear();
 
@@ -75,165 +82,106 @@ int zut_private_run_program(const std::string &program, const std::vector<std::s
     return RTNCD_FAILURE;
   }
 
-  // execvp replaces the current process in-place. so we fork and run execvp in the child process
-  pid_t pid = fork();
-
-  // Fork failed
-  if (-1 == pid)
+  int devnull_fd = open("/dev/null", O_RDONLY); // for use with spawn'd stdin
+  if (devnull_fd == -1)
   {
     close(stdout_pipe[0]);
     close(stdout_pipe[1]);
     close(stderr_pipe[0]);
     close(stderr_pipe[1]);
-    return RTNCD_FAILURE;
+    return RTNCD_FAILURE; 
   }
 
-  if (0 == pid)
+  std::vector<char *> argv_vec;
+  argv_vec.reserve(args.size() + 2); // 2 = program + ending nullptr
+  argv_vec.push_back(const_cast<char *>(program.c_str()));
+  for (const auto &arg : args)
   {
-    // --- CHILD PROCESS ---
-    // doesn't read from pipes
-    close(stdout_pipe[0]);
-    close(stderr_pipe[0]);
+    argv_vec.push_back(const_cast<char *>(arg.c_str()));
+  }
+  argv_vec.push_back(nullptr);
 
-    if (merge_streams)
-    {
-      // both stdout and stderr go to stdout pipe
-      if (-1 == dup2(stdout_pipe[1], STDOUT_FILENO))
-      {
-        exit(127);
-      }
-      if (-1 == dup2(stdout_pipe[1], STDERR_FILENO))
-      {
-        exit(127);
-      }
-    }
-    else
-    {
-      if (-1 == dup2(stdout_pipe[1], STDOUT_FILENO))
-      {
-        exit(127);
-      }
-      if (-1 == dup2(stderr_pipe[1], STDERR_FILENO))
-      {
-        exit(127);
-      }
-    }
+  int fd_count = 3;
+  int fd_map[3];
 
-    close(stderr_pipe[1]);
-    close(stdout_pipe[1]);
+  fd_map[0] = devnull_fd; // set to /dev/null - no unintentional writes to stdin
 
-    // convert std::vector<std::string> to char* array for execvp
-    std::vector<char *> c_args;
-    c_args.reserve(args.size() + 2); // 2 = program + ending nullptr
-    c_args.push_back(const_cast<char *>(program.c_str()));
-    for (const auto &arg : args)
-    {
-      c_args.push_back(const_cast<char *>(arg.c_str()));
-    }
-    c_args.push_back(nullptr); // Must be null-terminated
+  // Child fd 1 (stdout): Map to the write end of the stdout pipe
+  fd_map[1] = stdout_pipe[1];
 
-    execvp(program.c_str(), c_args.data());
-
-    // If execvp returns, the program didn't run
-    const std::string error = "zut_run_program: error executing " + program;
-    perror(error.c_str());
-    exit(RTNCD_FAILURE);
+  // Child fd 2 (stderr): Map to stderr pipe, or merge with stdout pipe
+  if (merge_streams)
+  {
+    fd_map[2] = stdout_pipe[1];
   }
   else
   {
-    // --- PARENT PROCESS ---
-    close(stdout_pipe[1]);
-    close(stderr_pipe[1]);
+    fd_map[2] = stderr_pipe[1];
+  }
 
-    struct pollfd fds[2];
-    fds[0].fd = stdout_pipe[0];
-    fds[0].events = POLLIN;
+  std::vector<const char *> env_vec = zut_private_build_env(program);
+  struct inheritance inherit = {};
 
-    // only watch stderr pipe if we're not merging streams, otherwise set to -1
-    if (!merge_streams)
+  pid_t pid = spawnp(program.c_str(), fd_count, fd_map, &inherit, (const char **)argv_vec.data(), env_vec.data());
+  
+  close(devnull_fd); // close /dev/null fd right away; child has a clone
+
+  if (pid == -1)
+  {
+    int spawn_error = errno;
+    std::string error_message;
+    if (spawn_error == ENOENT) 
     {
-      fds[1].fd = stderr_pipe[0];
-      fds[1].events = POLLIN;
-    }
-    else
+      error_message = "zut_private_run_program: " + program + ": command not found";
+    } 
+    else if (spawn_error == EACCES)
     {
-      fds[1].fd = -1;
+      error_message = "zut_private_run_program: Permission denied when trying to execute '" + program + "'.";
     }
-
-    char buffer[4096];
-    ssize_t bytes_read;
-
-    // while pipes still open
-    while (fds[0].fd != -1 || fds[1].fd != -1)
-    {
-      // blocks until there's data or an error
-      if (-1 == poll(fds, 2, -1))
-      {
-        if (EINTR != errno)
-        {
-          // critical problem, cleanup child process and exit loop
-          kill(pid, SIGKILL);
-          break;        
-        } else {
-          // transient problem, run another iteration of loop
-          continue;
-        }
-      }
-
-      for (int i = 0; i < 2; i++)
-      {
-        if (fds[i].fd != -1)
-        {
-
-          std::string &output = ((0 == i) ? stdout_response : stderr_response);
-          // close pipe if there's a hangup or error, otherwise read
-          if (fds[i].revents & POLLIN)
-          {
-            bytes_read = read(fds[i].fd, buffer, sizeof(buffer));
-            if (bytes_read > 0)
-            {
-              output.append(buffer, bytes_read);
-            }
-            else if (0 == bytes_read)
-            {
-              fds[i].fd = -1; // EOF
-            }
-            else if (-1 == bytes_read && EINTR != errno)
-            {
-              // critical error, cleanup child process and stop watching fd
-              kill(pid, SIGKILL);
-              fds[i].fd = -1;
-            }
-          }
-          else if (fds[i].revents & (POLLHUP | POLLERR))
-          {
-            fds[i].fd = -1;
-          }
-        }
-      }
+    else {
+      error_message = "zut_private_run_program: error running " + program + ": " + std::string(strerror(spawn_error));
     }
-
-    zut_strip_final_newline(stdout_response);
-    zut_strip_final_newline(stderr_response);
-
+    if (merge_streams) {
+      stdout_response = error_message;
+    } else {
+      stderr_response = error_message;
+    }
     close(stdout_pipe[0]);
+    close(stdout_pipe[1]);
     close(stderr_pipe[0]);
-
-    // wait for the child process to finish and get its exit status
-    int status;
-    if (-1 == waitpid(pid, &status, 0))
-    {
-      return RTNCD_FAILURE;
-    }
-
-    // Evaluate the exit status
-    if (WIFEXITED(status))
-    {
-      return WEXITSTATUS(status);
-    }
-
+    close(stderr_pipe[1]);
     return RTNCD_FAILURE;
   }
+
+  // The parent doesn't need the write ends of the pipes
+  close(stdout_pipe[1]);
+  close(stderr_pipe[1]);
+
+  std::array<struct pollfd, 2> fds = {{{stdout_pipe[0], POLLIN, 0},
+                                       {merge_streams ? -1 : stderr_pipe[0], POLLIN, 0}}};
+
+  zut_private_drain_pipes(fds, stdout_response, stderr_response, pid);
+
+  zut_strip_final_newline(stdout_response);
+  zut_strip_final_newline(stderr_response);
+
+  close(stdout_pipe[0]);
+  close(stderr_pipe[0]);
+
+  // wait for the child process to finish and get its exit status
+  int status;
+  if (-1 == waitpid(pid, &status, 0))
+  {
+    return RTNCD_FAILURE;
+  }
+
+  // Evaluate the exit status
+  if (WIFEXITED(status))
+  {
+    return WEXITSTATUS(status);
+  }
+
+  return RTNCD_FAILURE;
 }
 
 int zut_run_program(const std::string &program, const std::vector<std::string> &args, std::string &stdout_response, std::string &stderr_response)
@@ -245,6 +193,170 @@ int zut_run_program(const std::string &program, const std::vector<std::string> &
 {
   std::string dummy;
   return zut_private_run_program(program, args, response, dummy, true);
+}
+
+static void zut_private_drain_fd(struct pollfd &pfd, std::string &output, pid_t pid)
+{
+  if (pfd.fd == -1)
+  {
+    return;
+  }
+
+  if (pfd.revents & POLLIN)
+  {
+    std::array<char, 4096> buf;
+    ssize_t n = read(pfd.fd, buf.data(), buf.size());
+    if (n > 0)
+    {
+      output.append(buf.data(), n);
+    }
+    else if (0 == n)
+    {
+      pfd.fd = -1;
+    }
+    else if (-1 == n && EINTR != errno)
+    {
+      kill(pid, SIGKILL);
+      pfd.fd = -1;
+    }
+    return;
+  }
+
+  if (pfd.revents & (POLLHUP | POLLERR))
+  {
+    pfd.fd = -1;
+  }
+}
+
+static void zut_private_drain_pipes(std::array<struct pollfd, 2> &fds,
+                                    std::string &stdout_response,
+                                    std::string &stderr_response,
+                                    pid_t pid)
+{
+  while (fds[0].fd != -1 || fds[1].fd != -1)
+  {
+    if (-1 == poll(fds.data(), fds.size(), -1))
+    {
+      if (EINTR != errno)
+      {
+        kill(pid, SIGKILL);
+        break;
+      }
+      continue;
+    }
+
+    zut_private_drain_fd(fds[0], stdout_response, pid);
+    zut_private_drain_fd(fds[1], stderr_response, pid);
+  }
+}
+
+/**
+ * Commands that change process identity (UID/GID) and are not supported
+ * when _BPX_SHAREAS=YES (shared address space). See e.g. IBM doc for newgrp.
+ * When the user runs one of these, we must not pass _BPX_SHAREAS=YES to the child.
+ */
+static constexpr std::array<const char *, 3> ZUT_NOSHAREAS_COMMANDS = {"newgrp", "su", "sg"};
+
+static bool zut_private_command_requires_noshareas(const std::string &command)
+{
+  std::string s = command;
+  const std::string whitespace(" \t\n");
+  size_t pos = s.find_first_not_of(whitespace);
+  if (pos == std::string::npos)
+  {
+    return false;
+  }
+  while (pos < s.size())
+  {
+    size_t end = pos;
+    while (end < s.size() && s[end] != ' ' && s[end] != '\t' && s[end] != '\n')
+    {
+      ++end;
+    }
+    std::string token = s.substr(pos, end - pos);
+    pos = (end < s.size()) ? s.find_first_not_of(whitespace, end) : s.size();
+
+    if (token.empty())
+    {
+      continue;
+    }
+    size_t eq = token.find('=');
+    if (eq != std::string::npos && eq > 0)
+    {
+      continue; // env assignment (e.g. FOO=bar), skip
+    }
+    size_t last_slash = token.rfind('/');
+    std::string basename = (last_slash != std::string::npos) ? token.substr(last_slash + 1) : token;
+    for (const char *cmd : ZUT_NOSHAREAS_COMMANDS)
+    {
+      if (basename == cmd)
+      {
+        return true;
+      }
+    }
+    return false;
+  }
+  return false;
+}
+
+static std::string zut_private_get_shell() {
+  std::string shell_path = "/bin/sh";
+
+  // Check if /bin/sh exists AND is executable by the current user
+  if (access(shell_path.c_str(), X_OK) != 0)
+  {
+    // otherwise, try env. If it's empty, we leave shell_path=/bin/sh
+    const char* env_shell = std::getenv("SHELL");
+    if (env_shell != nullptr && env_shell[0] != '\0')
+    {
+      shell_path = env_shell;
+    }
+  }
+
+  return shell_path;
+}
+
+static std::vector<const char *> zut_private_build_env(const std::string &command)
+{
+  extern char **environ; // NOSONAR: POSIX-mandated global, cannot be const
+  std::vector<const char *> env_vec;
+  bool has_bpx_shareas = false;
+  const bool use_noshareas = zut_private_command_requires_noshareas(command);
+
+  for (char **ep = environ; ep != nullptr && *ep != nullptr; ++ep)
+  {
+    if (0 == strncmp(*ep, "_BPX_SHAREAS=", 13))
+    {
+      has_bpx_shareas = true;
+      if (use_noshareas)
+      {
+        continue; // do not pass _BPX_SHAREAS to child for identity-changing commands
+      }
+    }
+    env_vec.push_back(*ep);
+  }
+  if (!use_noshareas && !has_bpx_shareas)
+  {
+    env_vec.push_back("_BPX_SHAREAS=YES");
+  }
+  env_vec.push_back(nullptr);
+  return env_vec;
+}
+
+int zut_spawn_shell_command(const std::string &command, std::string &stdout_response, std::string &stderr_response)
+{
+  stdout_response.clear();
+  stderr_response.clear();
+
+  if (0 == command.size())
+  {  
+    stderr_response = "Error: You must specify a program to run.";
+    return RTNCD_FAILURE;
+  }
+
+  const std::string shell_program = zut_private_get_shell();
+  std::vector<std::string> argv_vec = {"-c", command};
+  return zut_private_run_program(shell_program, argv_vec, stdout_response, stderr_response, false);
 }
 
 int zut_search(const std::string &parms)
@@ -468,13 +580,21 @@ int zut_list_parmlib(ZDIAG &diag, std::vector<std::string> &parmlibs)
   PARMLIB_DSNS dsns = {0};
   int num_dsns = 0;
 
+  ZLOG_DEBUG("zut_list_parmlib: calling ZUTMLPLB");
   rc = ZUTMLPLB(&diag, &num_dsns, &dsns);
+  ZLOG_DEBUG("zut_list_parmlib: ZUTMLPLB returned rc=%d num_dsns=%d (positive=%d)", rc, num_dsns, num_dsns > 0 ? 1 : 0);
   if (0 != rc)
   {
     return rc;
   }
 
-  parmlibs.reserve(num_dsns);
+  if (num_dsns < 0 || num_dsns > MAX_PARMLIB_DSNS)
+  {
+    ZLOG_WARN("zut_list_parmlib: clamping num_dsns from %d to [0,%d]", num_dsns, MAX_PARMLIB_DSNS);
+    num_dsns = num_dsns < 0 ? 0 : MAX_PARMLIB_DSNS;
+  }
+
+  parmlibs.reserve(static_cast<size_t>(num_dsns));
   for (int i = 0; i < num_dsns; i++)
   {
     parmlibs.emplace_back(std::string(dsns.dsn[i].val, sizeof(dsns.dsn[i].val)));

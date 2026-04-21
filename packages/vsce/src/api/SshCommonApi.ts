@@ -20,7 +20,7 @@ import {
     ZoweVsCodeExtension,
 } from "@zowe/zowe-explorer-api";
 import * as vscode from "vscode";
-import { type ZSshClient, ZSshUtils } from "zowe-native-proto-sdk";
+import { type ZSshClient, ZSshUtils } from "zowex-sdk";
 import { SshClientCache } from "../SshClientCache";
 import { SshErrorHandler } from "../SshErrorHandler";
 

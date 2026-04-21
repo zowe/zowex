@@ -10,7 +10,7 @@
  */
 
 import type { IHandlerParameters } from "@zowe/imperative";
-import type { tso, ZSshClient } from "zowe-native-proto-sdk";
+import type { tso, ZSshClient } from "zowex-sdk";
 import { SshBaseHandler } from "../../SshBaseHandler";
 
 export default class TsoCommandHandler extends SshBaseHandler {

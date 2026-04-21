@@ -73,6 +73,27 @@ typedef DECB READ_PL;
 
 typedef struct exlst EXLIST;
 
+// Ref: https://www.ibm.com/docs/en/zos/2.5.0?topic=routines-dcb-abend-exit
+typedef struct
+{
+  unsigned short system_completion_code; // offset 0: system completion code in first 12 bits
+  unsigned char return_code;             // offset 2: return code associated with completion code
+  unsigned char option_mask;             // offset 3: option mask (input) / chosen action (output)
+  // following fields are only output from exit
+  IHADCB *PTR32 dcb;              // offset 4: address of DCB
+  unsigned int diag_info;         // offset 8: for system diagnostic use
+  void *PTR32 recovery_work_area; // offset 12: must be below 16 MB
+} DCB_ABEND_PL;
+
+#define DCB_ABEND_OPT_OK_TO_RECOVER 0x08
+#define DCB_ABEND_OPT_OK_TO_IGNORE 0x04
+#define DCB_ABEND_OPT_OK_TO_DELAY 0x02
+
+#define DCB_ABEND_RC_TERMINATE 0
+#define DCB_ABEND_RC_IGNORE 4
+#define DCB_ABEND_RC_DELAY 8
+#define DCB_ABEND_RC_IGNORE_QUIETLY 20
+
 #define MAX_HEADER_LEN 100
 typedef struct
 {
@@ -167,8 +188,26 @@ typedef struct
 } NOTE_RESPONSE;
 
 #define NUM_EXLIST_ENTRIES 2 // dcbabend and jfcb
+#define EYE "IO_CTRL "
 typedef struct
 {
+  char eye[8];
+  unsigned long long int work;
+  unsigned int output : 1; // TODO(Kelosky): remove this flag
+  unsigned int input : 1;  // TODO(Kelosky): remove this flag
+  unsigned int has_enq : 1;
+  unsigned int has_reserve : 1; // not reserved space... indicates RESERVE is outstanding
+  unsigned int eof : 1;
+  unsigned int dcb_abend : 1;
+  unsigned int ucb;
+  int buffer_size;
+  char *PTR32 buffer;
+  void *PTR32 zam24;
+  int zam24_len;
+  int lines_written;
+  char *PTR32 free_location;
+  int bytes_in_buffer;
+  char ddname[8];
   IHADCB dcb;
   IFGACB ifgacb;
   DECB decb;
@@ -178,20 +217,6 @@ typedef struct
   OPEN_PL opl;
   STOW_LIST stow_list;
   IFGRPL rpl;
-  char *PTR32 buffer;
-  int buffer_size;
-  int output : 1; // TODO(Kelosky): remove this flag
-  int input : 1;  // TODO(Kelosky): remove this flag
-  unsigned int has_enq : 1;
-  unsigned int has_reserve : 1; // not reserved space... indicates RESERVE is outstanding
-  unsigned int eof : 1;         // not reserved space... indicates RESERVE is outstanding
-  unsigned int ucb;
-  void *PTR32 zam24;
-  int zam24_len;
-  int lines_written;
-  char *PTR32 free_location;
-  int bytes_in_buffer;
-  char ddname[8];
 } IO_CTRL;
 
 #endif

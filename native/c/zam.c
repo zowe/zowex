@@ -11,7 +11,7 @@
 
 #include "zam.h"
 #include "dcbd.h"
-// #include "zam24.h"
+#include "zam24.h"
 #include "zamtypes.h"
 #include "zdstype.h"
 #include "zstorage.h"
@@ -23,10 +23,8 @@
 #include "zutm31.h"
 #include "ztime.h"
 #include "zio.h"
-#include "zwto.h"
-#include "zdbg.h"
 
-register FILE_CTRL *fc ASMREG("r8");
+register IO_CTRL *gioc ASMREG("r8");
 
 typedef struct
 {
@@ -56,6 +54,22 @@ static IO_CTRL *PTR32 new_read_io_ctrl(char *PTR32 ddname, int lrecl, int blkSiz
   memcpy(dcb, &dcb_read_model, sizeof(IHADCB));
   set_dcb_info(dcb, ddname, lrecl, blkSize, recfm);
   return ioc;
+}
+
+static int handle_dcb_abend(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc, const char *PTR32 operation)
+{
+  if (ioc->dcb_abend)
+  {
+    if (0 == diag->e_msg_len)
+    {
+      strcpy(diag->service_name, operation);
+      diag->e_msg_len = sprintf(diag->e_msg, "DCB abend during %s for %8.8s data set: %44.44s",
+                                operation, ioc->ddname, ioc->jfcb.jfcbdsnm);
+      diag->detail_rc = ZDS_RTNCD_DCB_ABEND_ERROR;
+    }
+    return RTNCD_FAILURE;
+  }
+  return 0;
 }
 
 static int validate_jfcb_attributes(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
@@ -172,6 +186,11 @@ static int open_data_set(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
     strcpy(diag->service_name, "OPEN");
     diag->e_msg_len = sprintf(diag->e_msg, "Failed to open ddname: %8.8s for data set: %44.44s rc was: %d", ioc->dcb.dcbddnam, ioc->jfcb.jfcbdsnm, rc);
     diag->detail_rc = ZDS_RTNCD_OPEN_ERROR;
+    return RTNCD_FAILURE;
+  }
+
+  if (handle_dcb_abend(diag, ioc, "OPEN"))
+  {
     return RTNCD_FAILURE;
   }
 
@@ -425,6 +444,8 @@ int open_output_bpam(ZDIAG *PTR32 diag, IO_CTRL *PTR32 *PTR32 ioc, const char *P
   memcpy(new_ioc->dcb.dcbddnam, ddname, sizeof(new_ioc->dcb.dcbddnam));
   memcpy(new_ioc->ddname, ddname, sizeof(new_ioc->ddname));
 
+  gioc = new_ioc;
+
   //
   // Read the JFCB for the data set
   //
@@ -530,6 +551,12 @@ static int handle_fixed_record(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc, const char
   if (ioc->bytes_in_buffer >= blocksize)
   {
     rc = write_sync(ioc, ioc->buffer);
+
+    if (handle_dcb_abend(diag, ioc, "WRITE"))
+    {
+      return RTNCD_FAILURE;
+    }
+
     if (0 != rc)
     {
       diag->e_msg_len = sprintf(diag->e_msg, "Failed to write record rc was: %d", rc);
@@ -571,6 +598,13 @@ static int write_variable_record(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc, const ch
   ioc->dcb.dcbblksi = ioc->bytes_in_buffer; // temporary update block size before writing
 
   rc = write_sync(ioc, ioc->buffer);
+  ioc->dcb.dcbblksi = blocksize; // restore block size before we do anything else
+
+  if (handle_dcb_abend(diag, ioc, "WRITE"))
+  {
+    return RTNCD_FAILURE;
+  }
+
   if (0 != rc)
   {
     diag->e_msg_len = sprintf(diag->e_msg, "Failed to write record rc was: %d", rc);
@@ -578,7 +612,6 @@ static int write_variable_record(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc, const ch
     diag->service_rc = rc;
     return RTNCD_FAILURE;
   }
-  ioc->dcb.dcbblksi = blocksize;
 
   ioc->free_location = ioc->buffer;
   ioc->free_location += sizeof(BDW);
@@ -645,6 +678,8 @@ int write_output_bpam(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc, const char *PTR32 d
   int lrecl = ioc->dcb.dcblrecl;
   int blocksize = ioc->dcb.dcbblksi;
 
+  gioc = ioc;
+
   if (ioc->dcb.dcbrecfm & dcbrecv)
   {
     // Truncate line to fit within LRECL (accounting for RDW)
@@ -691,7 +726,14 @@ static int write_flush(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
       }
 
       ioc->dcb.dcbblksi = ioc->bytes_in_buffer; // temporary update block size before writing
-      rc = write_sync(ioc, ioc->buffer);        // TODO(Kelosky): if we abend, we MUST restore the original block size before CLOSE
+      rc = write_sync(ioc, ioc->buffer);
+      ioc->dcb.dcbblksi = blocksize; // restore block size before we do anything else
+
+      if (handle_dcb_abend(diag, ioc, "WRITE"))
+      {
+        return RTNCD_FAILURE;
+      }
+
       if (0 != rc)
       {
         diag->e_msg_len = sprintf(diag->e_msg, "Failed to write record rc was: %d", rc);
@@ -699,7 +741,6 @@ static int write_flush(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
         diag->service_rc = rc;
         return RTNCD_FAILURE;
       }
-      ioc->dcb.dcbblksi = blocksize;
 
       ioc->bytes_in_buffer = 0;
       ioc->free_location = ioc->buffer;
@@ -895,15 +936,18 @@ static int close_data_set(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
   if (ioc->dcb.dcboflgs & dcbofopn)
   {
     rc = close_dcb(&ioc->dcb);
-    if (0 != rc)
+
+    if (handle_dcb_abend(diag, ioc, "CLOSE"))
     {
-      if (0 == diag->e_msg_len) // only set error if no error message was already set
-      {
-        diag->service_rc = rc;
-        strcpy(diag->service_name, "CLOSE");
-        diag->e_msg_len = sprintf(diag->e_msg, "Failed to close ddname: %8.8s data set: %44.44s rc was: %d", ioc->ddname, ioc->jfcb.jfcbdsnm, rc);
-        diag->detail_rc = ZDS_RTNCD_CLOSE_ERROR;
-      }
+      return RTNCD_FAILURE;
+    }
+
+    if (0 != rc && 0 == diag->e_msg_len) // only set error if no error message was already set
+    {
+      diag->service_rc = rc;
+      strcpy(diag->service_name, "CLOSE");
+      diag->e_msg_len = sprintf(diag->e_msg, "Failed to close ddname: %8.8s data set: %44.44s rc was: %d", ioc->ddname, ioc->jfcb.jfcbdsnm, rc);
+      diag->detail_rc = ZDS_RTNCD_CLOSE_ERROR;
     }
   }
   return rc;
@@ -959,21 +1003,10 @@ static int deq_data_set(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
   return rc;
 }
 
-// TODO(Kelosky): handle when each fails... continue or return?
-int close_output_bpam(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
+static int finalize_dcb(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
 {
   int rc = 0;
   int first_rc = 0;
-
-  //
-  // Write any remaining bytes in the buffer
-  //
-  rc = write_flush(diag, ioc);
-  if (0 != rc)
-  {
-    if (0 == first_rc)
-      first_rc = rc;
-  }
 
   //
   // Update ISPF statistics
@@ -1008,6 +1041,41 @@ int close_output_bpam(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
       first_rc = rc;
   }
 
+  return first_rc;
+}
+
+// TODO(Kelosky): handle when each fails... continue or return?
+int close_output_bpam(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
+{
+  int rc = 0;
+  int first_rc = 0;
+
+  gioc = ioc;
+
+  //
+  // Write any remaining bytes in the buffer
+  //
+  rc = write_flush(diag, ioc);
+  if (0 != rc)
+  {
+    first_rc = rc;
+  }
+
+  //
+  // Per IBM docs: check whether the DCB is really open before issuing
+  // any other macros using that DCB, other than CLOSE or FREEPOOL.
+  // If write_flush encountered an E37 and the DCB was silently closed,
+  // skip STOW and CLOSE but still perform DEQ and cleanup below.
+  //
+  if (ioc->dcb.dcboflgs & dcbofopn)
+  {
+    rc = finalize_dcb(diag, ioc);
+    if (0 != rc && 0 == first_rc)
+    {
+      first_rc = rc;
+    }
+  }
+
   //
   // Release the buffer
   //
@@ -1022,20 +1090,24 @@ int close_output_bpam(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
   // DEQ the reserve data set
   //
   rc = deq_reserve_data_set(diag, ioc);
-  if (0 != rc)
+  if (0 != rc && 0 == first_rc)
   {
-    if (0 == first_rc)
-      first_rc = rc;
+    first_rc = rc;
   }
 
   //
   // DEQ the data set
   //
   rc = deq_data_set(diag, ioc);
-  if (0 != rc)
+  if (0 != rc && 0 == first_rc)
   {
-    if (0 == first_rc)
-      first_rc = rc;
+    first_rc = rc;
+  }
+
+  if (ioc->zam24)
+  {
+    storage_release(ioc->zam24_len, ioc->zam24);
+    ioc->zam24 = NULL;
   }
 
   storage_release(sizeof(IO_CTRL), ioc);
@@ -1059,25 +1131,6 @@ IO_CTRL *open_output_assert(char *ddname, int lrecl, int blkSize, unsigned char 
   return ioc;
 }
 
-IO_CTRL *open_input_assert(char *ddname, int lrecl, int blkSize, unsigned char recfm)
-{
-  IO_CTRL *ioc = new_read_io_ctrl(ddname, lrecl, blkSize, recfm);
-  set_dcb_dcbe(&ioc->dcb);
-  set_eod(&ioc->dcb, eodad);
-  IHADCB *dcb = &ioc->dcb;
-  int rc = 0;
-  dcb->dcbdsrg1 = dcbdsgps; // DSORG=PS
-
-  rc = open_input_dcb(dcb);
-  ioc->input = 1;
-
-  if (0 != rc)
-    s0c3_abend(OPEN_INPUT_ASSERT_RC);
-  if (!(dcbofopn & dcb->dcboflgs))
-    s0c3_abend(OPEN_INPUT_ASSERT_FAIL);
-  return ioc;
-}
-
 void close_assert(IO_CTRL *ioc)
 {
   IHADCB *dcb = &ioc->dcb;
@@ -1098,12 +1151,11 @@ void close_assert(IO_CTRL *ioc)
     }
   }
 
-  // if (ioc->zam24)
-  // {
-  //   zwto_debug("@TEST close_assert: releasing zam24: %p", ioc->zam24);
-  //   storage_release(ioc->zam24_len, ioc->zam24);
-  //   ioc->zam24 = NULL;
-  // }
+  if (ioc->zam24)
+  {
+    storage_release(ioc->zam24_len, ioc->zam24);
+    ioc->zam24 = NULL;
+  }
 
   storage_release(sizeof(IO_CTRL), ioc);
 }
@@ -1144,28 +1196,61 @@ int note(IO_CTRL *ioc, NOTE_RESPONSE *PTR32 note_response, int *rsn)
   return rc;
 }
 
-// TODO(Kelosky): common logic for both read_input_jfcb and read_output_jfcb should be combined
+#pragma prolog(ZAMDEXIT, " ZWEPROLG NEWDSA=(YES,24),SAVE=BAKR ")
+#pragma epilog(ZAMDEXIT, " ZWEEPILG ")
+int ZAMDEXIT(DCB_ABEND_PL *PTR32 plist)
+{
+  gioc->dcb_abend = 1; // note DCBABEND
+
+  // Some abends cannot be ignored or delayed (such as SB14). Default is worst-case scenario of following through w/ termination.
+  int rc = DCB_ABEND_RC_TERMINATE;
+  if (plist->option_mask & DCB_ABEND_OPT_OK_TO_IGNORE)
+  {
+    // If the abend is safe to ignore according to the option mask, tell the system to ignore it (e.g. SE37 out-of-space)
+    // EOV abends continue to terminate and ignore this option, so ESTAEX will handle them instead.
+    rc = DCB_ABEND_RC_IGNORE;
+  }
+  else if (plist->option_mask & DCB_ABEND_OPT_OK_TO_DELAY)
+  {
+    // If ignoring is not possible, we can sometimes delay the abend until all the DCBs in the same OPEN or CLOSE macro are opened or closed
+    rc = DCB_ABEND_RC_DELAY;
+  }
+
+  return rc;
+}
+
+typedef int (*ZAM24Fn)();
+
+static void setup_exit_list(IO_CTRL *ioc)
+{
+  // Ref: https://www.ibm.com/docs/en/zos/2.5.0?topic=routines-dcb-exit-list
+  int zam24_len = ZAM24Q();
+  ioc->zam24_len = zam24_len;
+  ioc->zam24 = storage_obtain24(zam24_len);
+  // Copy function to local variable to avoid memcpy cast error
+  ZAM24Fn x = ZAM24;
+  memcpy(ioc->zam24, (void *)x, zam24_len);
+
+  // DCB abend exit that invokes ZAMDEXIT
+  ioc->exlst[0].exlentrb = (unsigned int)ioc->zam24;
+  ioc->exlst[0].exlcodes = exldcbab;
+  // "End-of-list" entry (used as delimiter)
+  ioc->exlst[1].exlentrb = (unsigned int)&ioc->jfcb;
+  ioc->exlst[1].exlcodes = exllaste + exlrjfcb;
+
+  memcpy(&ioc->rdjfcb_pl, &rdfjfcb_model, sizeof(RDJFCB_PL));
+
+  unsigned char recfm = ioc->dcb.dcbrecfm;
+  void *PTR32 exlst = &ioc->exlst;
+  memcpy(&ioc->dcb.dcbexlst, &exlst, sizeof(ioc->dcb.dcbexlst));
+  ioc->dcb.dcbrecfm = recfm;
+}
+
+// TODO: This function needs to be reworked to address some issues around opening a JFCB for input. Avoid using for now
 int read_input_jfcb(IO_CTRL *ioc)
 {
   int rc = 0;
-
-  // int zam24_len = ZAM24Q();
-  // zwto_debug("@TEST zam24_len: %d", zam24_len);
-  // ioc->zam24_len = zam24_len;
-  // ioc->zam24 = storage_obtain24(zam24_len);
-  // memcpy(ioc->zam24, (void *PTR32)ZAM24, zam24_len);
-
-  // ioc->exlst[0].exlentrb = (unsigned int)ioc->zam24; uncommend to enable DCBABEND
-  // ioc->exlst[0].exlcodes = exldcbab;
-  ioc->exlst[0].exlentrb = (unsigned int)&ioc->jfcb;
-  ioc->exlst[0].exlcodes = exllaste + exlrjfcb;
-  memcpy(&ioc->rdjfcb_pl, &rdfjfcb_model, sizeof(RDJFCB_PL));
-
-  unsigned char recfm = ioc->dcb.dcbrecfm; // save the recfm
-  void *PTR32 exlst = &ioc->exlst;
-  memcpy(&ioc->dcb.dcbexlst, &exlst, sizeof(ioc->dcb.dcbexlst));
-  ioc->dcb.dcbrecfm = recfm; // restore the recfm
-
+  setup_exit_list(ioc);
   RDJFCB(ioc->dcb, ioc->rdjfcb_pl, rc, INPUT);
   return rc;
 }
@@ -1173,24 +1258,7 @@ int read_input_jfcb(IO_CTRL *ioc)
 int read_output_jfcb(IO_CTRL *ioc)
 {
   int rc = 0;
-
-  // int zam24_len = ZAM24Q();
-  // zwto_debug("@TEST zam24_len: %d", zam24_len);
-  // ioc->zam24_len = zam24_len;
-  // ioc->zam24 = storage_obtain24(zam24_len);
-  // memcpy(ioc->zam24, (void *PTR32)ZAM24, zam24_len);
-
-  // ioc->exlst[0].exlentrb = (unsigned int)ioc->zam24; uncommend to enable DCBABEND
-  // ioc->exlst[0].exlcodes = exldcbab;
-  ioc->exlst[0].exlentrb = (unsigned int)&ioc->jfcb;
-  ioc->exlst[0].exlcodes = exllaste + exlrjfcb;
-  memcpy(&ioc->rdjfcb_pl, &rdfjfcb_model, sizeof(RDJFCB_PL));
-
-  unsigned char recfm = ioc->dcb.dcbrecfm; // save the recfm
-  void *PTR32 exlst = &ioc->exlst;
-  memcpy(&ioc->dcb.dcbexlst, &exlst, sizeof(ioc->dcb.dcbexlst));
-  ioc->dcb.dcbrecfm = recfm; // restore the recfm
-
+  setup_exit_list(ioc);
   RDJFCB(ioc->dcb, ioc->rdjfcb_pl, rc, OUTPUT);
   return rc;
 }
@@ -1280,14 +1348,6 @@ int check(DECB *cpl)
   return rc;
 }
 
-void read_dcb(IHADCB *dcb, READ_PL *rpl, char *buffer)
-{
-  // NOTE(Kelosky): READ does not appear to give an RC
-  int rc = 0;
-  memset(rpl, 0x00, sizeof(READ_PL));
-  READ(*dcb, *rpl, *buffer, rc);
-}
-
 int close_dcb(IHADCB *dcb)
 {
   int rc = 0;
@@ -1309,64 +1369,4 @@ int write_sync(IO_CTRL *ioc, char *buffer)
   }
 
   return check(&ioc->decb);
-}
-
-int read_sync(IO_CTRL *ioc, char *buffer)
-{
-  int rc = 0;
-  READ_PL *rpl = &ioc->decb;
-  IHADCB *dcb = &ioc->dcb;
-
-  if (dcb->dcbdcbe)
-  {
-    // file control begins at DCBE address
-    fc = dcb->dcbdcbe;
-
-    // fixed only records until rdjfcb
-    if (dcbrecf == dcb->dcbrecfm)
-    {
-      // TODO(Kelosky): skip read and use buffer for blocked records
-      // TODO(Kelosky): check for rc
-      // right now, for non-blocked, there is no buffer
-      read_dcb(dcb, rpl, fc->buffer);
-      // read(dcb, rpl, buffer);
-
-      rc = check(rpl);
-      if (fc->eod)
-      {
-        return -1;
-      }
-      if (0 != rc)
-      {
-        return rc;
-      }
-
-      // TODO(Kelosky): offset into buffer
-      memcpy(buffer, fc->buffer, dcb->dcblrecl);
-    }
-    else
-    {
-      s0c3_abend(UNSUPPORTED_RECFM);
-    }
-  }
-  else
-  {
-    s0c3_abend(DCBE_REQUIRED);
-  }
-
-  return 0;
-}
-
-// NOTE(Kelosky): registers 2-13 should be the same as the time
-// the read/check was called for non-VSAM end of data exit.
-void eodad()
-{
-  fc->eod = 1;
-}
-
-#pragma prolog(ZAMDA31, " ZWEPROLG NEWDSA=(YES,8),SAVE=BAKR ") // TODO(Kelosky): BSM=NO?
-#pragma epilog(ZAMDA31, " ZWEEPILG ")
-int ZAMDA31()
-{
-  return 0;
 }

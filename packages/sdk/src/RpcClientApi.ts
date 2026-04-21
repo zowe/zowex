@@ -10,7 +10,7 @@
  */
 
 import type { IRpcClient } from "./doc/client";
-import type { CommandRequest, CommandResponse, console, ds, jobs, system, tool, tso, uss } from "./doc/rpc";
+import type { CommandRequest, CommandResponse, console, core, ds, jobs, system, tool, tso, uss } from "./doc/rpc";
 import type { ProgressCallback } from "./doc/types";
 
 export abstract class RpcClientApi implements IRpcClient {
@@ -21,6 +21,10 @@ export abstract class RpcClientApi implements IRpcClient {
 
     public console = {
         issueCmd: this.rpc<console.IssueConsoleCmdRequest, console.IssueConsoleCmdResponse>("consoleCommand"),
+    };
+
+    public core = {
+        getInfo: this.rpc<core.GetInfoRequest, core.GetInfoResponse>("getInfo"),
     };
 
     public ds = {

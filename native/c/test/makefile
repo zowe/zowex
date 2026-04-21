@@ -40,7 +40,7 @@ ASM_FLAGS+=--verbose
 CPP_LIST_FLAG=
 MTL_LIST_FLAG=-qlist=$*.mtl.lst
 ASM_LIST_FLAG=-a=$*.s.lst
-.ELIF $(BuildType) == RELEASE
+.ELSIF $(BuildType) == RELEASE
 CPP_BND_FLAGS=$(CPP_BND_BASE_FLAGS) $(RELEASE_FLAGS)
 CPP_BND_FLAGS_AUTH=$(CPP_BND_BASE_FLAGS_AUTH) $(RELEASE_FLAGS)
 C_FLAGS+=$(RELEASE_FLAGS)
@@ -106,6 +106,7 @@ build-out/zds.test.o \
 build-out/zds.o \
 build-out/zdsm.o \
 build-out/zam.o \
+build-out/zam24.o \
 build-out/zjb.test.o \
 build-out/zjb.o \
 build-out/zjbm.o \
@@ -136,7 +137,9 @@ build-out/zlogger_metal.o \
 build-out/zjson.test.o \
 build-out/zjsonm.o \
 build-out/zowex.server.test.o \
-build-out/worker.test.o
+build-out/server.worker.test.o \
+build-out/server_validator.o \
+build-out/server.validator.test.o
 	$(CXX) $(CPP_BND_FLAGS) -o $@ $^
 
 build-out/zut.o:
@@ -157,6 +160,9 @@ build-out/zdsm.o:
 build-out/zam.o:
 	ln -sf ../../build-out/zam.o build-out/zam.o
 
+build-out/zam24.o:
+	ln -sf ../../build-out/zam24.o build-out/zam24.o
+
 build-out/zjb.o:
 	ln -sf ../../build-out/zjb.o build-out/zjb.o
 
@@ -174,6 +180,9 @@ build-out/zcnm31.o:
 
 build-out/zusf.o:
 	ln -sf ../../build-out/zusf.o build-out/zusf.o
+
+build-out/server_validator.o:
+	ln -sf ../../build-out/server/validator.o build-out/server_validator.o
 
 build-out/zowex.ds.test.o: zowex.ds.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
@@ -274,7 +283,7 @@ build-out/zjson.test.o: zjson.test.cpp
 build-out/zowex.server.test.o: zowex.server.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
-build-out/worker.test.o: worker.test.cpp
+build-out/server.worker.test.o: server/worker.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
 build-out/zjsonm.s: ../zjsonm.c
@@ -282,6 +291,9 @@ build-out/zjsonm.s: ../zjsonm.c
 
 build-out/zjsonm.o: build-out/zjsonm.s
 	$(ASM) $(ASM_FLAGS) $(ASM_LIST_FLAG) $(MACLIBS) -o $@ $^
+
+build-out/server.validator.test.o: server/validator.test.cpp
+	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
 #
 # Testing utilities

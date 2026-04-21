@@ -11,7 +11,7 @@
 
 import { type ICommandHandler, type IHandlerParameters, TextUtils } from "@zowe/imperative";
 import { SshSession } from "@zowe/zos-uss-for-zowe-sdk";
-import { type CommandResponse, type ISshErrorDefinition, ZSshClient, ZSshUtils } from "zowe-native-proto-sdk";
+import { type CommandResponse, type ISshErrorDefinition, ZSshClient, ZSshUtils } from "zowex-sdk";
 import { translateCliError } from "./CliErrorUtils";
 
 export abstract class SshBaseHandler implements ICommandHandler {

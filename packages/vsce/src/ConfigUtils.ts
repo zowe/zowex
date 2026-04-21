@@ -23,7 +23,7 @@ import {
     type qpItem,
     type qpOpts,
     ZSshClient,
-} from "zowe-native-proto-sdk";
+} from "zowex-sdk";
 import { getVsceConfig } from "./Utilities";
 
 // biome-ignore lint/complexity/noStaticOnlyClass: Utilities class has static methods

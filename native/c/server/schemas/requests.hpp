@@ -43,6 +43,8 @@ ZJSON_SCHEMA(IssueConsoleCmdRequest,
     FIELD_OPTIONAL(consoleName, STRING)
 );
 
+struct GetInfoRequest {};
+
 struct CreateDatasetRequest {};
 ZJSON_SCHEMA(CreateDatasetRequest,
     FIELD_REQUIRED(dsname, STRING),
@@ -51,7 +53,8 @@ ZJSON_SCHEMA(CreateDatasetRequest,
 
 struct CreateMemberRequest {};
 ZJSON_SCHEMA(CreateMemberRequest,
-    FIELD_REQUIRED(dsname, STRING)
+    FIELD_REQUIRED(dsname, STRING),
+    FIELD_OPTIONAL(overwrite, BOOL)
 );
 
 struct DeleteDatasetRequest {};
@@ -93,11 +96,11 @@ ZJSON_SCHEMA(ListDsMembersRequest,
 
 struct ReadDatasetRequest {};
 ZJSON_SCHEMA(ReadDatasetRequest,
+    FIELD_OPTIONAL(stream, ANY),
     FIELD_OPTIONAL(encoding, STRING),
     FIELD_OPTIONAL(localEncoding, STRING),
     FIELD_OPTIONAL(volume, STRING),
-    FIELD_REQUIRED(dsname, STRING),
-    FIELD_OPTIONAL(stream, ANY)
+    FIELD_REQUIRED(dsname, STRING)
 );
 
 struct RestoreDatasetRequest {};
@@ -107,13 +110,13 @@ ZJSON_SCHEMA(RestoreDatasetRequest,
 
 struct WriteDatasetRequest {};
 ZJSON_SCHEMA(WriteDatasetRequest,
+    FIELD_OPTIONAL(stream, ANY),
     FIELD_OPTIONAL(encoding, STRING),
     FIELD_OPTIONAL(localEncoding, STRING),
     FIELD_OPTIONAL(etag, STRING),
     FIELD_OPTIONAL(volume, STRING),
     FIELD_REQUIRED(dsname, STRING),
-    FIELD_OPTIONAL(data, STRING),
-    FIELD_OPTIONAL(stream, ANY)
+    FIELD_OPTIONAL(data, STRING)
 );
 
 struct CancelJobRequest {};
@@ -240,7 +243,8 @@ struct CreateFileRequest {};
 ZJSON_SCHEMA(CreateFileRequest,
     FIELD_OPTIONAL(permissions, STRING),
     FIELD_REQUIRED(fspath, STRING),
-    FIELD_OPTIONAL(isDir, BOOL)
+    FIELD_OPTIONAL(isDir, BOOL),
+    FIELD_OPTIONAL(overwrite, BOOL)
 );
 
 struct DeleteFileRequest {};
@@ -261,20 +265,20 @@ ZJSON_SCHEMA(ListFilesRequest,
 
 struct ReadFileRequest {};
 ZJSON_SCHEMA(ReadFileRequest,
+    FIELD_OPTIONAL(stream, ANY),
     FIELD_OPTIONAL(encoding, STRING),
     FIELD_OPTIONAL(localEncoding, STRING),
-    FIELD_REQUIRED(fspath, STRING),
-    FIELD_OPTIONAL(stream, ANY)
+    FIELD_REQUIRED(fspath, STRING)
 );
 
 struct WriteFileRequest {};
 ZJSON_SCHEMA(WriteFileRequest,
+    FIELD_OPTIONAL(stream, ANY),
     FIELD_OPTIONAL(encoding, STRING),
     FIELD_OPTIONAL(localEncoding, STRING),
     FIELD_OPTIONAL(etag, STRING),
     FIELD_REQUIRED(fspath, STRING),
     FIELD_OPTIONAL(data, STRING),
-    FIELD_OPTIONAL(stream, ANY),
     FIELD_OPTIONAL(contentLen, NUMBER)
 );
 

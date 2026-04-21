@@ -1,6 +1,6 @@
-# Comparing Zowe Native Protocol (ZNP) vs z/OSMF REST API
+# Comparing Zowe Remote SSH (ZNP) vs z/OSMF REST API
 
-This document helps illustrate the architectural differences between Zowe Native Protocol (SSH-based) and z/OSMF REST API approaches for mainframe access in Zowe Clients.
+This document helps illustrate the architectural differences between Zowe Remote SSH (SSH-based) and z/OSMF REST API approaches for mainframe access in Zowe Clients.
 
 ## High-Level Architecture
 
@@ -265,7 +265,7 @@ graph TB
 
 ```mermaid
 graph TB
-    subgraph "Zowe Native Protocol"
+    subgraph "Zowe Remote SSH"
         SSH_CONN["Single SSH Connection<br/>• Persistent<br/>• Multiplexed<br/>• Keep-alive"]
         SSH_BENEFIT["✅ Lower latency<br/>✅ Persistent state<br/>✅ Concurrent requests"]
         SSH_CONN --> SSH_BENEFIT
@@ -287,7 +287,7 @@ graph TB
 
 ```mermaid
 graph TB
-    subgraph "Zowe Native Protocol"
+    subgraph "Zowe Remote SSH"
         ZNP_RESOURCE["Resource Usage<br/>• Single SSH daemon process<br/>• Embedded zowex server<br/>• Efficient connection reuse"]
         ZNP_SCALE["Scaling Behavior<br/>• Multiplexed requests<br/>• Worker pool management<br/>• Predictable resource usage"]
         ZNP_RESOURCE --> ZNP_SCALE
@@ -309,7 +309,7 @@ graph TB
 
 ```mermaid
 flowchart TD
-    subgraph "Zowe Native Protocol Path"
+    subgraph "Zowe Remote SSH Path"
         ZNP_START["Client Request"] --> ZNP_SSH["SSH Transport"]
         ZNP_SSH --> ZNP_JSON["JSON-RPC Parsing"]
         ZNP_JSON --> ZNP_CPP["C++ Command Handler"]
@@ -398,7 +398,7 @@ graph TB
 ```mermaid
 sequenceDiagram
     participant Dev as Developer
-    participant ZNP as Zowe Native Protocol
+    participant ZNP as Zowe Remote SSH
     participant ZOSMF as z/OSMF REST API
 
     Note over Dev: Scenario: Rapid file editing workflow
@@ -425,7 +425,7 @@ sequenceDiagram
 
 ```mermaid
 graph LR
-    subgraph "Zowe Native Protocol"
+    subgraph "Zowe Remote SSH"
         ZNP_STREAM["Streaming Support<br/>• Base64 chunks<br/>• Named pipes<br/>• Progress tracking"]
         ZNP_BINARY["Binary Handling<br/>• Direct encoding<br/>• Efficient transfer<br/>• Large file support"]
     end

@@ -23,20 +23,26 @@
                     "type": "pattern",
                     "pattern": "[%d{yyyy/MM/dd} %d{hh:mm:ss.SSS}] [%p] %m"
                 },
-                "filename": "logs/zowe-native-proto.log"
+                "filename": "logs/zowex.log"
             }
         },
         "categories": {
             "default": {
-                "appenders": ["default"],
+                "appenders": [
+                    "default"
+                ],
                 "level": "DEBUG"
             },
             "imperative": {
-                "appenders": ["imperative"],
+                "appenders": [
+                    "imperative"
+                ],
                 "level": "DEBUG"
             },
             "app": {
-                "appenders": ["app"],
+                "appenders": [
+                    "app"
+                ],
                 "level": "DEBUG"
             }
         }

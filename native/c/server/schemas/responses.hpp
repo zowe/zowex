@@ -102,6 +102,13 @@ ZJSON_SCHEMA(IssueConsoleCmdResponse,
     FIELD_REQUIRED(data, STRING)
 );
 
+struct GetInfoResponse {};
+ZJSON_SCHEMA(GetInfoResponse,
+    FIELD_REQUIRED(success, BOOL),
+    FIELD_REQUIRED(version, STRING),
+    FIELD_REQUIRED(buildDate, STRING)
+);
+
 struct CreateDatasetResponse {};
 ZJSON_SCHEMA(CreateDatasetResponse,
     FIELD_REQUIRED(success, BOOL)

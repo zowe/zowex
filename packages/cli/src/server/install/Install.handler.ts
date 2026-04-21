@@ -16,7 +16,7 @@ import {
     type ITaskWithStatus,
     TaskStage,
 } from "@zowe/imperative";
-import { ZSshClient, ZSshUtils } from "zowe-native-proto-sdk";
+import { ZSshClient, ZSshUtils } from "zowex-sdk";
 import { translateCliError } from "../../CliErrorUtils";
 import { SshBaseHandler } from "../../SshBaseHandler";
 
@@ -27,7 +27,7 @@ export default class ServerInstallHandler implements ICommandHandler {
 
         const task: ITaskWithStatus = {
             percentComplete: 0,
-            statusMessage: "Deploying Zowe SSH server...",
+            statusMessage: "Deploying Zowe Remote SSH server...",
             stageName: TaskStage.IN_PROGRESS,
         };
 
@@ -62,7 +62,7 @@ export default class ServerInstallHandler implements ICommandHandler {
             params.response.progress.endBar();
         }
         params.response.console.log(
-            `Installed Zowe SSH server on ${ConfigUtils.getActiveProfileName("ssh", params.arguments)}`,
+            `Installed Zowe Remote SSH server on ${ConfigUtils.getActiveProfileName("ssh", params.arguments)}`,
         );
     }
 }

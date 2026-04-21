@@ -26,5 +26,6 @@ int handle_uss_delete(InvocationContext &result);
 int handle_uss_chmod(InvocationContext &result);
 int handle_uss_chown(InvocationContext &result);
 int handle_uss_chtag(InvocationContext &result);
+int handle_uss_issue_cmd(InvocationContext &context);
 void register_commands(parser::Command &root_command);
 } // namespace uss

@@ -9,7 +9,7 @@
  *
  */
 
-import { type ISshErrorDefinition, SshErrors } from "zowe-native-proto-sdk";
+import { type ISshErrorDefinition, SshErrors } from "zowex-sdk";
 
 /**
  * Translates known CLI errors into more user-friendly messages.

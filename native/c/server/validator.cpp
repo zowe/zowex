@@ -11,6 +11,7 @@
 
 #include "validator.hpp"
 #include "../zjson.hpp"
+#include <string_view>
 #include <unordered_set>
 
 using std::string;
@@ -101,20 +102,25 @@ ValidationResult validate_schema(const zjson::Value &params,
   }
 
   const auto &obj = params.as_object();
-  std::unordered_set<std::string> seen_fields;
+  std::unordered_set<std::string_view> seen_fields;
+  seen_fields.reserve(field_count);
+
+  auto get_field_path = [&parent_field](std::string_view name) {
+    return parent_field.empty() ? std::string(name) : parent_field + "." + std::string(name);
+  };
 
   // Check each field in the schema
   for (size_t i = 0; i < field_count; i++)
   {
     const FieldDescriptor &field = schema[i];
-    auto field_it = obj.find(field.name);
-    std::string field_path = parent_field.empty() ? field.name : parent_field + "." + field.name;
+    const std::string field_name_str(field.name);
+    auto field_it = obj.find(field_name_str);
 
     if (field_it == obj.end())
     {
       if (field.required)
       {
-        return ValidationResult::error(std::string("Missing required field: ") + field_path);
+        return ValidationResult::error("Missing required field: " + get_field_path(field.name));
       }
       continue;
     }
@@ -131,7 +137,7 @@ ValidationResult validate_schema(const zjson::Value &params,
     // Check type
     if (!check_type(value, field.type))
     {
-      return ValidationResult::error(std::string("Field '") + field_path + "' has wrong type. Expected " +
+      return ValidationResult::error("Field '" + get_field_path(field.name) + "' has wrong type. Expected " +
                                      type_name(field.type) + ", got " + actual_type_name(value));
     }
 
@@ -142,7 +148,7 @@ ValidationResult validate_schema(const zjson::Value &params,
       {
         return ValidationResult::error("Nested schemas beyond 1 level deep are not supported");
       }
-      ValidationResult nested_result = validate_schema(value, field.nested_schema, field.nested_schema_count, allow_unknown_fields, field.name);
+      ValidationResult nested_result = validate_schema(value, field.nested_schema, field.nested_schema_count, allow_unknown_fields, std::string(field.name));
       if (!nested_result.is_valid)
       {
         return nested_result;
@@ -157,7 +163,7 @@ ValidationResult validate_schema(const zjson::Value &params,
       {
         if (!check_type(arr[0], field.array_element_type))
         {
-          return ValidationResult::error(std::string("Field '") + field_path + "[0]' has wrong type. Expected " +
+          return ValidationResult::error("Field '" + get_field_path(field.name) + "[0]' has wrong type. Expected " +
                                          type_name(field.array_element_type) + ", got " + actual_type_name(arr[0]));
         }
 
@@ -168,7 +174,7 @@ ValidationResult validate_schema(const zjson::Value &params,
           {
             return ValidationResult::error("Nested schemas beyond 1 level deep are not supported");
           }
-          ValidationResult nested_result = validate_schema(arr[0], field.nested_schema, field.nested_schema_count, allow_unknown_fields, field.name + "[0]");
+          ValidationResult nested_result = validate_schema(arr[0], field.nested_schema, field.nested_schema_count, allow_unknown_fields, std::string(field.name) + "[0]");
           if (!nested_result.is_valid)
           {
             return nested_result;
@@ -183,10 +189,9 @@ ValidationResult validate_schema(const zjson::Value &params,
   {
     for (const auto &pair : obj)
     {
-      if (seen_fields.find(pair.first) == seen_fields.end())
+      if (seen_fields.find(std::string_view(pair.first)) == seen_fields.end())
       {
-        std::string field_path = parent_field.empty() ? pair.first : parent_field + "." + pair.first;
-        return ValidationResult::error("Unknown field: " + field_path);
+        return ValidationResult::error("Unknown field: " + get_field_path(pair.first));
       }
     }
   }

@@ -6,7 +6,7 @@ labels: bug
 
 <!-- Thanks for deciding to open an issue. Before submitting, please see the following information. -->
 
-<!-- Before opening a new issue, please search our existing issues: https://github.com/zowe/zowe-native-proto/issues -->
+<!-- Before opening a new issue, please search our existing issues: https://github.com/zowe/zowex/issues -->
 
 **Describe the bug**
 

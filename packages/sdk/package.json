@@ -1,6 +1,6 @@
 {
-  "name": "zowe-native-proto-sdk",
-  "version": "0.3.0",
+  "name": "zowex-sdk",
+  "version": "0.4.0",
   "main": "lib/index.js",
   "scripts": {
     "build": "tsc -b",
@@ -15,7 +15,7 @@
   "keywords": [],
   "author": "Zowe",
   "license": "EPL-2.0",
-  "description": "Zowe Native Proto APIs for Zowe SDK",
+  "description": "Zowe Remote SSH APIs for Zowe SDK",
   "files": [
     "bin",
     "lib"
@@ -34,8 +34,12 @@
     "@types/base64-stream": "^1.0.5",
     "@types/node": "^22.10.7",
     "@types/ssh2": "^1.15.4",
+    "rxjs": "^7.8.2",
     "typedoc": "^0.27.6",
     "typescript": "^5.7.3"
+  },
+  "optionalDependencies": {
+    "russh": "0.1.36"
   },
   "peerDependencies": {
     "@zowe/imperative": "^8.11.0",

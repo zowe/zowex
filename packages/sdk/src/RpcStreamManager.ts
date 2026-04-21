@@ -13,13 +13,18 @@ import { Readable, type Stream, Writable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { Logger } from "@zowe/imperative";
 import { Base64Decode, Base64Encode } from "base64-stream";
-import type { Client, ClientChannel } from "ssh2";
 import type { CallbackInfo, CommandResponse, RpcNotification, RpcPromise, RpcRequest } from "./doc";
 import type { ReadDatasetRequest } from "./doc/rpc/ds";
 import type { ReadFileRequest } from "./doc/rpc/uss";
 import { ProgressTransform } from "./ProgressTransform";
+import type { Client, ClientChannel } from "./ssh-rs";
 
-type StreamData = { stream: Stream; callbackInfo?: CallbackInfo; resourceName?: string };
+type StreamData = {
+    streamFn: () => Stream;
+    callbackInfo?: CallbackInfo;
+    resourceName?: string;
+    timeoutId: NodeJS.Timeout;
+};
 type StreamMode = "GET" | "PUT";
 
 export class RpcStreamManager {
@@ -29,12 +34,13 @@ export class RpcStreamManager {
 
     public registerStream(
         request: RpcRequest,
-        stream: Stream,
+        stream: () => Stream,
         timeoutId?: NodeJS.Timeout,
         callbackInfo?: CallbackInfo,
     ): void {
         this.mPendingStreamMap.set(request.id, {
-            stream: stream.on("keepAlive", () => timeoutId?.refresh()),
+            streamFn: stream,
+            timeoutId,
             callbackInfo,
             resourceName: (request.params as ReadDatasetRequest).dsname ?? (request.params as ReadFileRequest).fspath,
         });
@@ -57,7 +63,10 @@ export class RpcStreamManager {
     }
 
     private async uploadStream(params: { id: number; pipePath: string }): Promise<number> {
-        const { stream: readStream, callbackInfo } = this.mPendingStreamMap.get(params.id)!;
+        const pendingStream = this.mPendingStreamMap.get(params.id)!;
+        const readStream = pendingStream.streamFn();
+        const callbackInfo = pendingStream.callbackInfo;
+        readStream.on("keepAlive", () => pendingStream.timeoutId?.refresh());
         if (readStream == null || !(readStream instanceof Readable)) {
             throw new Error(`No stream found for request ID: ${params.id}`);
         }
@@ -73,7 +82,10 @@ export class RpcStreamManager {
     }
 
     private async downloadStream(params: { id: number; pipePath: string; contentLen?: number }): Promise<number> {
-        const { stream: writeStream, callbackInfo } = this.mPendingStreamMap.get(params.id)!;
+        const pendingStream = this.mPendingStreamMap.get(params.id)!;
+        const writeStream = pendingStream.streamFn();
+        writeStream.on("keepAlive", () => pendingStream.timeoutId?.refresh());
+        const callbackInfo = pendingStream.callbackInfo;
         if (writeStream == null || !(writeStream instanceof Writable)) {
             throw new Error(`No stream found for request ID: ${params.id}`);
         }

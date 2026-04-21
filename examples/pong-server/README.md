@@ -2,14 +2,15 @@
 
 Demonstrates z/OS SSH communication with EBCDIC to ASCII conversion.
 
-## Server
+## Deploy & Build
 
-- `zowe files upload dtu tools/pong-server <ussDir> --binary`
-- `go build -o pong-server pong.go` (on z/OS)
+```bash
+npx tsx examples/deploy.ts <ssh-profile> <deploy-dir> pong-server
+```
 
 ## Client
 
-- `cd tools/pong-server && npm install` (once)
-- `npx tsx client.ts ibmuser@<zosHost> <serverCmd>`
-  - `zosHost` - hostname of z/OS server
-  - `serverCmd` - command to run Go binary
+```bash
+cd examples/pong-server && npm install
+npx tsx client.ts <user>@<host> <deploy-dir>/examples/pong-server/server
+```

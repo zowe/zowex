@@ -10,7 +10,7 @@
  */
 
 import { ConfigUtils, type ICommandHandler, type IHandlerParameters } from "@zowe/imperative";
-import { ZSshClient, ZSshUtils } from "zowe-native-proto-sdk";
+import { ZSshClient, ZSshUtils } from "zowex-sdk";
 
 export default class ServerUninstallHandler implements ICommandHandler {
     public async process(params: IHandlerParameters): Promise<void> {
@@ -18,7 +18,7 @@ export default class ServerUninstallHandler implements ICommandHandler {
         const serverPath = params.arguments.serverPath ?? ZSshClient.DEFAULT_SERVER_PATH;
         await ZSshUtils.uninstallServer(session, serverPath);
         params.response.console.log(
-            `Uninstalled Zowe SSH server from ${ConfigUtils.getActiveProfileName("ssh", params.arguments)}`,
+            `Uninstalled Zowe Remote SSH server from ${ConfigUtils.getActiveProfileName("ssh", params.arguments)}`,
         );
     }
 }

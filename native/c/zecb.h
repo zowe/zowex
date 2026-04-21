@@ -21,6 +21,7 @@ typedef struct ecb ECB;
 #define STIMER_WAIT(time)                                     \
   __asm(                                                      \
       "*                                                  \n" \
+      " SLGR  2,2       Init register                     \n" \
       " TAM   ,         AMODE64??                         \n" \
       " JM    *+4+4+2   No, skip switching                \n" \
       " OILH  2,X'8000' Set AMODE31 flag                  \n" \
@@ -65,6 +66,7 @@ STIMERM_MODEL(stimerm_model); // make this copy in static storage
 #define STIMERM_SET(time, parm, exit, id, plist)              \
   __asm(                                                      \
       "*                                                  \n" \
+      " SLGR  2,2       Init register                     \n" \
       " TAM   ,         AMODE64??                         \n" \
       " JM    *+4+4+2   No, skip switching                \n" \
       " OILH  2,X'8000' Set AMODE31 flag                  \n" \
@@ -102,6 +104,7 @@ STIMERM_MODEL(stimerm_model); // make this copy in static storage
 #define STIMERM_CANCEL(rc, plist)                             \
   __asm(                                                      \
       "*                                                  \n" \
+      " SLGR  2,2       Init register                     \n" \
       " TAM   ,         AMODE64??                         \n" \
       " JM    *+4+4+2   No, skip switching                \n" \
       " OILH  2,X'8000' Set AMODE31 flag                  \n" \
@@ -124,8 +127,8 @@ STIMERM_MODEL(stimerm_model); // make this copy in static storage
       "*                                                  \n" \
       " SYSSTATE POP    Restore SYSSTATE                  \n" \
       "*                                                    " \
-      : "+m"(plist)                                           \
-      : "m"(rc)                                               \
+      : "+m"(plist), "=m"(rc)                                 \
+      :                                                       \
       : "r0", "r1", "r2", "r14", "r15");
 #else
 #define STIMERM_CANCEL(rc, plist)

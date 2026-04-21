@@ -36,14 +36,14 @@ async function main() {
 
             stream.write(remoteBinary + "\n");
             console.log("Remote binary started.");
-            stream.stderr.on("data", (data) => {
+            stream.stderr.on("data", (data: Buffer) => {
                 console.error("STDERR:", data.toString());
             });
-            stream.on("error", (error) => {
+            stream.on("error", (error: Error) => {
                 console.error("Stream error:", error);
                 sshClient.end();
             });
-            stream.on("close", (code, signal) => {
+            stream.on("close", (code: number, signal: string) => {
                 console.log(`Stream closed with code: ${code}, signal: ${signal}`);
                 sshClient.end();
             });
@@ -52,7 +52,7 @@ async function main() {
             console.log("Sending request:", request);
             stream.stdin.write(request + "\n");
             await new Promise<void>((resolve) => {
-                stream.stdout.on("data", (data) => {
+                stream.stdout.on("data", (data: Buffer) => {
                     console.log("Received response:", data.toString());
                     sshClient.end();
                     resolve();
@@ -61,7 +61,7 @@ async function main() {
         });
     });
 
-    sshClient.on("error", (err) => {
+    sshClient.on("error", (err: Error) => {
         console.error("SSH connection error:", err);
     });
 

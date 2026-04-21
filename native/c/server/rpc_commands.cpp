@@ -13,6 +13,7 @@
 #include "dispatcher.hpp"
 #include "schemas/requests.hpp"
 #include "schemas/responses.hpp"
+#include "../commands/core.hpp"
 #include "../commands/ds.hpp"
 #include "../commands/job.hpp"
 #include "../commands/system.hpp"
@@ -181,6 +182,11 @@ void register_uss_commands(CommandDispatcher &dispatcher)
                                   .set_default("encoding", "IBM-1047")
                                   .write_stdin("data", true)
                                   .handle_fifo("stream", "pipe-path", FifoMode::PUT));
+  dispatcher.register_command("unixCommand",
+                              CommandBuilder(uss::handle_uss_issue_cmd)
+                                  .validate<IssueUssCmdRequest, IssueUssCmdResponse>()
+                                  .rename_arg("commandText", "command")
+                                  .read_stdout("data", false));
 }
 
 void register_tso_commands(CommandDispatcher &dispatcher)
@@ -200,6 +206,13 @@ void register_tool_commands(CommandDispatcher &dispatcher)
                                   .read_stdout("data", false));
 }
 
+void register_core_commands(CommandDispatcher &dispatcher)
+{
+  dispatcher.register_command("getInfo",
+                              CommandBuilder(core::handle_version)
+                                  .validate<GetInfoRequest, GetInfoResponse>());
+}
+
 void register_system_commands(CommandDispatcher &dispatcher)
 {
   dispatcher.register_command("viewSyslog",
@@ -212,6 +225,7 @@ void register_system_commands(CommandDispatcher &dispatcher)
 
 void register_all_commands(CommandDispatcher &dispatcher)
 {
+  register_core_commands(dispatcher);
   register_ds_commands(dispatcher);
   register_job_commands(dispatcher);
   register_system_commands(dispatcher);
