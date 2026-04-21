@@ -191,27 +191,10 @@ typedef struct
 #define EYE "IO_CTRL "
 typedef struct
 {
-<<<<<<< date-parse-syslog
-  IHADCB dcb;
-  IFGACB ifgacb;
-  DECB decb;
-  JFCB jfcb;
-  EXLIST exlst[NUM_EXLIST_ENTRIES];
-  RDJFCB_PL rdjfcb_pl;
-  OPEN_PL opl;
-  STOW_LIST stow_list;
-  IFGRPL rpl;
-  DSINF dsinf;
-  char *PTR32 buffer;
-  int buffer_size;
-  int output : 1; // TODO(Kelosky): remove this flag
-  int input : 1;  // TODO(Kelosky): remove this flag
-=======
   char eye[8];
   unsigned long long int work;
   unsigned int output : 1; // TODO(Kelosky): remove this flag
   unsigned int input : 1;  // TODO(Kelosky): remove this flag
->>>>>>> feat/syslog-sdk-rpc
   unsigned int has_enq : 1;
   unsigned int has_reserve : 1; // not reserved space... indicates RESERVE is outstanding
   unsigned int eof : 1;
@@ -234,6 +217,7 @@ typedef struct
   OPEN_PL opl;
   STOW_LIST stow_list;
   IFGRPL rpl;
+  DSINF dsinf;
 } IO_CTRL;
 
 #endif

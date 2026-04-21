@@ -232,13 +232,14 @@ int ZDSRIVSM(ZDS *zds, IO_CTRL *ioc)
       zds31.diag.service_rc = stck_rc;
       strcpy(zds31.diag.service_name, "STCKECONV");
       zds31.diag.e_msg_len = sprintf(zds31.diag.e_msg, "Failed to STCKECONV rc was: %d", stck_rc);
+      memcpy(zds, &zds31, sizeof(ZDS));
       return RTNCD_FAILURE;
     }
 
     unsigned char ebcdic_date[8] = {0};
     __unpk(ebcdic_date, sizeof(ebcdic_date), &time_struct.date.yyyymmdd.year[0], sizeof(time_struct.date));
-    memcpy(zds->ebcdic_date, ebcdic_date, sizeof(zds->ebcdic_date));
-    memcpy(&zds->ts_binary, &time_struct.time, sizeof(zds->ts_binary));
+    memcpy(zds31.ebcdic_date, ebcdic_date, sizeof(zds31.ebcdic_date));
+    memcpy(&zds31.ts_binary, &time_struct.time, sizeof(zds31.ts_binary));
   }
 
   memcpy(zds, &zds31, sizeof(ZDS));
