@@ -37,6 +37,13 @@ module.exports = (_env, argv) => {
       // modules added here also need to be added in the .vscodeignore file
     },
     resolve: {
+      // Restrict resolution to this repo so a @zowe/cli install under a parent directory
+      // (e.g. ~/node_modules) is not bundled; Imperative uses require.resolve("@zowe/cli") and
+      // would otherwise pull the entire CLI + nested imperative into the VSIX.
+      modules: [
+        path.resolve(__dirname, 'node_modules'),
+        path.resolve(__dirname, '../../node_modules'),
+      ],
       // support reading TypeScript and JavaScript files, 📖 -> https://github.com/TypeStrong/ts-loader
       extensions: ['.ts', '.js'],
       alias: {

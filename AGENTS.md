@@ -54,6 +54,18 @@ The SDK package (`packages/sdk/`) contains both TypeScript client code and the n
 - **Native only** (testing via `serverPath`): `npm run z:rebuild` — no SDK repackage needed, just point your SSH profile's `serverPath` to the remote `<deployDir>/c/build-out`
 - **Full SDK package** (`.tgz` with bundled binaries): `npm run z:rebuild && npm run z:artifacts && npm run build --workspace=packages/sdk && mkdir -p dist && npm run package --workspace=packages/sdk`
 
+### VS Code extension (VSIX)
+
+To produce a VSIX that includes a **fresh** `server.pax.Z` (from `z:artifacts` into `packages/sdk/bin/`), run rspack in production via `vsce package`:
+
+```sh
+npm run z:rebuild && npm run z:artifacts && npm run build && npm run package --workspace=packages/vsce
+```
+
+The VSIX is written to `dist/zowe-native-proto-vsce-<version>.vsix`. Rspack copies `packages/sdk/bin` into `extension/bin` during `vscode:prepublish`.
+
+**Rspack and `@zowe/cli`:** `packages/vsce/rspack.config.js` restricts `resolve.modules` to this monorepo’s `node_modules` directories. If that restriction were omitted, Node’s directory walk could resolve `@zowe/cli` from a **parent** path (for example `~/node_modules/@zowe/cli` when the CLI is installed for the user but not in this repo). `@zowe/imperative` references `require.resolve("@zowe/cli")`, so the bundler would then include that entire CLI installation and its nested dependencies, which can break the build (e.g. ESM in transitive packages) and is never what the extension should ship.
+
 ### Native code (remote z/OS)
 
 All `npm run z:*` commands target the z/OS system in `config.yaml`:

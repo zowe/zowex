@@ -8,6 +8,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 - **Breaking:** Renamed contributed setting IDs from `zowe-native-proto` to `zowex`. All references to `zowe-native-proto` should be replaced with `zowex` in VS Code `settings.json` files. [#831](https://github.com/zowe/zowex/issues/831)
 - Fixed an error that would overwrite a member that already existed when creating a member with the "Replace" option. [#642](https://github.com/zowe/zowex/issues/642)
+- Restricted rspack `resolve.modules` to this monorepo so `vsce package` does not resolve `@zowe/cli` from a parent directory (for example `~/node_modules`) and bundle the wrong dependency tree or fail on ESM in transitive dependencies.
 
 ## `0.4.0`
 
