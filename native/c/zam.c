@@ -24,7 +24,7 @@
 #include "ztime.h"
 #include "zio.h"
 
-register IO_CTRL *gioc ASMREG("r8");
+register void *PTR32 reg8 ASMREG("r8");
 
 typedef struct
 {
@@ -444,7 +444,7 @@ int open_output_bpam(ZDIAG *PTR32 diag, IO_CTRL * PTR32 * PTR32 ioc, const char 
   memcpy(new_ioc->dcb.dcbddnam, ddname, sizeof(new_ioc->dcb.dcbddnam));
   memcpy(new_ioc->ddname, ddname, sizeof(new_ioc->ddname));
 
-  gioc = new_ioc;
+  reg8 = new_ioc;
 
   //
   // Read the JFCB for the data set
@@ -678,7 +678,7 @@ int write_output_bpam(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc, const char *PTR32 d
   int lrecl = ioc->dcb.dcblrecl;
   int blocksize = ioc->dcb.dcbblksi;
 
-  gioc = ioc;
+  reg8 = ioc;
 
   if (ioc->dcb.dcbrecfm & dcbrecv)
   {
@@ -1050,7 +1050,7 @@ int close_output_bpam(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
   int rc = 0;
   int first_rc = 0;
 
-  gioc = ioc;
+  reg8 = ioc;
 
   //
   // Write any remaining bytes in the buffer
@@ -1200,7 +1200,8 @@ int note(IO_CTRL *ioc, NOTE_RESPONSE *PTR32 note_response, int *rsn)
 #pragma epilog(ZAMDEXIT, " ZWEEPILG ")
 int ZAMDEXIT(DCB_ABEND_PL *PTR32 plist)
 {
-  gioc->dcb_abend = 1; // note DCBABEND
+  // Note DCBABEND on the IO_CTRL stored in R8 at time of exit
+  ((IO_CTRL *)reg8)->dcb_abend = 1;
 
   // Some abends cannot be ignored or delayed (such as SB14). Default is worst-case scenario of following through w/ termination.
   int rc = DCB_ABEND_RC_TERMINATE;
@@ -1218,7 +1219,7 @@ int ZAMDEXIT(DCB_ABEND_PL *PTR32 plist)
 
   // Restore the R8 register to value saved before the exit
   unsigned long long save8 = ZAM24R();
-  __asm(" LG   8,%0\n" : "+m"(save8)::"r8");
+  reg8 = (void *PTR32)save8;
 
   return rc;
 }
