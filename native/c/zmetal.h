@@ -431,20 +431,6 @@ static int delete_module(const char name[8])
 #define GET_PREV_REG64(reg, offset)
 #endif
 
-#if defined(__IBM_METAL__)
-#define SET_PREV_REG64(reg, offset)                            \
-  __asm(                                                       \
-      "*                                                   \n" \
-      " LG     1,128(,13)           -> Prev SA             \n" \
-      " STG    1," #offset "(,1)    Offset to reg          \n" \
-      "*                                                    "  \
-      :                                                        \
-      : "m"(reg)                                               \
-      : "r1");
-#else
-#define SET_PREV_REG64(reg, offset)
-#endif
-
 static unsigned long long int get_r0()
 {
   unsigned long long int reg = 0;
@@ -534,11 +520,6 @@ static unsigned long long int get_prev_r2()
   return reg;
 }
 
-static void set_prev_r0(unsigned long long int reg)
-{
-  SET_PREV_REG64(reg, 24);
-}
-
 #if defined(__IBM_METAL__)
 #define GET_STACK_ENV(reg)                                        \
   __asm(                                                          \
@@ -559,18 +540,5 @@ static unsigned long long int get_prev_r13()
   GET_STACK_ENV(reg);
   return reg;
 }
-
-#if defined(__IBM_METAL__)
-#define SET_REG(num, reg)                                       \
-  __asm(                                                        \
-      "*                                                    \n" \
-      " L    %0," #num "  = Value passed by caller          \n" \
-      "*                                                    "   \
-      : "=m"(*reg)                                              \
-      :                                                         \
-      : "#num");
-#else
-#define SET_REG(num, reg)
-#endif
 
 #endif

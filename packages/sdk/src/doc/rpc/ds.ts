@@ -31,6 +31,10 @@ export interface CreateMemberRequest extends common.CommandRequest<"createMember
      * Dataset name
      */
     dsname: string;
+    /**
+     * Whether to overwrite existing member
+     */
+    overwrite?: boolean;
 }
 
 export type CreateMemberResponse = common.CommandResponse;
