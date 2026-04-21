@@ -11,10 +11,9 @@ Review pull requests for code quality, security, and adherence to project standa
 
 1. **Get changed files**: `git diff --name-only main...HEAD 2>nul` (or target branch)
 2. **Get full diff**: `git diff main...HEAD 2>nul`'
-3. **Run automated checks**: `scripts/pr-check.sh` (if applicable)
-4. **Read key changed files** to understand context
-5. **Categorize findings** using the format below
-6. **Verify PR checklist** items from the PR template
+3. **Read key changed files** to understand context
+4. **Categorize findings** using the format below
+5. **Verify PR checklist** items from the [PR template](../../../.github/PULL_REQUEST_TEMPLATE.md)
 
 ## Output Format
 
@@ -58,11 +57,10 @@ Optional improvements:
 
 **Check for:**
 
-- Unsupported C++ features (range-based for loops, lambdas, `std::unique_ptr` in xlc code)
-- Memory management: proper `new`/`delete` pairing, no leaks
+- Manual memory management: proper `new`/`delete` pairing, no leaks
 - EBCDIC/ASCII encoding issues for z/OS
 - Proper error handling with return codes
-- Thread safety in `zowed/` daemon code
+- Thread safety in `zowex server` code
 
 **Style (from .clang-format):**
 
