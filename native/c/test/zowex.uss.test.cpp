@@ -580,7 +580,7 @@ void zowex_uss_tests()
                              ExpectWithContext(rc, response).ToBe(0);
                              Expect(response).ToContain("-rw-r--r--");
                            });
-                        it("should properly handle a creating a file in a non-existant directory",
+                        it("should properly handle a creating a file in a non-existent directory",
                            [&]() -> void
                            {
                              std::string uss_file = get_random_uss(ussTestDir) + "/does_not_exist";
@@ -591,6 +591,72 @@ void zowex_uss_tests()
                              }
                              ExpectWithContext(rc, response).ToBe(255);
                              Expect(response).ToContain("could not create USS file: '" + uss_file + "'");
+                           });
+                        it("should not overwrite existing files",
+                           [&]() -> void
+                           {
+                             std::string uss_file = get_random_uss(ussTestDir);
+                             std::string command = zowex_command + " uss create-file " + uss_file;
+                             int rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain("USS file '" + uss_file + "' created");
+
+                             // Write "test" data
+                             command = "echo test | " + zowex_command + " uss write " + uss_file + " --ec binary";
+                             rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain("Wrote data to");
+
+                             // Read "test" data to confirm
+                             command = zowex_command + " uss view " + uss_file + " --ec binary";
+                             rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain("test");
+
+                             // Create the same file again
+                             command = zowex_command + " uss create-file " + uss_file;
+                             rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).Not().ToBe(0);
+                             Expect(response).ToContain("Warning");
+
+                             // Read "test" data to confirm
+                             command = zowex_command + " uss view " + uss_file + " --ec binary";
+                             rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain("test");
+                           });
+                        it("should overwrite existing files if --overwrite is specified",
+                           [&]() -> void
+                           {
+                             std::string uss_file = get_random_uss(ussTestDir);
+                             std::string command = zowex_command + " uss create-file " + uss_file;
+                             int rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain("USS file '" + uss_file + "' created");
+
+                             // Write "test" data
+                             command = "echo test | " + zowex_command + " uss write " + uss_file + " --ec binary";
+                             rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain("Wrote data to");
+
+                             // Read "test" data to confirm
+                             command = zowex_command + " uss view " + uss_file + " --ec binary";
+                             rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain("test");
+
+                             // Create the same file again
+                             command = zowex_command + " uss create-file " + uss_file + " --overwrite";
+                             rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain("USS file '" + uss_file + "' created");
+
+                             // Read to confirm data was overwritten
+                             command = zowex_command + " uss view " + uss_file + " --ec binary";
+                             rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).Not().ToContain("test");
                            });
                       });
              describe("delete",

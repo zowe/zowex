@@ -306,8 +306,8 @@ static int copy_partitioned(ZDS *zds, ZDSTypeInfo &sourceInfo, ZDSTypeInfo &targ
 
   dds.push_back("alloc dd(SYSUT1) da('" + sourceInfo.base_dsn + "') shr");
   dds.push_back("alloc dd(SYSUT2) da('" + targetInfo.base_dsn + "') shr");
-  dds.push_back("alloc dd(sysin) lrecl(80) recfm(f,b) blksize(800)");
-  dds.push_back("alloc dd(sysprint) lrecl(121) recfm(f,b,a) blksize(1210)");
+  dds.push_back("alloc dd(sysin) lrecl(80) recfm(f,b)");
+  dds.push_back("alloc dd(sysprint) lrecl(121) recfm(f,b,a)");
 
   rc = zut_loop_dynalloc(zds->diag, dds);
   if (rc != RTNCD_SUCCESS)

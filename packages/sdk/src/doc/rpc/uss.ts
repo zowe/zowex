@@ -118,6 +118,10 @@ export interface CreateFileRequest extends common.CommandRequest<"createFile"> {
      * Whether to create a directory (true) or a file (false)
      */
     isDir?: boolean;
+    /**
+     * Whether to overwrite existing file
+     */
+    overwrite?: boolean;
 }
 
 export type CreateFileResponse = common.CommandResponse;

@@ -649,20 +649,20 @@ void zds_tests()
 
                              zds_create_dsn(&zds, src, pds_attr, response);
 
-                             std::string d1 = "DATA1", d2 = "DATA2", du = "OLD DATA";
+                             std::string d1 = "DATA1", d2 = "DATA2", data = "OLD DATA";
 
                              zds_write(ZDSWriteOpts{&zds, src + "(M1)"}, d1);
                              zds_write(ZDSWriteOpts{&zds, src + "(M2)"}, d2);
 
                              zds_create_dsn(&zds, tgt, pds_attr, response);
-                             zds_write(ZDSWriteOpts{&zds, tgt + "(UNIQUE)"}, du);
+                             zds_write(ZDSWriteOpts{&zds, tgt + "(tgt)"}, data);
 
                              opts.replace = true;
                              int rc = zds_copy_dsn(&zds, src, tgt, &opts);
                              ExpectWithContext(rc, zds.diag.e_msg).ToBe(0);
                            });
 
-                        it("should copy member to member with renaming",
+                        it("should copy member to member",
                            [&]() -> void
                            {
                              ZDS zds = {};
@@ -675,13 +675,14 @@ void zds_tests()
                              zds_create_dsn(&zds, src_pds, pds_attr, response);
                              zds_create_dsn(&zds, tgt_pds, pds_attr, response);
 
-                             std::string content = "MEMBER CONTENT";
-                             std::string member = "M1";
+                             std::string data = "test data";
                              ZDSWriteOpts wopts{&zds, src_pds + "(M1)"};
-                             int rc = zds_write(wopts, content);
+                             int rc = zds_write(wopts, data);
                              ExpectWithContext(rc, zds.diag.e_msg).ToBe(0);
 
-                             rc = zds_copy_dsn(&zds, src_pds + "(ORIG)", tgt_pds + "(NEW)", &opts);
+                             std::string src = src_pds + "(M1)";
+                             fprintf(stdout, "DSN to write: %s\n", src.c_str());
+                             rc = zds_copy_dsn(&zds, src, tgt_pds + "(NEW)", &opts);
                              ExpectWithContext(rc, zds.diag.e_msg).ToBe(0);
                            });
 
