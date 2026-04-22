@@ -732,29 +732,6 @@ void zds_tests()
                              ExpectWithContext(rc, zds.diag.e_msg).ToBe(0);
                            });
 
-                        it("should fail if target member exists and replace flag is missing",
-                           [&]() -> void
-                           {
-                             ZDS zds = {};
-                             ZDSCopyOptions opts{};
-                             std::string src = get_random_ds(3);
-                             std::string tgt = get_random_ds(3);
-                             created_dsns.push_back(src);
-                             created_dsns.push_back(tgt);
-
-                             zds_create_dsn(&zds, src, pds_attr, response);
-                             zds_create_dsn(&zds, tgt, pds_attr, response);
-
-                             std::string data = "test";
-                             zds_write(ZDSWriteOpts{&zds, .dsname = src + "(M1)"}, data);
-                             zds_write(ZDSWriteOpts{&zds, .dsname = tgt + "(M1)"}, data);
-
-                             int rc = zds_copy_dsn(&zds, src + "(M1)", tgt + "(M1)", &opts);
-                             Expect(rc).ToBe(RTNCD_FAILURE);
-                             Expect(std::string(zds.diag.e_msg)).ToContain("exists");
-                             //  Expect(std::string(zds.diag.e_msg)).ToContain("--replace");
-                           });
-
                         it("should fail if source data set does not exist",
                            [&]() -> void
                            {

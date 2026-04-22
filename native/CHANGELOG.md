@@ -6,7 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
-- **Breaking:** `c`: Refactored the backend for copying data sets to use Z/OS utilities IEBCOPY and IEBGENER. Removed `--delete-target-members` flag and added `--overwrite` flag for copying a partitioned data set to an existing partitioned data set. [#932] (https://github.com/zowe/zowex/issues/932)
+- **Breaking:** `c`: Refactored the backend for copying data sets to use Z/OS utilities IEBCOPY and IEBGENER. Removed `--delete-target-members` flag and added `--overwrite` flag for copying a partitioned data set to an existing partitioned data set. Removed duplicate `member_exists_in_pds` function. [#932] (https://github.com/zowe/zowex/issues/932)
 - **Breaking:** `c`: Refactored the `zds_write` function to consolidate data set and DD write logic into a single entry point. [#908](https://github.com/zowe/zowe-native-proto/issues/908)
 - `c`: Changed `zowex --version` and `zowex -v` to return just the version number. [#925](https://github.com/zowe/zowex/pull/925)
 - `c`: Removed duplicate `-v` and `--version` aliases on the `zowex version` command. [#922](https://github.com/zowe/zowex/pull/922)
