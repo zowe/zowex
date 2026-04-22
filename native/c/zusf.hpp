@@ -38,6 +38,16 @@ struct CopyOptions
   }
 };
 
+struct CreateOptions
+{
+  bool create_dir;
+  bool overwrite;
+  explicit CreateOptions(bool create_dir = false, bool overwrite = false)
+      : create_dir(create_dir), overwrite(overwrite)
+  {
+  }
+};
+
 struct ListOptions
 {
   bool all_files;
@@ -50,7 +60,7 @@ struct ListOptions
 };
 
 int zusf_copy_file_or_dir(ZUSF *zusf, const std::string &source_fs, const std::string &dest_fs, const CopyOptions &options);
-int zusf_create_uss_file_or_dir(ZUSF *zusf, const std::string &file, mode_t mode, bool createDir);
+int zusf_create_uss_file_or_dir(ZUSF *zusf, const std::string &file, mode_t mode, const CreateOptions &options);
 int zusf_move_uss_file_or_dir(ZUSF *zusf, const std::string &source, const std::string &target, bool force = true);
 std::string zusf_format_file_entry(ZUSF *zusf, const struct stat &file_stats, const std::string &file_path, const std::string &display_name, ListOptions options, bool use_csv_format);
 int zusf_list_uss_file_path(ZUSF *zusf, const std::string &file, std::string &response, ListOptions options = ListOptions{}, bool use_csv_format = false);
