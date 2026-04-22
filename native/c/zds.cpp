@@ -475,8 +475,6 @@ int zds_copy_dsn(ZDS *zds, const std::string &dsn1, const std::string &dsn2, ZDS
   bool target_ds_exists = zds_dataset_exists(info2.base_dsn);
   options->target_exists = info2.member_name.empty() ? target_ds_exists : zds_member_exists(info2.base_dsn, info2.member_name);
 
-  bool has_warning = false;
-  std::string warning_msg;
   if (zds_dataset_exists(info1.base_dsn) && target_ds_exists) {
     rc = validate_attributes(zds, info1, info2);
     if(rc != RTNCD_SUCCESS) {
