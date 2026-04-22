@@ -1180,7 +1180,7 @@ void register_commands(parser::Command &root_command)
   ds_copy_cmd->add_keyword_arg("overwrite", make_aliases("-o"),
                                "Replace the entire target partitioned data set with the source data set. All members including like named members will be overwritten",
                                ArgType_Flag, false, ArgValue(false));
-  ds_copy_cmd->add_keyword_arg("replace", make_aliases("--replace", "-r"),
+  ds_copy_cmd->add_keyword_arg("replace", make_aliases("-r"),
                                "Replaces target sequential/member content with source content or replaces matching members in a partitioned data set with source members (keeps non-matching target members)",
                                ArgType_Flag, false, ArgValue(false));
   ds_copy_cmd->set_handler(handle_data_set_copy);
