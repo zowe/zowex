@@ -270,12 +270,8 @@ static int copy_partitioned(ZDS *zds, ZDSTypeInfo &sourceInfo, ZDSTypeInfo &targ
   bool sourceIsPds = sourceInfo.member_name.empty();
   bool targetIsPds = targetInfo.member_name.empty();
 
-  printf("debug: target exists=%d\n", options->target_exists);
-  printf("debug: replace=%d\n", options->replace);
-  printf("debug: overwrite=%d\n", options->overwrite);
   if (options->target_exists && !options->replace && !options->overwrite)
   {
-    printf("debugg: here %s\n", "hello1");
     if (targetIsPds)
     {
       zds->diag.e_msg_len = sprintf(zds->diag.e_msg,
@@ -283,7 +279,6 @@ static int copy_partitioned(ZDS *zds, ZDSTypeInfo &sourceInfo, ZDSTypeInfo &targ
     }
     else
     {
-      printf("debugg: here2 %d\n", options->target_exists);
       zds->diag.e_msg_len = sprintf(zds->diag.e_msg,
                                     "Target member '%s' exists. Use --replace (-r) flag to replace the member's contents", targetInfo.member_name.c_str());
     }
@@ -449,7 +444,6 @@ int zds_copy_dsn(ZDS *zds, const std::string &dsn1, const std::string &dsn2, ZDS
 
   bool target_ds_exists = zds_dataset_exists(info2.base_dsn);
   options->target_exists = info2.member_name.empty() ? target_ds_exists : zds_member_exists(info2.base_dsn, info2.member_name);
-  printf("debug: target exists=%d\n", options->target_exists);
 
   if (!target_ds_exists)
   {
@@ -474,7 +468,6 @@ int zds_copy_dsn(ZDS *zds, const std::string &dsn1, const std::string &dsn2, ZDS
   }
   else if ((info1.type == ZDS_TYPE_PDS && target_type == ZDS_TYPE_PDS) || (info1.type == ZDS_TYPE_MEMBER && target_type == ZDS_TYPE_MEMBER))
   {
-     printf("debug: target exists=%d\n", options->target_exists);
     return copy_partitioned(zds, info1, info2, options);
   }
   else
