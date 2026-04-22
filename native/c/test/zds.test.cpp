@@ -754,6 +754,7 @@ void zds_tests()
 
                             int rc = zds_copy_dsn(&zds, src, tgt, &opts);
                             ExpectWithContext(rc, zds.diag.e_msg).ToBe(RTNCD_FAILURE);
+                            Expect(std::string(zds.diag.e_msg)).ToContain("--replace");
                           });
 
                         it("should fail if source data set does not exist",

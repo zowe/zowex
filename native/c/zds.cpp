@@ -373,6 +373,36 @@ static int copy_partitioned(ZDS *zds, ZDSTypeInfo &sourceInfo, ZDSTypeInfo &targ
   return rc;
 }
 
+static int validate_attributes(ZDS *zds, const ZDSTypeInfo &src, const ZDSTypeInfo &tgt) {
+    // fail if mistaching recfm
+    if (src.entry.recfm != tgt.entry.recfm) {
+        zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
+            "Incompatible RECFM: Source is %s and Target is %s",
+            src.entry.recfm.c_str(), tgt.entry.recfm.c_str());
+        return RTNCD_FAILURE;
+    }
+
+    // fail if mismatching lrecl
+    if (src.entry.lrecl != tgt.entry.lrecl) {
+        zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
+            "Incompatible LRECL: Source (%d) exceeds Target (%d)",
+            src.entry.lrecl, tgt.entry.lrecl);
+        return RTNCD_FAILURE;
+    }
+
+   //fail if pds to pds and block size mismatch
+    if(src.type == ZDS_TYPE_PDS || tgt.type == ZDS_TYPE_PDS) {
+       // fail if mismatching blcsize
+      if (src.entry.blksize != tgt.entry.blksize) {
+            zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
+              "Incompatible Block size: Source is %d and Target is %d",
+              src.entry.blksize, tgt.entry.blksize);
+          return RTNCD_FAILURE;
+      }
+    }
+    return RTNCD_SUCCESS;
+}
+
 int zds_copy_dsn(ZDS *zds, const std::string &dsn1, const std::string &dsn2, ZDSCopyOptions *options)
 {
   int rc = 0;
@@ -445,6 +475,15 @@ int zds_copy_dsn(ZDS *zds, const std::string &dsn1, const std::string &dsn2, ZDS
   bool target_ds_exists = zds_dataset_exists(info2.base_dsn);
   options->target_exists = info2.member_name.empty() ? target_ds_exists : zds_member_exists(info2.base_dsn, info2.member_name);
 
+  bool has_warning = false;
+  std::string warning_msg;
+  if (zds_dataset_exists(info1.base_dsn) && target_ds_exists) {
+    rc = validate_attributes(zds, info1, info2);
+    if(rc != RTNCD_SUCCESS) {
+      return rc;
+    }
+  }
+
   if (!target_ds_exists)
   {
     unsigned int code = 0;
@@ -464,17 +503,19 @@ int zds_copy_dsn(ZDS *zds, const std::string &dsn1, const std::string &dsn2, ZDS
 
   if (info1.type == ZDS_TYPE_PS && target_type == ZDS_TYPE_PS)
   {
-    return copy_sequential(zds, dsn1, dsn2, options);
+    rc = copy_sequential(zds, dsn1, dsn2, options);
   }
   else if ((info1.type == ZDS_TYPE_PDS && target_type == ZDS_TYPE_PDS) || (info1.type == ZDS_TYPE_MEMBER && target_type == ZDS_TYPE_MEMBER))
   {
-    return copy_partitioned(zds, info1, info2, options);
+    rc = copy_partitioned(zds, info1, info2, options);
   }
   else
   {
     zds->diag.e_msg_len = sprintf(zds->diag.e_msg, "Copy between these types is not supported.");
     return RTNCD_FAILURE;
   }
+
+  return rc;
 }
 
 bool zds_dataset_exists(const std::string &dsn)
