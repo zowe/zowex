@@ -144,7 +144,7 @@ int zjb_get_job_dsn_by_key(ZJB *zjb, const std::string &, int, std::string &);
  *
  * @param zjb job returned attributes and error information
  * @param job_dsn job data set name to read
- * @param timestamp timestamp to read, e.g. 10:41:00.15
+ * @param timestamp timestamp to read, e.g. 10:41:00
  * @param date date to read, e.g. 2026-03-13
  * @param response return job content
  * @return int 0 for success; non zero otherwise

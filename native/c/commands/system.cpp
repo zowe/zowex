@@ -116,7 +116,6 @@ int handle_system_list_subsystems(InvocationContext &context)
 #define DEFAULT_MAX_LINES_RELATIVE MAX_LINES
 #define DEFAULT_SECONDS_AGO 30
 
-
 int handle_system_view_syslog(InvocationContext &context)
 {
   int rc = 0;
@@ -190,20 +189,37 @@ int handle_system_view_syslog(InvocationContext &context)
     // resolve defaults and validate explicit values
     if (time_value.empty())
     {
-      strftime(buf, sizeof(buf), "%H:%M:%S.00", tm_now);
+      strftime(buf, sizeof(buf), "%H:%M:%S", tm_now);
       time_value = buf;
     }
     else
     {
-      int hh = -1, mm = -1, ss = -1, cs = -1;
-      int parsed = sscanf(time_value.c_str(), "%d:%d:%d.%d", &hh, &mm, &ss, &cs);
-      if (parsed < 3 || hh < 0 || hh > 23 || mm < 0 || mm > 59 || ss < 0 || ss > 59 || (parsed == 4 && (cs < 0 || cs > 99)))
+      // Check for invalid formats first (too many colons, dots, etc.)
+      size_t colon_count = std::count(time_value.begin(), time_value.end(), ':');
+      size_t dot_count = std::count(time_value.begin(), time_value.end(), '.');
+
+      if (colon_count != 2 || dot_count > 1)
       {
-        context.error_stream() << "Error: invalid time '" << time_value << "', expected hh:mm:ss.cs e.g. 12:01:30.03" << endl;
+        context.error_stream() << "Error: invalid time format '" << time_value << "', expected hh:mm:ss e.g. 12:01:30" << endl;
         return RTNCD_FAILURE;
       }
-      if (parsed == 3)
-        time_value += ".00";
+
+      int hh = -1, mm = -1, ss = -1, cs = -1;
+      int parsed = sscanf(time_value.c_str(), "%d:%d:%d.%d", &hh, &mm, &ss, &cs);
+
+      // Reject centiseconds format since it's not used in output
+      if (parsed == 4)
+      {
+        context.error_stream() << "Error: centiseconds not supported, use hh:mm:ss format e.g. 12:01:30" << endl;
+        return RTNCD_FAILURE;
+      }
+
+      // Validate HH:MM:SS format
+      if (parsed != 3 || hh < 0 || hh > 23 || mm < 0 || mm > 59 || ss < 0 || ss > 59)
+      {
+        context.error_stream() << "Error: invalid time '" << time_value << "', expected hh:mm:ss e.g. 12:01:30" << endl;
+        return RTNCD_FAILURE;
+      }
     }
 
     if (date_value.empty())
@@ -293,13 +309,13 @@ void register_commands(parser::Command &root_command)
   // View-syslog subcommand
   auto system_view_syslog_cmd = command_ptr(new Command("view-syslog", "view syslog"));
   system_view_syslog_cmd->set_handler(handle_system_view_syslog);
-  system_view_syslog_cmd->add_keyword_arg("time", make_aliases("--time", "-t"), "specify time hh:mm:ss.th, e.g. -t 10:41:00.15. Mutually exclusive with --seconds-ago", ArgType_Single, false);
+  system_view_syslog_cmd->add_keyword_arg("time", make_aliases("--time", "-t"), "specify time hh:mm:ss, e.g. -t 10:41:00. Mutually exclusive with --seconds-ago", ArgType_Single, false);
   system_view_syslog_cmd->add_keyword_arg("date", make_aliases("--date", "-d"), "specify date yyyy-mm-dd, e.g. --date 2026-01-20. Mutually exclusive with --seconds-ago", ArgType_Single, false, ArgValue(""), true);
   system_view_syslog_cmd->add_keyword_arg("seconds-ago", make_aliases("--seconds-ago", "-s"), "relative offset in seconds from now, e.g. --seconds-ago 300 for last 5 minutes. Mutually exclusive with --date/--time", ArgType_Single, false);
   system_view_syslog_cmd->add_keyword_arg("max-lines", make_aliases("--max-lines", "--ml"), "maximum number of lines to display (1-10000), e.g. --max-lines 100", ArgType_Single, false);
   system_view_syslog_cmd->add_example("View last 30 seconds of syslog (default)", "zowex system view-syslog");
   system_view_syslog_cmd->add_example("View last 5 minutes of syslog", "zowex system view-syslog --seconds-ago 300");
-  system_view_syslog_cmd->add_example("View syslog for a specific date and time", "zowex system view-syslog --date 2026-03-13 --time 10:41:00.15 --max-lines 100");
+  system_view_syslog_cmd->add_example("View syslog for a specific date and time", "zowex system view-syslog --date 2026-03-13 --time 10:41:00 --max-lines 100");
   system_cmd->add_command(system_view_syslog_cmd);
 
   root_command.add_command(system_cmd);

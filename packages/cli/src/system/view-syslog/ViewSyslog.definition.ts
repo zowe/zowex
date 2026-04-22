@@ -29,7 +29,7 @@ export const ViewSyslogDefinition: ICommandDefinition = {
         },
         {
             description: "View syslog for a specific date and time",
-            options: "--date 2026-03-23 --time 10:41:00.15 --max-lines 100",
+            options: "--date 2026-03-23 --time 10:41:00 --max-lines 100",
         },
     ],
     options: [
@@ -42,7 +42,7 @@ export const ViewSyslogDefinition: ICommandDefinition = {
         {
             name: "time",
             aliases: ["t"],
-            description: "Start time in hh:mm:ss.th format. Mutually exclusive with --seconds-ago.",
+            description: "Start time in hh:mm:ss format. Mutually exclusive with --seconds-ago.",
             type: "string",
         },
         {

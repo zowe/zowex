@@ -17,7 +17,7 @@ export interface ViewSyslogRequest extends common.CommandRequest<"viewSyslog"> {
      */
     date?: string;
     /**
-     * Time in hh:mm:ss.th. Mutually exclusive with secondsAgo.
+     * Time in hh:mm:ss. Mutually exclusive with secondsAgo.
      */
     time?: string;
     /**
@@ -41,7 +41,7 @@ export interface ViewSyslogResponse extends common.CommandResponse {
      */
     startDate?: string;
     /**
-     * Actual start time used for the read (hh:mm:ss.th).
+     * Actual start time used for the read (hh:mm:ss).
      */
     startTime?: string;
     /**
@@ -49,7 +49,7 @@ export interface ViewSyslogResponse extends common.CommandResponse {
      */
     endDate?: string;
     /**
-     * Time of the last record returned (hh:mm:ss.th).
+     * Time of the last record returned (hh:mm:ss).
      */
     endTime?: string;
     /**

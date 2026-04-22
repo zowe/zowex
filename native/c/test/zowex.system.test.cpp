@@ -237,7 +237,7 @@ void zowex_system_tests()
                   Expect(end_date[7]).ToBe('-');
                 });
 
-             it("should have endTime in hh:mm:ss.th format",
+             it("should have endTime in hh:mm:ss format",
                 []()
                 {
                   int rc = 0;
@@ -249,10 +249,9 @@ void zowex_system_tests()
                   Expect(pos).Not().ToBe(string::npos);
                   string after_end = stderr_output.substr(pos + 5);
                   // skip date (10 chars) + space (1 char) = 11
-                  string end_time = after_end.substr(11, 11);
+                  string end_time = after_end.substr(11, 8);
                   Expect(end_time[2]).ToBe(':');
                   Expect(end_time[5]).ToBe(':');
-                  Expect(end_time[8]).ToBe('.');
                 });
 
              it("should have end timestamp >= start timestamp",
