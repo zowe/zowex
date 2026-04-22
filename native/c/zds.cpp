@@ -390,7 +390,7 @@ static int validate_attributes(ZDS *zds, const ZDSTypeInfo &src, const ZDSTypeIn
         return RTNCD_FAILURE;
     }
 
-   //fail if pds to pds and block size mismatch
+   // fail if pds to pds and block size mismatch
     if(src.type == ZDS_TYPE_PDS || tgt.type == ZDS_TYPE_PDS) {
        // fail if mismatching blcsize
       if (src.entry.blksize != tgt.entry.blksize) {
