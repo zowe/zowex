@@ -6,6 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- `c`: Updated `zut_read_input` so that all tests pass on `zowex`. Now there is no specific handling for line-based TTY input so that data is more consistently preserved.[#953](https://github.com/zowe/zowex/pull/953)
 - **Breaking:** `c`: Refactored the `zds_write` function to consolidate data set and DD write logic into a single entry point. [#908](https://github.com/zowe/zowe-native-proto/issues/908)
 - `c`: Changed `zowex --version` and `zowex -v` to return just the version number. [#925](https://github.com/zowe/zowex/pull/925)
 - `c`: Removed duplicate `-v` and `--version` aliases on the `zowex version` command. [#922](https://github.com/zowe/zowex/pull/922)
