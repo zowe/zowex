@@ -179,8 +179,7 @@ export class VscePromptApi extends AbstractConfigManager {
     }
 
     protected getProfileSchemas(): imperative.IProfileTypeConfiguration[] {
-        const zoweExplorerApi = ZoweVsCodeExtension.getZoweExplorerApi();
-        const profCache = zoweExplorerApi.getExplorerExtenderApi().getProfilesCache();
+        const profCache = this.mProfilesCache;
 
         return [
             // biome-ignore lint/suspicious/noExplicitAny: Accessing protected method

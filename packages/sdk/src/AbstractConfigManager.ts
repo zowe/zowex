@@ -41,7 +41,7 @@ import {
 import { type ISshConfigExt, SshConfigUtils } from "./SshConfigUtils";
 
 export abstract class AbstractConfigManager {
-    public constructor(private mProfilesCache: ProfileInfo) {}
+    public constructor(protected mProfilesCache: ProfileInfo) {}
 
     protected abstract showMessage(message: string, type: MESSAGE_TYPE): void;
     protected abstract showInputBox(opts: inputBoxOpts): Promise<string | undefined>;
