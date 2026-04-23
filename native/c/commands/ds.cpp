@@ -1177,7 +1177,7 @@ void register_commands(parser::Command &root_command)
   auto ds_copy_cmd = command_ptr(new Command("copy", "copy data set (RECFM=U not supported)"));
   ds_copy_cmd->add_positional_arg("source", "source data set to copy from", ArgType_Single, true);
   ds_copy_cmd->add_positional_arg("target", "target data set to copy to", ArgType_Single, true);
-  ds_copy_cmd->add_keyword_arg("overwrite", make_aliases("-ow"),
+  ds_copy_cmd->add_keyword_arg("overwrite", make_aliases("--ow"),
                                "Replace the entire target partitioned data set with the source data set. All members including like named members will be overwritten",
                                ArgType_Flag, false, ArgValue(false));
   ds_copy_cmd->add_keyword_arg("replace", make_aliases("-r"),
