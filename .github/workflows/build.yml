@@ -72,8 +72,8 @@ jobs:
         id: sdk-artifact-upload
         if: ${{ matrix.os == 'ubuntu' }}
         with:
-          name: zowex-sdk
-          path: dist/zowex-sdk-*.tgz
+          name: @zowe/zowex-for-zowe-sdk
+          path: dist/@zowe/zowex-for-zowe-sdk-*.tgz
 
       - name: Comment on PR
         if: ${{ github.event_name == 'pull_request' && matrix.os == 'ubuntu' && github.event.pull_request.head.repo.full_name == github.repository }}
