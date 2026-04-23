@@ -24,7 +24,7 @@ try {
     fs.copyFileSync("package-lock.json", path.join(tempDir, "npm-shrinkwrap.json"));
     execSync("npm install --ignore-scripts", execOptions);
 
-    const sdkDir = path.join("node_modules", "zowex-sdk");
+    const sdkDir = path.join("node_modules", "@zowe/zowex-for-zowe-sdk");
     fs.unlinkSync(path.join(tempDir, sdkDir));
     fs.cpSync(fs.realpathSync(sdkDir), path.join(tempDir, sdkDir), { recursive: true });
     fs.rmSync(path.join(tempDir, "node_modules", "cpu-features"), { recursive: true, force: true });

@@ -31,7 +31,7 @@ import {
     type ProgressCallback,
     type qpItem,
     type qpOpts,
-} from "zowex-sdk";
+} from "@zowe/zowex-for-zowe-sdk";
 
 export default class ServerInstallHandler implements ICommandHandler {
     public async process(params: IHandlerParameters): Promise<void> {

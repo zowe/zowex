@@ -14,7 +14,7 @@ import * as path from "node:path";
 import type { SshSession } from "@zowe/zos-uss-for-zowe-sdk";
 import { Gui, imperative, ZoweExplorerApiType, ZoweVsCodeExtension } from "@zowe/zowe-explorer-api";
 import * as vscode from "vscode";
-import { ZSshUtils } from "zowex-sdk";
+import { ZSshUtils } from "@zowe/zowex-for-zowe-sdk";
 import { ConfigUtils, VscePromptApi } from "./ConfigUtils";
 import { SshClientCache } from "./SshClientCache";
 import { SshErrorHandler } from "./SshErrorHandler";

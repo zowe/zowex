@@ -23,7 +23,7 @@
   "dependencies": {
     "@zowe/zos-uss-for-zowe-sdk": "^8.24.0",
     "terminal-kit": "^3.1.2",
-    "zowex-sdk": "0.4.0"
+    "@zowe/zowex-for-zowe-sdk": "0.4.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.7",

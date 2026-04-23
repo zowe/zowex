@@ -124,7 +124,7 @@
     "@zowe/core-for-zowe-sdk": "^8.11.0",
     "@zowe/zowe-explorer-api": "^3.3.0",
     "ssh2": "^1.16.0",
-    "zowex-sdk": "0.4.0"
+    "@zowe/zowex-for-zowe-sdk": "0.4.0"
   },
   "devDependencies": {
     "@rspack/cli": "^1.7.6",
