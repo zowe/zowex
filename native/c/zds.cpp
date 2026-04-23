@@ -385,7 +385,7 @@ static int validate_attributes(ZDS *zds, const ZDSTypeInfo &src, const ZDSTypeIn
     // fail if mismatching lrecl
     if (src.entry.lrecl != tgt.entry.lrecl) {
         zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
-            "Incompatible LRECL: Source (%d) exceeds Target (%d)",
+            "Incompatible LRECL: Source is %d and Target is %d",
             src.entry.lrecl, tgt.entry.lrecl);
         return RTNCD_FAILURE;
     }
