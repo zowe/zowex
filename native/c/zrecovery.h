@@ -172,14 +172,10 @@ typedef struct
   // return address to IEAARR
   unsigned long long int arr_return;
 
-  // NOTE(Kelosky): we can also dervive R13 using f4sa->saveprev->savenext so that we probably don't need to store R13
-  unsigned long long int r13;
-
   // main line stack regs and pointer (r13)
   SAVF4SA f4sa;
 
   // main line stack regs and pointer (r13)
-  unsigned long long int final_r13;
   SAVF4SA final_f4sa;
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -212,21 +208,12 @@ typedef struct
 typedef void (*PTR64 ROUTINE)(ZRCVY_ENV *);
 typedef int (*PTR64 RECOVERY_ROUTINE)(SDWA);
 
-static void ieaarr(ROUTINE routine, void *PTR64 routine_parm, RECOVERY_ROUTINE arr, void *PTR64 arr_parm)
-{
-  IEAARR(
-      routine,
-      &routine_parm,
-      arr,
-      arr_parm);
-}
-
 #pragma prolog(ZRCVYRTY, " ZWEPROLG NEWDSA=NO ")
 #pragma epilog(ZRCVYRTY, " ZWEEPILG ")
 typedef void (*RETRY_ROUTINE)(ZRCVY_ENV);
 static void ZRCVYRTY(ZRCVY_ENV zenv)
 {
-  JUMP_ENV(zenv.f4sa, zenv.r13, 4); // TODO(Kelosky): document non-zero return code
+  JUMP_ENV(zenv.f4sa, 4); // TODO(Kelosky): document non-zero return code
 }
 
 static void vradata_init(SDWA *PTR64 sdwa)
@@ -259,7 +246,6 @@ static int ZRCVYARR(SDWA sdwa)
     // NOTE(Kelosky): we can use this block + RTNCD_RETRY if no SDWA to attempt retry
     // unsigned long long int return_r0 = 0;
     // memcpy(&return_r0, &retry_function, sizeof(return_r0));
-    // set_prev_r0(return_r0);
     if (zenv->perc_exit)
       zenv->perc_exit(zenv->perc_exit_data);
     return RTNCD_PERCOLATE; // TODO(Kelosky): handle no SDWA, for now percolate, but we can retry
@@ -305,16 +291,18 @@ static int ZRCVYARR(SDWA sdwa)
 }
 
 // router back to main routine
-#pragma prolog(ZRCVYRTE, " ZWEPROLG NEWDSA=NO ")
+#pragma prolog(ZRCVYRTE, " ZWEPROLG NEWDSA=NO,SAVE=NO ")
 #pragma epilog(ZRCVYRTE, " ZWEEPILG ")
 static void ZRCVYRTE(ZRCVY_ENV *PTR64 zenv) ATTRIBUTE(noinline);
 static void ZRCVYRTE(ZRCVY_ENV *PTR64 zenv)
 {
-  GET_ENTRY_REG64(zenv->arr_return, 8); // NOTE(Kelosky): this is the same as get_r14_by_ref() but will be inlined
-  JUMP_ENV(zenv->f4sa, zenv->r13, 0);
+  GET_REG64(zenv->arr_return, 14);
+  JUMP_ENV(zenv->f4sa, 0);
 }
 
 // NOTE(Kelosky): we must not have this function inline so to save and return to the mainline
+#pragma prolog(disable_recovery, " ZWEPROLG USENAB=YES ")
+#pragma epilog(disable_recovery, " ZWEEPILG ")
 static int disable_recovery(ZRCVY_ENV *zenv) ATTRIBUTE(noinline);
 static int disable_recovery(ZRCVY_ENV *zenv)
 {
@@ -322,16 +310,15 @@ static int disable_recovery(ZRCVY_ENV *zenv)
   unsigned long long int r13 = 0;
   GET_STACK_ENV(r13); // NOTE(Kelosky): this is the same as get_prev_r13() but will be inlined
   unsigned char *save_area = (unsigned char *)r13;
-  memcpy(&zenv->final_f4sa, save_area, sizeof(SAVF4SA));
-  zenv->final_r13 = r13;
-
-  // return to the IEAARR (ieaarr) which will then "jump" back to the stack position set just above
+  memcpy(&zenv->final_f4sa.savf4salang, save_area, sizeof(SAVF4SA));
   RETURN_TO_IEAARR(zenv->arr_return);
 }
 
 // NOTE(Kelosky): this function may "return twice" like setjmp()
 // NOTE(Kelosky): we must not have this function inline so to save and return to the mainline
 #pragma reachable(enable_recovery)
+#pragma prolog(enable_recovery, " ZWEPROLG USENAB=YES ")
+#pragma epilog(enable_recovery, " ZWEEPILG ")
 static int enable_recovery(ZRCVY_ENV *PTR64 zenv) ATTRIBUTE(noinline);
 static int enable_recovery(ZRCVY_ENV *PTR64 zenv)
 {
@@ -340,7 +327,6 @@ static int enable_recovery(ZRCVY_ENV *PTR64 zenv)
   unsigned char *save_area = (unsigned char *)r13;
 
   memcpy(&zenv->f4sa, save_area, sizeof(SAVF4SA));
-  zenv->r13 = r13;
 
   // here we call a router routine which will route back to main line code
   // eventually, whenever we call to drop recovery, we then fall through after this
@@ -353,7 +339,7 @@ static int enable_recovery(ZRCVY_ENV *PTR64 zenv)
       zenv);
 
   // jump back to main whenever drop was called
-  JUMP_ENV(zenv->final_f4sa, zenv->final_r13, 0);
+  JUMP_ENV(zenv->final_f4sa, 0);
 
   return 0; // NOTE(Kelosky): this never runs
 }

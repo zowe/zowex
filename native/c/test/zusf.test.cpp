@@ -70,8 +70,8 @@ void zusf_tests()
                   const std::string source_file = file_a;
                   const std::string dest_file = file_b;
                   std::string list_response;
-                  zusf_create_uss_file_or_dir(&zusf, source_file, 0664, false);
-                  zusf_create_uss_file_or_dir(&zusf, dest_file, 0775, true);
+                  zusf_create_uss_file_or_dir(&zusf, source_file, 0664, CreateOptions());
+                  zusf_create_uss_file_or_dir(&zusf, dest_file, 0775, CreateOptions(true));
                   int rc;
                   rc = zusf_copy_file_or_dir(&zusf, source_file, dest_file, copts_preserve);
                   Expect(rc).ToBe(0);
@@ -113,8 +113,8 @@ void zusf_tests()
                   const std::string dest_dir = dir_b;
                   std::string list_response;
                   const std::string dest_copied_file = dest_dir + "/" + get_basename(source_file);
-                  zusf_create_uss_file_or_dir(&zusf, source_file, 0664, false);
-                  zusf_create_uss_file_or_dir(&zusf, dest_dir, 0775, true);
+                  zusf_create_uss_file_or_dir(&zusf, source_file, 0664, CreateOptions());
+                  zusf_create_uss_file_or_dir(&zusf, dest_dir, 0775, CreateOptions(true));
                   int rc;
                   rc = zusf_copy_file_or_dir(&zusf, source_file, dest_dir, copts_preserve);
                   Expect(rc).ToBe(0);
@@ -162,8 +162,8 @@ void zusf_tests()
                   const std::string source_dir = dir_a;
                   const std::string dest_file = file_b;
                   std::string list_response;
-                  zusf_create_uss_file_or_dir(&zusf, source_dir, 0775, true);
-                  zusf_create_uss_file_or_dir(&zusf, dest_file, 0664, false);
+                  zusf_create_uss_file_or_dir(&zusf, source_dir, 0775, CreateOptions(true));
+                  zusf_create_uss_file_or_dir(&zusf, dest_file, 0664, CreateOptions());
                   int rc;
 
                   // copy to an existing file: error and no change to file/dir
@@ -202,7 +202,7 @@ void zusf_tests()
                   int rc;
                   std::string list_response;
 
-                  zusf_create_uss_file_or_dir(&zusf, source_dir, 0775, true);
+                  zusf_create_uss_file_or_dir(&zusf, source_dir, 0775, CreateOptions(true));
 
                   // bad source
                   rc = zusf_copy_file_or_dir(&zusf, "/noway/src/noexist", dest_dir, copts_preserve);
@@ -231,8 +231,8 @@ void zusf_tests()
                   const std::string dest_link_filepath = dest_dir + "/find";
                   const std::string dest_symlink_nested_dir = dest_dir + "/find/me/with/symlink";
 
-                  zusf_create_uss_file_or_dir(&zusf, source_nested, 0775, true);
-                  zusf_create_uss_file_or_dir(&zusf, symlink_nested_dir, 0775, true);
+                  zusf_create_uss_file_or_dir(&zusf, source_nested, 0775, CreateOptions(true));
+                  zusf_create_uss_file_or_dir(&zusf, symlink_nested_dir, 0775, CreateOptions(true));
 
                   // symlink
                   std::string cmd_output;
@@ -279,11 +279,11 @@ void zusf_tests()
                   const std::string source_dir = dir_a;
                   const std::string target_dir = dir_b;
 
-                  ExpectWithContext(zusf_create_uss_file_or_dir(&zusf, source_file, 0664, false), zusf.diag.e_msg).ToBe(0);
-                  ExpectWithContext(zusf_create_uss_file_or_dir(&zusf, target_file, 0400, false), zusf.diag.e_msg).ToBe(0);
-                  ExpectWithContext(zusf_create_uss_file_or_dir(&zusf, source_dir, 0664, true), zusf.diag.e_msg).ToBe(0);
-                  ExpectWithContext(zusf_create_uss_file_or_dir(&zusf, target_dir, 0775, true), zusf.diag.e_msg).ToBe(0);
-                  ExpectWithContext(zusf_create_uss_file_or_dir(&zusf, target_dir + "/" + get_basename(source_dir), 0400, true), zusf.diag.e_msg).ToBe(0);
+                  ExpectWithContext(zusf_create_uss_file_or_dir(&zusf, source_file, 0664, CreateOptions()), zusf.diag.e_msg).ToBe(0);
+                  ExpectWithContext(zusf_create_uss_file_or_dir(&zusf, target_file, 0400, CreateOptions()), zusf.diag.e_msg).ToBe(0);
+                  ExpectWithContext(zusf_create_uss_file_or_dir(&zusf, source_dir, 0664, CreateOptions(true)), zusf.diag.e_msg).ToBe(0);
+                  ExpectWithContext(zusf_create_uss_file_or_dir(&zusf, target_dir, 0775, CreateOptions(true)), zusf.diag.e_msg).ToBe(0);
+                  ExpectWithContext(zusf_create_uss_file_or_dir(&zusf, target_dir + "/" + get_basename(source_dir), 0400, CreateOptions(true)), zusf.diag.e_msg).ToBe(0);
 
                   // can't overwrite 0400 target without force
                   zusf_chmod_uss_file_or_dir(&zusf, target_file, 0400, false);
@@ -295,8 +295,8 @@ void zusf_tests()
                   const std::string source_file = file_a;
                   const std::string dest_dir = dir_b;
 
-                  zusf_create_uss_file_or_dir(&zusf, source_file, 0664, false);
-                  zusf_create_uss_file_or_dir(&zusf, dest_dir, 0400, true); // TODO: this does not set permissions to 0400. why? `zowex uss create-dir test_dir --mode 0400` works!
+                  zusf_create_uss_file_or_dir(&zusf, source_file, 0664, CreateOptions());
+                  zusf_create_uss_file_or_dir(&zusf, dest_dir, 0400, CreateOptions(true)); // TODO: this does not set permissions to 0400. why? `zowex uss create-dir test_dir --mode 0400` works!
                   // chmod must succeed for copy to fail
                   ExpectWithContext(zusf_chmod_uss_file_or_dir(&zusf, dest_dir, 0400, true), zusf.diag.e_msg).ToBe(0);
                   int rc;
@@ -1624,7 +1624,7 @@ void zusf_tests()
 
                   // Test file creation with encoding options set
                   // This simulates what would happen during file write operations
-                  int result = zusf_create_uss_file_or_dir(&zusf, test_file, 0644, false);
+                  int result = zusf_create_uss_file_or_dir(&zusf, test_file, 0644, CreateOptions());
                   Expect(result).ToBe(RTNCD_SUCCESS);
 
                   // Verify file was created
@@ -1653,7 +1653,7 @@ void zusf_tests()
                   rmdir(test_dir.c_str());
 
                   // Test directory creation with encoding options set
-                  int result = zusf_create_uss_file_or_dir(&zusf, test_dir, 0755, true);
+                  int result = zusf_create_uss_file_or_dir(&zusf, test_dir, 0755, CreateOptions(true));
                   Expect(result).ToBe(RTNCD_SUCCESS);
 
                   // Verify directory was created

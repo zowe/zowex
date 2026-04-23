@@ -6,11 +6,13 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- **Breaking:** `c`: Refactored the `zds_write` function to consolidate data set and DD write logic into a single entry point. [#908](https://github.com/zowe/zowe-native-proto/issues/908)
 - `c`: Changed `zowex --version` and `zowex -v` to return just the version number. [#925](https://github.com/zowe/zowex/pull/925)
 - `c`: Removed duplicate `-v` and `--version` aliases on the `zowex version` command. [#922](https://github.com/zowe/zowex/pull/922)
 - `c`: Added the `getInfo` RPC to retrieve the middleware version and build information. [#922](https://github.com/zowe/zowex/pull/922)
 - `c`: Added a DCB abend exit for handling edge cases around PDS member open, write, and close operations. When an abend is encountered, it is either delayed or ignored (when applicable) and an error is returned gracefully via the diagnostic structure (`ZDIAG`) rather than terminating the process. Refer to [DCB abend exits](doc/dcb-abend-exit.md) for more information on how and when abends are handled. **Note:** In the event of an end-of-space (end-of-volume) abend, the operating system closes the DCB if the ignore request is honored from the abend exit. However, the abend might still percolate during end-of-volume `CLOSE` routines. An ESTAE/ESTAEX recovery routine should be used to gracefully handle these cases. [#839](https://github.com/zowe/zowex/issues/839)
 - `c`: Fixed an issue where listing the members of a protected, partitioned data set resulted in an unclear error message. Now, the error messages are more specific and include information about insufficient permissions when applicable. [#297](https://github.com/zowe/zowex/issues/297)
+- `c`: Fixed an issue where the `zowex ds create-member` command would overwrite an existing member. Added an `--overwrite` flag to the command that defaults to false. [#642](https://github.com/zowe/zowex/issues/642)
 
 ## `0.4.0`
 

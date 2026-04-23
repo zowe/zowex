@@ -32,7 +32,14 @@
 .*
 .*       SAVE=[SA,BAKR]
 .*         SA: (default) save input regs
+.*       SAVE=[SA,BAKR,NO]
+.*         SA: (default) save input regs
 .*         BAKR: save registers on linkage stack
+.*         NO: do not save save input registers
+.*
+.*       USENAB=[NO,YES]
+.*         NO: (default) do not attempt to use NAB
+.*         YES: use NAB
 .*
 .*       SAM64=[NO,YES]
 .*         NO:  (default) use 31-bit AMODE
@@ -50,7 +57,7 @@
 .*    &CCN_CSECT
 .*    CCN_IASM_MACRO
 .*
-&NAME    ZWEPROLG &NEWDSA=,&SAVE=SA,&SAM64=NO,&LOC24=NO
+&NAME    ZWEPROLG &NEWDSA=,&SAVE=SA,&SAM64=NO,&LOC24=NO,&USENAB=NO
 .*
          COPY  CCNZGBL
          GBLA  &ZG_DSASZ
@@ -68,6 +75,7 @@
 &ZG_BAKR  SETB  0
 &ZG_LOC24 SETB  0
 &ZG_SAM64 SETB  0
+&ZG_UNAB  SETB  0
 &IS_64    SETB  (&CCN_LP64 OR '&SAM64' EQ 'YES')
 &IS_AR    SETB  ('&CCN_ASCM' EQ 'AR')
 &KB#      SETA  1024
@@ -94,10 +102,13 @@
 &SLRx    SETC  'SLGR '
 .CONT000 ANOP  ,
 .*
-.*       Validate and handle SAVE= paramters
+.*       Validate macro operands
 .*
-         AIF   ('&SAVE' NE 'SA' AND '&SAVE' NE 'BAKR').ERR020
+         AIF   ('&SAVE' NE 'SA'                                        +
+               AND '&SAVE' NE 'BAKR'                                   +
+               AND '&SAVE' NE 'NO').ERR020
          AIF   ('&SAVE' EQ 'BAKR').CONT020
+         AIF   ('&SAVE' EQ 'NO').CONT200
 &ZG_SAVE SETB  1
          AGO   .CONT100
 .*
@@ -105,25 +116,27 @@
 &ZG_BAKR SETB  1
          AGO   .CONT100
 .*
-.*       Must be NO or YES
-.*
 .CONT100 ANOP ,
          AIF   ('&SAM64' NE 'NO' AND '&SAM64' NE 'YES').ERR030
-.*
-.*       SAM64=YES may only be used with SAVE=BAKR
-.*
          AIF   ('&SAVE' NE 'BAKR' AND '&SAM64' EQ 'YES').ERR040
+         AIF   ('&NEWDSA(1)' EQ 'YES' AND '&USENAB' EQ 'YES').ERR060
+         AIF   ('&USENAB' NE 'NO' AND '&USENAB' NE 'YES').ERR070
+         AIF   ('&USENAB' EQ 'YES' AND '&SAVE' EQ 'NO').ERR080
 .*
 .*       Set SAM64=YES if requested
 .*
-         AIF   ('&SAM64' NE 'YES').CONT150
+         AIF   ('&SAM64' NE 'YES').CONT120
 &ZG_SAM64 SETB  1
 .*
-.CONT150 ANOP ,
+.CONT120 ANOP ,
          AIF   ('&LOC24' NE 'NO' AND '&LOC24' NE 'YES').ERR050
-         AIF   ('&LOC24' EQ 'NO').CONT200
+         AIF   ('&LOC24' EQ 'NO').CONT140
 &ZG_LOC24 SETB  1
-         AGO   .CONT200
+         AGO   .CONT140
+.*
+.CONT140 ANOP ,
+         AIF   ('&USENAB' NE 'YES').CONT200
+&ZG_UNAB SETB  1
 .*
 .CONT200 ANOP ,
          AIF   ('&NEWDSA(1)' EQ 'YES').CONT240
@@ -147,8 +160,8 @@
 .*       Save input regs
 .*
 .CONT300 ANOP ,
-         AIF   (&ZG_SAVE).CONT380
-         AIF   (NOT &ZG_BAKR).CONT400
+         AIF   (&ZG_SAVE).CONT340
+         AIF   (NOT &ZG_BAKR).CONT500
 .*
 .*       NOTE(Kelosky): in the future, if 31-bit caller BASSMs here
 .*       we would not want to do this because we would return in
@@ -163,15 +176,28 @@
          SAM64 ,                Set AMODE to 64
 .CONT320 ANOP ,
          BAKR  14,0             Save registers on linkage stack
-         AGO   .CONT400
+         AGO   .CONT500
 .*
-.CONT380 ANOP ,
+.CONT340 ANOP ,
          AIF   (&IS_64).SAVE64
          STM   14,12,12(13)     Save caller regs
-         AGO   .CONT400
+         AGO   .CONT360
 .SAVE64  ANOP
          STMG  14,12,8(13)      Save caller regs
-.CONT400 ANOP  ,
+.CONT360 ANOP
+         AIF   (NOT &ZG_UNAB).CONT500
+         AIF   (&IS_64).UNAB64
+         LR    15,13            Copy SA
+         L     13,8(,13)        Get previous SA
+         ST    15,4(,13)        Chain
+         AGO   .CONT500
+.UNAB64  ANOP
+         LGR   15,13            Copy SA
+         LG    13,136(,13)      Get NAB
+         STG   15,128(,13)      Chain
+         AGO   .CONT500
+.*
+.CONT500 ANOP  ,
          AIF   (NOT &GETDSA).EXIT
 .*
 .*       Obtain DSA
@@ -183,7 +209,7 @@
          &LHIx 3,&KB#            Number of KBs
          &MHIx 3,1024            Multiply by 1024
 *
-         AIF   (&ZG_LOC24).CONT440
+         AIF   (&ZG_LOC24).CONT540
 *        STORAGE OBTAIN,                                               +
                LENGTH=(3),                                             +
                CALLRKY=YES,                                            +
@@ -198,9 +224,9 @@
                LOC=(31,64),                                            +
                BNDRY=PAGE,                                             +
                COND=NO
-         AGO   .CONT480
+         AGO   .CONT580
 .*
-.CONT440 ANOP
+.CONT540 ANOP
 *        STORAGE OBTAIN,                                               +
                LENGTH=(3),                                             +
                CALLRKY=YES,                                            +
@@ -215,7 +241,7 @@
                LOC=(24,64),                                            +
                BNDRY=PAGE,                                             +
                COND=NO
-.CONT480 ANOP
+.CONT580 ANOP
 .*
          &LRxx 2,1               -> New storage save
 .*
@@ -254,7 +280,7 @@
          MNOTE 8,'&MACNM. - DSA= must be YES|NO'
          AGO   .EXIT
 .ERR020  ANOP  ,
-         MNOTE 8,'&MACNM. - SAVE= must be SA|BAKR'
+         MNOTE 8,'&MACNM. - SAVE= must be SA|BAKR|NO'
          AGO   .EXIT
 .ERR030  ANOP  ,
          MNOTE 8,'&MACNM. - SAM64= must be NO|YES'
@@ -264,6 +290,15 @@
          AGO   .EXIT
 .ERR050  ANOP  ,
          MNOTE 8,'&MACNM. - LOC24= must be NO|YES'
+         AGO   .EXIT
+.ERR060  ANOP  ,
+         MNOTE 8,'&MACNM. - Must use either USENAB=YES or NEWDSA=YES'
+         AGO   .EXIT
+.ERR070  ANOP  ,
+         MNOTE 8,'&MACNM. - USENAB= must be NO|YES'
+         AGO   .EXIT
+.ERR080  ANOP  ,
+         MNOTE 8,'&MACNM. - USENAB=YES may not be used with SAVE=NO'
          AGO   .EXIT
 .*
 .* Common exit
