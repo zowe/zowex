@@ -218,7 +218,7 @@ static int copy_sequential(ZDS *zds, const std::string &dsn1, const std::string 
 
   if (options->target_exists && !options->replace)
   {
-    zds->diag.e_msg_len = sprintf(zds->diag.e_msg,
+    zds->diag.e_msg_len = snprintf(zds->diag.e_msg, (int)(sizeof(zds->diag.e_msg) - 1),
                                   "Target data set '%s' already exists. Use --replace (-r) flag to replace the target's contents", dsn2.c_str());
     return RTNCD_FAILURE;
   }
