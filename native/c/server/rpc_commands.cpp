@@ -87,9 +87,7 @@ void register_ds_commands(CommandDispatcher &dispatcher)
   dispatcher.register_command("renameMember", create_ds_builder(ds::handle_rename_member).validate<RenameMemberRequest, RenameMemberResponse>());
   dispatcher.register_command("copyDatasetOrMember",
                               CommandBuilder(ds::handle_data_set_copy)
-                                  .validate<CopyDatasetRequest, CopyDatasetResponse>()
-                                  .rename_arg("fromDataset", "source")
-                                  .rename_arg("toDataset", "target"));
+                                  .validate<CopyDatasetRequest, CopyDatasetResponse>());
 }
 
 void register_job_commands(CommandDispatcher &dispatcher)
