@@ -1,0 +1,23 @@
+import type { ICommandDefinition } from "@zowe/imperative";
+import { SshSession } from "@zowe/zos-uss-for-zowe-sdk";
+import { Constants } from "../Constants";
+import { CopyDatasetOrMemberDefinition } from "./CopyDataSetorMemberDefinition";
+
+const CopyDefinition: ICommandDefinition = {
+    name: "copy",
+    aliases: ["cp"],
+    summary: "Copy data sets and members",
+    description: "Copy a data set or member to another data set or member",
+    type: "group",
+    children: [CopyDataSetorMemberDefinition],
+    passOn: [
+        {
+            property: "options",
+            value: [...SshSession.SSH_CONNECTION_OPTIONS, Constants.OPT_SERVER_PATH],
+            merge: true,
+            ignoreNodes: [{ type: "group" }],
+        },
+    ],
+};
+
+export = CopyDefinition;

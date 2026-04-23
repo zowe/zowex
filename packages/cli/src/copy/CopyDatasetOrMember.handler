@@ -1,0 +1,50 @@
+import { ICommandHandler, IHandlerParameters } from "@zowe/imperative";
+import { AbstractHandler } from "./Abstract.handler"; // Assuming you have a base handler for RPC calls
+import { CopyDatasetRequest } from "../interfaces/CopyDatasetRequest";
+
+export default class DataSetHandler extends AbstractHandler implements ICommandHandler {
+    public async process(params: IHandlerParameters): Promise<void> {
+        // 1. Extract arguments from the Zowe params object
+        const fromDataset = params.arguments.fromDataset as string;
+        const toDataset = params.arguments.toDataset as string;
+        const replace = params.arguments.replace as boolean;
+        const overwrite = params.arguments.overwrite as boolean;
+
+        // 2. Construct the request object for the middleware
+        // Note: We use the names "source" and "target" to match your C++ context.get calls
+        const request: CopyDatasetRequest = {
+            source: fromDataset,
+            target: toDataset,
+            replace: replace,
+            overwrite: overwrite
+        };
+
+        try {
+            // 3. Call the middleware via JSON-RPC
+            // "copyDatasetOrMember" is the string you registered in the dispatcher
+            const response = await this.session.sendRequest("copyDatasetOrMember", request);
+
+            // 4. Handle success using the structured result you added earlier
+            if (response.success) {
+                const result = response.result;
+                let message = `Successfully copied '${fromDataset}' to '${toDataset}'.`;
+
+                if (result.targetCreated) {
+                    message = `New data set '${toDataset}' created and copied from '${fromDataset}'.`;
+                } else if (result.memberCreated) {
+                    message = `New member '${toDataset}' created and copied from '${fromDataset}'.`;
+                } else if (result.overwritten) {
+                    message = `Target data set '${toDataset}' was overwritten with contents of '${fromDataset}'.`;
+                } else if (result.replaced) {
+                    message = `Target '${toDataset}' was updated/replaced with contents of '${fromDataset}'.`
+                }
+
+                params.response.console.log(message);
+                params.response.data.setObj(result);
+            }
+        } catch (err) {
+            params.response.console.error(err.message);
+            throw err;
+        }
+    }
+}
