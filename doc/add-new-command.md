@@ -350,7 +350,7 @@ Create a test script to verify your command works end-to-end:
 **`test-ping.ts`:**
 
 ```typescript
-import { ZSshClient } from "zowex-sdk/src/ZSshClient";
+import { ZSshClient } from "@zowe/zowex-for-zowe-sdk/src/ZSshClient";
 import { ProfileInfo } from "@zowe/imperative";
 
 async function main() {
