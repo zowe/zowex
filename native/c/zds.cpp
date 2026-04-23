@@ -214,7 +214,7 @@ static int zds_write_member_bpam_streamed(ZDS *zds, const std::string &dsn, cons
 static int copy_sequential(ZDS *zds, const std::string &dsn1, const std::string &dsn2, ZDSCopyOptions *options)
 {
   int rc = 0;
-  std::vector<std::string> dds;
+  std::vector<std::string> dds{};
 
   if (options->target_exists && !options->replace)
   {
