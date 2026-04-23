@@ -299,7 +299,7 @@ static int copy_partitioned(ZDS *zds, const ZDSTypeInfo &sourceInfo, const ZDSTy
                                      "Overwrite failed. Could not recreate '%s' using LIKE. Details: %s", targetInfo.base_dsn.c_str(), create_resp.c_str());
       return RTNCD_FAILURE;
     }
-    zut_bpxwdyn("FREE DA('" + targetInfo.base_dsn + "')", &code, resp);
+    rc = zut_bpxwdyn("FREE DA('" + targetInfo.base_dsn + "')", &code, resp);
     if(rc != RTNCD_SUCCESS) {
       zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
                                      "Overwrite failed. Details: %s", create_resp.c_str());
