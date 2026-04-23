@@ -104,6 +104,7 @@ typedef struct
 
   ZEncode encoding_opts;
   char etag[9]; // 8 characters + null terminator
+  unsigned char _etag_ddname_pad[7];
   char ddname[8];
 
   int32_t max_entries;
