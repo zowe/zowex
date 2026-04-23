@@ -495,8 +495,7 @@ int zds_copy_dsn(ZDS *zds, const std::string &dsn1, const std::string &dsn2, ZDS
                                     dsn2.c_str(), dsn1.c_str(), create_resp.c_str());
       return RTNCD_FAILURE;
     }
-    std::string free = "FREE DA('" + dsn2 + "')";
-    zut_bpxwdyn(free, &code, create_resp);
+    zut_bpxwdyn("FREE DA('" + dsn2 + "')", &code, create_resp);
   }
 
   if (info1.type == ZDS_TYPE_PS && target_type == ZDS_TYPE_PS)
