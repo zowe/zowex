@@ -11,8 +11,8 @@
 
 import { ImperativeError } from "@zowe/imperative";
 import { type ZoweExplorerApiType, ZoweVsCodeExtension } from "@zowe/zowe-explorer-api";
-import * as vscode from "vscode";
 import { RpcErrorCode, SshErrors } from "@zowe/zowex-for-zowe-sdk";
+import * as vscode from "vscode";
 
 /**
  * Enhanced error handling utility for SSH operations using Zowe Explorer's ErrorCorrelator

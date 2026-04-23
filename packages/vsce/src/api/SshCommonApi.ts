@@ -19,8 +19,8 @@ import {
     ZoweExplorerApiType,
     ZoweVsCodeExtension,
 } from "@zowe/zowe-explorer-api";
-import * as vscode from "vscode";
 import { type ZSshClient, ZSshUtils } from "@zowe/zowex-for-zowe-sdk";
+import * as vscode from "vscode";
 import { SshClientCache } from "../SshClientCache";
 import { SshErrorHandler } from "../SshErrorHandler";
 

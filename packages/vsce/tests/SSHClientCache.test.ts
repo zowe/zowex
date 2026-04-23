@@ -10,9 +10,9 @@
  */
 
 import { imperative, ZoweVsCodeExtension } from "@zowe/zowe-explorer-api";
+import { ZSshClient, ZSshUtils } from "@zowe/zowex-for-zowe-sdk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as vscode from "vscode";
-import { ZSshClient, ZSshUtils } from "@zowe/zowex-for-zowe-sdk";
 import { SshClientCache } from "../src/SshClientCache";
 import { deployWithProgress, getVsceConfig } from "../src/Utilities";
 
