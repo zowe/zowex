@@ -299,7 +299,7 @@ static int copy_partitioned(ZDS *zds, ZDSTypeInfo &sourceInfo, ZDSTypeInfo &targ
   }
 
   int rc = 0;
-  std::vector<std::string> dds;
+  std::vector<std::string> dds{};
 
   dds.push_back("alloc dd(SYSUT1) da('" + sourceInfo.base_dsn + "') shr");
   dds.push_back("alloc dd(SYSUT2) da('" + targetInfo.base_dsn + "') shr");
