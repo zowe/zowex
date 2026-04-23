@@ -213,6 +213,12 @@ int handle_uss_list(InvocationContext &context)
           fields.push_back(field);
         }
 
+        // We should have 8 fields: mode, links, user, group, size, filetag, mtime, name
+        if (fields.size() < 8)
+        {
+          continue;
+        }
+
         entry->set("mode", str(fields[0]));
         entry->set("links", i64(atoi(fields[1].c_str())));
         entry->set("user", str(fields[2]));

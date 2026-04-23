@@ -27,7 +27,7 @@ int ZCNACT(ZCN *zcn)
   if (0 != rc)
   {
     strcpy(zcn->diag.service_name, "TESTAUTH");
-    zcn->diag.e_msg_len = sprintf(zcn->diag.e_msg, "Not authorized - %d", rc);
+    ZDIAG_SET_MSG(&zcn->diag, "Not authorized - %d", rc);
     zcn->diag.detail_rc = ZCN_RTNCD_NOT_AUTH;
     return RTNCD_FAILURE;
   }
@@ -42,7 +42,7 @@ int ZCNACT(ZCN *zcn)
     memcpy(zcn, &zcn31, sizeof(ZCN));
     if (0 != rc)
     {
-      zcn->diag.e_msg_len = sprintf(zcn->diag.e_msg, "Error activating console, service: %s, rc: %d, service_rc: %d, service_rsn: %d", zcn->diag.service_name, rc, zcn->diag.service_rc, zcn->diag.service_rsn);
+      ZDIAG_SET_MSG(&zcn->diag, "Error activating console, service: %.16s, rc: %d, service_rc: %d, service_rsn: %d", zcn->diag.service_name, rc, zcn->diag.service_rc, zcn->diag.service_rsn);
       rc = RTNCD_FAILURE;
     }
   }
@@ -67,7 +67,7 @@ int ZCNPUT(ZCN *zcn, const char *command)
   if (0 != rc)
   {
     strcpy(zcn->diag.service_name, "TESTAUTH");
-    zcn->diag.e_msg_len = sprintf(zcn->diag.e_msg, "Not authorized - %d", rc);
+    ZDIAG_SET_MSG(&zcn->diag, "Not authorized - %d", rc);
     zcn->diag.detail_rc = ZCN_RTNCD_NOT_AUTH;
     return RTNCD_FAILURE;
   }
@@ -79,7 +79,7 @@ int ZCNPUT(ZCN *zcn, const char *command)
 
   if (0 != rc)
   {
-    zcn->diag.e_msg_len = sprintf(zcn->diag.e_msg, "Error writting data to console, service: %s, rc: %d, service_rc: %d, service_rsn: %d", zcn->diag.service_name, rc, zcn->diag.service_rc, zcn->diag.service_rsn);
+    ZDIAG_SET_MSG(&zcn->diag, "Error writting data to console, service: %.16s, rc: %d, service_rc: %d, service_rsn: %d", zcn->diag.service_name, rc, zcn->diag.service_rc, zcn->diag.service_rsn);
     return RTNCD_FAILURE;
   }
 
@@ -120,7 +120,7 @@ int ZCNGET(ZCN *zcn, char *response)
   if (0 != rc)
   {
     strcpy(zcn->diag.service_name, "TESTAUTH");
-    zcn->diag.e_msg_len = sprintf(zcn->diag.e_msg, "Not authorized - %d", rc);
+    ZDIAG_SET_MSG(&zcn->diag, "Not authorized - %d", rc);
     zcn->diag.detail_rc = ZCN_RTNCD_NOT_AUTH;
     return RTNCD_FAILURE;
   }
@@ -140,7 +140,7 @@ int ZCNGET(ZCN *zcn, char *response)
 
   if (0 != rc)
   {
-    zcn->diag.e_msg_len = sprintf(zcn->diag.e_msg, "Error getting data from console, service: %s, rc: %d, service_rc: %d, service_rsn: %d", zcn->diag.service_name, rc, zcn->diag.service_rc, zcn->diag.service_rsn);
+    ZDIAG_SET_MSG(&zcn->diag, "Error getting data from console, service: %.16s, rc: %d, service_rc: %d, service_rsn: %d", zcn->diag.service_name, rc, zcn->diag.service_rc, zcn->diag.service_rsn);
     return RTNCD_FAILURE;
   }
 
@@ -157,7 +157,7 @@ int ZCNDACT(ZCN *zcn)
   if (0 != rc)
   {
     strcpy(zcn->diag.service_name, "TESTAUTH");
-    zcn->diag.e_msg_len = sprintf(zcn->diag.e_msg, "Not authorized - %d", rc);
+    ZDIAG_SET_MSG(&zcn->diag, "Not authorized - %d", rc);
     zcn->diag.detail_rc = ZCN_RTNCD_NOT_AUTH;
     return RTNCD_FAILURE;
   }
@@ -169,7 +169,7 @@ int ZCNDACT(ZCN *zcn)
 
   if (0 != rc)
   {
-    zcn->diag.e_msg_len = sprintf(zcn->diag.e_msg, "Error deactivating console, service: %s, rc: %d, service_rc: %d, service_rsn: %d", zcn->diag.service_name, rc, zcn->diag.service_rc, zcn->diag.service_rsn);
+    ZDIAG_SET_MSG(&zcn->diag, "Error deactivating console, service: %.16s, rc: %d, service_rc: %d, service_rsn: %d", zcn->diag.service_name, rc, zcn->diag.service_rc, zcn->diag.service_rsn);
     return RTNCD_FAILURE;
   }
 
