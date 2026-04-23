@@ -74,6 +74,8 @@ describe("parseSearchOutput", () => {
         const result = parseSearchOutput(output);
 
         expect(result.members.map((m) => m.name)).toEqual(["GDG", "IEFBR14"]);
+        expect(result.dataset).toBe("IBMUSER.JCL");
+        expect(result.summary.membersWithLines).toEqual(8);
         expect(result.members[0].matches.map((m) => m.lineNumber)).toEqual([1]);
         expect(result.members[1].matches.map((m) => m.lineNumber)).toEqual([4]);
         expect(result.summary.linesFound).toBe(10);
