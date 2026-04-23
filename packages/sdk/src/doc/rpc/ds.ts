@@ -231,3 +231,11 @@ export interface WriteDatasetResponse extends common.CommandResponse {
      */
     truncationWarning?: string;
 }
+
+export interface CopyDatasetRequest extends common.CommandRequest {
+    source: string;
+
+    target: string;
+}
+
+export type CopyDatasetResponse = common.CommandResponse;

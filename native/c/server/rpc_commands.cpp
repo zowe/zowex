@@ -133,6 +133,11 @@ void register_job_commands(CommandDispatcher &dispatcher)
   dispatcher.register_command("submitUss",
                               create_uss_builder(job::handle_job_submit_uss)
                                   .validate<SubmitUssRequest, SubmitJclResponse>());
+  dispatcher.register_command("copyDatasetOrMember",
+                              CommandBuilder(ds::handle_data_set_copy)
+                                  .validate<CopyDatasetRequest, CopyDatasetResponse>()
+                                  .rename_arg("fromDataset", "source")
+                                  .rename_arg("toDataset", "target"));
 }
 
 void register_uss_commands(CommandDispatcher &dispatcher)

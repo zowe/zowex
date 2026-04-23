@@ -995,18 +995,22 @@ int handle_data_set_copy(InvocationContext &context)
 
   if (!options.target_exists && !options.member_created)
   {
+    result->set("targetCreated", boolean(true));
     context.output_stream() << "New data set '" << target << "' created and copied from '" << source << "'" << std::endl;
   }
   else if (options.member_created)
   {
+    result->set("memberCreated", boolean(true));
     context.output_stream() << "New member '" << target << "' created and copied from '" << source << "'" << std::endl;
   }
   else if (options.overwrite)
   {
+    result->set("overwrite", boolean(true));
     context.output_stream() << "Target data set '" << target << "' was overwritten with the attributes and contents of '" << source << "'" << std::endl;
   }
   else if (options.replace)
   {
+    result->set("replace", boolean(true));
     context.output_stream() << "Data set '" << target << "' has been updated with contents of '" << source << "'" << std::endl;
   }
   else

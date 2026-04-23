@@ -293,8 +293,18 @@ static int copy_partitioned(ZDS *zds, const ZDSTypeInfo &sourceInfo, const ZDSTy
     // Delete target
     zds_delete_dsn(zds, targetInfo.base_dsn);
     // Recreate it empty
-    zut_bpxwdyn("ALLOC DA('" + targetInfo.base_dsn + "') LIKE('" + sourceInfo.base_dsn + "') NEW CATALOG", &code, create_resp);
+    int rc = zut_bpxwdyn("ALLOC DA('" + targetInfo.base_dsn + "') LIKE('" + sourceInfo.base_dsn + "') NEW CATALOG", &code, create_resp);
+    if(rc != RTNCD_SUCCESS) {
+      zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
+                                     "Overwrite failed. Could not recreate '%s' using LIKE. Details: %s", targetInfo.base_dsn.c_str(), create_resp.c_str());
+      return RTNCD_FAILURE;
+    }
     zut_bpxwdyn("FREE DA('" + targetInfo.base_dsn + "')", &code, resp);
+    if(rc != RTNCD_SUCCESS) {
+      zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
+                                     "Overwrite failed. Details: %s", create_resp.c_str());
+      return RTNCD_FAILURE;
+    }
   }
 
   int rc = 0;
