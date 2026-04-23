@@ -265,7 +265,7 @@ static int copy_sequential(ZDS *zds, const std::string &dsn1, const std::string 
   return rc;
 }
 
-static int copy_partitioned(ZDS *zds, ZDSTypeInfo &sourceInfo, ZDSTypeInfo &targetInfo, ZDSCopyOptions *options)
+static int copy_partitioned(ZDS *zds, const ZDSTypeInfo &sourceInfo, const ZDSTypeInfo &targetInfo, ZDSCopyOptions *options)
 {
   bool sourceIsPds = sourceInfo.member_name.empty();
   bool targetIsPds = targetInfo.member_name.empty();
@@ -291,9 +291,9 @@ static int copy_partitioned(ZDS *zds, ZDSTypeInfo &sourceInfo, ZDSTypeInfo &targ
     std::string resp;
     std::string create_resp;
     // Delete target
-    int rc = zds_delete_dsn(zds, targetInfo.base_dsn);
+    zds_delete_dsn(zds, targetInfo.base_dsn);
     // Recreate it empty
-    rc = zut_bpxwdyn("ALLOC DA('" + targetInfo.base_dsn + "') LIKE('" + sourceInfo.base_dsn + "') NEW CATALOG", &code, create_resp);
+    zut_bpxwdyn("ALLOC DA('" + targetInfo.base_dsn + "') LIKE('" + sourceInfo.base_dsn + "') NEW CATALOG", &code, create_resp);
     zut_bpxwdyn("FREE DA('" + targetInfo.base_dsn + "')", &code, resp);
   }
 
@@ -376,7 +376,7 @@ static int validate_attributes(ZDS *zds, const ZDSTypeInfo &src, const ZDSTypeIn
     // fail if mistaching recfm
     if (src.entry.recfm != tgt.entry.recfm) {
         zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
-            "Incompatible RECFM: Source is %s and Target is %s",
+            "Expected target RECFM to match source (%s), but the destination RECFM is %s",
             src.entry.recfm.c_str(), tgt.entry.recfm.c_str());
         return RTNCD_FAILURE;
     }
@@ -384,7 +384,7 @@ static int validate_attributes(ZDS *zds, const ZDSTypeInfo &src, const ZDSTypeIn
     // fail if mismatching lrecl
     if (src.entry.lrecl != tgt.entry.lrecl) {
         zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
-            "Incompatible LRECL: Source is %d and Target is %d",
+            "Expected target LRECL to match source (%d), but the destination LRECL is %d",
             src.entry.lrecl, tgt.entry.lrecl);
         return RTNCD_FAILURE;
     }
@@ -394,7 +394,7 @@ static int validate_attributes(ZDS *zds, const ZDSTypeInfo &src, const ZDSTypeIn
        // fail if mismatching blcsize
       if (src.entry.blksize != tgt.entry.blksize) {
             zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
-              "Incompatible Block size: Source is %d and Target is %d",
+              "Expected target block size to match source (%d), but the destination block size is %d",
               src.entry.blksize, tgt.entry.blksize);
           return RTNCD_FAILURE;
       }
@@ -427,13 +427,10 @@ int zds_copy_dsn(ZDS *zds, const std::string &dsn1, const std::string &dsn2, ZDS
     return RTNCD_FAILURE;
   }
 
-  if (!info1.member_name.empty())
+  if (!info1.member_name.empty() && !zds_member_exists(info1.base_dsn, info1.member_name))
   {
-    if (!zds_member_exists(info1.base_dsn, info1.member_name))
-    {
-      zds->diag.e_msg_len = sprintf(zds->diag.e_msg, "Source member '%s' not found", info1.member_name.c_str());
-      return RTNCD_FAILURE;
-    }
+    zds->diag.e_msg_len = sprintf(zds->diag.e_msg, "Source member '%s' not found", info1.member_name.c_str());
+    return RTNCD_FAILURE;
   }
 
   // PDS -> Member is not supported
