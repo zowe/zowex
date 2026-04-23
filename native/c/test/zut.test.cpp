@@ -308,6 +308,17 @@ void zut_tests()
                              expect(result).ToBe(input_data);
                            });
 
+                        it("should handle multiple lines without a trailing newline",
+                           []() -> void
+                           {
+                             std::string input_data = "line1\nline2\nline3";
+                             std::istringstream input_stream(input_data);
+
+                             std::string result = zut_read_input(input_stream);
+
+                             expect(result).ToBe(input_data);
+                           });
+
                         it("should handle multiple consecutive newlines",
                            []() -> void
                            {
