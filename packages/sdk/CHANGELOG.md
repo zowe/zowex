@@ -6,6 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- Fixed an issue when searching a single member did not returned properly parsed results. [#941](https://github.com/zowe/zowex/issues/941)
 - Added support for invoking the `getInfo` server command, which allows the client SDK to get version and build information from the server. [#922](https://github.com/zowe/zowex/pull/922)
 - Added warning to `AbstractConfigManager.validateDeployPath` method when server path ends in `/c/build-out`, preventing developers from accidentally overwriting a dev deployment. [#912](https://github.com/zowe/zowex/pull/912)
 - Added `overwrite` property to the `CreateMemberRequest` and `CreateFileRequest` types. [#642](https://github.com/zowe/zowex/issues/642)

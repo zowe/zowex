@@ -1050,26 +1050,9 @@ FileGuard::operator bool() const
 std::string zut_read_input(std::istream &input_stream)
 {
   std::string data;
-  if (!isatty(fileno(stdin)))
-  {
-    std::istreambuf_iterator<char> begin(input_stream);
-    std::istreambuf_iterator<char> end;
-    data.assign(begin, end);
-  }
-  else
-  {
-    std::string line;
-    bool first_line = true;
-    while (std::getline(input_stream, line))
-    {
-      if (!first_line)
-      {
-        data.push_back('\n');
-      }
-      first_line = false;
-      data += line;
-    }
-  }
+  std::istreambuf_iterator<char> begin(input_stream);
+  std::istreambuf_iterator<char> end;
+  data.assign(begin, end);
   return data;
 }
 
