@@ -12,7 +12,6 @@
 import { ProfileConstants } from "@zowe/core-for-zowe-sdk";
 import type { ISshSession } from "@zowe/zos-uss-for-zowe-sdk";
 import { Gui, type IZoweTree, type IZoweTreeNode, type imperative, ZoweVsCodeExtension } from "@zowe/zowe-explorer-api";
-import * as vscode from "vscode";
 import {
     AbstractConfigManager,
     type IDisposable,
@@ -23,7 +22,8 @@ import {
     type qpItem,
     type qpOpts,
     ZSshClient,
-} from "zowex-sdk";
+} from "@zowe/zowex-for-zowe-sdk";
+import * as vscode from "vscode";
 import { getVsceConfig } from "./Utilities";
 
 // biome-ignore lint/complexity/noStaticOnlyClass: Utilities class has static methods

@@ -10,7 +10,7 @@
  */
 
 import type { IHandlerParameters } from "@zowe/imperative";
-import { B64String, type uss, type ZSshClient } from "zowex-sdk";
+import { B64String, type uss, type ZSshClient } from "@zowe/zowex-for-zowe-sdk";
 import { SshBaseHandler } from "../../SshBaseHandler";
 
 export default class ViewUssFileHandler extends SshBaseHandler {
