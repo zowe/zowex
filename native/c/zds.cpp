@@ -216,6 +216,14 @@ static int copy_sequential(ZDS *zds, const std::string &dsn1, const std::string 
   int rc = 0;
   std::vector<std::string> dds{};
 
+  if (options->overwrite)
+  {
+    zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
+                                   "Cannot use --overwrite when a sequential data set is specified. Use --replace (-r) to replace the contents of target data set '%s'.",
+                                   dsn2.c_str());
+    return RTNCD_FAILURE;
+  }
+
   if (options->target_exists && !options->replace)
   {
     zds->diag.e_msg_len = snprintf(zds->diag.e_msg, (int)(sizeof(zds->diag.e_msg) - 1),
@@ -269,6 +277,14 @@ static int copy_partitioned(ZDS *zds, const ZDSTypeInfo &sourceInfo, const ZDSTy
 {
   bool sourceIsPds = sourceInfo.member_name.empty();
   bool targetIsPds = targetInfo.member_name.empty();
+
+  if (options->overwrite && !targetIsPds)
+  {
+    zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
+                                  "Cannot use --overwrite when a target member is specified. Use --replace (-r) to replace the contents of member '%s'.",
+                                   targetInfo.member_name.c_str());
+    return RTNCD_FAILURE;
+  }
 
   if (options->target_exists && !options->replace && !options->overwrite)
   {
