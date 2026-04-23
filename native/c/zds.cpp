@@ -1990,7 +1990,7 @@ int zds_close_output_bpam(ZDS *zds, IO_CTRL *ioc)
       {
         zds->diag.detail_rc = ZDS_RTNCD_SERVICE_FAILURE;
         zds->diag.service_rc = code;
-        ZDIAG_SET_MSG(&zds->diag, "Failed to free with code '%08X' on data set '%s': %s", code, zds->ddname, resp.c_str());
+        ZDIAG_SET_MSG(&zds->diag, "Failed to free with code '%08X' on DD '%.*s': %s", code, (int)sizeof(zds->ddname), zds->ddname, resp.c_str());
         rc = RTNCD_FAILURE;
       }
     }
