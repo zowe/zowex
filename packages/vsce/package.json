@@ -2,7 +2,7 @@
   "name": "zowex-vsce",
   "displayName": "Zowe Remote SSH",
   "description": "Zowe Remote SSH VS Code Extension for Zowe Explorer",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "publisher": "Zowe",
   "repository": "https://github.com/zowe/zowex-vsce/tree/main/packages/vsce",
   "engines": {
@@ -123,8 +123,8 @@
   "dependencies": {
     "@zowe/core-for-zowe-sdk": "^8.11.0",
     "@zowe/zowe-explorer-api": "^3.3.0",
-    "ssh2": "^1.16.0",
-    "@zowe/zowex-for-zowe-sdk": "0.4.0"
+    "@zowe/zowex-for-zowe-sdk": "0.5.0",
+    "ssh2": "^1.16.0"
   },
   "devDependencies": {
     "@rspack/cli": "^1.7.6",
