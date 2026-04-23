@@ -72,7 +72,7 @@ jobs:
         id: sdk-artifact-upload
         if: ${{ matrix.os == 'ubuntu' }}
         with:
-          name: @zowe/zowex-for-zowe-sdk
+          name: zowex-sdk
           path: dist/@zowe/zowex-for-zowe-sdk-*.tgz
 
       - name: Comment on PR
