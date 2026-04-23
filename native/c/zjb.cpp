@@ -8,7 +8,6 @@
  * Copyright Contributors to the Zowe Project.
  *
  */
-
 #include <sstream>
 #include <string>
 #include <cstring>
@@ -240,6 +239,14 @@ static int zjb_read_job_dynamic_allocation(ZJB *zjb, std::string jobdsn, std::st
   s99parms->__S99VERB = s99vrbal; // allocation
   s99parms->__S99FLAG1 = 0x4000;  // s99nocnv;
   s99parms->__S99TXTPP = s99tupl;
+
+  // NOTE(Kelosky): `ibm-clang` appears to optimize the previous assignments, so this approach is to
+  // force the compiler to not optimize the assignments.
+  unsigned char size = sizeof(__S99parms);
+  unsigned char verb = s99vrbal;
+  memcpy(&s99parms->__S99RBLN, &size, sizeof(size));
+  memcpy(&s99parms->__S99VERB, &verb, sizeof(verb));
+
   // s99parms->__S99S99X = s99parmsx; // TODO(Kelosky): reenable when we look at s99parmsx->__S99ENMSG and free
 
   // https://www.ibm.com/docs/en/zos/3.1.0?topic=list-coding-dynamic-allocation-request

@@ -10,7 +10,7 @@
  */
 
 import type { IHandlerParameters } from "@zowe/imperative";
-import type { jobs, ZSshClient } from "zowex-sdk";
+import type { jobs, ZSshClient } from "@zowe/zowex-for-zowe-sdk";
 import { SshBaseHandler } from "../../SshBaseHandler";
 
 export default class ReleaseJobHandler extends SshBaseHandler {

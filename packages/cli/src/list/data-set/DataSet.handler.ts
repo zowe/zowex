@@ -10,7 +10,7 @@
  */
 
 import { type IHandlerParameters, ImperativeError, TextUtils } from "@zowe/imperative";
-import type { Dataset, ds, ZSshClient } from "zowex-sdk";
+import type { Dataset, ds, ZSshClient } from "@zowe/zowex-for-zowe-sdk";
 import { SshBaseHandler } from "../../SshBaseHandler";
 
 export default class ListDataSetsHandler extends SshBaseHandler {
