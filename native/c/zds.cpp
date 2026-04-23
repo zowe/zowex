@@ -334,7 +334,7 @@ static int copy_partitioned(ZDS *zds, ZDSTypeInfo &sourceInfo, ZDSTypeInfo &targ
     }
   }
 
-  ZDSWriteOpts wopts;
+  ZDSWriteOpts wopts{};
   wopts.zds = zds;
   wopts.ddname = "sysin";
 
