@@ -979,6 +979,7 @@ int handle_data_set_copy(InvocationContext &context)
   ZDSCopyOptions options;
   options.overwrite = context.get<bool>("overwrite", false);
   options.replace = context.get<bool>("replace", false);
+  const auto result = obj();
 
   int rc = zds_copy_dsn(&zds, source, target, &options);
 
@@ -1012,6 +1013,8 @@ int handle_data_set_copy(InvocationContext &context)
   {
     context.output_stream() << "Data set '" << source << "' copied to '" << target << "'" << std::endl;
   }
+
+  context.set_object(result);
   return RTNCD_SUCCESS;
 }
 
