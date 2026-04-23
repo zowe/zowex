@@ -293,8 +293,7 @@ static int copy_partitioned(ZDS *zds, ZDSTypeInfo &sourceInfo, ZDSTypeInfo &targ
     // Delete target
     int rc = zds_delete_dsn(zds, targetInfo.base_dsn);
     // Recreate it empty
-    std::string create = "ALLOC DA('" + targetInfo.base_dsn + "') LIKE('" + sourceInfo.base_dsn + "') NEW CATALOG";
-    rc = zut_bpxwdyn(create, &code, create_resp);
+    rc = zut_bpxwdyn("ALLOC DA('" + targetInfo.base_dsn + "') LIKE('" + sourceInfo.base_dsn + "') NEW CATALOG", &code, create_resp);
     zut_bpxwdyn("FREE DA('" + targetInfo.base_dsn + "')", &code, resp);
   }
 
