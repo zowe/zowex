@@ -10,7 +10,7 @@ Validate a VS Code extension against the Zowe Explorer V3 Conformance Criteria (
 ## Quick Start
 
 1. Identify which conformance sections apply (use the decision tree below)
-2. Copy the applicable checklist from [CRITERIA.md](CRITERIA.md)
+2. Copy the applicable checklist from [CRITERIA.md](CRITERIA.md) (or fetch live criteria if requested, see "Full Criteria Reference")
 3. Audit the extension against each item
 4. Report findings using the output format
 
@@ -136,3 +136,5 @@ Use this output format:
 ## Full Criteria Reference
 
 For the complete text of all 30 conformance criteria with version info and required/best-practice classification, see [CRITERIA.md](CRITERIA.md).
+
+> **Live Audit Option:** By default, use the local `CRITERIA.md`. If the user explicitly asks for a "live audit" or "latest criteria", use your web browsing or fetching capabilities to read the latest criteria directly from the official documentation: https://docs.zowe.org/stable/whats-new/zowe-v3-conformance-criteria/
