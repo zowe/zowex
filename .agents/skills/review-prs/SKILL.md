@@ -53,7 +53,7 @@ Optional improvements:
 
 **Compiler constraints:**
 
-- Backend and middleware uses **ibm-clang**, supporting C++17
+- Backend and JSON-RPC server uses **ibm-clang**, supporting C++17
 
 **Check for:**
 
