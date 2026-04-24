@@ -6,12 +6,21 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- `c`: Improved error message when deleting a member fails because its parent PDS is open in ISPF. [#916](https://github.com/zowe/zowe-native-proto/issues/916)
+
+## `0.5.0`
+
+- `c`: Fixed several vulnerabilities in C++ and Metal C code to improve stability. [#940](https://github.com/zowe/zowex/pull/940)
+- **Breaking:** `c`: Refactored the backend for copying data sets to use Z/OS utilities IEBCOPY and IEBGENER. Removed `--delete-target-members` flag and added `--overwrite` flag for copying a partitioned data set to an existing partitioned data set. Removed duplicate `member_exists_in_pds` function. [#932](https://github.com/zowe/zowex/issues/932)
+- `c`: Fix spool read / dynalloc error via optimization assignments. [#945](https://github.com/zowe/zowex/issues/945)
+- `c`: Updated `zut_read_input` so that all tests pass on `zowex`. Now there is no specific handling for line-based TTY input so that data is more consistently preserved.[#953](https://github.com/zowe/zowex/pull/953)
+- **Breaking:** `c`: Refactored the `zds_write` function to consolidate data set and DD write logic into a single entry point. [#908](https://github.com/zowe/zowe-native-proto/issues/908)
 - `c`: Changed `zowex --version` and `zowex -v` to return just the version number. [#925](https://github.com/zowe/zowex/pull/925)
 - `c`: Removed duplicate `-v` and `--version` aliases on the `zowex version` command. [#922](https://github.com/zowe/zowex/pull/922)
 - `c`: Added the `getInfo` RPC to retrieve the middleware version and build information. [#922](https://github.com/zowe/zowex/pull/922)
 - `c`: Added a DCB abend exit for handling edge cases around PDS member open, write, and close operations. When an abend is encountered, it is either delayed or ignored (when applicable) and an error is returned gracefully via the diagnostic structure (`ZDIAG`) rather than terminating the process. Refer to [DCB abend exits](doc/dcb-abend-exit.md) for more information on how and when abends are handled. **Note:** In the event of an end-of-space (end-of-volume) abend, the operating system closes the DCB if the ignore request is honored from the abend exit. However, the abend might still percolate during end-of-volume `CLOSE` routines. An ESTAE/ESTAEX recovery routine should be used to gracefully handle these cases. [#839](https://github.com/zowe/zowex/issues/839)
 - `c`: Fixed an issue where listing the members of a protected, partitioned data set resulted in an unclear error message. Now, the error messages are more specific and include information about insufficient permissions when applicable. [#297](https://github.com/zowe/zowex/issues/297)
-- `c`: Improved error message when deleting a member fails because its parent PDS is open in ISPF. [#916](https://github.com/zowe/zowe-native-proto/issues/916)
+- `c`: Fixed an issue where the `zowex ds create-member` command would overwrite an existing member. Added an `--overwrite` flag to the command that defaults to false. [#642](https://github.com/zowe/zowex/issues/642)
 
 ## `0.4.0`
 

@@ -133,13 +133,13 @@ int zusf_get_file_ccsid(ZUSF *zusf, const std::string &file)
   struct stat file_stats;
   if (stat(file.c_str(), &file_stats) == -1)
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Path '%s' does not exist", file.c_str());
+    ZDIAG_SET_MSG(&zusf->diag, "Path '%s' does not exist", file.c_str());
     return RTNCD_FAILURE;
   }
 
   if (S_ISDIR(file_stats.st_mode))
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Path '%s' is a directory", file.c_str());
+    ZDIAG_SET_MSG(&zusf->diag, "Path '%s' is a directory", file.c_str());
     return RTNCD_FAILURE;
   }
 
@@ -854,13 +854,13 @@ int zusf_copy_file_or_dir(ZUSF *zusf, const std::string &source_path, const std:
 
   if (!zusf_is_valid_path(source_path) || !zusf_is_valid_path(destination_path))
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Source or target path is empty or too long");
+    ZDIAG_SET_MSG(&zusf->diag, "Source or target path is empty or too long");
     return RTNCD_FAILURE;
   }
 
   if (options.follow_symlinks && !options.recursive)
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "follow symlinks option requires setting the recursive flag");
+    ZDIAG_SET_MSG(&zusf->diag, "follow symlinks option requires setting the recursive flag");
     return RTNCD_FAILURE;
   }
   struct stat buf;
@@ -868,7 +868,7 @@ int zusf_copy_file_or_dir(ZUSF *zusf, const std::string &source_path, const std:
   {
     if (S_ISFIFO(buf.st_mode))
     {
-      zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "we do not support copying from named pipes");
+      ZDIAG_SET_MSG(&zusf->diag, "we do not support copying from named pipes");
       return RTNCD_FAILURE;
     }
   }
@@ -877,13 +877,13 @@ int zusf_copy_file_or_dir(ZUSF *zusf, const std::string &source_path, const std:
   {
     if (S_ISFIFO(buf.st_mode))
     {
-      zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "we do not support copying to named pipes");
+      ZDIAG_SET_MSG(&zusf->diag, "we do not support copying to named pipes");
       return RTNCD_FAILURE;
     }
   }
 
   std::vector<std::string> command_parameters;
-  command_parameters.reserve(6);
+  command_parameters.reserve(7);
 
   if (options.recursive)
   {
@@ -901,6 +901,7 @@ int zusf_copy_file_or_dir(ZUSF *zusf, const std::string &source_path, const std:
   {
     command_parameters.emplace_back("-f");
   }
+  command_parameters.emplace_back("--");
   command_parameters.emplace_back(source_path);
   command_parameters.emplace_back(destination_path);
 
@@ -908,7 +909,7 @@ int zusf_copy_file_or_dir(ZUSF *zusf, const std::string &source_path, const std:
   int rc = zut_run_program("cp", command_parameters, stdout_resp, stderr_resp);
   if (rc > 0)
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Failed to copy %s to %s, errno: %d\nstderr: %s", source_path.c_str(), destination_path.c_str(), rc, stderr_resp.c_str());
+    ZDIAG_SET_MSG(&zusf->diag, "Failed to copy %s to %s, errno: %d\nstderr: %s", source_path.c_str(), destination_path.c_str(), rc, stderr_resp.c_str());
     return RTNCD_FAILURE;
   }
   return rc;
@@ -920,31 +921,31 @@ int zusf_copy_file_or_dir(ZUSF *zusf, const std::string &source_path, const std:
  * @param zusf pointer to a ZUSF object
  * @param file name of the USS file
  * @param mode mode of the file or directory
- * @param createDir flag indicating whether to create a directory
+ * @param options create options
  *
  * @return RTNCD_SUCCESS on success, RTNCD_FAILURE on failure
  */
-int zusf_create_uss_file_or_dir(ZUSF *zusf, const std::string &file, mode_t mode, bool createDir)
+int zusf_create_uss_file_or_dir(ZUSF *zusf, const std::string &file, mode_t mode, const CreateOptions &options)
 {
   struct stat file_stats;
-  if (stat(file.c_str(), &file_stats) != -1)
+  if (stat(file.c_str(), &file_stats) != -1 && !options.overwrite)
   {
     if (S_ISREG(file_stats.st_mode))
     {
-      zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "File '%s' already exists", file.c_str());
+      ZDIAG_SET_MSG(&zusf->diag, "File '%s' already exists", file.c_str());
     }
     else if (S_ISDIR(file_stats.st_mode))
     {
-      zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Directory '%s' already exists", file.c_str());
+      ZDIAG_SET_MSG(&zusf->diag, "Directory '%s' already exists", file.c_str());
     }
     else
     {
-      zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Path '%s' already exists! Mode: '%08o'", file.c_str(), file_stats.st_mode);
+      ZDIAG_SET_MSG(&zusf->diag, "Path '%s' already exists! Mode: '%08o'", file.c_str(), file_stats.st_mode);
     }
-    return RTNCD_FAILURE;
+    return RTNCD_WARNING;
   }
 
-  if (createDir)
+  if (options.create_dir)
   {
     const auto last_trailing_slash = file.find_last_of("/");
     if (last_trailing_slash != std::string::npos)
@@ -953,7 +954,7 @@ int zusf_create_uss_file_or_dir(ZUSF *zusf, const std::string &file, mode_t mode
       const auto exists = stat(parent_path.c_str(), &file_stats) == 0;
       if (!exists)
       {
-        const auto rc = zusf_create_uss_file_or_dir(zusf, parent_path, mode, true);
+        const auto rc = zusf_create_uss_file_or_dir(zusf, parent_path, mode, CreateOptions(true));
         if (0 != rc)
         {
           return rc;
@@ -963,7 +964,7 @@ int zusf_create_uss_file_or_dir(ZUSF *zusf, const std::string &file, mode_t mode
     const auto rc = mkdir(file.c_str(), mode);
     if (0 != rc)
     {
-      zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Failed to create directory '%s', errno: %d", file.c_str(), errno);
+      ZDIAG_SET_MSG(&zusf->diag, "Failed to create directory '%s', errno: %d", file.c_str(), errno);
     }
     chmod(file.c_str(), mode);
     return rc;
@@ -979,7 +980,7 @@ int zusf_create_uss_file_or_dir(ZUSF *zusf, const std::string &file, mode_t mode
     }
   }
 
-  zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Could not create '%s'", file.c_str());
+  ZDIAG_SET_MSG(&zusf->diag, "Could not create '%s'", file.c_str());
   return RTNCD_FAILURE;
 }
 
@@ -987,7 +988,7 @@ int zusf_move_uss_file_or_dir(ZUSF *zusf, const std::string &source, const std::
 {
   if (!zusf_is_valid_path(source) || !zusf_is_valid_path(target))
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Source or target path is empty or too long");
+    ZDIAG_SET_MSG(&zusf->diag, "Source or target path is empty or too long");
     return RTNCD_FAILURE;
   }
 
@@ -998,14 +999,14 @@ int zusf_move_uss_file_or_dir(ZUSF *zusf, const std::string &source, const std::
   struct stat source_stats;
   if (lstat(source.c_str(), &source_stats) == -1)
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Source path '%s' does not exist", truncated_source.c_str());
+    ZDIAG_SET_MSG(&zusf->diag, "Source path '%s' does not exist", truncated_source.c_str());
     return RTNCD_FAILURE;
   }
 
   // simple string compare for source and target
   if (strcmp(source.c_str(), target.c_str()) == 0)
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Source '%s' and target '%s' are identical", truncated_source.c_str(), truncated_target.c_str());
+    ZDIAG_SET_MSG(&zusf->diag, "Source '%s' and target '%s' are identical", truncated_source.c_str(), truncated_target.c_str());
     return RTNCD_FAILURE;
   }
 
@@ -1014,7 +1015,7 @@ int zusf_move_uss_file_or_dir(ZUSF *zusf, const std::string &source, const std::
   char resolved_source[PATH_MAX];
   if (stat(source.c_str(), &source_stats) == 0 && realpath(source.c_str(), resolved_source) == nullptr)
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Failed to resolve source path '%s'; errno: %d", truncated_source.c_str(), errno);
+    ZDIAG_SET_MSG(&zusf->diag, "Failed to resolve source path '%s'; errno: %d", truncated_source.c_str(), errno);
     return RTNCD_FAILURE;
   }
 
@@ -1029,7 +1030,7 @@ int zusf_move_uss_file_or_dir(ZUSF *zusf, const std::string &source, const std::
     // if target exists and force is not set, return failure
     if (!force)
     {
-      zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Target path '%s' already exists", truncated_target.c_str());
+      ZDIAG_SET_MSG(&zusf->diag, "Target path '%s' already exists", truncated_target.c_str());
       return RTNCD_FAILURE;
     }
 
@@ -1037,14 +1038,14 @@ int zusf_move_uss_file_or_dir(ZUSF *zusf, const std::string &source, const std::
     // resolve target path, save it to resolved_target
     if (stat(target.c_str(), &target_stats) == 0 && realpath(target.c_str(), resolved_target) == nullptr)
     {
-      zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Failed to resolve target path '%s'; errno: %d", truncated_target.c_str(), errno);
+      ZDIAG_SET_MSG(&zusf->diag, "Failed to resolve target path '%s'; errno: %d", truncated_target.c_str(), errno);
       return RTNCD_FAILURE;
     }
 
     // check if paths are identical
     if (strcmp(resolved_source, resolved_target) == 0)
     {
-      zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Source '%s' and target '%s' are identical", truncated_source.c_str(), truncated_target.c_str());
+      ZDIAG_SET_MSG(&zusf->diag, "Source '%s' and target '%s' are identical", truncated_source.c_str(), truncated_target.c_str());
       return RTNCD_FAILURE;
     }
 
@@ -1052,24 +1053,24 @@ int zusf_move_uss_file_or_dir(ZUSF *zusf, const std::string &source, const std::
     // check if source is a directory and target is not
     if (S_ISDIR(source_stats.st_mode) && !target_is_dir)
     {
-      zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Cannot move directory '%s'. Target '%s' is not a directory", truncated_source.c_str(), truncated_target.c_str());
+      ZDIAG_SET_MSG(&zusf->diag, "Cannot move directory '%s'. Target '%s' is not a directory", truncated_source.c_str(), truncated_target.c_str());
       return RTNCD_FAILURE;
     }
 
     // check if source is a pipe and target is not
     if (S_ISFIFO(source_stats.st_mode) && !S_ISFIFO(target_stats.st_mode))
     {
-      zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Cannot move pipe '%s'. Target '%s' is not a pipe", truncated_source.c_str(), truncated_target.c_str());
+      ZDIAG_SET_MSG(&zusf->diag, "Cannot move pipe '%s'. Target '%s' is not a pipe", truncated_source.c_str(), truncated_target.c_str());
       return RTNCD_FAILURE;
     }
   }
 
   // TODO(zFernand0): Use std::filesystem::rename instead of rename when C++17 is available
   std::string stdout_resp, stderr_resp;
-  int rc = zut_run_program("mv", {source, target}, stdout_resp, stderr_resp);
+  int rc = zut_run_program("mv", {"--", source, target}, stdout_resp, stderr_resp);
   if (rc != 0)
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Failed to move file or directory from '%s' to '%s', errno: %d", truncated_source.c_str(), truncated_target.c_str(), rc);
+    ZDIAG_SET_MSG(&zusf->diag, "Failed to move file or directory from '%s' to '%s', errno: %d", truncated_source.c_str(), truncated_target.c_str(), rc);
     return RTNCD_FAILURE;
   }
 
@@ -1220,14 +1221,14 @@ int zusf_list_uss_file_path(ZUSF *zusf, const std::string &file, std::string &re
 {
   if (!zusf_is_valid_path(file))
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "File path is empty or too long");
+    ZDIAG_SET_MSG(&zusf->diag, "File path is empty or too long");
     return RTNCD_FAILURE;
   }
   // TODO(zFernand0): Handle `*` and other bash-expansion rules
   struct stat file_stats;
   if (stat(file.c_str(), &file_stats) == -1)
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Path '%s' does not exist", file.c_str());
+    ZDIAG_SET_MSG(&zusf->diag, "Path '%s' does not exist", file.c_str());
     return RTNCD_FAILURE;
   }
 
@@ -1241,7 +1242,7 @@ int zusf_list_uss_file_path(ZUSF *zusf, const std::string &file, std::string &re
 
   if (!S_ISDIR(file_stats.st_mode))
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Path '%s' is not a directory", file.c_str());
+    ZDIAG_SET_MSG(&zusf->diag, "Path '%s' is not a directory", file.c_str());
     return RTNCD_FAILURE;
   }
 
@@ -1278,7 +1279,7 @@ int zusf_list_uss_file_path(ZUSF *zusf, const std::string &file, std::string &re
   std::vector<std::string> entry_names;
   if (zusf_collect_directory_entries_recursive(zusf, file, entry_names, options) != RTNCD_SUCCESS)
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Could not open directory '%s'", file.c_str());
+    ZDIAG_SET_MSG(&zusf->diag, "Could not open directory '%s'", file.c_str());
     return RTNCD_FAILURE;
   }
 
@@ -1290,7 +1291,7 @@ int zusf_list_uss_file_path(ZUSF *zusf, const std::string &file, std::string &re
     struct stat child_stats;
     if (lstat(child_path.c_str(), &child_stats) != 0)
     {
-      zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Could not stat child path '%s'", child_path.c_str());
+      ZDIAG_SET_MSG(&zusf->diag, "Could not stat child path '%s'", child_path.c_str());
       return RTNCD_FAILURE;
     }
 
@@ -1315,7 +1316,7 @@ int zusf_read_from_uss_file(ZUSF *zusf, const std::string &file, std::string &re
   std::ifstream in(file.c_str(), zusf->encoding_opts.data_type == eDataTypeBinary ? std::ifstream::in | std::ifstream::binary : std::ifstream::in);
   if (!in.is_open())
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Could not open file '%s'", file.c_str());
+    ZDIAG_SET_MSG(&zusf->diag, "Could not open file '%s'", file.c_str());
     return RTNCD_FAILURE;
   }
 
@@ -1363,7 +1364,7 @@ int zusf_read_from_uss_file(ZUSF *zusf, const std::string &file, std::string &re
     }
     catch (std::exception &e)
     {
-      zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Failed to convert input data from %s to %s", source_encoding.c_str(), encoding_to_use.c_str());
+      ZDIAG_SET_MSG(&zusf->diag, "Failed to convert input data from %s to %s", source_encoding.c_str(), encoding_to_use.c_str());
       return RTNCD_FAILURE;
     }
     if (!temp.empty())
@@ -1389,7 +1390,7 @@ int zusf_read_from_uss_file_streamed(ZUSF *zusf, const std::string &file, const 
 {
   if (content_len == nullptr)
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "content_len must be a valid size_t pointer");
+    ZDIAG_SET_MSG(&zusf->diag, "content_len must be a valid size_t pointer");
     return RTNCD_FAILURE;
   }
 
@@ -1397,14 +1398,14 @@ int zusf_read_from_uss_file_streamed(ZUSF *zusf, const std::string &file, const 
   FileGuard fin(file.c_str(), zusf->encoding_opts.data_type == eDataTypeBinary ? "rb" : "r");
   if (!fin)
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Could not open file '%s'", file.c_str());
+    ZDIAG_SET_MSG(&zusf->diag, "Could not open file '%s'", file.c_str());
     return RTNCD_FAILURE;
   }
 
   struct stat st;
   if (stat(file.c_str(), &st) != 0)
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Could not stat file '%s'", file.c_str());
+    ZDIAG_SET_MSG(&zusf->diag, "Could not stat file '%s'", file.c_str());
     return RTNCD_FAILURE;
   }
 
@@ -1416,14 +1417,14 @@ int zusf_read_from_uss_file_streamed(ZUSF *zusf, const std::string &file, const 
   int fifo_fd = open(pipe.c_str(), O_WRONLY);
   if (fifo_fd == -1)
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "open() failed on output pipe '%s', errno: %d", pipe.c_str(), errno);
+    ZDIAG_SET_MSG(&zusf->diag, "open() failed on output pipe '%s', errno: %d", pipe.c_str(), errno);
     return RTNCD_FAILURE;
   }
 
   FileGuard fout(fifo_fd, "w");
   if (!fout)
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Could not open output pipe '%s'", pipe.c_str());
+    ZDIAG_SET_MSG(&zusf->diag, "Could not open output pipe '%s'", pipe.c_str());
     close(fifo_fd);
     return RTNCD_FAILURE;
   }
@@ -1466,7 +1467,7 @@ int zusf_read_from_uss_file_streamed(ZUSF *zusf, const std::string &file, const 
     cd = iconv_open(source_encoding.c_str(), encoding_to_use.c_str());
     if (cd == (iconv_t)(-1))
     {
-      zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Cannot open converter from %s to %s", encoding_to_use.c_str(), source_encoding.c_str());
+      ZDIAG_SET_MSG(&zusf->diag, "Cannot open converter from %s to %s", encoding_to_use.c_str(), source_encoding.c_str());
       return RTNCD_FAILURE;
     }
   }
@@ -1487,7 +1488,7 @@ int zusf_read_from_uss_file_streamed(ZUSF *zusf, const std::string &file, const 
       catch (std::exception &e)
       {
         iconv_close(cd);
-        zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Failed to convert input data from %s to %s", encoding_to_use.c_str(), source_encoding.c_str());
+        ZDIAG_SET_MSG(&zusf->diag, "Failed to convert input data from %s to %s", encoding_to_use.c_str(), source_encoding.c_str());
         return RTNCD_FAILURE;
       }
     }
@@ -1522,7 +1523,7 @@ int zusf_read_from_uss_file_streamed(ZUSF *zusf, const std::string &file, const 
     catch (std::exception &e)
     {
       iconv_close(cd);
-      zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Failed to flush encoding state");
+      ZDIAG_SET_MSG(&zusf->diag, "Failed to flush encoding state");
       return RTNCD_FAILURE;
     }
 
@@ -1559,7 +1560,7 @@ int zusf_write_to_uss_file(ZUSF *zusf, const std::string &file, std::string &dat
     const auto current_etag = zut_build_etag(file_stats.st_mtime, file_stats.st_size);
     if (current_etag != zusf->etag)
     {
-      zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Etag mismatch: expected %s, actual %s", zusf->etag, current_etag.c_str());
+      ZDIAG_SET_MSG(&zusf->diag, "Etag mismatch: expected %s, actual %s", zusf->etag, current_etag.c_str());
       return RTNCD_FAILURE;
     }
   }
@@ -1601,7 +1602,7 @@ int zusf_write_to_uss_file(ZUSF *zusf, const std::string &file, std::string &dat
     }
     catch (std::exception &e)
     {
-      zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Failed to convert input data from %s to %s", source_encoding.c_str(), encoding_to_use.c_str());
+      ZDIAG_SET_MSG(&zusf->diag, "Failed to convert input data from %s to %s", source_encoding.c_str(), encoding_to_use.c_str());
       return RTNCD_FAILURE;
     }
   }
@@ -1612,7 +1613,7 @@ int zusf_write_to_uss_file(ZUSF *zusf, const std::string &file, std::string &dat
     FileGuard fp(file.c_str(), mode);
     if (!fp)
     {
-      zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Could not open '%s' for writing", file.c_str());
+      ZDIAG_SET_MSG(&zusf->diag, "Could not open '%s' for writing", file.c_str());
       return RTNCD_FAILURE;
     }
 
@@ -1621,7 +1622,7 @@ int zusf_write_to_uss_file(ZUSF *zusf, const std::string &file, std::string &dat
       size_t bytes_written = fwrite(temp.data(), 1, temp.size(), fp);
       if (bytes_written != temp.size())
       {
-        zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Failed to write to '%s' (possibly out of space)", file.c_str());
+        ZDIAG_SET_MSG(&zusf->diag, "Failed to write to '%s' (possibly out of space)", file.c_str());
         return RTNCD_FAILURE;
       }
     }
@@ -1635,8 +1636,8 @@ int zusf_write_to_uss_file(ZUSF *zusf, const std::string &file, std::string &dat
   struct stat new_stats;
   if (stat(file.c_str(), &new_stats) == -1)
   {
-    zusf->diag.e_msg_len = sprintf(
-        zusf->diag.e_msg,
+    zusf->diag.e_msg_len = snprintf(
+        zusf->diag.e_msg, sizeof(zusf->diag.e_msg),
         "Could not stat file '%s' after writing",
         file.c_str());
     return RTNCD_FAILURE;
@@ -1663,7 +1664,7 @@ int zusf_write_to_uss_file_streamed(ZUSF *zusf, const std::string &file, const s
   // TODO(zFernand0): Avoid overriding existing files
   if (content_len == nullptr)
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "content_len must be a valid size_t pointer");
+    ZDIAG_SET_MSG(&zusf->diag, "content_len must be a valid size_t pointer");
     return RTNCD_FAILURE;
   }
 
@@ -1698,7 +1699,7 @@ int zusf_write_to_uss_file_streamed(ZUSF *zusf, const std::string &file, const s
     const auto current_etag = zut_build_etag(file_stats.st_mtime, file_stats.st_size);
     if (current_etag != zusf->etag)
     {
-      zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Etag mismatch: expected %s, actual %s", zusf->etag, current_etag.c_str());
+      ZDIAG_SET_MSG(&zusf->diag, "Etag mismatch: expected %s, actual %s", zusf->etag, current_etag.c_str());
       return RTNCD_FAILURE;
     }
   }
@@ -1710,21 +1711,21 @@ int zusf_write_to_uss_file_streamed(ZUSF *zusf, const std::string &file, const s
   FileGuard fout(file.c_str(), zusf->encoding_opts.data_type == eDataTypeBinary ? "wb" : "w");
   if (!fout)
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Could not open '%s'", file.c_str());
+    ZDIAG_SET_MSG(&zusf->diag, "Could not open '%s'", file.c_str());
     return RTNCD_FAILURE;
   }
 
   int fifo_fd = open(pipe.c_str(), O_RDONLY);
   if (fifo_fd == -1)
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "open() failed on input pipe '%s', errno: %d", pipe.c_str(), errno);
+    ZDIAG_SET_MSG(&zusf->diag, "open() failed on input pipe '%s', errno: %d", pipe.c_str(), errno);
     return RTNCD_FAILURE;
   }
 
   FileGuard fin(fifo_fd, "r");
   if (!fin)
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Could not open input pipe '%s'", pipe.c_str());
+    ZDIAG_SET_MSG(&zusf->diag, "Could not open input pipe '%s'", pipe.c_str());
     close(fifo_fd);
     return RTNCD_FAILURE;
   }
@@ -1744,7 +1745,7 @@ int zusf_write_to_uss_file_streamed(ZUSF *zusf, const std::string &file, const s
     cd = iconv_open(encoding_to_use.c_str(), source_encoding.c_str());
     if (cd == (iconv_t)(-1))
     {
-      zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Cannot open converter from %s to %s", source_encoding.c_str(), encoding_to_use.c_str());
+      ZDIAG_SET_MSG(&zusf->diag, "Cannot open converter from %s to %s", source_encoding.c_str(), encoding_to_use.c_str());
       return RTNCD_FAILURE;
     }
   }
@@ -1767,7 +1768,7 @@ int zusf_write_to_uss_file_streamed(ZUSF *zusf, const std::string &file, const s
       catch (std::exception &e)
       {
         iconv_close(cd);
-        zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Failed to convert input data from %s to %s", source_encoding.c_str(), encoding_to_use.c_str());
+        ZDIAG_SET_MSG(&zusf->diag, "Failed to convert input data from %s to %s", source_encoding.c_str(), encoding_to_use.c_str());
         return RTNCD_FAILURE;
       }
     }
@@ -1807,7 +1808,7 @@ int zusf_write_to_uss_file_streamed(ZUSF *zusf, const std::string &file, const s
     catch (std::exception &e)
     {
       iconv_close(cd);
-      zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Failed to flush encoding state");
+      ZDIAG_SET_MSG(&zusf->diag, "Failed to flush encoding state");
       return RTNCD_FAILURE;
     }
 
@@ -1817,7 +1818,7 @@ int zusf_write_to_uss_file_streamed(ZUSF *zusf, const std::string &file, const s
   const int flush_rc = fflush(fout);
   if (truncated || flush_rc != 0)
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Failed to write to '%s' (possibly out of space)", file.c_str());
+    ZDIAG_SET_MSG(&zusf->diag, "Failed to write to '%s' (possibly out of space)", file.c_str());
     return RTNCD_FAILURE;
   }
 
@@ -1828,7 +1829,7 @@ int zusf_write_to_uss_file_streamed(ZUSF *zusf, const std::string &file, const s
 
   if (stat(file.c_str(), &file_stats) == -1)
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Path '%s' does not exist", file.c_str());
+    ZDIAG_SET_MSG(&zusf->diag, "Path '%s' does not exist", file.c_str());
     return RTNCD_FAILURE;
   }
 
@@ -1854,13 +1855,13 @@ int zusf_chmod_uss_file_or_dir(ZUSF *zusf, const std::string &file, mode_t mode,
   struct stat file_stats;
   if (stat(file.c_str(), &file_stats) == -1)
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Path '%s' does not exist", file.c_str());
+    ZDIAG_SET_MSG(&zusf->diag, "Path '%s' does not exist", file.c_str());
     return RTNCD_FAILURE;
   }
 
   if (!recursive && S_ISDIR(file_stats.st_mode))
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Path '%s' is a folder and recursive is false", file.c_str());
+    ZDIAG_SET_MSG(&zusf->diag, "Path '%s' is a folder and recursive is false", file.c_str());
     return RTNCD_FAILURE;
   }
 
@@ -1870,7 +1871,7 @@ int zusf_chmod_uss_file_or_dir(ZUSF *zusf, const std::string &file, mode_t mode,
     DIR *dir = opendir(file.c_str());
     if (dir == nullptr)
     {
-      zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Could not open directory '%s'", file.c_str());
+      ZDIAG_SET_MSG(&zusf->diag, "Could not open directory '%s'", file.c_str());
       return RTNCD_FAILURE;
     }
     struct dirent *entry;
@@ -1900,14 +1901,14 @@ int zusf_delete_uss_item(ZUSF *zusf, const std::string &file, bool recursive)
   struct stat file_stats;
   if (lstat(file.c_str(), &file_stats) == -1)
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Path '%s' does not exist", file.c_str());
+    ZDIAG_SET_MSG(&zusf->diag, "Path '%s' does not exist", file.c_str());
     return RTNCD_FAILURE;
   }
 
   const auto is_dir = S_ISDIR(file_stats.st_mode);
   if (is_dir && !recursive)
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Path '%s' is a directory and recursive was false", file.c_str());
+    ZDIAG_SET_MSG(&zusf->diag, "Path '%s' is a directory and recursive was false", file.c_str());
     return RTNCD_FAILURE;
   }
 
@@ -1916,7 +1917,7 @@ int zusf_delete_uss_item(ZUSF *zusf, const std::string &file, bool recursive)
     DIR *dir = opendir(file.c_str());
     if (dir == nullptr)
     {
-      zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Could not open directory '%s'", file.c_str());
+      ZDIAG_SET_MSG(&zusf->diag, "Could not open directory '%s'", file.c_str());
       return RTNCD_FAILURE;
     }
     struct dirent *entry;
@@ -1929,7 +1930,7 @@ int zusf_delete_uss_item(ZUSF *zusf, const std::string &file, bool recursive)
         if (lstat(child_path.c_str(), &child_stats) == -1)
         {
           closedir(dir);
-          zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Could not stat child path '%s'", child_path.c_str());
+          ZDIAG_SET_MSG(&zusf->diag, "Could not stat child path '%s'", child_path.c_str());
           return RTNCD_FAILURE;
         }
 
@@ -1947,7 +1948,7 @@ int zusf_delete_uss_item(ZUSF *zusf, const std::string &file, bool recursive)
   const auto rc = is_dir ? rmdir(file.c_str()) : remove(file.c_str());
   if (0 != rc)
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Could not delete '%s', rc: %d", file.c_str(), errno);
+    ZDIAG_SET_MSG(&zusf->diag, "Could not delete '%s', rc: %d", file.c_str(), errno);
     return RTNCD_FAILURE;
   }
 
@@ -2055,14 +2056,14 @@ int zusf_chown_uss_file_or_dir(ZUSF *zusf, const std::string &file, const std::s
   // Verify target exists and capture current metadata
   if (stat(file.c_str(), &file_stats) == -1)
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Path '%s' does not exist", file.c_str());
+    ZDIAG_SET_MSG(&zusf->diag, "Path '%s' does not exist", file.c_str());
     return RTNCD_FAILURE;
   }
 
   // Refuse to descend into a directory if caller didn’t request recursion
   if (S_ISDIR(file_stats.st_mode) && !recursive)
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Path '%s' is a folder and recursive is false", file.c_str());
+    ZDIAG_SET_MSG(&zusf->diag, "Path '%s' is a folder and recursive is false", file.c_str());
     return RTNCD_FAILURE;
   }
 
@@ -2083,7 +2084,7 @@ int zusf_chown_uss_file_or_dir(ZUSF *zusf, const std::string &file, const std::s
   if (!resolve_uid_from_str(userPart, uid))
   {
     errno = EINVAL;
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "chown error: invalid user '%s'", userPart.c_str());
+    ZDIAG_SET_MSG(&zusf->diag, "chown error: invalid user '%s'", userPart.c_str());
     return RTNCD_FAILURE;
   }
 
@@ -2091,7 +2092,7 @@ int zusf_chown_uss_file_or_dir(ZUSF *zusf, const std::string &file, const std::s
   if (!resolve_gid_from_str(groupPart, gid))
   {
     errno = EINVAL;
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "chown error: invalid group '%s'", groupPart.c_str());
+    ZDIAG_SET_MSG(&zusf->diag, "chown error: invalid group '%s'", groupPart.c_str());
     return RTNCD_FAILURE;
   }
 
@@ -2099,7 +2100,7 @@ int zusf_chown_uss_file_or_dir(ZUSF *zusf, const std::string &file, const std::s
   if (uid == (uid_t)-1 && gid == (gid_t)-1)
   {
     errno = EINVAL;
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "chown error: neither user nor group specified");
+    ZDIAG_SET_MSG(&zusf->diag, "chown error: neither user nor group specified");
     return RTNCD_FAILURE;
   }
 
@@ -2111,7 +2112,7 @@ int zusf_chown_uss_file_or_dir(ZUSF *zusf, const std::string &file, const std::s
   const auto rc = chown(file.c_str(), uid, gid);
   if (rc != 0)
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "chown failed for path '%s', errno %d", file.c_str(), errno);
+    ZDIAG_SET_MSG(&zusf->diag, "chown failed for path '%s', errno %d", file.c_str(), errno);
     return RTNCD_FAILURE;
   }
 
@@ -2121,7 +2122,7 @@ int zusf_chown_uss_file_or_dir(ZUSF *zusf, const std::string &file, const std::s
     DIR *dir = opendir(file.c_str());
     if (!dir)
     {
-      zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Could not open directory '%s'", file.c_str());
+      ZDIAG_SET_MSG(&zusf->diag, "Could not open directory '%s'", file.c_str());
       return RTNCD_FAILURE;
     }
 
@@ -2135,7 +2136,7 @@ int zusf_chown_uss_file_or_dir(ZUSF *zusf, const std::string &file, const std::s
         if (stat(child_path.c_str(), &child_stats) == -1)
         {
           closedir(dir);
-          zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Could not stat child path '%s'", child_path.c_str());
+          ZDIAG_SET_MSG(&zusf->diag, "Could not stat child path '%s'", child_path.c_str());
           return RTNCD_FAILURE;
         }
 
@@ -2158,7 +2159,7 @@ int zusf_chtag_uss_file_or_dir(ZUSF *zusf, const std::string &file, const std::s
   struct stat file_stats;
   if (stat(file.c_str(), &file_stats) == -1)
   {
-    zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Path '%s' does not exist", file.c_str());
+    ZDIAG_SET_MSG(&zusf->diag, "Path '%s' does not exist", file.c_str());
     return RTNCD_FAILURE;
   }
 
@@ -2178,7 +2179,7 @@ int zusf_chtag_uss_file_or_dir(ZUSF *zusf, const std::string &file, const std::s
     ccsid = zusf_get_ccsid_from_display_name(tag);
     if (ccsid == -1)
     {
-      zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Invalid tag '%s' - not a valid CCSID or display name", tag.c_str());
+      ZDIAG_SET_MSG(&zusf->diag, "Invalid tag '%s' - not a valid CCSID or display name", tag.c_str());
       return RTNCD_FAILURE;
     }
   }
@@ -2194,7 +2195,7 @@ int zusf_chtag_uss_file_or_dir(ZUSF *zusf, const std::string &file, const std::s
     const auto rc = __chattr((char *)file.c_str(), &attr, sizeof(attr));
     if (0 != rc)
     {
-      zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Failed to update attributes for path '%s'", file.c_str());
+      ZDIAG_SET_MSG(&zusf->diag, "Failed to update attributes for path '%s'", file.c_str());
       return RTNCD_FAILURE;
     }
   }
@@ -2203,7 +2204,7 @@ int zusf_chtag_uss_file_or_dir(ZUSF *zusf, const std::string &file, const std::s
     DIR *dir = opendir(file.c_str());
     if (dir == nullptr)
     {
-      zusf->diag.e_msg_len = sprintf(zusf->diag.e_msg, "Could not open directory '%s'", file.c_str());
+      ZDIAG_SET_MSG(&zusf->diag, "Could not open directory '%s'", file.c_str());
       return RTNCD_FAILURE;
     }
     struct dirent *entry;

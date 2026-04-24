@@ -496,42 +496,74 @@ void zowex_ds_tests()
                              ExpectWithContext(rc, response).ToBe(0);
                              Expect(response).ToContain("Data set and/or member created");
                            });
+                        it("should not overwrite existing members",
+                           [&]() -> void
+                           {
+                             std::string ds = "'" + _ds.back() + "(TEST)'";
+                             std::string response;
+                             std::string command = zowex_command + " data-set create-member " + ds;
+                             int rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain("Data set and/or member created");
 
-                        // TODO: https://github.com/zowe/zowex/issues/643
-                        xit("should not overwrite existing members",
-                            [&]() -> void
-                            {
-                              std::string ds = "'" + _ds.back() + "(TEST)'";
-                              std::string response;
-                              std::string command = zowex_command + " data-set create-member " + ds;
-                              int rc = execute_command_with_output(command, response);
-                              ExpectWithContext(rc, response).ToBe(0);
-                              Expect(response).ToContain("Data set and/or member created");
+                             // Write "test" data
+                             command = "echo test | " + zowex_command + " data-set write " + ds;
+                             rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain("Wrote data to");
 
-                              // Write "test" data
-                              command = "echo test | " + zowex_command + " data-set write " + ds;
-                              rc = execute_command_with_output(command, response);
-                              ExpectWithContext(rc, response).ToBe(0);
-                              Expect(response).ToContain("Wrote data to");
+                             // Read "test" data to confirm
+                             command = zowex_command + " data-set view " + ds;
+                             rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain("test");
 
-                              // Read "test" data to confirm
-                              command = "echo test | " + zowex_command + " data-set view " + ds;
-                              rc = execute_command_with_output(command, response);
-                              ExpectWithContext(rc, response).ToBe(0);
-                              Expect(response).ToContain("test");
+                             // Create the same TEST member
+                             command = zowex_command + " data-set create-member " + ds;
+                             rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).Not().ToBe(0);
+                             Expect(response).ToContain("Warning");
 
-                              // Create the same TEST member
-                              command = "echo test | " + zowex_command + " data-set create-member " + ds;
-                              rc = execute_command_with_output(command, response);
-                              ExpectWithContext(rc, response).Not().ToBe(0);
-                              Expect(response).ToContain("ERROR");
+                             // Read "test" data to confirm
+                             command = zowex_command + " data-set view " + ds;
+                             rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain("test");
+                           });
+                        it("should overwrite existing members if --overwrite is specified",
+                           [&]() -> void
+                           {
+                             std::string ds = "'" + _ds.back() + "(TEST)'";
+                             std::string response;
+                             std::string command = zowex_command + " data-set create-member " + ds;
+                             int rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain("Data set and/or member created");
 
-                              // Read "test" data to confirm
-                              command = "echo test | " + zowex_command + " data-set view " + ds;
-                              rc = execute_command_with_output(command, response);
-                              ExpectWithContext(rc, response).ToBe(0);
-                              Expect(response).ToContain("test");
-                            });
+                             // Write "test" data
+                             command = "echo test | " + zowex_command + " data-set write " + ds;
+                             rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain("Wrote data to");
+
+                             // Read "test" data to confirm
+                             command = zowex_command + " data-set view " + ds;
+                             rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain("test");
+
+                             // Create the same TEST member
+                             command = zowex_command + " data-set create-member " + ds + " --overwrite";
+                             rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain("Data set and/or member created");
+
+                             // Read to confirm data was overwritten
+                             command = zowex_command + " data-set view " + ds;
+                             rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).Not().ToContain("test");
+                           });
                       });
              describe("create-vb",
                       [&]() -> void

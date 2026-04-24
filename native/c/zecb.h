@@ -127,8 +127,8 @@ STIMERM_MODEL(stimerm_model); // make this copy in static storage
       "*                                                  \n" \
       " SYSSTATE POP    Restore SYSSTATE                  \n" \
       "*                                                    " \
-      : "+m"(plist)                                           \
-      : "m"(rc)                                               \
+      : "+m"(plist), "=m"(rc)                                 \
+      :                                                       \
       : "r0", "r1", "r2", "r14", "r15");
 #else
 #define STIMERM_CANCEL(rc, plist)

@@ -89,7 +89,7 @@ int zut_private_run_program(const std::string &program, const std::vector<std::s
     close(stdout_pipe[1]);
     close(stderr_pipe[0]);
     close(stderr_pipe[1]);
-    return RTNCD_FAILURE; 
+    return RTNCD_FAILURE;
   }
 
   std::vector<char *> argv_vec;
@@ -123,27 +123,31 @@ int zut_private_run_program(const std::string &program, const std::vector<std::s
   struct inheritance inherit = {};
 
   pid_t pid = spawnp(program.c_str(), fd_count, fd_map, &inherit, (const char **)argv_vec.data(), env_vec.data());
-  
+
   close(devnull_fd); // close /dev/null fd right away; child has a clone
 
   if (pid == -1)
   {
     int spawn_error = errno;
     std::string error_message;
-    if (spawn_error == ENOENT) 
+    if (spawn_error == ENOENT)
     {
       error_message = "zut_private_run_program: " + program + ": command not found";
-    } 
+    }
     else if (spawn_error == EACCES)
     {
       error_message = "zut_private_run_program: Permission denied when trying to execute '" + program + "'.";
     }
-    else {
+    else
+    {
       error_message = "zut_private_run_program: error running " + program + ": " + std::string(strerror(spawn_error));
     }
-    if (merge_streams) {
+    if (merge_streams)
+    {
       stdout_response = error_message;
-    } else {
+    }
+    else
+    {
       stderr_response = error_message;
     }
     close(stdout_pipe[0]);
@@ -299,14 +303,15 @@ static bool zut_private_command_requires_noshareas(const std::string &command)
   return false;
 }
 
-static std::string zut_private_get_shell() {
+static std::string zut_private_get_shell()
+{
   std::string shell_path = "/bin/sh";
 
   // Check if /bin/sh exists AND is executable by the current user
   if (access(shell_path.c_str(), X_OK) != 0)
   {
     // otherwise, try env. If it's empty, we leave shell_path=/bin/sh
-    const char* env_shell = std::getenv("SHELL");
+    const char *env_shell = std::getenv("SHELL");
     if (env_shell != nullptr && env_shell[0] != '\0')
     {
       shell_path = env_shell;
@@ -349,7 +354,7 @@ int zut_spawn_shell_command(const std::string &command, std::string &stdout_resp
   stderr_response.clear();
 
   if (0 == command.size())
-  {  
+  {
     stderr_response = "Error: You must specify a program to run.";
     return RTNCD_FAILURE;
   }
@@ -389,13 +394,14 @@ int zut_substitute_symbol(const std::string &pattern, std::string &result)
   }
   memset(parms, 0x00, sizeof(SYMBOL_DATA));
 
-  if (pattern.size() > sizeof(parms->input))
+  if (pattern.size() >= sizeof(parms->input))
   {
     free(parms);
     return RTNCD_FAILURE;
   }
 
-  strcpy(parms->input, pattern.c_str());
+  strncpy(parms->input, pattern.c_str(), sizeof(parms->input) - 1);
+  parms->input[sizeof(parms->input) - 1] = '\0';
   parms->length = std::strlen(pattern.c_str());
   int rc = ZUTSYMBP(parms);
   if (RTNCD_SUCCESS != rc)
@@ -403,6 +409,7 @@ int zut_substitute_symbol(const std::string &pattern, std::string &result)
     free(parms);
     return rc;
   }
+  parms->output[sizeof(parms->output) - 1] = '\0';
   result += std::string(parms->output);
   free(parms);
   return RTNCD_SUCCESS;
@@ -434,6 +441,11 @@ int zut_bpxwdyn_common(const std::string &parm, unsigned int *code, std::string 
   memset(p, 0x00, sizeof(BPXWDYN_PARM) + sizeof(BPXWDYN_RESPONSE));
 
   BPXWDYN_PARM *bparm = (BPXWDYN_PARM *)p;
+  if (parm.size() >= sizeof(bparm->str))
+  {
+    return RTNCD_FAILURE;
+  }
+
   BPXWDYN_RESPONSE *response = (BPXWDYN_RESPONSE *)(p + sizeof(BPXWDYN_PARM));
 
   if (ddname == "RTDDN")
@@ -445,7 +457,8 @@ int zut_bpxwdyn_common(const std::string &parm, unsigned int *code, std::string 
     bparm->rtdsn = 1; // set bit flag indicating we want to return the DS name
   }
 
-  bparm->len = sprintf(bparm->str, "%s", parm.c_str());
+  bparm->len = snprintf(bparm->str, sizeof(bparm->str), "%s", parm.c_str());
+
   int rc = ZUTWDYN(bparm, response);
 
   if (bparm->rtdd)
@@ -666,11 +679,11 @@ void zut_print_string_as_bytes(std::string &input, std::ostream *out_stream)
   {
     if (p == (input.data() + input.length() - 1))
     {
-      sprintf(buf, "%02x", (unsigned char)*p);
+      snprintf(buf, sizeof(buf), "%02x", (unsigned char)*p);
     }
     else
     {
-      sprintf(buf, "%02x ", (unsigned char)*p);
+      snprintf(buf, sizeof(buf), "%02x ", (unsigned char)*p);
     }
     output_stream << buf;
   }
@@ -747,14 +760,14 @@ size_t zut_iconv(iconv_t cd, ZConvData &data, ZDIAG &diag, bool flush_state)
   // If an error occurred, throw an exception with iconv's return code and errno
   if (-1 == rc)
   {
-    diag.e_msg_len = sprintf(diag.e_msg, "[zut_iconv] Error when converting characters. rc=%zu,errno=%d", rc, errno);
+    ZDIAG_SET_MSG(&diag, "[zut_iconv] Error when converting characters. rc=%zu,errno=%d", rc, errno);
     return -1;
   }
 
   // "If the input conversion is stopped... the value pointed to by inbytesleft will be nonzero and errno is set to indicate the condition"
   if (0 != input_bytes_remaining)
   {
-    diag.e_msg_len = sprintf(diag.e_msg, "[zut_iconv] Failed to convert all input bytes. rc=%zu,errno=%d", rc, errno);
+    ZDIAG_SET_MSG(&diag, "[zut_iconv] Failed to convert all input bytes. rc=%zu,errno=%d", rc, errno);
     return -1;
   }
 
@@ -764,7 +777,7 @@ size_t zut_iconv(iconv_t cd, ZConvData &data, ZDIAG &diag, bool flush_state)
     size_t flush_rc = iconv(cd, nullptr, nullptr, &data.output_iter, &output_bytes_remaining);
     if (-1 == flush_rc)
     {
-      diag.e_msg_len = sprintf(diag.e_msg, "[zut_iconv] Error flushing shift state. rc=%zu,errno=%d", flush_rc, errno);
+      ZDIAG_SET_MSG(&diag, "[zut_iconv] Error flushing shift state. rc=%zu,errno=%d", flush_rc, errno);
       return -1;
     }
   }
@@ -792,7 +805,7 @@ std::vector<char> zut_iconv_flush(iconv_t cd, ZDIAG &diag)
   size_t flush_rc = iconv(cd, nullptr, nullptr, &output_iter, &output_bytes_remaining);
   if (-1 == flush_rc)
   {
-    diag.e_msg_len = sprintf(diag.e_msg, "[zut_iconv_flush] Error flushing shift state. rc=%zu,errno=%d", flush_rc, errno);
+    ZDIAG_SET_MSG(&diag, "[zut_iconv_flush] Error flushing shift state. rc=%zu,errno=%d", flush_rc, errno);
     return std::vector<char>(); // Return empty vector on error
   }
 
@@ -838,7 +851,7 @@ std::vector<char> zut_encode(const char *input_str, const size_t input_size, con
   iconv_t cd = iconv_open(to_encoding.c_str(), from_encoding.c_str());
   if (cd == (iconv_t)(-1))
   {
-    diag.e_msg_len = sprintf(diag.e_msg, "Cannot open converter from %s to %s", from_encoding.c_str(), to_encoding.c_str());
+    ZDIAG_SET_MSG(&diag, "Cannot open converter from %s to %s", from_encoding.c_str(), to_encoding.c_str());
     return std::vector<char>();
   }
 
@@ -966,7 +979,7 @@ int zut_loop_dynalloc(ZDIAG &diag, const std::vector<std::string> &list)
       diag.detail_rc = ZUT_RTNCD_SERVICE_FAILURE;
       diag.service_rc = rc;
       strcpy(diag.service_name, "bpxwdyn");
-      diag.e_msg_len = sprintf(diag.e_msg, "bpxwdyn failed with '%s' rc: '%d', emsg: '%s'", diag.service_name, rc, alloc.c_str());
+      ZDIAG_SET_MSG(&diag, "bpxwdyn failed with '%s' rc: '%d', emsg: '%s'", diag.service_name, rc, response.c_str());
       return RTNCD_FAILURE;
     }
   }
@@ -985,13 +998,13 @@ int zut_free_dynalloc_dds(ZDIAG &diag, const std::vector<std::string> &list)
     const auto dd_start = alloc_dd.find("dd(");
     if (dd_start == std::string::npos)
     {
-      diag.e_msg_len = sprintf(diag.e_msg, "Invalid format in DD alloc string: %s", entry.c_str());
+      ZDIAG_SET_MSG(&diag, "Invalid format in DD alloc string: %s", entry.c_str());
       return RTNCD_FAILURE;
     }
     const auto paren_end = alloc_dd.find(")", dd_start + 3);
     if (paren_end == std::string::npos)
     {
-      diag.e_msg_len = sprintf(diag.e_msg, "Invalid format in DD alloc string: %s", entry.c_str());
+      ZDIAG_SET_MSG(&diag, "Invalid format in DD alloc string: %s", entry.c_str());
       return RTNCD_FAILURE;
     }
     free_dds.push_back("free " + alloc_dd.substr(dd_start, paren_end - dd_start + 1));
@@ -1044,26 +1057,9 @@ FileGuard::operator bool() const
 std::string zut_read_input(std::istream &input_stream)
 {
   std::string data;
-  if (!isatty(fileno(stdin)))
-  {
-    std::istreambuf_iterator<char> begin(input_stream);
-    std::istreambuf_iterator<char> end;
-    data.assign(begin, end);
-  }
-  else
-  {
-    std::string line;
-    bool first_line = true;
-    while (std::getline(input_stream, line))
-    {
-      if (!first_line)
-      {
-        data.push_back('\n');
-      }
-      first_line = false;
-      data += line;
-    }
-  }
+  std::istreambuf_iterator<char> begin(input_stream);
+  std::istreambuf_iterator<char> end;
+  data.assign(begin, end);
   return data;
 }
 

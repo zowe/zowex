@@ -26,7 +26,7 @@ int zcn_activate(ZCN *zcn, const std::string &console_name)
   int rc = 0;
   zcn->diag.detail_rc = 0;
 
-  strcpy(zcn->eye, ZCN_EYE);
+  memcpy(zcn->eye, ZCN_EYE, sizeof(zcn->eye));
 
   zut_uppercase_pad_truncate(zcn->console_name, console_name, sizeof(zcn->console_name));
 
@@ -56,7 +56,7 @@ int zcn_put(ZCN *zcn, const std::string &command)
   char *command31 = (char *)__malloc31(command.length() + 1);
   if (command31 == nullptr)
   {
-    zcn->diag.e_msg_len = sprintf(zcn->diag.e_msg, "Failed to allocate 31-bit memory for command: %s", command.c_str());
+    ZDIAG_SET_MSG(&zcn->diag, "Failed to allocate 31-bit memory for command: %s", command.c_str());
     return RTNCD_FAILURE;
   }
   memset(command31, 0x00, command.length() + 1);
@@ -86,7 +86,7 @@ int zcn_get(ZCN *zcn, std::string &response)
   char *resp31 = (char *)__malloc31(zcn->buffer_size);
   if (resp31 == nullptr)
   {
-    zcn->diag.e_msg_len = sprintf(zcn->diag.e_msg, "Failed to allocate 31-bit memory for response");
+    ZDIAG_SET_MSG(&zcn->diag, "Failed to allocate 31-bit memory for response");
     return RTNCD_FAILURE;
   }
   memset(resp31, 0x00, zcn->buffer_size);

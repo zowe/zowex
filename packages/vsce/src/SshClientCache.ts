@@ -11,8 +11,8 @@
 
 import type { SshSession } from "@zowe/zos-uss-for-zowe-sdk";
 import { imperative, ZoweVsCodeExtension } from "@zowe/zowe-explorer-api";
+import { type ClientOptions, type ExistingClientRequest, ZSshClient, ZSshUtils } from "@zowe/zowex-for-zowe-sdk";
 import * as vscode from "vscode";
-import { type ClientOptions, type ExistingClientRequest, ZSshClient, ZSshUtils } from "zowex-sdk";
 import { ConfigUtils } from "./ConfigUtils";
 import { deployWithProgress, getVsceConfig } from "./Utilities";
 

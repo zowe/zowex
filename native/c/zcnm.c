@@ -19,6 +19,7 @@
 
 #pragma prolog(ZCNACT, " ZWEPROLG NEWDSA=(YES,128) ")
 #pragma epilog(ZCNACT, " ZWEEPILG ")
+// #pragma option_override(ZCNACT, "opt(level,0)")
 int ZCNACT(ZCN *zcn)
 {
   int rc = 0;
@@ -26,21 +27,32 @@ int ZCNACT(ZCN *zcn)
   if (0 != rc)
   {
     strcpy(zcn->diag.service_name, "TESTAUTH");
-    zcn->diag.e_msg_len = sprintf(zcn->diag.e_msg, "Not authorized - %d", rc);
+    ZDIAG_SET_MSG(&zcn->diag, "Not authorized - %d", rc);
     zcn->diag.detail_rc = ZCN_RTNCD_NOT_AUTH;
     return RTNCD_FAILURE;
   }
 
-  ZCN zcn31 = {0};
-  memcpy(&zcn31, zcn, sizeof(ZCN));
-  rc = zcnm1act(&zcn31);
-  memcpy(zcn, &zcn31, sizeof(ZCN));
+  ZRCVY_ENV zenv = {0};
 
-  if (0 != rc)
+  if (0 == enable_recovery(&zenv))
   {
-    zcn->diag.e_msg_len = sprintf(zcn->diag.e_msg, "Error activating console, service: %s, rc: %d, service_rc: %d, service_rsn: %d", zcn->diag.service_name, rc, zcn->diag.service_rc, zcn->diag.service_rsn);
-    return RTNCD_FAILURE;
+    ZCN zcn31 = {0};
+    memcpy(&zcn31, zcn, sizeof(ZCN));
+    rc = zcnm1act(&zcn31);
+    memcpy(zcn, &zcn31, sizeof(ZCN));
+    if (0 != rc)
+    {
+      ZDIAG_SET_MSG(&zcn->diag, "Error activating console, service: %.16s, rc: %d, service_rc: %d, service_rsn: %d", zcn->diag.service_name, rc, zcn->diag.service_rc, zcn->diag.service_rsn);
+      rc = RTNCD_FAILURE;
+    }
   }
+  else
+  {
+    zcn->diag.e_msg_len = sprintf(zcn->diag.e_msg, "Unexpected abend occurred during activation");
+    rc = RTNCD_FAILURE;
+  }
+
+  disable_recovery(&zenv);
 
   return rc;
 }
@@ -55,7 +67,7 @@ int ZCNPUT(ZCN *zcn, const char *command)
   if (0 != rc)
   {
     strcpy(zcn->diag.service_name, "TESTAUTH");
-    zcn->diag.e_msg_len = sprintf(zcn->diag.e_msg, "Not authorized - %d", rc);
+    ZDIAG_SET_MSG(&zcn->diag, "Not authorized - %d", rc);
     zcn->diag.detail_rc = ZCN_RTNCD_NOT_AUTH;
     return RTNCD_FAILURE;
   }
@@ -67,7 +79,7 @@ int ZCNPUT(ZCN *zcn, const char *command)
 
   if (0 != rc)
   {
-    zcn->diag.e_msg_len = sprintf(zcn->diag.e_msg, "Error writting data to console, service: %s, rc: %d, service_rc: %d, service_rsn: %d", zcn->diag.service_name, rc, zcn->diag.service_rc, zcn->diag.service_rsn);
+    ZDIAG_SET_MSG(&zcn->diag, "Error writting data to console, service: %.16s, rc: %d, service_rc: %d, service_rsn: %d", zcn->diag.service_name, rc, zcn->diag.service_rc, zcn->diag.service_rsn);
     return RTNCD_FAILURE;
   }
 
@@ -108,7 +120,7 @@ int ZCNGET(ZCN *zcn, char *response)
   if (0 != rc)
   {
     strcpy(zcn->diag.service_name, "TESTAUTH");
-    zcn->diag.e_msg_len = sprintf(zcn->diag.e_msg, "Not authorized - %d", rc);
+    ZDIAG_SET_MSG(&zcn->diag, "Not authorized - %d", rc);
     zcn->diag.detail_rc = ZCN_RTNCD_NOT_AUTH;
     return RTNCD_FAILURE;
   }
@@ -128,7 +140,7 @@ int ZCNGET(ZCN *zcn, char *response)
 
   if (0 != rc)
   {
-    zcn->diag.e_msg_len = sprintf(zcn->diag.e_msg, "Error getting data from console, service: %s, rc: %d, service_rc: %d, service_rsn: %d", zcn->diag.service_name, rc, zcn->diag.service_rc, zcn->diag.service_rsn);
+    ZDIAG_SET_MSG(&zcn->diag, "Error getting data from console, service: %.16s, rc: %d, service_rc: %d, service_rsn: %d", zcn->diag.service_name, rc, zcn->diag.service_rc, zcn->diag.service_rsn);
     return RTNCD_FAILURE;
   }
 
@@ -145,7 +157,7 @@ int ZCNDACT(ZCN *zcn)
   if (0 != rc)
   {
     strcpy(zcn->diag.service_name, "TESTAUTH");
-    zcn->diag.e_msg_len = sprintf(zcn->diag.e_msg, "Not authorized - %d", rc);
+    ZDIAG_SET_MSG(&zcn->diag, "Not authorized - %d", rc);
     zcn->diag.detail_rc = ZCN_RTNCD_NOT_AUTH;
     return RTNCD_FAILURE;
   }
@@ -157,7 +169,7 @@ int ZCNDACT(ZCN *zcn)
 
   if (0 != rc)
   {
-    zcn->diag.e_msg_len = sprintf(zcn->diag.e_msg, "Error deactivating console, service: %s, rc: %d, service_rc: %d, service_rsn: %d", zcn->diag.service_name, rc, zcn->diag.service_rc, zcn->diag.service_rsn);
+    ZDIAG_SET_MSG(&zcn->diag, "Error deactivating console, service: %.16s, rc: %d, service_rc: %d, service_rsn: %d", zcn->diag.service_name, rc, zcn->diag.service_rc, zcn->diag.service_rsn);
     return RTNCD_FAILURE;
   }
 

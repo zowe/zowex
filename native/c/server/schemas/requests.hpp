@@ -53,7 +53,8 @@ ZJSON_SCHEMA(CreateDatasetRequest,
 
 struct CreateMemberRequest {};
 ZJSON_SCHEMA(CreateMemberRequest,
-    FIELD_REQUIRED(dsname, STRING)
+    FIELD_REQUIRED(dsname, STRING),
+    FIELD_OPTIONAL(overwrite, BOOL)
 );
 
 struct DeleteDatasetRequest {};
@@ -116,6 +117,14 @@ ZJSON_SCHEMA(WriteDatasetRequest,
     FIELD_OPTIONAL(volume, STRING),
     FIELD_REQUIRED(dsname, STRING),
     FIELD_OPTIONAL(data, STRING)
+);
+
+struct CopyDatasetRequest {};
+ZJSON_SCHEMA(CopyDatasetRequest,
+    FIELD_REQUIRED(source, STRING),
+    FIELD_REQUIRED(target, STRING),
+    FIELD_OPTIONAL(replace, BOOL),
+    FIELD_OPTIONAL(overwrite, BOOL)
 );
 
 struct CancelJobRequest {};
@@ -234,7 +243,8 @@ struct CreateFileRequest {};
 ZJSON_SCHEMA(CreateFileRequest,
     FIELD_OPTIONAL(permissions, STRING),
     FIELD_REQUIRED(fspath, STRING),
-    FIELD_OPTIONAL(isDir, BOOL)
+    FIELD_OPTIONAL(isDir, BOOL),
+    FIELD_OPTIONAL(overwrite, BOOL)
 );
 
 struct DeleteFileRequest {};

@@ -21,7 +21,6 @@ import {
     TextUtils,
 } from "@zowe/imperative";
 import type { ISshSession } from "@zowe/zos-uss-for-zowe-sdk";
-import * as termkit from "terminal-kit";
 import {
     AbstractConfigManager,
     type IDisposable,
@@ -31,7 +30,8 @@ import {
     type ProgressCallback,
     type qpItem,
     type qpOpts,
-} from "zowex-sdk";
+} from "@zowe/zowex-for-zowe-sdk";
+import * as termkit from "terminal-kit";
 
 export default class ServerInstallHandler implements ICommandHandler {
     public async process(params: IHandlerParameters): Promise<void> {
