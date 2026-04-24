@@ -313,18 +313,83 @@ export class SshMvsApi extends SshCommonApi implements MainframeInteraction.IMvs
     }
 
     public async allocateLikeDataSet(
-        _dataSetName: string,
-        _likeDataSetName: string,
+        dataSetName: string,
+        likeDataSetName: string,
     ): Promise<zosfiles.IZosFilesResponse> {
-        throw new Error("Not yet implemented");
+        const listResponse = await (await this.client).ds.listDatasets({
+            pattern: likeDataSetName,
+            maxItems: 1,
+            attributes: true,
+        });
+
+        if (listResponse.items.length === 0) {
+            return this.buildZosFilesResponse(
+                { success: false },
+                false,
+                `Source data set "${likeDataSetName}" not found`,
+            );
+        }
+
+        const sourceDs = listResponse.items[0];
+
+        const attributes: DatasetAttributes = {
+            dsname: dataSetName,
+            recfm: sourceDs.recfm,
+            lrecl: sourceDs.lrecl,
+            blksize: sourceDs.blksize,
+            dsorg: sourceDs.dsorg,
+            dsntype: sourceDs.dsntype,
+            vol: sourceDs.volser,
+            alcunit: sourceDs.spacu?.toUpperCase().startsWith("CYL") ? "CYLS" : "TRKS",
+            primary: sourceDs.alloc || 1,
+            secondary: 1,
+        };
+
+        try {
+            const response = await (await this.client).ds.createDataset({
+                dsname: dataSetName,
+                attributes: attributes,
+            });
+
+            if (response.success) {
+                Gui.infoMessage(`Successfully allocated dataset "${dataSetName}" like "${likeDataSetName}"`);
+            }
+
+            return this.buildZosFilesResponse(response, response.success);
+        } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            Gui.errorMessage(`Failed to allocate dataset: ${errorMsg}`);
+            return this.buildZosFilesResponse({ success: false }, false, errorMsg);
+        }
     }
 
     public async copyDataSetMember(
-        { dsn: _fromDataSetName, member: _fromMemberName }: zosfiles.IDataSet,
-        { dsn: _toDataSetName, member: _toMemberName }: zosfiles.IDataSet,
-        _options?: { replace?: boolean },
+        { dsn: fromDataSetName, member: fromMemberName }: zosfiles.IDataSet,
+        { dsn: toDataSetName, member: toMemberName }: zosfiles.IDataSet,
+        options?: { replace?: boolean; overwrite?: boolean },
     ): Promise<zosfiles.IZosFilesResponse> {
-        throw new Error("Not yet implemented");
+        const source = fromMemberName ? `${fromDataSetName}(${fromMemberName})` : fromDataSetName;
+        const target = toMemberName ? `${toDataSetName}(${toMemberName})` : toDataSetName;
+
+        try {
+            const response = await (await this.client).ds.copyDatasetOrMember({
+                source,
+                target,
+                replace: options?.replace ?? false,
+                overwrite: options?.overwrite ?? false,
+            });
+
+            if (!response.success) {
+                const errorMsg = response.result?.errorMessage || "Unknown error during copy";
+                Gui.errorMessage(`Failed to copy ${source} to ${target}: ${errorMsg}`);
+                return this.buildZosFilesResponse(response, false, errorMsg);
+            }
+            return this.buildZosFilesResponse(response, true);
+        } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            Gui.errorMessage(`Error during copy operation: ${errorMsg}`);
+            return this.buildZosFilesResponse({ success: false }, false, errorMsg);
+        }
     }
 
     public async renameDataSet(
