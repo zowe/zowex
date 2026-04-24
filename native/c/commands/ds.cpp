@@ -561,6 +561,7 @@ int handle_data_set_list(InvocationContext &context)
       else if (ZDS_RSNCD_NOT_FOUND == zds.diag.detail_rc)
       {
         context.error_stream() << "Warning: no matching results found" << std::endl;
+        context.error_stream() << "  Details: " << zds.diag.e_msg << std::endl;
       }
     }
   }
