@@ -1,30 +1,25 @@
-import { ICommandHandler, IHandlerParameters } from "@zowe/imperative";
-import { AbstractHandler } from "./Abstract.handler"; // Assuming you have a base handler for RPC calls
-import { CopyDatasetRequest } from "../interfaces/CopyDatasetRequest";
+import type { IHandlerParameters } from "@zowe/imperative";
+import { SshBaseHandler } from "../../SshBaseHandler";
+import type { ds, ZSshClient } from "@zowe/zowex-for-zowe-sdk";
+import { CopyDatasetRequest } from "../CopyDatasetRequest";
 
-export default class DataSetHandler extends AbstractHandler implements ICommandHandler {
-    public async process(params: IHandlerParameters): Promise<void> {
-        // 1. Extract arguments from the Zowe params object
+export default class CopyDatasetOrMemberHandler extends SshBaseHandler {
+    public async processWithClient(params: IHandlerParameters, client: ZSshClient): Promise<ds.CopyDatasetResponse> {
         const fromDataset = params.arguments.fromDataset as string;
         const toDataset = params.arguments.toDataset as string;
         const replace = params.arguments.replace as boolean;
         const overwrite = params.arguments.overwrite as boolean;
 
-        // 2. Construct the request object for the middleware
-        // Note: We use the names "source" and "target" to match your C++ context.get calls
         const request: CopyDatasetRequest = {
             source: fromDataset,
             target: toDataset,
             replace: replace,
-            overwrite: overwrite
+            overwrite: overwrite,
         };
 
         try {
-            // 3. Call the middleware via JSON-RPC
-            // "copyDatasetOrMember" is the string you registered in the dispatcher
-            const response = await this.session.sendRequest("copyDatasetOrMember", request);
+            const response = await client.ds.copy({});
 
-            // 4. Handle success using the structured result you added earlier
             if (response.success) {
                 const result = response.result;
                 let message = `Successfully copied '${fromDataset}' to '${toDataset}'.`;
@@ -36,7 +31,7 @@ export default class DataSetHandler extends AbstractHandler implements ICommandH
                 } else if (result.overwritten) {
                     message = `Target data set '${toDataset}' was overwritten with contents of '${fromDataset}'.`;
                 } else if (result.replaced) {
-                    message = `Target '${toDataset}' was updated/replaced with contents of '${fromDataset}'.`
+                    message = `Target '${toDataset}' was updated/replaced with contents of '${fromDataset}'.`;
                 }
 
                 params.response.console.log(message);

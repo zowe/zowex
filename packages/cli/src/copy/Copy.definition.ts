@@ -1,7 +1,7 @@
 import type { ICommandDefinition } from "@zowe/imperative";
 import { SshSession } from "@zowe/zos-uss-for-zowe-sdk";
 import { Constants } from "../Constants";
-import { CopyDatasetOrMemberDefinition } from "./CopyDataSetorMemberDefinition";
+import { CopyDatasetOrMemberDefinition } from "./CopyDatasetOrMember.definition";
 
 const CopyDefinition: ICommandDefinition = {
     name: "copy",
@@ -9,7 +9,7 @@ const CopyDefinition: ICommandDefinition = {
     summary: "Copy data sets and members",
     description: "Copy a data set or member to another data set or member",
     type: "group",
-    children: [CopyDataSetorMemberDefinition],
+    children: [CopyDatasetOrMemberDefinition],
     passOn: [
         {
             property: "options",
