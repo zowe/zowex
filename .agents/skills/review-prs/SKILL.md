@@ -1,5 +1,5 @@
 ---
-name: review-pr
+name: review-prs
 description: Review pull requests for the zowex codebase. Analyze C++ backend and middleware (ibm-clang), TypeScript clients (CLI, SDK, VS Code extension), and z/OS-specific concerns. Use when asked to review a PR, branch, or code changes.
 ---
 
@@ -13,7 +13,7 @@ Review pull requests for code quality, security, and adherence to project standa
 2. **Get full diff**: `git diff main...HEAD 2>nul`'
 3. **Read key changed files** to understand context
 4. **Categorize findings** using the format below
-5. **Verify PR checklist** items from the [PR template](../../../.github/PULL_REQUEST_TEMPLATE.md)
+5. **Verify PR checklist** items from the workspace's `.github/PULL_REQUEST_TEMPLATE.md`
 
 ## Output Format
 

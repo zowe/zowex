@@ -1,5 +1,5 @@
 ---
-name: zowe-conformance-check
+name: zowe-conformance
 description: Validate VS Code extensions and CLI plug-ins against Zowe V3 Conformance Criteria. Audit package.json, settings, commands, menus, profile usage, and API registration for conformance. Use when checking Zowe conformance, preparing for conformance submission, auditing an extension/plug-in against Zowe criteria, or when the user mentions conformance.
 ---
 
