@@ -4,10 +4,10 @@ All notable changes to the native code for "zowex" are documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## Recent Changes
+## `0.5.0`
 
 - `c`: Fixed several vulnerabilities in C++ and Metal C code to improve stability. [#940](https://github.com/zowe/zowex/pull/940)
-- **Breaking:** `c`: Refactored the backend for copying data sets to use Z/OS utilities IEBCOPY and IEBGENER. Removed `--delete-target-members` flag and added `--overwrite` flag for copying a partitioned data set to an existing partitioned data set. Removed duplicate `member_exists_in_pds` function. [#932] (https://github.com/zowe/zowex/issues/932)
+- **Breaking:** `c`: Refactored the backend for copying data sets to use Z/OS utilities IEBCOPY and IEBGENER. Removed `--delete-target-members` flag and added `--overwrite` flag for copying a partitioned data set to an existing partitioned data set. Removed duplicate `member_exists_in_pds` function. [#932](https://github.com/zowe/zowex/issues/932)
 - `c`: Fix spool read / dynalloc error via optimization assignments. [#945](https://github.com/zowe/zowex/issues/945)
 - `c`: Updated `zut_read_input` so that all tests pass on `zowex`. Now there is no specific handling for line-based TTY input so that data is more consistently preserved.[#953](https://github.com/zowe/zowex/pull/953)
 - **Breaking:** `c`: Refactored the `zds_write` function to consolidate data set and DD write logic into a single entry point. [#908](https://github.com/zowe/zowe-native-proto/issues/908)
@@ -248,4 +248,3 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## [Unreleased]
 
 - Initial release
-
