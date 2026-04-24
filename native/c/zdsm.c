@@ -60,7 +60,7 @@ int ZDSCSI00(ZDS *zds, CSIFIELD *selection, void *work_area)
   if (!zds->csi)
   {
     strcpy(zds->diag.service_name, "LOAD");
-    zds->diag.e_msg_len = sprintf(zds->diag.e_msg, "Load failure for IGGCSI00");
+    ZDIAG_SET_MSG(&zds->diag, "Load failure for IGGCSI00");
     zds->diag.detail_rc = ZDS_RTNCD_SERVICE_FAILURE;
     return RTNCD_FAILURE;
   }
@@ -71,7 +71,7 @@ int ZDSCSI00(ZDS *zds, CSIFIELD *selection, void *work_area)
   if (0 != rc)
   {
     strcpy(zds->diag.service_name, "IGGCSI00");
-    zds->diag.e_msg_len = sprintf(zds->diag.e_msg, "IGGCSI00 rc was: '%d', rsn was: '%04x'", rc, rsn);
+    ZDIAG_SET_MSG(&zds->diag, "IGGCSI00 rc was: '%d', rsn was: '%04x'", rc, rsn);
     zds->diag.service_rc = rc;
     zds->diag.service_rsn = rsn;
     zds->diag.detail_rc = ZDS_RTNCD_SERVICE_FAILURE;
@@ -118,13 +118,13 @@ int ZDSDSCB1(ZDS *zds, const char *dsn, const char *volser, DSCBFormat1 *dscb)
   params.number_dscbs = MAX_DSCBS;
   params.option_flags = OPTION_EADSCB;
   // Allow lookup of format-1 or format-8 DSCB
-  char dsname[44] = {0};
+  char dsname[ZDS_MAX_DSNAME_LENGTH] = {0};
   memset(dsname, ' ', sizeof(dsname));
-  memcpy(dsname, dsn, strlen(dsn));
+  memcpy(dsname, dsn, ZMIN(strlen(dsn), ZDS_MAX_DSNAME_LENGTH));
   params.listname_addrx.dsname_ptr = dsname;
-  char volume[6] = {0};
+  char volume[ZDS_MAX_VOLSER_LENGTH] = {0};
   memset(volume, ' ', sizeof(volume));
-  memcpy(volume, volser, strlen(volser));
+  memcpy(volume, volser, ZMIN(strlen(volser), ZDS_MAX_VOLSER_LENGTH));
   params.listname_addrx.volume_ptr = volume;
   params.listname_addrx.workarea_ptr = workarea;
 
@@ -132,8 +132,7 @@ int ZDSDSCB1(ZDS *zds, const char *dsn, const char *volser, DSCBFormat1 *dscb)
   if (0 != rc)
   {
     strcpy(zds->diag.service_name, "OBTAIN");
-    zds->diag.e_msg_len =
-        sprintf(zds->diag.e_msg, "OBTAIN SVC failed for %s on %s with rc=%d, workarea_ptr=%p",
+    ZDIAG_SET_MSG(&zds->diag, "OBTAIN SVC failed for %.44s on %.6s with rc=%d, workarea_ptr=%p",
                 dsn, volser, rc, workarea);
     zds->diag.service_rc = rc;
     zds->diag.detail_rc = ZDS_RTNCD_SERVICE_FAILURE;
@@ -158,8 +157,7 @@ int ZDSDSCB1(ZDS *zds, const char *dsn, const char *volser, DSCBFormat1 *dscb)
   }
 
   strcpy(zds->diag.service_name, "OBTAIN");
-  zds->diag.e_msg_len = sprintf(
-      zds->diag.e_msg, "Could not find Format-1 or Format-8 DSCB, OBTAIN rc=%d, sizeof(dscb)=%d", rc, sizeof(IndexableDSCBFormat1));
+  ZDIAG_SET_MSG(&zds->diag, "Could not find Format-1 or Format-8 DSCB, OBTAIN rc=%d, sizeof(dscb)=%d", rc, sizeof(IndexableDSCBFormat1));
   zds->diag.detail_rc = ZDS_RTNCD_UNEXPECTED_ERROR;
   return RTNCD_FAILURE;
 }

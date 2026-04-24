@@ -119,6 +119,11 @@ MGCRE_MODEL(mgcre_model);
 #define MGCRE(id, message, cart, authcmdx, plist)
 #endif
 
+// MGCETXT	Command text - Table 2 "MGCRE mapping", structure "MGCETEXT" https://www.ibm.com/docs/en/zos/3.2.0?topic=rqe-mgcre-information
+#ifndef MGCRTEXT
+#define MGCRTEXT 126
+#endif
+
 // NOTE(Kelosky): this piece is permitted in AMODE64 - for consistency, it remains here
 int zcnm1put(ZCN *zcn, const char *command)
 {
@@ -131,16 +136,17 @@ int zcnm1put(ZCN *zcn, const char *command)
   MGCRE_MODEL(dsa_mgcre_model);
   dsa_mgcre_model = mgcre_model;
 
-  struct
+  struct MGCETEXT
   {
     short commandLen;
-    char command[256];
+    char command[MGCRTEXT];
   } commandBuffer = {0};
 
   unsigned short authcmdx = 0x8000; // 1000000000000000 - Master Authority - https://www.ibm.com/docs/en/zos/3.1.0?topic=commands-mgcre-execute-form
   unsigned short *authcmdxp = &authcmdx;
 
-  commandBuffer.commandLen = sprintf(commandBuffer.command, "%s", command);
+  /* Use precision specifier %.*s as snprintf is unavailable in Metal C */
+  commandBuffer.commandLen = sprintf(commandBuffer.command, "%.*s", (int)(sizeof(commandBuffer.command) - 1), command);
   char cart[8] = "ZOWECART";
 
   strcpy(zcn->diag.service_name, "MGCRE");
@@ -287,6 +293,11 @@ static void extract_control_info(unsigned int alet, unsigned char *offset, ZCN *
   char *FAR reply_id = __set_far_ALET_offset(0, zcn->reply_id);
 
   zcn->reply_id_len = mdbscp->mdbcrpyl;
+  if (zcn->reply_id_len > 8)
+  {
+    // Truncate reply ID length to 8 characters (max length of reply ID)
+    zcn->reply_id_len = 8;
+  }
   __far_memcpy(reply_id, mdbscp->mdbcrpyi, zcn->reply_id_len);
 }
 
@@ -297,6 +308,12 @@ static int extract_text(unsigned int alet, unsigned char *offset, int len, char 
 
   char b[256] = {0};
   char *FAR bp = __set_far_ALET_offset(0, b);
+
+  if (len > 256)
+  {
+    // Truncate text length to 256 characters (max length of text buffer)
+    len = 256;
+  }
 
   __far_memcpy(bp, text, len);
 
