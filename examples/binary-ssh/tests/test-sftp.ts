@@ -13,7 +13,7 @@ import { statSync, unlinkSync } from "node:fs";
 import { parse } from "node:path";
 import { promisify } from "node:util";
 import { NodeSSH, type Config as NodeSSHConfig } from "node-ssh";
-import { ZSshUtils } from "zowex-sdk/src";
+import { ZSshUtils } from "@zowe/zowex-for-zowe-sdk/src";
 import * as utils from "./utils";
 const userConfig = require("./config.json");
 const testPrefix = parse(__filename).name;

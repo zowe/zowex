@@ -132,7 +132,7 @@ int zutm1lpl(ZDIAG *diag, int *num_dsns, PARMLIB_DSNS *dsns)
 
   if (0 != rc)
   {
-    diag->e_msg_len = sprintf(diag->e_msg, "Error: could not list parmlibs rc: '%d' rsn: '%d'", rc, rsn);
+    ZDIAG_SET_MSG(diag, "Error: could not list parmlibs rc: '%d' rsn: '%d'", rc, rsn);
     return rc;
   }
 

@@ -24,7 +24,6 @@ ENTRY24  DS    0H
          OILH  R15,X'8000'         Set AMODE 31 bit for BASSM
          LA    R1,WORK              -> IO_CTRL "work" field
          BASSM 0,R15               Call ZAMDEXIT in AMODE 31
-         BR    R14                 Return to system
 *
 CONSTANT DS    0D
          LTORG ,

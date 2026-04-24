@@ -31,6 +31,10 @@ export interface CreateMemberRequest extends common.CommandRequest<"createMember
      * Dataset name
      */
     dsname: string;
+    /**
+     * Whether to overwrite existing member
+     */
+    overwrite?: boolean;
 }
 
 export type CreateMemberResponse = common.CommandResponse;
@@ -227,3 +231,15 @@ export interface WriteDatasetResponse extends common.CommandResponse {
      */
     truncationWarning?: string;
 }
+
+export interface CopyDatasetRequest extends common.CommandRequest {
+    source: string;
+
+    target: string;
+
+    replace?: boolean;
+
+    overwrite?: boolean;
+}
+
+export type CopyDatasetResponse = common.CommandResponse;

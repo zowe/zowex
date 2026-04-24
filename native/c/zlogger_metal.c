@@ -114,8 +114,15 @@ static void ZLGTIME(char *buffer, int buffer_size)
   /* Safety check - if conversion gives unreasonable result, use simple fallback */
   if (unix_seconds == 0 || unix_seconds > 4000000000ULL)
   { /* Year 2096+ is unreasonable */
-    /* Fallback to simple hex format */
-    sprintf(buffer, "STCK:%016llX", clock_value);
+    /* Fallback to simple hex format safely */
+    if (buffer_size >= 22)
+    {
+      sprintf(buffer, "STCK:%016llX", clock_value);
+    }
+    else if (buffer_size > 0)
+    {
+      buffer[0] = '\0';
+    }
     return;
   }
 
@@ -213,7 +220,7 @@ static int ZLGWRWTO(int level, const char *message)
                               ? g_level_strings[level]
                               : "UNKNOWN";
 
-  wto_buf.len = sprintf(wto_buf.msg, "ZOWEX %s: %.100s", level_str, message);
+  wto_buf.len = sprintf(wto_buf.msg, "ZOWEX %.6s: %.90s", level_str, message);
 
   if (wto_buf.len >= (short)sizeof(wto_buf.msg))
   {
@@ -309,7 +316,12 @@ int ZLGINIT(const char *log_file_path, int *min_level)
     return 0;
   }
 
-  strcpy(logger->log_path, log_file_path);
+  strncpy(logger->log_path, log_file_path, sizeof(logger->log_path) - 1);
+  logger->log_path[sizeof(logger->log_path) - 1] = '\0';
+  if (strlen(log_file_path) >= sizeof(logger->log_path))
+  {
+    return -1;
+  }
 
   logger->min_level = *min_level;
   logger->use_wto = 1;
@@ -330,7 +342,15 @@ int ZLGINIT(const char *log_file_path, int *min_level)
   BPXWDYN_PARM *bparm = (BPXWDYN_PARM *)p;
   BPXWDYN_RESPONSE *response = (BPXWDYN_RESPONSE *)(p + sizeof(BPXWDYN_PARM));
 
-  bparm->len = sprintf(bparm->str, "%s", alloc_cmd);
+  /* Use precision specifier %.*s as snprintf is unavailable in Metal C */
+  int cmd_result = sprintf(bparm->str, "%.*s", (int)(sizeof(bparm->str) - 1), alloc_cmd);
+  if (cmd_result >= sizeof(bparm->str))
+  {
+    storage_release(size, p);
+    return -1;
+  }
+  bparm->len = cmd_result;
+
   int rc = ZUTWDYN(bparm, response);
 
   if (rc != 0)
@@ -373,9 +393,13 @@ int ZLGWRITE(int *level, const char *message)
                   ? g_level_strings[*level]
                   : "UNKNOWN";
 
-  /* Format complete message */
-  sprintf(formatted_msg, "[%s] [%s] %s",
-          timestamp, level_str, message);
+  /* Format complete message safely using %.*s (max message 900 chars to fit in 1024) */
+  int format_result = sprintf(formatted_msg, "[%s] [%s] %.*s",
+                              timestamp, level_str, 900, message);
+  if (format_result >= sizeof(formatted_msg))
+  {
+    formatted_msg[sizeof(formatted_msg) - 1] = '\0';
+  }
 
   /* Try DD writing first if available */
   if (logger->use_dd)

@@ -22,7 +22,7 @@ import {
     imperative,
     type MainframeInteraction,
 } from "@zowe/zowe-explorer-api";
-import { B64String, type Dataset, type DatasetAttributes, type ds } from "zowex-sdk";
+import { B64String, type Dataset, type DatasetAttributes, type ds } from "@zowe/zowex-for-zowe-sdk";
 import { SshCommonApi } from "./SshCommonApi";
 
 class SshAttributesProvider implements IAttributesProvider {
@@ -300,6 +300,7 @@ export class SshMvsApi extends SshCommonApi implements MainframeInteraction.IMvs
         try {
             response = await (await this.client).ds.createMember({
                 dsname: dataSetName,
+                overwrite: true, // Overwrite detection already handled on client side
             });
             if (!response.success) {
                 Gui.errorMessage(`Failed to create data set member: ${dataSetName}`);
