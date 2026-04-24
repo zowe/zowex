@@ -311,7 +311,7 @@ class Value
   // Forward declare friend functions and classes
   friend std::string value_to_json_string(const Value &value);
   friend Value parse_json_string(const std::string &json_str);
-  friend Value json_handle_to_value(JSON_INSTANCE *instance, KEY_HANDLE *key_handle);
+  friend Value json_handle_to_value(JSON_INSTANCE *instance, KEY_HANDLE *key_handle, int depth);
 
   // Friend template specializations for vector serialization
   template <typename T>
@@ -1439,10 +1439,20 @@ inline std::string unescape_json_string(const std::string &s)
   return res;
 }
 
-inline Value json_handle_to_value(JSON_INSTANCE *instance, KEY_HANDLE *key_handle)
+// Maximum allowed JSON nesting depth to prevent stack overflow
+static constexpr int MAX_JSON_DEPTH = 64;
+
+inline Value json_handle_to_value(JSON_INSTANCE *instance, KEY_HANDLE *key_handle, int depth = 0)
 {
   try
   {
+    // Check depth limit to prevent unbounded recursion
+    if (depth >= MAX_JSON_DEPTH)
+    {
+      ZLOG_WARN("JSON parsing depth limit reached: %d", depth);
+      return Value();
+    }
+
     int type = 0;
     int rc = ZJSNGJST(instance, key_handle, &type);
     if (rc != 0)
@@ -1537,7 +1547,7 @@ inline Value json_handle_to_value(JSON_INSTANCE *instance, KEY_HANDLE *key_handl
         {
           try
           {
-            Value element = json_handle_to_value(instance, &element_handle);
+            Value element = json_handle_to_value(instance, &element_handle, depth + 1);
             result.add_to_array(element);
           }
           catch (...)
@@ -1576,7 +1586,7 @@ inline Value json_handle_to_value(JSON_INSTANCE *instance, KEY_HANDLE *key_handl
           try
           {
             std::string key_name(key_buffer_ptr, actual_length);
-            Value value = json_handle_to_value(instance, &value_handle);
+            Value value = json_handle_to_value(instance, &value_handle, depth + 1);
             result.add_to_object(key_name, value);
           }
           catch (...)
@@ -1599,7 +1609,7 @@ inline Value json_handle_to_value(JSON_INSTANCE *instance, KEY_HANDLE *key_handl
             try
             {
               std::string key_name(key_buffer_ptr, actual_length);
-              Value value = json_handle_to_value(instance, &value_handle);
+              Value value = json_handle_to_value(instance, &value_handle, depth + 1);
               result.add_to_object(key_name, value);
             }
             catch (...)
