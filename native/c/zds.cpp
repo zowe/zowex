@@ -3451,7 +3451,6 @@ int zds_list_data_sets(ZDS *zds, std::string dsn, std::vector<ZDSEntry> &dataset
           PATH != f->type &&
           ALTERNATE_INDEX != f->type)
       {
-        std::cout << "@TEST address of failed entry is " << (void *)f << std::endl;
         free(area);
         ZDSDEL(zds);
         zds->diag.detail_rc = ZDS_RTNCD_SERVICE_FAILURE;
