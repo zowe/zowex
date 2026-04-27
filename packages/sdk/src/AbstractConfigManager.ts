@@ -151,7 +151,7 @@ export abstract class AbstractConfigManager {
                 return { ...foundProfile, profile: { ...foundProfile.profile, ...validConfig } };
             }
         }
-        
+
         const useProject = priotizeProjectLevelConfig && this.getCurrentDir() !== undefined;
         await this.createZoweSchema(!useProject);
 
