@@ -8,7 +8,6 @@
  * Copyright Contributors to the Zowe Project.
  *
  */
-
 #include <sstream>
 #include <string>
 #include <cstring>
