@@ -4,6 +4,10 @@ All notable changes to the Client code for "@zowe/zowex-for-zowe-sdk" are docume
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## Recent Changes
+
+- Updated the `russh` dependency for technical currency. [#963](https://github.com/zowe/zowex/pull/963)
+
 ## `0.5.0`
 
 - Added support for copying data sets and members files in the `RpcClientApi` class. [#932](https://github.com/zowe/zowex/issues/932)
