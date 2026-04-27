@@ -11,8 +11,8 @@
 
 import * as fs from "node:fs";
 import type { IHandlerParameters } from "@zowe/imperative";
-import type { ZSshClient } from "zowex-sdk";
-import type { ds } from "zowex-sdk/src/doc";
+import type { ZSshClient } from "@zowe/zowex-for-zowe-sdk";
+import type { ds } from "@zowe/zowex-for-zowe-sdk/src/doc";
 import { SshBaseHandler } from "../../SshBaseHandler";
 
 export default class UploadFileToDataSetHandler extends SshBaseHandler {
