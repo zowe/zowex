@@ -128,7 +128,8 @@ int handle_tool_search(InvocationContext &context)
 
   // Write control statements
   ZDS zds{};
-  zds_write_to_dd(&zds, "sysin", data);
+  ZDSWriteOpts write_opts{.zds = &zds, .ddname = "sysin"};
+  zds_write(write_opts, data);
   if (0 != rc)
   {
     context.error_stream() << "Error: could not write to dd: '" << "sysin" << "' rc: '" << rc << "'" << std::endl;
@@ -197,7 +198,8 @@ int handle_tool_amblist(InvocationContext &context)
 
   // Write control statements
   ZDS zds{};
-  zds_write_to_dd(&zds, "sysin", statements);
+  ZDSWriteOpts write_opts{.zds = &zds, .ddname = "sysin"};
+  zds_write(write_opts, statements);
   if (0 != rc)
   {
     context.error_stream() << "Error: could not write to dd: '" << "sysin" << "' rc: '" << rc << "'" << std::endl;

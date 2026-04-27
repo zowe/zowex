@@ -9,6 +9,7 @@
  *
  */
 
+#include <cstdio>
 #ifndef _OPEN_SYS_FILE_EXT
 #define _OPEN_SYS_FILE_EXT 1
 #endif
@@ -44,11 +45,12 @@ int process_data_set_create_result(InvocationContext &context, ZDS *zds, int rc,
   {
     std::string member_name = dsn.substr(start + 1, end - start - 1);
     std::string data = "";
-    rc = zds_write_to_dsn(zds, dsn, data);
+    ZDSWriteOpts write_opts{.zds = zds, .dsname = dsn};
+    rc = zds_write(write_opts, data);
     if (0 != rc)
     {
-      context.output_stream() << "Error: could not write to data set: '" << dsn << "' rc: '" << rc << "'" << std::endl;
-      context.output_stream() << "  Details: " << zds->diag.e_msg << std::endl;
+      context.error_stream() << "Error: could not write to data set: '" << dsn << "' rc: '" << rc << "'" << std::endl;
+      context.error_stream() << "  Details: " << zds->diag.e_msg << std::endl;
       return RTNCD_FAILURE;
     }
     context.output_stream() << "Data set and/or member created: '" << dsn << "'" << std::endl;
@@ -304,25 +306,32 @@ int handle_data_set_create_member(InvocationContext &context)
     rc = zds_list_data_sets(&zds, dataset_name, entries);
     if (RTNCD_WARNING < rc || entries.size() == 0)
     {
-      context.output_stream() << "Error: could not create data set member: '" << dataset_name << "' rc: '" << rc << "'" << std::endl;
-      context.output_stream() << "  Details:\n"
-                              << zds.diag.e_msg << std::endl;
+      context.error_stream() << "Error: could not create data set member: '" << dataset_name << "' rc: '" << rc << "'" << std::endl;
+      context.error_stream() << "  Details: " << zds.diag.e_msg << std::endl;
       return RTNCD_FAILURE;
     }
 
+    bool overwrite = context.get<bool>("overwrite", false);
+    if (!overwrite && zds_member_exists(dataset_name, member_name))
+    {
+      context.error_stream() << "Warning: Data set member already exists: '" << dsn << "'" << std::endl;
+      return RTNCD_WARNING;
+    }
+
     std::string data = "";
-    rc = zds_write_to_dsn(&zds, dsn, data);
+    ZDSWriteOpts write_opts{.zds = &zds, .dsname = dsn};
+    rc = zds_write(write_opts, data);
     if (0 != rc)
     {
-      context.output_stream() << "Error: could not write to data set: '" << dsn << "' rc: '" << rc << "'" << std::endl;
-      context.output_stream() << "  Details: " << zds.diag.e_msg << std::endl;
+      context.error_stream() << "Error: could not write to data set: '" << dsn << "' rc: '" << rc << "'" << std::endl;
+      context.error_stream() << "  Details: " << zds.diag.e_msg << std::endl;
       return RTNCD_FAILURE;
     }
     context.output_stream() << "Data set and/or member created: '" << dsn << "'" << std::endl;
   }
   else
   {
-    context.output_stream() << "Error: could not find member name in dsn: '" << dsn << "'" << std::endl;
+    context.error_stream() << "Error: could not find member name in dsn: '" << dsn << "'" << std::endl;
     return RTNCD_FAILURE;
   }
 
@@ -728,13 +737,15 @@ int handle_data_set_write(InvocationContext &context)
 
   if (has_pipe_path && !pipe_path.empty())
   {
-    rc = zds_write_to_dsn_streamed(&zds, dsn, pipe_path, &content_len);
+    ZDSWriteOpts write_opts{.zds = &zds, .dsname = dsn};
+    rc = zds_write_streamed(write_opts, pipe_path, &content_len);
     result->set("contentLen", i64(content_len));
   }
   else
   {
     std::string data = zut_read_input(context.input_stream());
-    rc = zds_write_to_dsn(&zds, dsn, data);
+    ZDSWriteOpts write_opts{.zds = &zds, .dsname = dsn};
+    rc = zds_write(write_opts, data);
   }
 
   if (dds.size() > 0)
@@ -913,7 +924,9 @@ int handle_data_set_compress(InvocationContext &context)
 
   // write control statements
   ZDS zds{};
-  rc = zds_write_to_dd(&zds, "sysin", "        COPY OUTDD=B,INDD=A");
+  ZDSWriteOpts write_opts{.zds = &zds, .ddname = "sysin"};
+  std::string copy_stmt = "        COPY OUTDD=B,INDD=A";
+  rc = zds_write(write_opts, copy_stmt);
   if (0 != rc)
   {
     context.error_stream() << "Error: could not write to dd: '" << "sysin" << "' rc: '" << rc << "'" << std::endl;
@@ -964,8 +977,9 @@ int handle_data_set_copy(InvocationContext &context)
 
   ZDS zds{};
   ZDSCopyOptions options;
+  options.overwrite = context.get<bool>("overwrite", false);
   options.replace = context.get<bool>("replace", false);
-  options.delete_target_members = context.get<bool>("delete-target-members", false);
+  const auto result = obj();
 
   int rc = zds_copy_dsn(&zds, source, target, &options);
 
@@ -979,26 +993,32 @@ int handle_data_set_copy(InvocationContext &context)
     return RTNCD_FAILURE;
   }
 
-  if (options.target_created)
+  if (!options.target_exists && !options.member_created)
   {
+    result->set("targetCreated", boolean(true));
     context.output_stream() << "New data set '" << target << "' created and copied from '" << source << "'" << std::endl;
   }
   else if (options.member_created)
   {
+    result->set("memberCreated", boolean(true));
     context.output_stream() << "New member '" << target << "' created and copied from '" << source << "'" << std::endl;
   }
-  else if (options.delete_target_members)
+  else if (options.overwrite)
   {
-    context.output_stream() << "Target members deleted and data set '" << target << "' replaced with contents of '" << source << "'" << std::endl;
+    result->set("overwrite", boolean(true));
+    context.output_stream() << "Target data set '" << target << "' was overwritten with the attributes and contents of '" << source << "'" << std::endl;
   }
   else if (options.replace)
   {
+    result->set("replace", boolean(true));
     context.output_stream() << "Data set '" << target << "' has been updated with contents of '" << source << "'" << std::endl;
   }
   else
   {
     context.output_stream() << "Data set '" << source << "' copied to '" << target << "'" << std::endl;
   }
+
+  context.set_object(result);
   return RTNCD_SUCCESS;
 }
 
@@ -1066,6 +1086,7 @@ void register_commands(parser::Command &root_command)
   auto ds_create_member_cmd = command_ptr(new Command("create-member", "create member in data set"));
   ds_create_member_cmd->add_alias("cre-m");
   ds_create_member_cmd->add_positional_arg("dsn", "data set name with member specified", ArgType_Single, true);
+  ds_create_member_cmd->add_keyword_arg("overwrite", make_aliases("--ow"), "overwrite existing member", ArgType_Flag, false, ArgValue(false));
   ds_create_member_cmd->set_handler(handle_data_set_create_member);
   data_set_cmd->add_command(ds_create_member_cmd);
 
@@ -1163,11 +1184,11 @@ void register_commands(parser::Command &root_command)
   auto ds_copy_cmd = command_ptr(new Command("copy", "copy data set (RECFM=U not supported)"));
   ds_copy_cmd->add_positional_arg("source", "source data set to copy from", ArgType_Single, true);
   ds_copy_cmd->add_positional_arg("target", "target data set to copy to", ArgType_Single, true);
-  ds_copy_cmd->add_keyword_arg("replace", make_aliases("--replace", "-r"),
-                               "replace matching members in target PDS with source members (keeps non-matching target members)",
+  ds_copy_cmd->add_keyword_arg("overwrite", make_aliases("--ow"),
+                               "Replace the entire target partitioned data set with the source data set. All members including like named members will be overwritten",
                                ArgType_Flag, false, ArgValue(false));
-  ds_copy_cmd->add_keyword_arg("delete-target-members", make_aliases("--delete-target-members", "-d"),
-                               "delete all members from target PDS before copying (PDS-to-PDS copy only, makes target match source exactly)",
+  ds_copy_cmd->add_keyword_arg("replace", make_aliases("-r"),
+                               "Replaces target sequential/member content with source content or replaces matching members in a partitioned data set with source members (keeps non-matching target members)",
                                ArgType_Flag, false, ArgValue(false));
   ds_copy_cmd->set_handler(handle_data_set_copy);
   data_set_cmd->add_command(ds_copy_cmd);

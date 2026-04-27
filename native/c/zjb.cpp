@@ -8,7 +8,6 @@
  * Copyright Contributors to the Zowe Project.
  *
  */
-
 #include <sstream>
 #include <string>
 #include <cstring>
@@ -79,7 +78,7 @@ int zjb_get_job_dsn_by_key(ZJB *zjb, const std::string &jobid, int key, std::str
 
   if (0 != rc)
   {
-    zjb->diag.e_msg_len = sprintf(zjb->diag.e_msg, "Could not locate data set key '%d' on job '%s'", key, jobid.c_str());
+    ZDIAG_SET_MSG(&zjb->diag, "Could not locate data set key '%d' on job '%s'", key, jobid.c_str());
     zjb->diag.detail_rc = ZJB_RTNCD_JOB_DSN_KEY_NOT_FOUND;
     return RTNCD_WARNING;
   }
@@ -114,7 +113,7 @@ int zjb_read_job_jcl(ZJB *zjb, const std::string &jobid, std::string &response)
 
   if (args.size() < MIN_SIZE)
   {
-    zjb->diag.e_msg_len = sprintf(zjb->diag.e_msg, "Unexpected data set name '%s' for jobid %s", list[0].dsn.c_str(), jobid.c_str());
+    ZDIAG_SET_MSG(&zjb->diag, "Unexpected data set name '%s' for jobid %s", list[0].dsn.c_str(), jobid.c_str());
     zjb->diag.detail_rc = ZJB_RTNCD_UNEXPECTED_ERROR;
     return RTNCD_FAILURE;
   }
@@ -137,7 +136,7 @@ static int zjb_read_job_dynamic_allocation(ZJB *zjb, std::string jobdsn, std::st
   unsigned char *parms = (unsigned char *)__malloc31(total_size_needed);
   if (parms == nullptr)
   {
-    zjb->diag.e_msg_len = sprintf(zjb->diag.e_msg, "Failed to allocate 31-bit memory for job parms when reading %s", jobdsn.c_str());
+    ZDIAG_SET_MSG(&zjb->diag, "Failed to allocate 31-bit memory for job parms when reading %s", jobdsn.c_str());
     return RTNCD_FAILURE;
   }
   memset(parms, 0x00, total_size_needed);
@@ -241,6 +240,14 @@ static int zjb_read_job_dynamic_allocation(ZJB *zjb, std::string jobdsn, std::st
   s99parms->__S99VERB = s99vrbal; // allocation
   s99parms->__S99FLAG1 = 0x4000;  // s99nocnv;
   s99parms->__S99TXTPP = s99tupl;
+
+  // NOTE(Kelosky): `ibm-clang` appears to optimize the previous assignments, so this approach is to
+  // force the compiler to not optimize the assignments.
+  unsigned char size = sizeof(__S99parms);
+  unsigned char verb = s99vrbal;
+  memcpy(&s99parms->__S99RBLN, &size, sizeof(size));
+  memcpy(&s99parms->__S99VERB, &verb, sizeof(verb));
+
   // s99parms->__S99S99X = s99parmsx; // TODO(Kelosky): reenable when we look at s99parmsx->__S99ENMSG and free
 
   // https://www.ibm.com/docs/en/zos/3.1.0?topic=list-coding-dynamic-allocation-request
@@ -252,7 +259,7 @@ static int zjb_read_job_dynamic_allocation(ZJB *zjb, std::string jobdsn, std::st
   {
     strcpy(zjb->diag.service_name, "svc99");
     zjb->diag.service_rc = rc;
-    zjb->diag.e_msg_len = sprintf(zjb->diag.e_msg, "Could not allocate job spool file '%s', rc: '%d' s99error: '%d' s99info: '%d'", jobdsn.c_str(), rc, s99parms->__S99ERROR, s99parms->__S99INFO);
+    ZDIAG_SET_MSG(&zjb->diag, "Could not allocate job spool file '%s', rc: '%d' s99error: '%d' s99info: '%d'", jobdsn.c_str(), rc, s99parms->__S99ERROR, s99parms->__S99INFO);
     zjb->diag.detail_rc = ZJB_RTNCD_SERVICE_FAILURE;
     free(parms);
     return RTNCD_FAILURE;
@@ -284,7 +291,7 @@ static int zjb_free_job_dynamic_allocation(ZJB *zjb, std::string ddname)
   {
     strcpy(zjb->diag.service_name, "dynfree");
     zjb->diag.service_rc = rc;
-    zjb->diag.e_msg_len = sprintf(zjb->diag.e_msg, "dynfree failed with %d", rc);
+    ZDIAG_SET_MSG(&zjb->diag, "dynfree failed with %d", rc);
     zjb->diag.detail_rc = ZJB_RTNCD_SERVICE_FAILURE;
     return RTNCD_FAILURE;
   }
@@ -473,7 +480,7 @@ int zjb_submit(ZJB *zjb, const std::string &contents, std::string &jobid)
   {
     strcpy(zjb->diag.service_name, "dyninit");
     zjb->diag.service_rc = rc;
-    zjb->diag.e_msg_len = sprintf(zjb->diag.e_msg, "dyninit failed with %d", rc);
+    ZDIAG_SET_MSG(&zjb->diag, "dyninit failed with %d", rc);
     zjb->diag.detail_rc = ZJB_RTNCD_SERVICE_FAILURE;
     return RTNCD_FAILURE;
   }
@@ -493,12 +500,13 @@ int zjb_submit(ZJB *zjb, const std::string &contents, std::string &jobid)
   {
     strcpy(zjb->diag.service_name, "dynalloc");
     zjb->diag.service_rc = rc;
-    zjb->diag.e_msg_len = sprintf(zjb->diag.e_msg, "dynalloc failed with %d", rc);
+    ZDIAG_SET_MSG(&zjb->diag, "dynalloc failed with %d", rc);
     zjb->diag.detail_rc = ZJB_RTNCD_SERVICE_FAILURE;
     return RTNCD_FAILURE;
   }
 
-  rc = zds_write_to_dd(&zds, ddname, contents);
+  ZDSWriteOpts write_opts{.zds = &zds, .ddname = ddname};
+  rc = zds_write(write_opts, contents);
   if (0 != rc)
   {
     memcpy(&zjb->diag, &zds.diag, sizeof(ZDIAG));
@@ -508,7 +516,8 @@ int zjb_submit(ZJB *zjb, const std::string &contents, std::string &jobid)
 
   char cjobid[8 + 1] = {0};
   // https://www.ibm.com/docs/en/zos/3.1.0?topic=iazsymbl-jes-system-symbols
-  rc = ZJBSYMB(zjb, "SYS_LASTJOBID", cjobid);
+  int jobid_size = sizeof(cjobid);
+  rc = ZJBSYMB(zjb, "SYS_LASTJOBID", cjobid, &jobid_size);
 
   if (0 != rc)
   {
@@ -529,7 +538,7 @@ int zjb_submit(ZJB *zjb, const std::string &contents, std::string &jobid)
     if (jobid == "" || jobid == "        ")
     {
       strcpy(zjb->diag.service_name, "intrdr");
-      zjb->diag.e_msg_len = sprintf(zjb->diag.e_msg, "job submission failed");
+      ZDIAG_SET_MSG(&zjb->diag, "job submission failed");
       zjb->diag.detail_rc = ZJB_RTNCD_SUBMIT_ERROR;
       return RTNCD_FAILURE;
     }
@@ -539,7 +548,8 @@ int zjb_submit(ZJB *zjb, const std::string &contents, std::string &jobid)
   memcpy(zjb->jobid, jobid.c_str(), sizeof(zjb->jobid));
 
   char ccorrelator[64 + 1] = {0};
-  rc = ZJBSYMB(zjb, "SYS_CORR_LASTJOB", ccorrelator);
+  int correlator_size = sizeof(ccorrelator);
+  rc = ZJBSYMB(zjb, "SYS_CORR_LASTJOB", ccorrelator, &correlator_size);
 
   if (0 != rc)
   {
@@ -559,7 +569,7 @@ int zjb_submit(ZJB *zjb, const std::string &contents, std::string &jobid)
     {
       strcpy(zjb->diag.service_name, "dynfree");
       zjb->diag.service_rc = rc;
-      zjb->diag.e_msg_len = sprintf(zjb->diag.e_msg, "dynfree failed with %d", rc);
+      ZDIAG_SET_MSG(&zjb->diag, "dynfree failed with %d", rc);
       zjb->diag.detail_rc = ZJB_RTNCD_SERVICE_FAILURE;
       return RTNCD_FAILURE;
     }
@@ -624,7 +634,7 @@ int zjb_list_dds(ZJB *zjb, const std::string &jobid, std::vector<ZJobDD> &jobDDs
     }
 
     ZUTMFR64(sysoutInfo);
-    zjb->diag.e_msg_len = sprintf(zjb->diag.e_msg, "no output DDs found for '%s'", jobid.c_str());
+    ZDIAG_SET_MSG(&zjb->diag, "no output DDs found for '%s'", jobid.c_str());
     zjb->diag.detail_rc = ZJB_RTNCD_VERBOSE_INFO_NOT_FOUND;
     return RTNCD_WARNING;
   }
@@ -679,7 +689,7 @@ int zjb_view(ZJB *zjb, const std::string &jobid, ZJob &job)
 
   if (0 == entries)
   {
-    zjb->diag.e_msg_len = sprintf(zjb->diag.e_msg, "Could not locate job with id '%s'", jobid.c_str());
+    ZDIAG_SET_MSG(&zjb->diag, "Could not locate job with id '%s'", jobid.c_str());
     zjb->diag.detail_rc = ZJB_RTNCD_JOB_NOT_FOUND;
     return RTNCD_FAILURE;
   }

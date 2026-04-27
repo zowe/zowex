@@ -269,7 +269,8 @@ void write_to_dsn(const std::string &dsn, const std::string &content)
 {
   ZDS zds{};
   std::string data = content;
-  zds_write_to_dsn(&zds, dsn, data);
+  ZDSWriteOpts write_opts{.zds = &zds, .dsname = dsn};
+  zds_write(write_opts, data);
 }
 
 TestFileGuard::TestFileGuard(const char *_filename, const char &mode, const char *_link)

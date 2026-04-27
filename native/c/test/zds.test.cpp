@@ -13,6 +13,7 @@
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
+#include "../zbase64.h"
 #include <vector>
 #include <thread>
 #include <chrono>
@@ -76,108 +77,73 @@ struct ListMembersTestContext : DataSetTestContextBase
   }
 };
 
-// Test context for copy operations
-struct CopyTestContext : DataSetTestContextBase
+// Test context for DD allocation and management
+struct DDTestContext : DataSetTestContextBase
 {
-  std::string source_dsn;
-  std::string target_dsn;
+  std::vector<std::string> allocated_dds;
 
-  explicit CopyTestContext(std::vector<std::string> &list)
+  explicit DDTestContext(std::vector<std::string> &list)
       : DataSetTestContextBase(list)
   {
-    source_dsn = get_random_ds(3);
-    target_dsn = get_random_ds(3);
-    cleanup_list.push_back(source_dsn);
-    cleanup_list.push_back(target_dsn);
   }
 
-  void create_source_pds()
+  void allocate_fb_dd(const std::string &ddname, int lrecl, int blksize = 0)
   {
-    create_pds_at(source_dsn);
-  }
-  void create_source_pdse()
-  {
-    create_pdse_at(source_dsn);
-  }
-  void create_source_seq()
-  {
-    create_seq_at(source_dsn);
-  }
-  void create_target_pds()
-  {
-    create_pds_at(target_dsn);
-  }
-  void create_target_seq()
-  {
-    create_seq_at(target_dsn);
-  }
+    if (blksize == 0)
+      blksize = lrecl;
+    std::string alloc_cmd = "alloc dd(" + ddname + ") lrecl(" + std::to_string(lrecl) +
+                            ") recfm(f,b) blksize(" + std::to_string(blksize) + ")";
 
-  void write_source_member(const std::string &member, const std::string &data)
-  {
-    write_to_dsn(source_dsn + "(" + member + ")", data);
-  }
+    std::vector<std::string> single_dd;
+    single_dd.push_back(alloc_cmd);
+    allocated_dds.push_back(alloc_cmd);
 
-  void write_source(const std::string &data)
-  {
-    write_to_dsn(source_dsn, data);
-  }
-
-  void write_target_member(const std::string &member, const std::string &data)
-  {
-    write_to_dsn(target_dsn + "(" + member + ")", data);
-  }
-
-  void write_target(const std::string &data)
-  {
-    write_to_dsn(target_dsn, data);
-  }
-
-  int copy(bool replace = false, bool delete_target_members = false)
-  {
-    ZDS zds = {0};
-    ZDSCopyOptions options;
-    options.replace = replace;
-    options.delete_target_members = delete_target_members;
-    return zds_copy_dsn(&zds, source_dsn, target_dsn, &options);
-  }
-
-  int copy_member(const std::string &src_mem, const std::string &tgt_mem, bool replace = false, bool delete_target_members = false)
-  {
-    ZDS zds = {0};
-    ZDSCopyOptions options;
-    options.replace = replace;
-    options.delete_target_members = delete_target_members;
-    return zds_copy_dsn(&zds, source_dsn + "(" + src_mem + ")", target_dsn + "(" + tgt_mem + ")", &options);
-  }
-
-  bool target_has_member(const std::string &member)
-  {
-    std::vector<ZDSMem> members;
-    ZDS zds = {0};
-    zds_list_members(&zds, target_dsn, members);
-    for (const auto &mem : members)
+    ZDIAG diag{};
+    int rc = zut_loop_dynalloc(diag, single_dd);
+    if (rc != 0)
     {
-      std::string name = mem.name;
-      zut_trim(name);
-      if (name == member)
-        return true;
+      throw std::runtime_error("Failed to allocate DD " + ddname + ": " + std::string(diag.e_msg));
     }
-    return false;
   }
 
-  bool source_has_member(const std::string &member)
+  void allocate_vb_dd(const std::string &ddname, int lrecl)
   {
-    std::vector<ZDSMem> members;
-    ZDS zds = {0};
-    zds_list_members(&zds, source_dsn, members);
-    for (const auto &mem : members)
+    std::string alloc_cmd = "alloc dd(" + ddname + ") lrecl(" + std::to_string(lrecl) +
+                            ") recfm(v,b) blksize(" + std::to_string(lrecl + 4) + ")";
+
+    std::vector<std::string> single_dd;
+    single_dd.push_back(alloc_cmd);
+    allocated_dds.push_back(alloc_cmd);
+
+    ZDIAG diag{};
+    int rc = zut_loop_dynalloc(diag, single_dd);
+    if (rc != 0)
     {
-      std::string name = mem.name;
-      zut_trim(name);
-      if (name == member)
-        return true;
+      throw std::runtime_error("Failed to allocate VB DD " + ddname + ": " + std::string(diag.e_msg));
     }
-    return false;
+  }
+
+  void allocate_sysprint_dd()
+  {
+    allocate_fb_dd("SYSPRINT", 80);
+  }
+
+  bool verify_dd_content(const std::string &ddname, const std::string &expected)
+  {
+    ZDS read_zds{};
+    ZDSReadOpts read_opts{.zds = &read_zds, .ddname = ddname};
+    std::string content;
+    int rc = zds_read(read_opts, content);
+    return (rc == 0) && (content.find(expected) != std::string::npos);
+  }
+
+  ~DDTestContext()
+  {
+    if (!allocated_dds.empty())
+    {
+      ZDIAG diag{};
+      zut_free_dynalloc_dds(diag, allocated_dds);
+    }
   }
 };
 
@@ -624,387 +590,206 @@ void zds_tests()
                              }
                            });
                       });
-             describe("copy",
+
+             describe("copy datasets",
                       [&]() -> void
                       {
-                        it("should copy PDS to PDS",
+                        DS_ATTRIBUTES pds_attr{};
+                        pds_attr.dsorg = "PO";
+                        pds_attr.recfm = "FB";
+                        pds_attr.lrecl = 80;
+                        pds_attr.blksize = 6160;
+                        pds_attr.alcunit = "TRACKS";
+                        pds_attr.primary = 5;
+                        pds_attr.secondary = 5;
+                        pds_attr.dirblk = 10;
+
+                        DS_ATTRIBUTES ps_attr{};
+
+                        ps_attr.dsorg = "PS";
+                        ps_attr.recfm = "FB";
+                        ps_attr.lrecl = 80;
+                        ps_attr.blksize = 0;
+                        ps_attr.alcunit = "TRACKS";
+                        ps_attr.primary = 1;
+                        ps_attr.secondary = 1;
+                        ps_attr.dirblk = 0;
+
+                        std::string response;
+
+                        it("should copy sequential to sequential (creates target)",
                            [&]() -> void
                            {
-                             CopyTestContext tc(created_dsns);
-                             tc.create_source_pds();
-                             tc.write_source_member("MEMBER", "Test data");
-                             Expect(tc.copy()).ToBe(0);
+                             ZDS zds = {};
+                             ZDSCopyOptions opts{};
+                             std::string src = get_random_ds(3);
+                             std::string tgt = get_random_ds(3);
+                             created_dsns.push_back(src);
+                             created_dsns.push_back(tgt);
+
+                             Expect(zds_create_dsn(&zds, src, ps_attr, response)).ToBe(0);
+
+                             std::string data = "test data";
+                             ZDSWriteOpts wopts{&zds, .dsname = src};
+                             Expect(zds_write(wopts, data)).ToBe(0);
+
+                             int rc = zds_copy_dsn(&zds, src, tgt, &opts);
+                             ExpectWithContext(rc, zds.diag.e_msg).ToBe(0);
                            });
 
-                        it("should copy PDSE to nonexisting PDS (creates target)",
+                        it("should copy PDS to PDS with replace flag",
                            [&]() -> void
                            {
-                             CopyTestContext tc(created_dsns);
-                             tc.create_source_pdse();
-                             tc.write_source_member("MEMBER", "Test data");
-                             Expect(tc.copy()).ToBe(0);
-                           });
+                             ZDS zds = {};
+                             ZDSCopyOptions opts{};
+                             std::string src = get_random_ds(3);
+                             std::string tgt = get_random_ds(3);
+                             created_dsns.push_back(src);
+                             created_dsns.push_back(tgt);
 
-                        it("should fail to copy PDS member to sequential data set",
-                           [&]() -> void
-                           {
-                             CopyTestContext tc(created_dsns);
-                             tc.create_source_pds();
-                             tc.write_source_member("MEMBER", "Member content");
+                             zds_create_dsn(&zds, src, pds_attr, response);
 
-                             ZDS zds = {0};
-                             int rc = zds_copy_dsn(&zds, tc.source_dsn + "(MEMBER)", tc.target_dsn, nullptr);
-                             Expect(rc).Not().ToBe(0);
-                             Expect(std::string(zds.diag.e_msg)).ToContain("must specify a member name");
-                           });
+                             std::string d1 = "DATA1", d2 = "DATA2", data = "OLD DATA";
 
-                        it("should copy sequential data set to sequential data set",
-                           [&]() -> void
-                           {
-                             CopyTestContext tc(created_dsns);
-                             tc.create_source_seq();
-                             tc.write_source("Sequential data");
-                             Expect(tc.copy()).ToBe(0);
+                             zds_write(ZDSWriteOpts{&zds, .dsname = src + "(M1)"}, d1);
+                             zds_write(ZDSWriteOpts{&zds, .dsname = src + "(M2)"}, d2);
+
+                             zds_create_dsn(&zds, tgt, pds_attr, response);
+                             zds_write(ZDSWriteOpts{&zds, .dsname = tgt + "(tgt)"}, data);
+
+                             opts.replace = true;
+                             int rc = zds_copy_dsn(&zds, src, tgt, &opts);
+                             ExpectWithContext(rc, zds.diag.e_msg).ToBe(0);
                            });
 
                         it("should copy member to member",
                            [&]() -> void
                            {
-                             CopyTestContext tc(created_dsns);
-                             tc.create_source_pds();
-                             tc.create_target_pds();
-                             tc.write_source_member("SRCMEM", "Source member data");
-                             Expect(tc.copy_member("SRCMEM", "TGTMEM")).ToBe(0);
-                           });
+                             ZDS zds = {};
+                             ZDSCopyOptions opts{};
+                             std::string src_pds = get_random_ds(3);
+                             std::string tgt_pds = get_random_ds(3);
+                             created_dsns.push_back(src_pds);
+                             created_dsns.push_back(tgt_pds);
 
-                        it("should fail to copy sequential data set to PDS member",
-                           [&]() -> void
-                           {
-                             CopyTestContext tc(created_dsns);
-                             tc.create_source_seq();
-                             tc.write_source("Sequential data");
+                             zds_create_dsn(&zds, src_pds, pds_attr, response);
+                             zds_create_dsn(&zds, tgt_pds, pds_attr, response);
 
-                             ZDS zds = {0};
-                             int rc = zds_copy_dsn(&zds, tc.source_dsn, tc.target_dsn + "(MEMBER)", nullptr);
-                             Expect(rc).Not().ToBe(0);
-                             Expect(std::string(zds.diag.e_msg)).ToContain("must be a sequential data set");
-                           });
-
-                        it("should fail to copy PDS to existing sequential data set",
-                           [&]() -> void
-                           {
-                             CopyTestContext tc(created_dsns);
-                             tc.create_source_pds();
-                             tc.create_target_seq();
-                             tc.write_source_member("MEMBER", "PDS member content");
-                             tc.write_target("Sequential content");
-
-                             ZDS zds = {0};
-                             int rc = zds_copy_dsn(&zds, tc.source_dsn, tc.target_dsn, nullptr);
-                             Expect(rc).Not().ToBe(0);
-                             Expect(std::string(zds.diag.e_msg)).ToContain("must be a PDS");
-                           });
-
-                        it("should copy PDS with multiple members",
-                           [&]() -> void
-                           {
-                             CopyTestContext tc(created_dsns);
-                             tc.create_source_pds();
-                             for (int i = 1; i <= 3; i++)
-                             {
-                               tc.write_source_member("MEM" + std::to_string(i), "Data " + std::to_string(i));
-                             }
-                             Expect(tc.copy()).ToBe(0);
-                           });
-
-                        it("should fail when copying from nonexistent source",
-                           [&]() -> void
-                           {
-                             ZDS zds = {0};
-                             std::string source_dsn = "NONEXISTENT.DATASET.NAME";
-                             std::string target_dsn = get_random_ds(3);
-                             created_dsns.push_back(target_dsn);
-                             int rc = zds_copy_dsn(&zds, source_dsn, target_dsn, nullptr);
-                             Expect(rc).Not().ToBe(0);
-                             Expect(std::string(zds.diag.e_msg)).ToContain("not found");
-                           });
-
-                        it("should preserve data set attributes when copying",
-                           [&]() -> void
-                           {
-                             CopyTestContext tc(created_dsns);
-                             tc.create_source_seq();
-                             tc.write_source("Test data");
-                             Expect(tc.copy()).ToBe(0);
-
-                             std::vector<ZDSEntry> source_entries;
-                             std::vector<ZDSEntry> target_entries;
-                             ZDS zds_list = {0};
-                             zds_list_data_sets(&zds_list, tc.source_dsn, source_entries, true);
-                             zds_list_data_sets(&zds_list, tc.target_dsn, target_entries, true);
-                             Expect(source_entries.empty()).ToBe(false);
-                             Expect(target_entries.empty()).ToBe(false);
-
-                             const ZDSEntry &src = source_entries[0];
-                             const ZDSEntry &tgt = target_entries[0];
-                             Expect(tgt.recfm).ToBe(src.recfm);
-                             Expect(tgt.lrecl).ToBe(src.lrecl);
-                             Expect(tgt.blksize).ToBe(src.blksize);
-                             Expect(tgt.spacu).ToBe(src.spacu);
-                             Expect(tgt.primary).ToBe(src.primary);
-                             Expect(tgt.secondary).ToBe(src.secondary);
-
-                             ZDS read_zds{};
-                             ZDSReadOpts read_opts{.zds = &read_zds, .dsname = tc.target_dsn};
-                             std::string content;
-                             zds_read(read_opts, content);
-                             Expect(content.find("Test data") != std::string::npos).ToBe(true);
-                           });
-
-                        it("should fail to overwrite existing sequential data set without replace flag",
-                           [&]() -> void
-                           {
-                             CopyTestContext tc(created_dsns);
-                             tc.create_source_seq();
-                             tc.create_target_seq();
-                             tc.write_source("Source data");
-                             tc.write_target("Old target data");
-
-                             ZDS zds = {0};
-                             ZDSCopyOptions options;
-                             options.replace = false;
-                             int rc = zds_copy_dsn(&zds, tc.source_dsn, tc.target_dsn, &options);
-                             Expect(rc).Not().ToBe(0);
-                             Expect(std::string(zds.diag.e_msg)).ToContain("already exists");
-                           });
-
-                        it("should overwrite existing sequential data set with replace flag",
-                           [&]() -> void
-                           {
-                             CopyTestContext tc(created_dsns);
-                             tc.create_source_seq();
-                             tc.create_target_seq();
-                             tc.write_source("Source data");
-                             tc.write_target("Old target data");
-                             Expect(tc.copy(true)).ToBe(0);
-                           });
-
-                        it("should skip existing members in PDS without replace flag",
-                           [&]() -> void
-                           {
-                             CopyTestContext tc(created_dsns);
-                             tc.create_source_pds();
-                             tc.create_target_pds();
-                             tc.write_source_member("MEM1", "Source member");
-                             tc.write_source_member("MEM2", "Source member 2");
-                             tc.write_target_member("MEM1", "Old target member");
-
-                             Expect(tc.copy(false)).ToBe(0);
-                             Expect(tc.target_has_member("MEM2")).ToBe(true);
-                           });
-
-                        it("should replace existing members in PDS with replace flag",
-                           [&]() -> void
-                           {
-                             CopyTestContext tc(created_dsns);
-                             tc.create_source_pds();
-                             tc.create_target_pds();
-                             tc.write_source_member("MEM1", "Source member");
-                             tc.write_target_member("MEM1", "Old target member");
-                             Expect(tc.copy(true)).ToBe(0);
-                           });
-
-                        it("should overwrite entire PDS with delete_target_members flag",
-                           [&]() -> void
-                           {
-                             CopyTestContext tc(created_dsns);
-                             tc.create_source_pds();
-                             tc.create_target_pds();
-                             tc.write_source_member("MEM1", "Source member");
-                             tc.write_target_member("MEM2", "Target member to be deleted");
-
-                             ZDS zds = {0};
-                             ZDSCopyOptions options;
-                             options.delete_target_members = true;
-                             int rc = zds_copy_dsn(&zds, tc.source_dsn, tc.target_dsn, &options);
+                             std::string data = "test data";
+                             ZDSWriteOpts wopts{&zds, .dsname = src_pds + "(M1)"};
+                             int rc = zds_write(wopts, data);
                              ExpectWithContext(rc, zds.diag.e_msg).ToBe(0);
 
-                             Expect(tc.target_has_member("MEM1")).ToBe(true);
-                             Expect(tc.target_has_member("MEM2")).ToBe(false);
-                           });
-
-                        it("should fail to overwrite existing member without replace flag",
-                           [&]() -> void
-                           {
-                             CopyTestContext tc(created_dsns);
-                             tc.create_source_pds();
-                             tc.create_target_pds();
-                             tc.write_source_member("MEM", "New source data");
-                             tc.write_target_member("MEM", "Old target data");
-
-                             ZDS zds = {0};
-                             ZDSCopyOptions options;
-                             options.replace = false;
-                             int rc = zds_copy_dsn(&zds, tc.source_dsn + "(MEM)", tc.target_dsn + "(MEM)", &options);
-                             Expect(rc).Not().ToBe(0);
-                             Expect(std::string(zds.diag.e_msg)).ToContain("already exists");
-                           });
-
-                        it("should overwrite existing member with replace flag",
-                           [&]() -> void
-                           {
-                             CopyTestContext tc(created_dsns);
-                             tc.create_source_pds();
-                             tc.create_target_pds();
-                             tc.write_source_member("MEM", "New source data");
-                             tc.write_target_member("MEM", "Old target data");
-                             Expect(tc.copy_member("MEM", "MEM", true)).ToBe(0);
-                           });
-
-                        it("should copy member to another member in the same PDS",
-                           [&]() -> void
-                           {
-                             CopyTestContext tc(created_dsns);
-                             tc.create_source_pds();
-                             tc.write_source_member("SRC", "Source member data");
-
-                             // Copy within same PDS
-                             ZDS zds = {0};
-                             ZDSCopyOptions options;
-                             options.replace = false;
-                             int rc = zds_copy_dsn(&zds, tc.source_dsn + "(SRC)", tc.source_dsn + "(DST)", &options);
-                             ExpectWithContext(rc, zds.diag.e_msg).ToBe(0);
-
-                             // Verify both members exist
-                             Expect(tc.source_has_member("SRC")).ToBe(true);
-                             Expect(tc.source_has_member("DST")).ToBe(true);
-                           });
-
-                        it("should copy and rename member in the same PDS with replace",
-                           [&]() -> void
-                           {
-                             CopyTestContext tc(created_dsns);
-                             tc.create_source_pds();
-                             tc.write_source_member("ORIG", "Original data");
-                             tc.write_source_member("COPY", "Old copy data");
-
-                             // Copy and replace within same PDS
-                             ZDS zds = {0};
-                             ZDSCopyOptions options;
-                             options.replace = true;
-                             int rc = zds_copy_dsn(&zds, tc.source_dsn + "(ORIG)", tc.source_dsn + "(COPY)", &options);
+                             std::string src = src_pds + "(M1)";
+                             rc = zds_copy_dsn(&zds, src, tgt_pds + "(NEW)", &opts);
                              ExpectWithContext(rc, zds.diag.e_msg).ToBe(0);
                            });
 
-                        it("should copy empty PDS",
+                        it("should copy PDS to PDS with overwrite",
                            [&]() -> void
                            {
-                             CopyTestContext tc(created_dsns);
-                             tc.create_source_pds();
-                             Expect(tc.copy()).ToBe(0);
+                             ZDS zds = {};
+                             ZDSCopyOptions opts{};
+                             opts.overwrite = true;
+                             std::string src = get_random_ds(3);
+                             std::string tgt = get_random_ds(3);
+                             created_dsns.push_back(src);
+                             created_dsns.push_back(tgt);
+
+                             zds_create_dsn(&zds, src, pds_attr, response);
+                             std::string n = "NEW", o = "OLD";
+                             zds_write(ZDSWriteOpts{&zds, .dsname = src + "(M1)"}, n);
+
+                             zds_create_dsn(&zds, tgt, pds_attr, response);
+                             zds_write(ZDSWriteOpts{&zds, .dsname = tgt + "(tgt)"}, o);
+
+                             int rc = zds_copy_dsn(&zds, src, tgt, &opts);
+                             ExpectWithContext(rc, zds.diag.e_msg).ToBe(0);
+
+                             std::string out;
+                             ZDSReadOpts ropts{&zds, .dsname = tgt + "(tgt)"};
+                             int read_rc = zds_read(ropts, out);
+                             Expect(read_rc).Not().ToBe(0);
                            });
 
-                        it("should copy empty sequential data set",
+                        it("should handle special characters (@, #, $) with single quotes",
                            [&]() -> void
                            {
-                             CopyTestContext tc(created_dsns);
-                             tc.create_source_seq();
-                             Expect(tc.copy()).ToBe(0);
+                             ZDS zds = {};
+                             ZDSCopyOptions opts{};
+                             std::string src = get_user() + ".TEST.PDS@#$";
+                             std::string tgt = get_user() + ".TEST.TGT#@$";
+                             created_dsns.push_back(src);
+                             created_dsns.push_back(tgt);
+
+                             zds_create_dsn(&zds, src, pds_attr, response);
+                             zds_create_dsn(&zds, tgt, pds_attr, response);
+
+                             std::string data = "test data";
+                             zds_write(ZDSWriteOpts{&zds, .dsname = src + "(MEM#1)"}, data);
+
+                             int rc = zds_copy_dsn(&zds, src + "(MEM#1)", tgt + "(MEM#1)", &opts);
+                             ExpectWithContext(rc, zds.diag.e_msg).ToBe(0);
                            });
 
-                        it("should copy PDSE to PDSE",
+                        it("should fail if target member exists and replace flag is not used",
+                          [&]() -> void
+                          {
+                            ZDS zds = {};
+                            ZDSCopyOptions opts{};
+                            std::string src = get_random_ds(3);
+                            std::string tgt = get_random_ds(3);
+                            created_dsns.push_back(src);
+                            created_dsns.push_back(tgt);
+
+                            zds_create_dsn(&zds, src, pds_attr, response);
+
+                            zds_create_dsn(&zds, tgt, pds_attr, response);
+
+                            std::string d1 = "DATA1", d2 = "DATA2";
+
+                            zds_write(ZDSWriteOpts{&zds, .dsname = src + "(M1)"}, d1);
+
+                            zds_write(ZDSWriteOpts{&zds, .dsname = tgt + "(tgt)"}, d2);
+
+                            int rc = zds_copy_dsn(&zds, src, tgt, &opts);
+                            ExpectWithContext(rc, zds.diag.e_msg).ToBe(RTNCD_FAILURE);
+                            Expect(std::string(zds.diag.e_msg)).ToContain("--replace");
+                          });
+
+                        it("should fail if source data set does not exist",
                            [&]() -> void
                            {
-                             CopyTestContext tc(created_dsns);
-                             tc.create_source_pdse();
-                             tc.write_source_member("MEMBER", "PDSE data");
-                             Expect(tc.copy()).ToBe(0);
+                             ZDS zds = {};
+                             ZDSCopyOptions opts{};
+
+                             std::string src = "DNE.DATASET";
+                             std::string tgt = get_random_ds(3);
+                             created_dsns.push_back(tgt);
+
+                             int rc = zds_copy_dsn(&zds, src, tgt, &opts);
+
+                             Expect(rc).ToBe(RTNCD_FAILURE);
+
+                             Expect(std::string(zds.diag.e_msg)).ToContain("Source data set 'DNE.DATASET' not found");
                            });
 
-                        it("should copy PDS to new target without replace flag",
+                        it("should fail if source member does not exist in an existing PDS",
                            [&]() -> void
                            {
-                             CopyTestContext tc(created_dsns);
-                             tc.create_source_pds();
-                             tc.write_source_member("MEMBER", "Test data");
-                             Expect(tc.copy(false)).ToBe(0);
-                           });
+                             ZDS zds = {};
+                             ZDSCopyOptions opts{};
+                             std::string src = get_random_ds(3);
+                             std::string tgt = get_random_ds(3);
+                             created_dsns.push_back(src);
+                             created_dsns.push_back(tgt);
+                             Expect(zds_create_dsn(&zds, src, pds_attr, response)).ToBe(0);
+                             Expect(zds_create_dsn(&zds, tgt, pds_attr, response)).ToBe(0);
 
-                        it("should copy sequential to new target without replace flag",
-                           [&]() -> void
-                           {
-                             CopyTestContext tc(created_dsns);
-                             tc.create_source_seq();
-                             tc.write_source("Sequential data");
-                             Expect(tc.copy(false)).ToBe(0);
-                           });
+                             int rc = zds_copy_dsn(&zds, src + "(DNE)", tgt + "(NEW)", &opts);
 
-                        it("should add new members to existing PDS without replace flag",
-                           [&]() -> void
-                           {
-                             CopyTestContext tc(created_dsns);
-                             tc.create_source_pds();
-                             tc.create_target_pds();
-                             tc.write_source_member("MEM1", "Source data");
-                             tc.write_target_member("MEM2", "Target data");
-
-                             Expect(tc.copy(false)).ToBe(0);
-                             Expect(tc.target_has_member("MEM1")).ToBe(true);
-                             Expect(tc.target_has_member("MEM2")).ToBe(true);
-                           });
-
-                        it("should fail to copy sequential to PDS member even with replace",
-                           [&]() -> void
-                           {
-                             CopyTestContext tc(created_dsns);
-                             tc.create_source_seq();
-                             tc.create_target_pds();
-                             tc.write_source("Sequential source data");
-                             tc.write_target_member("EXISTING", "Old member data");
-
-                             ZDS zds = {0};
-                             ZDSCopyOptions options;
-                             options.replace = true;
-                             int rc = zds_copy_dsn(&zds, tc.source_dsn, tc.target_dsn + "(EXISTING)", &options);
-                             Expect(rc).Not().ToBe(0);
-                             Expect(std::string(zds.diag.e_msg)).ToContain("must be a sequential data set");
-                           });
-
-                        it("should set member_created when copying to new member",
-                           [&]() -> void
-                           {
-                             CopyTestContext tc(created_dsns);
-                             tc.create_source_pds();
-                             tc.create_target_pds();
-                             tc.write_source_member("SRC", "source content");
-
-                             ZDS zds = {0};
-                             ZDSCopyOptions options;
-                             options.replace = false;
-                             options.delete_target_members = false;
-                             int rc = zds_copy_dsn(&zds, tc.source_dsn + "(SRC)", tc.target_dsn + "(NEW)", &options);
-                             Expect(rc).ToBe(0);
-                             Expect(options.target_created).ToBe(false); // PDS already existed
-                             Expect(options.member_created).ToBe(true);  // Member was newly created
-                           });
-
-                        it("should not set member_created when overwriting existing member",
-                           [&]() -> void
-                           {
-                             CopyTestContext tc(created_dsns);
-                             tc.create_source_pds();
-                             tc.create_target_pds();
-                             tc.write_source_member("SRC", "source content");
-                             tc.write_target_member("EXIST", "existing content");
-
-                             ZDS zds = {0};
-                             ZDSCopyOptions options;
-                             options.replace = true;
-                             options.delete_target_members = false;
-                             int rc = zds_copy_dsn(&zds, tc.source_dsn + "(SRC)", tc.target_dsn + "(EXIST)", &options);
-                             Expect(rc).ToBe(0);
-                             Expect(options.target_created).ToBe(false);
-                             Expect(options.member_created).ToBe(false); // Member already existed
+                             Expect(rc).ToBe(RTNCD_FAILURE);
+                             Expect(std::string(zds.diag.e_msg)).ToContain("Source member 'DNE' not found");
                            });
                       });
 
@@ -1152,7 +937,8 @@ void zds_tests()
                              created_dsns.push_back(ds);
                              int rc = zds_create_dsn(&zds, ds, attr, response);
                              std::string empty = "";
-                             rc = zds_write_to_dsn(&zds, ds + "(M1)", empty);
+                             ZDSWriteOpts write_opts{.zds = &zds, .dsname = ds + "(M1)"};
+                             rc = zds_write(write_opts, empty);
                              Expect(rc).ToBe(0);
                              rc = zds_rename_members(&zds, ds, M1, longName);
                              Expect(rc).ToBe(RTNCD_FAILURE);
@@ -1191,10 +977,12 @@ void zds_tests()
                              int rc = zds_create_dsn(&zds, ds, attr, response);
 
                              std::string empty = "";
-                             rc = zds_write_to_dsn(&zds, ds + "(M1)", empty);
+                             ZDSWriteOpts write_opts{.zds = &zds, .dsname = ds + "(M1)"};
+                             rc = zds_write(write_opts, empty);
                              Expect(rc).ToBe(0);
                              memset(zds.etag, 0, 8);
-                             rc = zds_write_to_dsn(&zds, ds + "(M2)", empty);
+                             ZDSWriteOpts write_opts2{.zds = &zds, .dsname = ds + "(M2)"};
+                             rc = zds_write(write_opts2, empty);
                              Expect(rc).ToBe(0);
 
                              rc = zds_rename_members(&zds, ds, M1, M2);
@@ -1211,7 +999,8 @@ void zds_tests()
                              int rc = zds_create_dsn(&zds, ds, attr, response);
 
                              std::string empty = "";
-                             rc = zds_write_to_dsn(&zds, ds + "(M1)", empty);
+                             ZDSWriteOpts write_opts{.zds = &zds, .dsname = ds + "(M1)"};
+                             rc = zds_write(write_opts, empty);
                              Expect(rc).ToBe(0);
 
                              rc = zds_rename_members(&zds, ds, M1, "M3");
@@ -1228,7 +1017,8 @@ void zds_tests()
                              int rc = zds_create_dsn(&zds, ds, attr, response);
 
                              std::string empty = "";
-                             rc = zds_write_to_dsn(&zds, ds + "(M1)", empty);
+                             ZDSWriteOpts write_opts{.zds = &zds, .dsname = ds + "(M1)"};
+                             rc = zds_write(write_opts, empty);
                              Expect(rc).ToBe(0);
 
                              rc = zds_rename_members(&zds, ds, M1, "123");
@@ -1618,7 +1408,8 @@ void zds_tests()
                              create_seq(&zds, dsn);
 
                              std::string data = "etag test data";
-                             int rc = zds_write_to_dsn(&zds, dsn, data);
+                             ZDSWriteOpts write_opts{.zds = &zds, .dsname = dsn};
+                             int rc = zds_write(write_opts, data);
                              ExpectWithContext(rc, zds.diag.e_msg).ToBe(0);
                              std::string write_etag(zds.etag);
                              Expect(write_etag.empty()).ToBe(false);
@@ -1644,21 +1435,24 @@ void zds_tests()
                              create_seq(&zds, dsn);
 
                              std::string data = "original content";
-                             int rc = zds_write_to_dsn(&zds, dsn, data);
+                             ZDSWriteOpts write_opts{.zds = &zds, .dsname = dsn};
+                             int rc = zds_write(write_opts, data);
                              ExpectWithContext(rc, zds.diag.e_msg).ToBe(0);
                              std::string valid_etag(zds.etag);
 
                              // Overwrite with new content (changes the actual etag on disk)
                              ZDS zds2 = {0};
                              std::string data2 = "modified content";
-                             rc = zds_write_to_dsn(&zds2, dsn, data2);
+                             ZDSWriteOpts write_opts2{.zds = &zds2, .dsname = dsn};
+                             rc = zds_write(write_opts2, data2);
                              ExpectWithContext(rc, zds2.diag.e_msg).ToBe(0);
 
                              // Attempt to write using the stale (first) etag — should fail
                              ZDS zds3 = {0};
                              strcpy(zds3.etag, valid_etag.c_str());
                              std::string data3 = "conflicting write";
-                             rc = zds_write_to_dsn(&zds3, dsn, data3);
+                             ZDSWriteOpts write_opts3{.zds = &zds3, .dsname = dsn};
+                             rc = zds_write(write_opts3, data3);
                              Expect(rc).Not().ToBe(0);
                              Expect(std::string(zds3.diag.e_msg)).ToContain("Etag mismatch");
                            });
@@ -1735,7 +1529,8 @@ void zds_tests()
                              ExpectWithContext(rc, diag.e_msg).ToBe(0);
 
                              ZDS write_zds{};
-                             rc = zds_write_to_dd(&write_zds, "SYSPRINT", expected);
+                             ZDSWriteOpts write_opts{.zds = &write_zds, .ddname = "SYSPRINT"};
+                             rc = zds_write(write_opts, expected);
                              ExpectWithContext(rc, write_zds.diag.e_msg).ToBe(0);
 
                              ZDS read_zds{};
@@ -1747,6 +1542,400 @@ void zds_tests()
 
                              zut_free_dynalloc_dds(diag, dds);
                            });
+
+                        describe("DD write operations",
+                                 [&]() -> void
+                                 {
+                                   describe("basic operations",
+                                            [&]() -> void
+                                            {
+                                              it("should write text to FB LRECL=80 DD (SYSPRINT pattern)",
+                                                 [&]() -> void
+                                                 {
+                                                   DDTestContext ctx(created_dsns);
+                                                   ctx.allocate_sysprint_dd();
+
+                                                   std::string test_data = "Line 1: Basic text content\nLine 2: More test data\nLine 3: Final line";
+                                                   ZDS write_zds{};
+                                                   ZDSWriteOpts write_opts{.zds = &write_zds, .ddname = "SYSPRINT"};
+                                                   int rc = zds_write(write_opts, test_data);
+                                                   ExpectWithContext(rc, write_zds.diag.e_msg).ToBe(0);
+
+                                                   bool has_line1 = ctx.verify_dd_content("SYSPRINT", "Line 1: Basic text content");
+                                                   bool has_line2 = ctx.verify_dd_content("SYSPRINT", "Line 2: More test data");
+                                                   bool has_line3 = ctx.verify_dd_content("SYSPRINT", "Line 3: Final line");
+                                                   Expect(has_line1).ToBe(true);
+                                                   Expect(has_line2).ToBe(true);
+                                                   Expect(has_line3).ToBe(true);
+                                                 });
+
+                                              it("should write binary data to VB DD",
+                                                 [&]() -> void
+                                                 {
+                                                   DDTestContext ctx(created_dsns);
+                                                   ctx.allocate_vb_dd("BINDD", 255);
+
+                                                   std::string binary_data = "Binary\x00\x01\x02test\xFF\xFE data";
+                                                   ZDS write_zds{};
+                                                   write_zds.encoding_opts.data_type = eDataTypeBinary;
+                                                   ZDSWriteOpts write_opts{.zds = &write_zds, .ddname = "BINDD"};
+                                                   int rc = zds_write(write_opts, binary_data);
+                                                   ExpectWithContext(rc, write_zds.diag.e_msg).ToBe(0);
+
+                                                   ZDS read_zds{};
+                                                   read_zds.encoding_opts.data_type = eDataTypeBinary;
+                                                   ZDSReadOpts read_opts{.zds = &read_zds, .ddname = "BINDD"};
+                                                   std::string content;
+                                                   rc = zds_read(read_opts, content);
+                                                   ExpectWithContext(rc, read_zds.diag.e_msg).ToBe(0);
+                                                   Expect(content.find("Binary") != std::string::npos).ToBe(true);
+                                                 });
+
+                                              it("should write empty content to DD",
+                                                 [&]() -> void
+                                                 {
+                                                   DDTestContext ctx(created_dsns);
+                                                   ctx.allocate_fb_dd("EMPTYDD", 80);
+
+                                                   std::string empty_data = "";
+                                                   ZDS write_zds{};
+                                                   ZDSWriteOpts write_opts{.zds = &write_zds, .ddname = "EMPTYDD"};
+                                                   int rc = zds_write(write_opts, empty_data);
+                                                   ExpectWithContext(rc, write_zds.diag.e_msg).ToBe(0);
+
+                                                   ZDS read_zds{};
+                                                   ZDSReadOpts read_opts{.zds = &read_zds, .ddname = "EMPTYDD"};
+                                                   std::string content;
+                                                   rc = zds_read(read_opts, content);
+                                                   ExpectWithContext(rc, read_zds.diag.e_msg).ToBe(0);
+                                                   Expect(content.empty()).ToBe(true);
+                                                 });
+
+                                              it("should handle single-line vs multi-line content",
+                                                 [&]() -> void
+                                                 {
+                                                   DDTestContext ctx(created_dsns);
+                                                   ctx.allocate_fb_dd("TESTDD", 80);
+
+                                                   // Test single line without newline
+                                                   std::string single_line = "Single line without newline";
+                                                   ZDS write_zds{};
+                                                   ZDSWriteOpts write_opts{.zds = &write_zds, .ddname = "TESTDD"};
+                                                   int rc = zds_write(write_opts, single_line);
+                                                   ExpectWithContext(rc, write_zds.diag.e_msg).ToBe(0);
+
+                                                   bool has_single_line = ctx.verify_dd_content("TESTDD", "Single line without newline");
+                                                   Expect(has_single_line).ToBe(true);
+                                                 });
+
+                                              it("should verify content round-trip accuracy",
+                                                 [&]() -> void
+                                                 {
+                                                   DDTestContext ctx(created_dsns);
+                                                   ctx.allocate_fb_dd("ROUNDDD", 133);
+
+                                                   std::string test_content = "Round-trip test line 1\nRound-trip test line 2\nSpecial chars: !@#$%^&*()";
+                                                   ZDS write_zds{};
+                                                   ZDSWriteOpts write_opts{.zds = &write_zds, .ddname = "ROUNDDD"};
+                                                   int rc = zds_write(write_opts, test_content);
+                                                   ExpectWithContext(rc, write_zds.diag.e_msg).ToBe(0);
+
+                                                   ZDS read_zds{};
+                                                   ZDSReadOpts read_opts{.zds = &read_zds, .ddname = "ROUNDDD"};
+                                                   std::string content;
+                                                   rc = zds_read(read_opts, content);
+                                                   ExpectWithContext(rc, read_zds.diag.e_msg).ToBe(0);
+                                                   Expect(content.find("Round-trip test line 1") != std::string::npos).ToBe(true);
+                                                   Expect(content.find("Special chars: !@#$%^&*()") != std::string::npos).ToBe(true);
+                                                 });
+                                            });
+
+                                   describe("record format support",
+                                            [&]() -> void
+                                            {
+                                              it("should handle FB with various LRECL values",
+                                                 [&]() -> void
+                                                 {
+                                                   DDTestContext ctx(created_dsns);
+
+                                                   // Test LRECL=80 (standard)
+                                                   ctx.allocate_fb_dd("FB80", 80);
+                                                   std::string data80 = "Standard 80-character record for typical mainframe usage";
+                                                   ZDS zds80{};
+                                                   ZDSWriteOpts opts80{.zds = &zds80, .ddname = "FB80"};
+                                                   int rc = zds_write(opts80, data80);
+                                                   ExpectWithContext(rc, zds80.diag.e_msg).ToBe(0);
+
+                                                   // Test LRECL=133 (wide reports)
+                                                   ctx.allocate_fb_dd("FB133", 133);
+                                                   std::string data133 = "Wide format record for reports that need more than 80 characters per line - this is commonly used for listings";
+                                                   ZDS zds133{};
+                                                   ZDSWriteOpts opts133{.zds = &zds133, .ddname = "FB133"};
+                                                   rc = zds_write(opts133, data133);
+                                                   ExpectWithContext(rc, zds133.diag.e_msg).ToBe(0);
+
+                                                   // Test LRECL=255 (maximum for FB)
+                                                   ctx.allocate_fb_dd("FB255", 255);
+                                                   std::string data255 = "Maximum length fixed-block record that can contain up to 255 characters of data which is useful for very wide reports or data transfer operations that need the maximum capacity available in fixed-block format";
+                                                   ZDS zds255{};
+                                                   ZDSWriteOpts opts255{.zds = &zds255, .ddname = "FB255"};
+                                                   rc = zds_write(opts255, data255);
+                                                   ExpectWithContext(rc, zds255.diag.e_msg).ToBe(0);
+
+                                                   bool has_fb80 = ctx.verify_dd_content("FB80", "Standard 80-character");
+                                                   bool has_fb133 = ctx.verify_dd_content("FB133", "Wide format record");
+                                                   bool has_fb255 = ctx.verify_dd_content("FB255", "Maximum length fixed-block");
+                                                   Expect(has_fb80).ToBe(true);
+                                                   Expect(has_fb133).ToBe(true);
+                                                   Expect(has_fb255).ToBe(true);
+                                                 });
+
+                                              it("should handle VB with various LRECL values",
+                                                 [&]() -> void
+                                                 {
+                                                   DDTestContext ctx(created_dsns);
+
+                                                   // Test VB with LRECL=80
+                                                   ctx.allocate_vb_dd("VB80", 80);
+                                                   std::string vb_data = "Variable block record\nShorter line\nThis is a longer line that demonstrates variable length";
+                                                   ZDS vb_zds{};
+                                                   ZDSWriteOpts vb_opts{.zds = &vb_zds, .ddname = "VB80"};
+                                                   int rc = zds_write(vb_opts, vb_data);
+                                                   ExpectWithContext(rc, vb_zds.diag.e_msg).ToBe(0);
+
+                                                   // Test VB with LRECL=1000 (large but reasonable)
+                                                   ctx.allocate_vb_dd("VB1K", 1000);
+                                                   std::string large_vb = "Large variable block record that can handle very long lines";
+                                                   ZDS large_zds{};
+                                                   ZDSWriteOpts large_opts{.zds = &large_zds, .ddname = "VB1K"};
+                                                   rc = zds_write(large_opts, large_vb);
+                                                   ExpectWithContext(rc, large_zds.diag.e_msg).ToBe(0);
+
+                                                   bool has_vb80 = ctx.verify_dd_content("VB80", "Variable block record");
+                                                   bool has_vb1k = ctx.verify_dd_content("VB1K", "Large variable block");
+                                                   Expect(has_vb80).ToBe(true);
+                                                   Expect(has_vb1k).ToBe(true);
+                                                 });
+
+                                              it("should return out-of-space failure if contents are too long",
+                                                 [&]() -> void
+                                                 {
+                                                   DDTestContext ctx(created_dsns);
+                                                   ctx.allocate_fb_dd("TRUNCDD", 40);
+
+                                                   std::string long_line = "This line is much longer than 40 characters and should be truncated by the system";
+                                                   ZDS trunc_zds{};
+                                                   ZDSWriteOpts trunc_opts{.zds = &trunc_zds, .ddname = "TRUNCDD"};
+                                                   int rc = zds_write(trunc_opts, long_line);
+                                                   ExpectWithContext(rc, trunc_zds.diag.e_msg).ToBe(RTNCD_FAILURE);
+                                                   Expect(std::string(trunc_zds.diag.e_msg)).ToContain("Failed to write all contents to 'DD:TRUNCDD' (possibly out of space)");
+
+                                                   // Verify truncation occurred (should only contain first 40 chars)
+                                                   ZDS read_zds{};
+                                                   ZDSReadOpts read_opts{.zds = &read_zds, .ddname = "TRUNCDD"};
+                                                   std::string content;
+                                                   rc = zds_read(read_opts, content);
+                                                   ExpectWithContext(rc, read_zds.diag.e_msg).ToBe(0);
+                                                   Expect(content.find("This line is much longer than 40 char") != std::string::npos).ToBe(true);
+                                                   Expect(content.find("should be truncated by the system") == std::string::npos).ToBe(true);
+                                                 });
+                                            });
+
+                                   describe("encoding support",
+                                            [&]() -> void
+                                            {
+                                              it("should handle text mode with default encoding",
+                                                 [&]() -> void
+                                                 {
+                                                   DDTestContext ctx(created_dsns);
+                                                   ctx.allocate_fb_dd("TEXTDD", 80);
+
+                                                   std::string text_data = "Text mode content with UTF-8 characters";
+                                                   ZDS text_zds{};
+                                                   text_zds.encoding_opts.data_type = eDataTypeText;
+                                                   ZDSWriteOpts text_opts{.zds = &text_zds, .ddname = "TEXTDD"};
+                                                   int rc = zds_write(text_opts, text_data);
+                                                   ExpectWithContext(rc, text_zds.diag.e_msg).ToBe(0);
+
+                                                   bool has_text_content = ctx.verify_dd_content("TEXTDD", "Text mode content");
+                                                   Expect(has_text_content).ToBe(true);
+                                                 });
+
+                                              it("should handle binary mode without conversion",
+                                                 [&]() -> void
+                                                 {
+                                                   DDTestContext ctx(created_dsns);
+                                                   ctx.allocate_vb_dd("BINDD", 100);
+
+                                                   std::string binary_data = "Binary\x00\x01\x02\x03\xFF\xFE\xFD\xFC data";
+                                                   ZDS binary_zds{};
+                                                   binary_zds.encoding_opts.data_type = eDataTypeBinary;
+                                                   ZDSWriteOpts binary_opts{.zds = &binary_zds, .ddname = "BINDD"};
+                                                   int rc = zds_write(binary_opts, binary_data);
+                                                   ExpectWithContext(rc, binary_zds.diag.e_msg).ToBe(0);
+
+                                                   // Read back in binary mode
+                                                   ZDS read_zds{};
+                                                   read_zds.encoding_opts.data_type = eDataTypeBinary;
+                                                   ZDSReadOpts read_opts{.zds = &read_zds, .ddname = "BINDD"};
+                                                   std::string content;
+                                                   rc = zds_read(read_opts, content);
+                                                   ExpectWithContext(rc, read_zds.diag.e_msg).ToBe(0);
+                                                   Expect(content.find("Binary") != std::string::npos).ToBe(true);
+                                                 });
+
+                                              it("should handle mixed content scenarios",
+                                                 [&]() -> void
+                                                 {
+                                                   DDTestContext ctx(created_dsns);
+                                                   ctx.allocate_fb_dd("MIXEDDD", 120);
+
+                                                   std::string mixed_data = "Text content\nWith special chars: áéíóú\nAnd numbers: 12345";
+                                                   ZDS mixed_zds{};
+                                                   mixed_zds.encoding_opts.data_type = eDataTypeText;
+                                                   ZDSWriteOpts mixed_opts{.zds = &mixed_zds, .ddname = "MIXEDDD"};
+                                                   int rc = zds_write(mixed_opts, mixed_data);
+                                                   ExpectWithContext(rc, mixed_zds.diag.e_msg).ToBe(0);
+
+                                                   bool has_mixed_text = ctx.verify_dd_content("MIXEDDD", "Text content");
+                                                   bool has_mixed_numbers = ctx.verify_dd_content("MIXEDDD", "And numbers: 12345");
+                                                   Expect(has_mixed_text).ToBe(true);
+                                                   Expect(has_mixed_numbers).ToBe(true);
+                                                 });
+                                            });
+
+                                   describe("streaming operations",
+                                            [&]() -> void
+                                            {
+                                              it("should handle zds_write_streamed with pipe input",
+                                                 [&]() -> void
+                                                 {
+                                                   DDTestContext ctx(created_dsns);
+                                                   ctx.allocate_fb_dd("STREAMDD", 80);
+
+                                                   // Create a temporary file to simulate pipe input
+                                                   std::string temp_file = "/tmp/zds_stream_test_" + std::to_string(getpid());
+                                                   std::string content = "Streamed line 1\nStreamed line 2\nStreamed line 3\n";
+                                                   std::string encoded_content = zbase64::encode(content);
+                                                   std::ofstream temp_out(temp_file);
+                                                   temp_out << encoded_content;
+                                                   temp_out.close();
+
+                                                   size_t content_len = 0;
+                                                   ZDS stream_zds{};
+                                                   ZDSWriteOpts stream_opts{.zds = &stream_zds, .ddname = "STREAMDD"};
+                                                   int rc = zds_write_streamed(stream_opts, temp_file, &content_len);
+                                                   ExpectWithContext(rc, stream_zds.diag.e_msg).ToBe(0);
+
+                                                   // Verify content length was set
+                                                   Expect(content_len > 0).ToBe(true);
+
+                                                   // Verify content was written
+                                                   bool has_stream_line1 = ctx.verify_dd_content("STREAMDD", "Streamed line 1");
+                                                   bool has_stream_line3 = ctx.verify_dd_content("STREAMDD", "Streamed line 3");
+                                                   Expect(has_stream_line1).ToBe(true);
+                                                   Expect(has_stream_line3).ToBe(true);
+
+                                                   // Cleanup
+                                                   unlink(temp_file.c_str());
+                                                 });
+
+                                              it("should validate content length parameter",
+                                                 [&]() -> void
+                                                 {
+                                                   DDTestContext ctx(created_dsns);
+                                                   ctx.allocate_vb_dd("LENDD", 255);
+
+                                                   std::string temp_file = "/tmp/zds_len_test_" + std::to_string(getpid());
+                                                   std::string test_content = "Content length validation test data\nSecond line for length check\n";
+                                                   std::string encoded_content = zbase64::encode(test_content);
+                                                   std::ofstream temp_out(temp_file);
+                                                   temp_out << encoded_content;
+                                                   temp_out.close();
+
+                                                   size_t content_len = 0;
+                                                   ZDS len_zds{};
+                                                   ZDSWriteOpts len_opts{.zds = &len_zds, .ddname = "LENDD"};
+                                                   int rc = zds_write_streamed(len_opts, temp_file, &content_len);
+                                                   ExpectWithContext(rc, len_zds.diag.e_msg).ToBe(0);
+
+                                                   // Content length should match expected decoded size
+                                                   Expect(content_len).ToBe(test_content.length());
+
+                                                   unlink(temp_file.c_str());
+                                                 });
+
+                                              it("should handle large data efficiently",
+                                                 [&]() -> void
+                                                 {
+                                                   DDTestContext ctx(created_dsns);
+                                                   ctx.allocate_vb_dd("LARGEDD", 1000);
+
+                                                   // Create larger test data
+                                                   std::string temp_file = "/tmp/zds_large_test_" + std::to_string(getpid());
+                                                   std::stringstream content_stream;
+                                                   for (int i = 0; i < 1000; i++)
+                                                   {
+                                                     content_stream << "Large data test line " << i << " with substantial content to test streaming efficiency\n";
+                                                   }
+                                                   std::string content = content_stream.str();
+                                                   std::string encoded_content = zbase64::encode(content);
+                                                   std::ofstream temp_out(temp_file);
+                                                   temp_out << encoded_content;
+                                                   temp_out.close();
+
+                                                   size_t content_len = 0;
+                                                   ZDS large_zds{};
+                                                   ZDSWriteOpts large_opts{.zds = &large_zds, .ddname = "LARGEDD"};
+                                                   int rc = zds_write_streamed(large_opts, temp_file, &content_len);
+                                                   ExpectWithContext(rc, large_zds.diag.e_msg).ToBe(0);
+
+                                                   Expect(content_len > 5000).ToBe(true); // Should be substantial content (reduced from 100 lines)
+                                                   bool has_large_line0 = ctx.verify_dd_content("LARGEDD", "Large data test line 0");
+                                                   bool has_large_line999 = ctx.verify_dd_content("LARGEDD", "Large data test line 999");
+                                                   ExpectWithContext(has_large_line0, "Line 0 is missing in written DD contents").ToBe(true);
+                                                   ExpectWithContext(has_large_line999, "Line 999 is missing in written DD contents").ToBe(true);
+
+                                                   unlink(temp_file.c_str());
+                                                 });
+                                            });
+
+                                   describe("error handling",
+                                            [&]() -> void
+                                            {
+                                              it("should reject empty DD names",
+                                                 [&]() -> void
+                                                 {
+                                                   std::string test_data = "Test data for empty DD name";
+                                                   ZDS error_zds{};
+                                                   ZDSWriteOpts error_opts{.zds = &error_zds, .ddname = ""};
+                                                   int rc = zds_write(error_opts, test_data);
+
+                                                   Expect(rc).Not().ToBe(0);
+                                                   Expect(std::string(error_zds.diag.e_msg).length() > 0).ToBe(true);
+                                                 });
+
+                                              it("should handle null content_len pointer in streamed operations",
+                                                 [&]() -> void
+                                                 {
+                                                   std::string temp_file = "/tmp/zds_null_test_" + std::to_string(getpid());
+                                                   std::string content = "Test data for null pointer\n";
+                                                   std::string encoded_content = zbase64::encode(content);
+                                                   std::ofstream temp_out(temp_file);
+                                                   temp_out << encoded_content;
+                                                   temp_out.close();
+
+                                                   ZDS null_zds{};
+                                                   ZDSWriteOpts null_opts{.zds = &null_zds, .ddname = "TESTDD"};
+                                                   int rc = zds_write_streamed(null_opts, temp_file, nullptr);
+
+                                                   Expect(rc).Not().ToBe(0);
+                                                   Expect(std::string(null_zds.diag.e_msg).find("content_len") != std::string::npos).ToBe(true);
+
+                                                   unlink(temp_file.c_str());
+                                                 });
+                                            });
+                                 });
                       });
 
              describe("DCB abend",
@@ -1770,7 +1959,7 @@ void zds_tests()
                              Expect(sizeof(DCB_ABEND_PL)).ToBe(16);
                            });
 
-                        it("should catch abend when using zds_write_to_dsn (BPAM) to a PDS past its max space",
+                        it("should catch abend when writing past max space of a PDS",
                            [&]() -> void
                            {
                              ZDS zds = {0};
@@ -1802,10 +1991,12 @@ void zds_tests()
                                large_data += std::string(80, 'A') + "\n";
                              }
 
+                             ZDSWriteOpts write_opts{.zds = &zds, .dsname = ds + "(M1)"};
+
                              // This should fail with an abend. DCB abend exit runs as part of the member write process - no mocking available so we can't test the DCB exit itself,
                              // this just verifies that the abend is percolated and handled by recovery
                              Expect([&]()
-                                    { rc = zds_write_to_dsn(&zds, ds + "(M1)", large_data); })
+                                    { rc = zds_write(write_opts, large_data); })
                                  .ToAbend();
                            });
                       });
