@@ -25,6 +25,36 @@ namespace plugin
 static void traverse_and_register_impl(parser::Command *cmd, std::string &path_prefix, CommandDispatcher &dispatcher, int depth);
 
 /**
+ * @brief Convert kebab-case string to camelCase
+ *
+ * Converts a string with hyphens (kebab-case) to camelCase format.
+ * Example: "my-flag-name" -> "myFlagName"
+ *
+ * @param kebab_str The input string in kebab-case format
+ * @return std::string The converted camelCase string
+ */
+static std::string kebab_to_camel_case(const std::string &kebab_str)
+{
+  std::string result;
+  bool capitalize_next = false;
+
+  for (char c : kebab_str)
+  {
+    if (c == '-')
+    {
+      capitalize_next = true;
+    }
+    else
+    {
+      result += capitalize_next ? static_cast<char>(std::toupper(c)) : c;
+      capitalize_next = false;
+    }
+  }
+
+  return result;
+}
+
+/**
  * @brief Recursively traverse command tree and register to middleware
  *
  * @param cmd The command to process
@@ -76,34 +106,21 @@ static void traverse_and_register_impl(parser::Command *cmd, std::string &path_p
         // to the kebab-case name expected by the handler.
         if (arg.name.find('-') != std::string::npos)
         {
-          std::string camel_name;
-          bool capitalize_next = false;
-          for (char c : arg.name)
-          {
-            if (c == '-')
-            {
-              capitalize_next = true;
-            }
-            else
-            {
-              camel_name += capitalize_next ? static_cast<char>(std::toupper(c)) : c;
-              capitalize_next = false;
-            }
-          }
+          std::string camel_name = kebab_to_camel_case(arg.name);
           builder.rename_arg(camel_name, arg.name);
         }
 
         // Also apply default values if provided
         if (!arg.default_value.is_none())
         {
-          if (arg.default_value.is_bool())
+          if (arg.default_value.is_string())
+            builder.set_default(arg.name, *arg.default_value.get_string());
+          else if (arg.default_value.is_bool())
             builder.set_default(arg.name, *arg.default_value.get_bool());
           else if (arg.default_value.is_int())
             builder.set_default(arg.name, *arg.default_value.get_int());
           else if (arg.default_value.is_double())
             builder.set_default(arg.name, *arg.default_value.get_double());
-          else if (arg.default_value.is_string())
-            builder.set_default(arg.name, *arg.default_value.get_string());
         }
       }
 
@@ -133,8 +150,7 @@ static void traverse_and_register_impl(parser::Command *cmd, std::string &path_p
     if (it->second) // Null check for safety
     {
       // Append to existing string instead of creating new ones
-      path_prefix += ".";
-      path_prefix += it->first;
+      path_prefix += "." + it->first;
 
       traverse_and_register_impl(it->second.get(), path_prefix, dispatcher, depth + 1);
 
