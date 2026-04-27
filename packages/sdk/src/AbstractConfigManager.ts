@@ -65,6 +65,7 @@ export abstract class AbstractConfigManager {
     public async promptForProfile(
         profileName?: string,
         setExistingProfile = true,
+        priotizeProjectLevelConfig = true,
     ): Promise<IProfileLoaded | undefined> {
         this.validationResult = undefined;
         if (profileName) {
@@ -150,13 +151,9 @@ export abstract class AbstractConfigManager {
                 return { ...foundProfile, profile: { ...foundProfile.profile, ...validConfig } };
             }
         }
-
-        // Prioritize creating a team config in the local workspace if it exists even if a global config exists
-        // TODO: This behavior is only for the POC phase
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////
-        const useProject = this.getCurrentDir() !== undefined;
+        
+        const useProject = priotizeProjectLevelConfig && this.getCurrentDir() !== undefined;
         await this.createZoweSchema(!useProject);
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
         // Prompt for a new profile name with the hostname (for adding a new config) or host value (for migrating from a config)
         this.selectedProfile = await this.getNewProfileName(this.selectedProfile!, this.mProfilesCache.getTeamConfig());
