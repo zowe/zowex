@@ -375,29 +375,4 @@ static int enable_recovery(ZRCVY_ENV *PTR64 zenv)
   return 0; // NOTE(Kelosky): this never runs
 }
 
-// NOTE(Kelosky): this function may "return twice" like setjmp()
-// NOTE(Kelosky): we must not have this function inline so to save and return to the mainline
-#pragma reachable(enable_estaex)
-static int enable_estaex(ZRCVY_ENV *PTR64 zenv) ATTRIBUTE(noinline);
-static int enable_estaex(ZRCVY_ENV *PTR64 zenv)
-{
-  unsigned long long int r13 = 0;
-  GET_STACK_ENV(r13); // NOTE(Kelosky): this is the same as get_prev_r13() but will be inlined
-  unsigned char *save_area = (unsigned char *)r13;
-
-  memcpy(&zenv->f4sa, save_area, sizeof(SAVF4SA));
-  zenv->r13 = r13;
-
-  ESTAEX_ESTABLISH(ZRCVYARR, zenv, zenv->estaex_token, zenv->estaex_list);
-
-  return 0;
-}
-
-static int disable_estaex(ZRCVY_ENV *zenv) ATTRIBUTE(noinline);
-static int disable_estaex(ZRCVY_ENV *zenv)
-{
-  ESTAEX_CANCEL(zenv->estaex_token, zenv->estaex_list);
-  return 0;
-}
-
 #endif

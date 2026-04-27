@@ -119,7 +119,7 @@ IEFSSI_QUERY_MODEL(iefssi_query_model); // make this copy in static storage
 
 typedef struct jqry___header JQRY_HEADER;
 
-static int iefssi_query(JQRY_HEADER *PTR32 *PTR32 area, int *PTR32 rsn, const char *filter)
+static int iefssi_query(JQRY_HEADER * PTR32 * PTR32 area, int *PTR32 rsn, const char *filter)
 {
   int rc = 0;
   char filter_truncated[4] = {};
@@ -141,7 +141,7 @@ static void iefssreq_perc_exit(void *PTR64 data)
 }
 
 // https://www.ibm.com/docs/en/zos/3.1.0?topic=subsystem-making-request-iefssreq-macro
-static int iefssreq(SSOB *PTR32 *PTR32 ssob)
+static int iefssreq(SSOB * PTR32 * PTR32 ssob)
 {
   int rc = 0;
   ZRCVY_ENV zenv = {0};
@@ -149,7 +149,7 @@ static int iefssreq(SSOB *PTR32 *PTR32 ssob)
   zenv.abexit = iefssreq_abexit;
   zenv.perc_exit = iefssreq_perc_exit;
 
-  enable_estaex(&zenv);
+  enable_recovery(&zenv);
 
   // ABEND: S0C9 (Divide by zero) - Handled gracefully by the compiler, so no ABEND will be triggered
   // volatile int zero = 0;
@@ -172,7 +172,7 @@ static int iefssreq(SSOB *PTR32 *PTR32 ssob)
 
   IEFSSREQ(ssob, rc);
 
-  disable_estaex(&zenv);
+  disable_recovery(&zenv);
   return rc;
 }
 
