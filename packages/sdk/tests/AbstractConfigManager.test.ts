@@ -322,7 +322,7 @@ describe("AbstractConfigManager", async () => {
                         const createZoweSchemaSpy = vi.spyOn(testManager as any, "createZoweSchema");
                         const setSpy = vi.spyOn(testManager as any, "setProfile").mockImplementation(() => {});
 
-                        await testManager.promptForProfile(undefined, true, true);
+                        await testManager.promptForProfile(undefined, { setExistingProfile: true, prioritizeProjectLevelConfig: true });
 
                         // When prioritizeProjectLevelConfig=true and getCurrentDir() returns a directory,
                         // createZoweSchema should be called with false (project-level, not global)
@@ -350,7 +350,7 @@ describe("AbstractConfigManager", async () => {
                         const createZoweSchemaSpy = vi.spyOn(testManager as any, "createZoweSchema");
                         const setSpy = vi.spyOn(testManager as any, "setProfile").mockImplementation(() => {});
 
-                        await testManager.promptForProfile(undefined, true, false);
+                        await testManager.promptForProfile(undefined, { setExistingProfile: true, prioritizeProjectLevelConfig: false });
 
                         // When prioritizeProjectLevelConfig=false, createZoweSchema should be called with true (global)
                         expect(createZoweSchemaSpy).toHaveBeenCalledWith(true);
@@ -377,7 +377,7 @@ describe("AbstractConfigManager", async () => {
                         const createZoweSchemaSpy = vi.spyOn(testManager as any, "createZoweSchema");
                         const setSpy = vi.spyOn(testManager as any, "setProfile").mockImplementation(() => {});
 
-                        await testManager.promptForProfile(undefined, true, true);
+                        await testManager.promptForProfile(undefined, { setExistingProfile: true, prioritizeProjectLevelConfig: true });
 
                         // When prioritizeProjectLevelConfig=true but getCurrentDir() returns undefined,
                         // createZoweSchema should be called with true (global)
