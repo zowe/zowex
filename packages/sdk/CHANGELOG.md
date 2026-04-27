@@ -4,6 +4,10 @@ All notable changes to the Client code for "@zowe/zowex-for-zowe-sdk" are docume
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## Recent Changes
+
+- Added `prioritizeProjectLevelConfig` parameter to `promptForProfile` function to allow toggling between project-level and global configuration creation when setting up new SSH profiles. [#964](https://github.com/zowe/zowex/pull/964)
+
 ## `0.5.0`
 
 - Added support for copying data sets and members files in the `RpcClientApi` class. [#932](https://github.com/zowe/zowex/issues/932)
