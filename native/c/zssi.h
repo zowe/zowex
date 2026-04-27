@@ -149,7 +149,6 @@ static int iefssreq(SSOB * PTR32 * PTR32 ssob)
   zenv.abexit = iefssreq_abexit;
   zenv.perc_exit = iefssreq_perc_exit;
 
-  enable_recovery(&zenv);
 
   // ABEND: S0C9 (Divide by zero) - Handled gracefully by the compiler, so no ABEND will be triggered
   // volatile int zero = 0;
@@ -169,6 +168,8 @@ static int iefssreq(SSOB * PTR32 * PTR32 ssob)
 
   // ABEND: User ABEND (e.g., U1234)
   // __asm(" ABEND 1234,DUMP ");
+
+  enable_recovery(&zenv);
 
   IEFSSREQ(ssob, rc);
 
