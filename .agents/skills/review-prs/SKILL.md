@@ -10,7 +10,7 @@ Review pull requests for code quality, security, and adherence to project standa
 ## Review Workflow
 
 1. **Get changed files**: `git diff --name-only main...HEAD 2>nul` (or target branch)
-2. **Get full diff**: `git diff main...HEAD 2>nul`'
+2. **Get full diff**: `git diff main...HEAD 2>nul`
 3. **Read key changed files** to understand context
 4. **Categorize findings** using the format below
 5. **Verify PR checklist** items from the workspace's `.github/PULL_REQUEST_TEMPLATE.md`
@@ -49,7 +49,7 @@ Optional improvements:
 
 ## Platform-Specific Checks
 
-### C++ Backend (`native/c/`, `native/zowed/`)
+### C++ & Metal C Backend (`native/c/`, `native/zowed/`)
 
 **Compiler constraints:**
 
@@ -68,6 +68,9 @@ Optional improvements:
 - 2-space indentation
 - Pointer alignment: right (`char *ptr`)
 
+Use the [cpp-code-quality](../cpp-code-quality) skill to evaluate quality of new or changed C++ code.
+Use the [metalc-code-quality](../metalc-code-quality/) skill to evaluate quality of new or changed Metal C code.
+
 ### TypeScript Clients (`packages/cli/`, `packages/sdk/`, `packages/vsce/`)
 
 **Check for:**
@@ -83,6 +86,8 @@ Optional improvements:
 - Double quotes
 - 120 character line width
 - No unused imports
+
+Use the [frontend-code-quality](../frontend-code-quality/) skill to evaluate quality of new or changed TypeScript code.
 
 ---
 
