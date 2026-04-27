@@ -17,7 +17,7 @@ Before refactoring, evaluate code against:
 - [ ] DRY: No duplicated logic
 - [ ] YAGNI: No unused/speculative code
 - [ ] SRP: Each function/class has one responsibility
-- [ ] Complexity: Functions < 50 lines, cyclomatic complexity < 10
+- [ ] Complexity: Functions < 50 lines, cyclomatic complexity < 10 (treat as a warning/suggestion, not a strict requirement)
 - [ ] Naming: Clear names, minimal comments needed
 - [ ] Error handling: Consistent patterns
 - [ ] Memory: Proper use of RAII/smart pointers vs. legacy C-style allocation
@@ -150,7 +150,7 @@ int write_output(TransformResult *result);
 ### Metrics
 
 - **Function length**: Target < 50 lines
-- **Cyclomatic complexity**: Target < 10 branches
+- **Cyclomatic complexity**: Target < 10 branches (use as a warning/suggestion to guide refactoring, rather than a strict requirement)
 - **Nesting depth**: Target < 4 levels
 
 ### Patterns

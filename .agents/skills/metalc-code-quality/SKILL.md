@@ -19,7 +19,7 @@ Before refactoring, evaluate code against:
 - [ ] DRY: No duplicated logic
 - [ ] YAGNI: No unused/speculative code
 - [ ] SRP: Each function has one responsibility
-- [ ] Complexity: Functions < 50 lines, cyclomatic complexity < 10
+- [ ] Complexity: Functions < 50 lines, cyclomatic complexity < 10 (treat as a warning/suggestion, not a strict requirement)
 - [ ] Memory: Proper use of `storage_obtain` and `storage_release` with correct sizes. **No memory leaks on error paths.**
 - [ ] AMODE Safety: Correct pointer types (`PTR32` vs `PTR64`) used for system services.
 - [ ] Linkage: Proper `#pragma prolog` and `#pragma epilog` for functions.
