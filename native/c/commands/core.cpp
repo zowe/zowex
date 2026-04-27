@@ -119,7 +119,7 @@ int handle_plugins_list(plugin::InvocationContext &context)
   std::ostream &out = context.output_stream();
 
   std::vector<std::string> plugin_files;
-  DIR *plugins_dir = opendir("./plugins");
+  DIR *plugins_dir = opendir(get_plugin_manager()->get_plugins_path().c_str());
   if (plugins_dir != nullptr)
   {
     struct dirent *entry;

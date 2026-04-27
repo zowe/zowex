@@ -222,16 +222,17 @@ private:
   std::set<parser::command_ptr> m_server_commands;
 };
 
-void PluginManager::load_plugins()
+void PluginManager::load_plugins(const std::string &plugins_path)
 {
-  auto *plugins_dir = opendir("./plugins");
+  m_plugins_path = plugins_path;
+  auto *plugins_dir = opendir(m_plugins_path.c_str());
   if (plugins_dir != nullptr)
   {
     struct dirent *entry;
     void (*register_plugin)(plugin::PluginManager &);
     while ((entry = readdir(plugins_dir)) != nullptr)
     {
-      std::string plugin_path = std::string("./plugins/") + entry->d_name;
+      std::string plugin_path = m_plugins_path + "/" + entry->d_name;
       void *plugin = dlopen(plugin_path.c_str(), RTLD_LAZY);
       if (plugin == nullptr)
       {

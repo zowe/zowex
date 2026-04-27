@@ -1190,7 +1190,12 @@ public:
   // Register commands from all providers, attaching them under the supplied root command.
   void register_commands(parser::Command &rootCommand);
 
-  void load_plugins();
+  void load_plugins(const std::string &plugins_path);
+
+  const std::string &get_plugins_path() const
+  {
+    return m_plugins_path;
+  }
 
   const std::vector<LoadedPlugin> &get_loaded_plugins() const
   {
@@ -1213,6 +1218,7 @@ private:
 
   std::vector<std::unique_ptr<CommandProvider>> m_command_providers;
   std::set<parser::command_ptr> m_server_commands;
+  std::string m_plugins_path;
   std::vector<LoadedPlugin> m_plugins;
   PluginMetadata m_pending_metadata;
   bool m_metadata_pending;
