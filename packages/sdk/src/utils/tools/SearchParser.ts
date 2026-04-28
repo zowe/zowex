@@ -69,6 +69,23 @@ export function parseSearchOutput(output: string): SearchResult {
         const dsMatch = line.match(/SRCH DSN:\s+(\S+)/);
         if (dsMatch) {
             dataset = dsMatch[1];
+
+            if (line.includes("SOURCE SECTION")) {
+                const memParse = dsMatch[1].match(/^(.+)\(([^)]+)\)\s*$/); // Parse member name from dataset name if present
+                if (memParse) {
+                    if (currentMember) {
+                        const lastMatch = currentMember.matches.at(-1);
+                        if (lastMatch) lastMatch.afterContext.push(...pendingContext);
+                        members.push(currentMember);
+                    }
+                    pendingContext = [];
+                    currentMember = {
+                        name: memParse[2],
+                        matches: [],
+                    };
+                    continue;
+                }
+            }
         }
 
         // Parse member header: " <member name>                    --------- STRING(S) FOUND -------------------"

@@ -1,6 +1,6 @@
 {
-  "name": "zowex-sdk",
-  "version": "0.4.0",
+  "name": "@zowe/zowex-for-zowe-sdk",
+  "version": "0.5.0",
   "main": "lib/index.js",
   "scripts": {
     "build": "tsc -b",
@@ -39,7 +39,7 @@
     "typescript": "^5.7.3"
   },
   "optionalDependencies": {
-    "russh": "0.1.36"
+    "russh": "0.1.37"
   },
   "peerDependencies": {
     "@zowe/imperative": "^8.11.0",

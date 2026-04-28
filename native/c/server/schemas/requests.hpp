@@ -119,6 +119,14 @@ ZJSON_SCHEMA(WriteDatasetRequest,
     FIELD_OPTIONAL(data, STRING)
 );
 
+struct CopyDatasetRequest {};
+ZJSON_SCHEMA(CopyDatasetRequest,
+    FIELD_REQUIRED(source, STRING),
+    FIELD_REQUIRED(target, STRING),
+    FIELD_OPTIONAL(replace, BOOL),
+    FIELD_OPTIONAL(overwrite, BOOL)
+);
+
 struct CancelJobRequest {};
 ZJSON_SCHEMA(CancelJobRequest,
     FIELD_REQUIRED(jobId, STRING)
