@@ -219,7 +219,7 @@ Command &setup_root_command(char *argv[])
     if (!is_help_request && command.is_apf_authorized()) {
       return true;
     }
-  
+
     auth_off(); 
     return true; });
   auto &root_command = g_arg_parser->get_root_command();

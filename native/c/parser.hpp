@@ -341,7 +341,7 @@ public:
   }
 
   // mark command as APF authorized (and propagate to children)
-  Command &set_apf_authorized(bool authorized = true)
+  Command &set_apf_authorized(bool authorized = false)
   {
     m_apf_authorized = authorized;
     for (auto &pair : m_commands)
@@ -477,7 +477,12 @@ public:
       return *this;
 
     sub->ensure_help_argument();
-    sub->set_apf_authorized(m_apf_authorized);
+    
+    // Only propagate APF authorization if the parent is authorized
+    if (m_apf_authorized)
+    {
+      sub->set_apf_authorized(true);
+    }
 
     std::string sub_name = sub->get_name();
     // check for conflicts with existing names and aliases
