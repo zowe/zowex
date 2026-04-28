@@ -542,10 +542,9 @@ int zjb_submit(ZJB *zjb, const std::string &contents, std::string &jobid)
     }
   }
 
-  // We should do something like this:
   memcpy(zjb->jobid, jobid.c_str(), sizeof(zjb->jobid));
 
-  char ccorrelator[64 + 1] = {0};
+  char ccorrelator[64 + 1]{};
   int correlator_size = sizeof(ccorrelator);
   rc = ZJBSYMB(zjb, "SYS_CORR_LASTJOB", ccorrelator, &correlator_size);
 

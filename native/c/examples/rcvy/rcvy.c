@@ -247,15 +247,13 @@ static int test_iefssreq_with_wild_free(void)
 
   // 2. Simulate a real-world bug: we tell JES2 to free memory,
   // but we pass an uninitialized/garbage pointer!
-  stat.stattype = 3;                       // statmem (free memory)
-  stat.statjobf = (void *PTR32)0xDEADBEEF; // Wild pointer!
-  stat.statjcrp = (void *PTR32)0xDEADBEEF; // Wild pointer!
+  stat.stattype = 3; // statmem (free memory)
+  stat.statjobf = (void *PTR32)0xDEADBEEF;
+  stat.statjcrp = (void *PTR32)0xDEADBEEF;
 
   // Prepare pointer for IEFSSREQ macro
   ssobp = &ssob;
-  // ssobp->ssobssib = (SSIB * PTR32)0xDEADBEEF;
   ssobp = (SSOB * PTR32)((unsigned int)ssobp | 0x80000000);
-  // ssobp = (SSOB * PTR32)0xDEADBEEF;
 
   zwto_debug("@TEST Calling iefssreq() to free wild pointer 0xDEADBEEF...");
 

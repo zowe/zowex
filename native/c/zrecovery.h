@@ -147,34 +147,6 @@ typedef struct sdwarc4 SDWARC4;
 #define VRADATA_DATA(sdwa, key, data, len)
 #endif
 
-#if defined(__IBM_METAL__)
-#define ESTAEX_ESTABLISH(routine, parm, token, list)              \
-  __asm(                                                          \
-      "*                                                      \n" \
-      " ESTAEX (%1),PARAM=(%2),MF=(E,(%3))                    \n" \
-      " ST 0,%0                                               \n" \
-      "*                                                        " \
-      : "=m"(token)                                               \
-      : "r"(routine), "r"(parm), "r"(list)                        \
-      : "r0", "r1", "r14", "r15");
-#else
-#define ESTAEX_ESTABLISH(routine, parm, token, list)
-#endif
-
-#if defined(__IBM_METAL__)
-#define ESTAEX_CANCEL(token, list)                                \
-  __asm(                                                          \
-      "*                                                      \n" \
-      " L 0,%0                                                \n" \
-      " ESTAEX 0,TOKEN=(0),MF=(E,(%1))                        \n" \
-      "*                                                        " \
-      :                                                           \
-      : "m"(token), "r"(list)                                     \
-      : "r0", "r1", "r14", "r15");
-#else
-#define ESTAEX_CANCEL(token, list)
-#endif
-
 /**
  * TODO(Kelosky): features
  * - test for TRAP(ON,NOSPIE)
