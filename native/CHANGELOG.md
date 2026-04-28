@@ -4,6 +4,10 @@ All notable changes to the native code for "zowex" are documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## Recent Changes
+
+- `c`: Fixes issue where ZWEPROLG could return to caller in an incorrect AMODE. [#951](https://github.com/zowe/zowex/issues/951)
+
 ## `0.5.0`
 
 - `c`: Fixes wildcard search for listing data sets on multiple catalogs. [#947](https://github.com/zowe/zowex/issues/947)

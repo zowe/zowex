@@ -19,7 +19,7 @@
 //   // zlongjmp(zenv);
 // }
 
-#pragma prolog(sub, " ZWEPROLG NEWDSA=(YES,128),SAVE=BAKR ")
+#pragma prolog(sub, " ZWEPROLG NEWDSA=(YES,128),SAVE=BAKR,BSM=NO ")
 #pragma epilog(sub, " ZWEEPILG ")
 int sub()
 {
