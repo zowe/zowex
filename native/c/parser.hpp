@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
+#include <functional>
 #include <iomanip>
 #include <iostream>
 #include <map>
@@ -88,6 +89,8 @@ class ArgumentParser;
 class ParseResult;
 
 typedef plugin::Argument ArgValue;
+
+typedef std::function<void(const std::string &command_path)> PreCommandHook;
 
 enum ArgType
 {
@@ -542,7 +545,8 @@ public:
 
   ParseResult parse(const std::vector<lexer::Token> &tokens,
                     size_t &current_token_index,
-                    const std::string &command_path_prefix) const;
+                    const std::string &command_path_prefix,
+                    const std::vector<PreCommandHook> *pre_hooks = nullptr) const;
 
   // generate help text for this command and its subcommands
   void generate_help(std::ostream &os,
@@ -1181,7 +1185,8 @@ inline bool ParseResult::get_value<bool>(const std::string &name,
 inline ParseResult
 Command::parse(const std::vector<lexer::Token> &tokens,
                size_t &current_token_index,
-               const std::string &command_path_prefix) const
+               const std::string &command_path_prefix,
+               const std::vector<PreCommandHook> *pre_hooks) const
 {
   ZLOG_TRACE("Command::parse entry: command='%s', prefix='%s', tokens=%zu, current_index=%zu",
              m_name.c_str(), command_path_prefix.c_str(), tokens.size(), current_token_index);
@@ -1653,7 +1658,7 @@ Command::parse(const std::vector<lexer::Token> &tokens,
         ZLOG_TRACE("Subcommand '%s' matched, delegating parse", potential_subcommand_or_alias.c_str());
         current_token_index++; // consume the subcommand/alias token
         ParseResult sub_result = matched_subcommand->parse(
-            tokens, current_token_index, result.command_path + " ");
+            tokens, current_token_index, result.command_path + " ", pre_hooks);
 
         // propagate the result (success, error, or help request) from the
         // subcommand.
@@ -1889,6 +1894,15 @@ Command::parse(const std::vector<lexer::Token> &tokens,
   {
     ZLOG_TRACE("Executing handler for command '%s'", m_name.c_str());
 
+    // Execute pre-command hooks before the handler
+    if (pre_hooks)
+    {
+      for (const auto &hook : *pre_hooks)
+      {
+        hook(result.command_path);
+      }
+    }
+
     plugin::ArgumentMap invocation_args;
     for (const auto &kv : result.m_values)
     {
@@ -1961,6 +1975,19 @@ public:
   const std::string &get_program_name() const
   {
     return m_program_name;
+  }
+
+  /**
+   * @brief Register a pre-command hook to be called before any command handler executes.
+   *
+   * Hooks receive the full command path (e.g. "zowex console issue") and run
+   * in registration order. They cannot prevent handler execution.
+   *
+   * @param hook Callback invoked with the command path before the handler runs
+   */
+  void add_pre_command_hook(PreCommandHook hook)
+  {
+    m_pre_hooks.push_back(std::move(hook));
   }
 
   /**
@@ -2115,7 +2142,7 @@ public:
     }
 
     ZLOG_TRACE("Starting parse with %zu tokens", tokens.size());
-    ParseResult result = m_root_cmd->parse(tokens, token_index, "");
+    ParseResult result = m_root_cmd->parse(tokens, token_index, "", &m_pre_hooks);
     if (result.status == ParseResult::ParserStatus_Success &&
         token_index < tokens.size())
     {
@@ -2165,7 +2192,7 @@ public:
 
       ZLOG_TRACE("Lexer produced %zu tokens for string parse", tokens.size());
       size_t token_index = 0;
-      ParseResult result = m_root_cmd->parse(tokens, token_index, "");
+      ParseResult result = m_root_cmd->parse(tokens, token_index, "", &m_pre_hooks);
 
       // return early in the event of an error or help request from the parse
       // call
@@ -2227,6 +2254,7 @@ private:
   std::string m_program_name;
   std::string m_program_desc;
   command_ptr m_root_cmd;
+  std::vector<PreCommandHook> m_pre_hooks;
 }; // class ArgumentParser
 
 /**
