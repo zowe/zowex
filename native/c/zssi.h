@@ -144,7 +144,11 @@ static int iefssreq(SSOB * PTR32 * PTR32 ssob)
     disable_recovery(&zenv);
     return rc;
   }
-  return RTNCD_FAILURE;
+  else
+  {
+    disable_recovery(&zenv);
+    return RTNCD_FAILURE;
+  }
 }
 
 #endif

@@ -35,7 +35,7 @@
 typedef struct iazbtokp IAZBTOKP;
 
 void zjb_build_job_response(ZJB_JOB_INFO *PTR64, int, std::vector<ZJob> &);
-void zjb_get_jobid_from_syslog(ZJB *zjb, std::string &jobid);
+int zjb_get_jobid_from_syslog(ZJB *zjb, std::string &jobid);
 
 #define BTOKLEN (293 - 254) // 293 is the full length, minus the max optional buffer area for logs (less 254)
 
@@ -527,15 +527,13 @@ int zjb_submit(ZJB *zjb, const std::string &contents, std::string &jobid)
 
   jobid = std::string(cjobid);
 
-  bool is_dynfree_needed = true;
+  bool dynfree_needed = true;
   if (jobid == "" || jobid == "        ")
   {
     rc = dynfree(&ip);
-    is_dynfree_needed = false;
+    dynfree_needed = false;
 
-    zjb_get_jobid_from_syslog(zjb, jobid);
-
-    if (jobid == "" || jobid == "        ")
+    if (0 == zjb_get_jobid_from_syslog(zjb, jobid))
     {
       strcpy(zjb->diag.service_name, "intrdr");
       ZDIAG_SET_MSG(&zjb->diag, "job submission failed");
@@ -553,7 +551,7 @@ int zjb_submit(ZJB *zjb, const std::string &contents, std::string &jobid)
 
   if (0 != rc)
   {
-    if (is_dynfree_needed)
+    if (dynfree_needed)
     {
       dynfree(&ip);
     }
@@ -562,7 +560,7 @@ int zjb_submit(ZJB *zjb, const std::string &contents, std::string &jobid)
 
   memcpy(zjb->correlator, ccorrelator, sizeof(zjb->correlator));
 
-  if (is_dynfree_needed)
+  if (dynfree_needed)
   {
     rc = dynfree(&ip);
     if (0 != rc)
@@ -878,7 +876,7 @@ void zjb_build_job_response(ZJB_JOB_INFO *PTR64 job_info, int entries, std::vect
   }
 }
 
-void zjb_get_jobid_from_syslog(ZJB *zjb, std::string &jobid)
+int zjb_get_jobid_from_syslog(ZJB *zjb, std::string &jobid)
 {
   time_t now = time(nullptr) - 1; // Look 1 second back to be safe
   struct tm tm_now_storage;
@@ -895,20 +893,24 @@ void zjb_get_jobid_from_syslog(ZJB *zjb, std::string &jobid)
   ZJB zjb_syslog = {0};
   zjb_syslog.encoding_opts.data_type = eDataTypeText;
   std::string syslog_content;
-  int syslog_rc = zjb_read_syslog(&zjb_syslog, syslog_content, date_value, time_value, 500);
+  int rc = zjb_read_syslog(&zjb_syslog, syslog_content, date_value, time_value, 500);
 
-  if (syslog_rc == 0)
+  if (0 == rc)
   {
     std::string IEFC_MESSAGE = "IEFC452I";
     size_t pos = syslog_content.rfind(IEFC_MESSAGE); // Get the most recent one
 
-    if (pos != std::string::npos)
+    if (std::string::npos != pos)
     {
       size_t line_start = syslog_content.rfind('\n', pos);
-      if (line_start == std::string::npos)
+      if (std::string::npos == line_start)
+      {
         line_start = 0;
+      }
       else
+      {
         line_start++;
+      }
 
       std::string line = syslog_content.substr(line_start, syslog_content.find('\n', pos) - line_start);
       std::string line_reverse = line;
@@ -919,26 +921,26 @@ void zjb_get_jobid_from_syslog(ZJB *zjb, std::string &jobid)
       //                            558 RORRE LCJ - NUR TON BOJ - 1BOJTSET I254CFEI  49000000 85780BOJ 75.25:05:01 69062     DCBA 0000404 M
 
       size_t original_iefc_pos = line.find(IEFC_MESSAGE);
-      if (original_iefc_pos != std::string::npos)
+      if (std::string::npos != original_iefc_pos)
       {
         // Index in reversed string where the text *before* IEFC452I begins
         size_t rev_start_pos = line.length() - original_iefc_pos;
 
         // Find the first non-space character (this is the start of the word "49000000" in reverse)
         size_t word1_start = line_reverse.find_first_not_of(" ", rev_start_pos);
-        if (word1_start != std::string::npos)
+        if (std::string::npos != word1_start)
         {
           // Find the space after word1
           size_t word1_end = line_reverse.find_first_of(" ", word1_start);
-          if (word1_end != std::string::npos)
+          if (std::string::npos != word1_end)
           {
             // Find the start of word2 (which should be "JOB08758" in reverse, i.e., "85780BOJ")
             size_t word2_start = line_reverse.find_first_not_of(" ", word1_end);
-            if (word2_start != std::string::npos)
+            if (std::string::npos != word2_start)
             {
               // Find the space after word2
               size_t word2_end = line_reverse.find_first_of(" ", word2_start);
-              if (word2_end == std::string::npos)
+              if (std::string::npos == word2_end)
               {
                 word2_end = line_reverse.length();
               }
@@ -952,4 +954,6 @@ void zjb_get_jobid_from_syslog(ZJB *zjb, std::string &jobid)
     }
     jobid = found_jobid;
   }
+
+  return rc;
 }
