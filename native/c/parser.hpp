@@ -90,7 +90,10 @@ class ParseResult;
 
 typedef plugin::Argument ArgValue;
 
-typedef std::function<void(const std::string &command_path)> PreCommandHook;
+class Command;
+
+// Return value signals whether the hook succeeded
+typedef std::function<bool(const Command &command, bool is_help_request)> PreCommandHook;
 
 enum ArgType
 {
@@ -326,7 +329,7 @@ public:
 
   Command(std::string name, std::string help)
       : m_name(name), m_help(help), m_handler(nullptr),
-        m_allow_dynamic_keywords(false), m_allow_passthrough(false)
+        m_allow_dynamic_keywords(false), m_allow_passthrough(false), m_apf_authorized(false)
   {
     ensure_help_argument();
   }
@@ -335,6 +338,25 @@ public:
   ~Command()
   {
     m_commands.clear();
+  }
+
+  // mark command as APF authorized (and propagate to children)
+  Command &set_apf_authorized(bool authorized = true)
+  {
+    m_apf_authorized = authorized;
+    for (auto &pair : m_commands)
+    {
+      if (pair.second)
+      {
+        pair.second->set_apf_authorized(authorized);
+      }
+    }
+    return *this;
+  }
+
+  bool is_apf_authorized() const
+  {
+    return m_apf_authorized;
   }
 
   // add an argument
@@ -455,6 +477,7 @@ public:
       return *this;
 
     sub->ensure_help_argument();
+    sub->set_apf_authorized(m_apf_authorized);
 
     std::string sub_name = sub->get_name();
     // check for conflicts with existing names and aliases
@@ -795,6 +818,7 @@ public:
 private:
   bool m_allow_dynamic_keywords;
   bool m_allow_passthrough;
+  bool m_apf_authorized;
   std::string m_passthrough_description;
 
   // helper to check if the token at the given index is a flag/option token
@@ -1469,6 +1493,21 @@ Command::parse(const std::vector<lexer::Token> &tokens,
       if (matched_arg->is_help_flag)
       {
         ZLOG_TRACE("Help flag detected, showing help and exiting");
+
+        // Execute pre-command hooks before the help runs
+        if (pre_hooks)
+        {
+          for (const auto &hook : *pre_hooks)
+          {
+            if (!hook(*this, true))
+            {
+              ZLOG_TRACE("Pre-command hook aborted execution for help command '%s'", m_name.c_str());
+              result.exit_code = 1;
+              return result;
+            }
+          }
+        }
+
         generate_help(std::cout, command_path_prefix);
         result.status = ParseResult::ParserStatus_HelpRequested;
         result.exit_code = 0; // help request is a successful exit
@@ -1899,7 +1938,12 @@ Command::parse(const std::vector<lexer::Token> &tokens,
     {
       for (const auto &hook : *pre_hooks)
       {
-        hook(result.command_path);
+        if (!hook(*this, false))
+        {
+          ZLOG_TRACE("Pre-command hook aborted execution for command '%s'", m_name.c_str());
+          result.exit_code = 1;
+          return result;
+        }
       }
     }
 
@@ -1925,6 +1969,21 @@ Command::parse(const std::vector<lexer::Token> &tokens,
       result.status == ParseResult::ParserStatus_Success)
   {
     ZLOG_TRACE("Command group with no handler, showing help");
+
+    // Execute pre-command hooks before the help runs
+    if (pre_hooks)
+    {
+      for (const auto &hook : *pre_hooks)
+      {
+        if (!hook(*this, true))
+        {
+          ZLOG_TRACE("Pre-command hook aborted execution for help command group '%s'", m_name.c_str());
+          result.exit_code = 1;
+          return result;
+        }
+      }
+    }
+
     generate_help(std::cout, command_path_prefix);
     result.status = ParseResult::ParserStatus_HelpRequested;
     result.exit_code = 0;
