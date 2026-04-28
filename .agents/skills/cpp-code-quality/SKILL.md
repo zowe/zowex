@@ -1,3 +1,4 @@
+---
 name: cpp-code-quality
 description: Improve C++ code quality by identifying duplication, complexity, and design issues. Apply DRY, YAGNI, SRP principles. Use when refactoring, deduplicating, simplifying, or improving backend code in native/c/.
 ---

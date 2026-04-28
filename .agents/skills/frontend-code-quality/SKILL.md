@@ -1,3 +1,4 @@
+---
 name: frontend-code-quality
 description: Improve TypeScript code quality in CLI, SDK, and VS Code extension packages. Apply DRY, YAGNI, SRP principles to reduce duplication and complexity. Use when refactoring, deduplicating, simplifying, or improving code in packages/cli/, packages/sdk/, or packages/vsce/.
 ---

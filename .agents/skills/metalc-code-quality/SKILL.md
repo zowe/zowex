@@ -1,3 +1,4 @@
+---
 name: metalc-code-quality
 description: Improve z/OS Metal C code quality by identifying duplication, complexity, and design issues. Apply DRY, YAGNI, SRP principles. Use when refactoring, deduplicating, simplifying, or improving native Metal C code in native/c/.
 ---
