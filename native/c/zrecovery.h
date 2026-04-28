@@ -241,10 +241,10 @@ typedef int (*PTR64 RECOVERY_ROUTINE)(SDWA);
 
 #pragma prolog(ZRCVYRTY, " ZWEPROLG NEWDSA=NO ")
 #pragma epilog(ZRCVYRTY, " ZWEEPILG ")
-typedef void (*RETRY_ROUTINE)(ZRCVY_ENV);
-static void ZRCVYRTY(ZRCVY_ENV zenv)
+typedef void (*RETRY_ROUTINE)(ZRCVY_ENV *);
+static void ZRCVYRTY(ZRCVY_ENV *zenv)
 {
-  JUMP_ENV(zenv.f4sa, 4); // TODO(Kelosky): document non-zero return code
+  JUMP_ENV(zenv->f4sa, 4); // TODO(Kelosky): document non-zero return code
 }
 
 static void vradata_init(SDWA *PTR64 sdwa)
@@ -316,7 +316,7 @@ static int ZRCVYARR(SDWA sdwa)
   SETRP_RETRY(
       4, // RTNCD_RETRY
       retry_function,
-      &sdwa);
+      zenv);
 
   return RTNCD_RETRY;
 }
@@ -362,12 +362,11 @@ static int enable_recovery(ZRCVY_ENV *PTR64 zenv)
   // here we call a router routine which will route back to main line code
   // eventually, whenever we call to drop recovery, we then fall through after this
   // IEAARR invocation and jump back to where to drop was called
-  // ieaarr(ZRCVYRTE, zenv, ZRCVYARR, zenv);
   IEAARR(
       ZRCVYRTE,
       &zenv,
       ZRCVYARR,
-      zenv);
+      &zenv);
 
   // jump back to main whenever drop was called
   JUMP_ENV(zenv->final_f4sa, 0);

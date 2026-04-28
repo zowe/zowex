@@ -42,6 +42,26 @@
 #define IEFSSREQ(ssob, rc)                                    \
   __asm(                                                      \
       "*                                                  \n" \
+      "*  Tested with the following ABENDS:               \n" \
+      "*                                                  \n" \
+      "*  S0C9 (Divide by zero)                           \n" \
+      "*LHI  1,0          Load zero into R1               \n" \
+      "*DR   0,0          Divide R0 by R1 (zero)          \n" \
+      "*                                                  \n" \
+      "*  S0C4 (Protection Exception)                     \n" \
+      "*LA   1,4          Load address 4 into R1          \n" \
+      "*MVI  0(1),X'FF'   Store to protected storage      \n" \
+      "*                                                  \n" \
+      "*  S0C3 (Illegal Instruction)                      \n" \
+      "*EXRL 0,*          Execute myself                  \n" \
+      "*                                                  \n" \
+      "*  S0C1 (Operation Exception - Invalid Opcode)     \n" \
+      "*DC F'0'                                           \n" \
+      "*                                                  \n" \
+      "*  User ABEND (e.g., U1234)                        \n" \
+      "*ABEND 1234,DUMP                                   \n" \
+      "*                                                  \n" \
+      "*                                                  \n" \
       " SLGR  2,2       Init register                     \n" \
       " TAM   ,         AMODE64??                         \n" \
       " JM    *+4+4+2   No, skip switching                \n" \
@@ -130,51 +150,21 @@ static int iefssi_query(JQRY_HEADER * PTR32 * PTR32 area, int *PTR32 rsn, const 
   return rc;
 }
 
-static void iefssreq_abexit(SDWA *PTR64 sdwa, void *PTR64 data)
-{
-  zut_print_debug("ARR caught ABEND!");
-}
-
-static void iefssreq_perc_exit(void *PTR64 data)
-{
-  zut_print_debug("ARR percolating ABEND up the recovery chain...");
-}
-
 // https://www.ibm.com/docs/en/zos/3.1.0?topic=subsystem-making-request-iefssreq-macro
+#pragma prolog(iefssreq, " ZWEPROLG NEWDSA=(YES,128) ")
+#pragma epilog(iefssreq, " ZWEEPILG ")
 static int iefssreq(SSOB * PTR32 * PTR32 ssob)
 {
   int rc = 0;
   ZRCVY_ENV zenv = {0};
 
-  zenv.abexit = iefssreq_abexit;
-  zenv.perc_exit = iefssreq_perc_exit;
-
-
-  // ABEND: S0C9 (Divide by zero) - Handled gracefully by the compiler, so no ABEND will be triggered
-  // volatile int zero = 0;
-  // int crash = 1 / zero;
-
-  // ABEND: S0C4 (Protection Exception) - Handled internally by IEFSSREQ (RC=16)
-  // ssobp = (SSOB * PTR32)0x00000000;
-
-  // ------------------------------------------------------------
-
-  // ABEND: S0C1 (Operation Exception - Invalid Opcode)
-  // __asm(" DC F'0' ");
-
-  // ABEND: S0C4 (Protection Exception)
-  // int *bad_ptr = (int *)0x00000004;
-  // *bad_ptr = 123;
-
-  // ABEND: User ABEND (e.g., U1234)
-  // __asm(" ABEND 1234,DUMP ");
-
-  enable_recovery(&zenv);
-
-  IEFSSREQ(ssob, rc);
-
-  disable_recovery(&zenv);
-  return rc;
+  if (0 == enable_recovery(&zenv))
+  {
+    IEFSSREQ(ssob, rc);
+    disable_recovery(&zenv);
+    return rc;
+  }
+  return RTNCD_FAILURE;
 }
 
 #endif
