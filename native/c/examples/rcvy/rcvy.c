@@ -232,6 +232,51 @@ static int test_iefssreq_with_bad_pointer_recovery(void)
   return 0;
 }
 
+static int test_iefssreq_with_wild_free(void)
+{
+  zwto_debug("@TEST Starting iefssreq test with WILD FREE (tests realistic subsystem abend)");
+
+  int rc = 0;
+  SSOB ssob = {0};
+  SSIB ssib = {0};
+  STAT stat = {0};
+  SSOB *PTR32 ssobp = NULL;
+
+  // 1. Set up a perfectly valid SSOB and SSIB
+  setup_ssob_for_job_list(&ssob, &ssib, &stat);
+
+  // 2. Simulate a real-world bug: we tell JES2 to free memory,
+  // but we pass an uninitialized/garbage pointer!
+  stat.stattype = 3;                       // statmem (free memory)
+  stat.statjobf = (void *PTR32)0xDEADBEEF; // Wild pointer!
+  stat.statjcrp = (void *PTR32)0xDEADBEEF; // Wild pointer!
+
+  // Prepare pointer for IEFSSREQ macro
+  ssobp = &ssob;
+  // ssobp->ssobssib = (SSIB * PTR32)0xDEADBEEF;
+  ssobp = (SSOB * PTR32)((unsigned int)ssobp | 0x80000000);
+  // ssobp = (SSOB * PTR32)0xDEADBEEF;
+
+  zwto_debug("@TEST Calling iefssreq() to free wild pointer 0xDEADBEEF...");
+
+  // 3. This will naturally abend deep inside JES2's memory management routines!
+  rc = iefssreq_with_recovery(&ssobp);
+  // rc = iefssreq(&ssobp);
+
+  zwto_debug("@TEST iefssreq with wild free completed with RC=%d", rc);
+
+  if (rc != 0)
+  {
+    zwto_debug("@TEST SUCCESS: Recovery caught the natural subsystem abend!");
+  }
+  else
+  {
+    zwto_debug("@TEST UNEXPECTED: iefssreq succeeded? RC=%d", rc);
+  }
+
+  return 0;
+}
+
 int main()
 {
   zwto_debug("@TEST Recovery test program starting");
@@ -243,6 +288,10 @@ int main()
   // Test 2: IEFSSREQ with bad pointer and built-in recovery
   zwto_debug("@TEST === Test 2: IEFSSREQ with Bad Pointer (tests recovery) ===");
   test_iefssreq_with_bad_pointer_recovery();
+
+  // Test 3: IEFSSREQ with wild free (natural subsystem abend)
+  zwto_debug("@TEST === Test 3: IEFSSREQ with Wild Free (natural subsystem abend) ===");
+  test_iefssreq_with_wild_free();
 
   return 0;
 }
