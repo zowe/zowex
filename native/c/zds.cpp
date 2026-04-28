@@ -12,7 +12,6 @@
 
 #ifndef _OPEN_SYS_ITOA_EXT
 #define _OPEN_SYS_ITOA_EXT
-#include "zdbg.h"
 #include "ztype.h"
 #include <cctype>
 #endif
@@ -227,7 +226,7 @@ static int copy_sequential(ZDS *zds, const std::string &dsn1, const std::string 
   if (options->target_exists && !options->replace)
   {
     zds->diag.e_msg_len = snprintf(zds->diag.e_msg, (int)(sizeof(zds->diag.e_msg) - 1),
-                                  "Target data set '%s' already exists. Use --replace (-r) flag to replace the target's contents", dsn2.c_str());
+                                   "Target data set '%s' already exists. Use --replace (-r) flag to replace the target's contents", dsn2.c_str());
     return RTNCD_FAILURE;
   }
 
@@ -259,8 +258,9 @@ static int copy_sequential(ZDS *zds, const std::string &dsn1, const std::string 
                                    "IEBGENER failed with RC=%d. SYSPRINT: %s",
                                    rc, truncated_detail);
 
-    if (zds->diag.e_msg_len >= sizeof(zds->diag.e_msg)) {
-        zds->diag.e_msg_len = sizeof(zds->diag.e_msg) - 1;
+    if (zds->diag.e_msg_len >= sizeof(zds->diag.e_msg))
+    {
+      zds->diag.e_msg_len = sizeof(zds->diag.e_msg) - 1;
     }
     rc = RTNCD_FAILURE;
   }
@@ -281,7 +281,7 @@ static int copy_partitioned(ZDS *zds, const ZDSTypeInfo &sourceInfo, const ZDSTy
   if (options->overwrite && !targetIsPds)
   {
     zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
-                                  "Cannot use --overwrite when a target member is specified. Use --replace (-r) to replace the contents of member '%s'.",
+                                   "Cannot use --overwrite when a target member is specified. Use --replace (-r) to replace the contents of member '%s'.",
                                    targetInfo.member_name.c_str());
     return RTNCD_FAILURE;
   }
@@ -291,12 +291,12 @@ static int copy_partitioned(ZDS *zds, const ZDSTypeInfo &sourceInfo, const ZDSTy
     if (targetIsPds)
     {
       ZDIAG_SET_MSG(&zds->diag,
-                                    "Target data set '%s' exists. Use --replace (-r) flag to replace like-named members or --overwrite to replace the entire partitioned data set", targetInfo.base_dsn.c_str());
+                    "Target data set '%s' exists. Use --replace (-r) flag to replace like-named members or --overwrite to replace the entire partitioned data set", targetInfo.base_dsn.c_str());
     }
     else
     {
       ZDIAG_SET_MSG(&zds->diag,
-                                    "Target member '%s' exists. Use --replace (-r) flag to replace the member's contents", targetInfo.member_name.c_str());
+                    "Target member '%s' exists. Use --replace (-r) flag to replace the member's contents", targetInfo.member_name.c_str());
     }
     return RTNCD_FAILURE;
   }
@@ -310,13 +310,15 @@ static int copy_partitioned(ZDS *zds, const ZDSTypeInfo &sourceInfo, const ZDSTy
     zds_delete_dsn(zds, targetInfo.base_dsn);
     // Recreate it empty
     int rc = zut_bpxwdyn("ALLOC DA('" + targetInfo.base_dsn + "') LIKE('" + sourceInfo.base_dsn + "') NEW CATALOG", &code, create_resp);
-    if(rc != RTNCD_SUCCESS) {
+    if (rc != RTNCD_SUCCESS)
+    {
       zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
                                      "Overwrite failed. Could not recreate '%s' using LIKE. Details: %s", targetInfo.base_dsn.c_str(), create_resp.c_str());
       return RTNCD_FAILURE;
     }
     rc = zut_bpxwdyn("FREE DA('" + targetInfo.base_dsn + "')", &code, resp);
-    if(rc != RTNCD_SUCCESS) {
+    if (rc != RTNCD_SUCCESS)
+    {
       zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
                                      "Overwrite failed. Details: %s", create_resp.c_str());
       return RTNCD_FAILURE;
@@ -383,11 +385,12 @@ static int copy_partitioned(ZDS *zds, const ZDSTypeInfo &sourceInfo, const ZDSTy
       truncated_detail[sizeof(truncated_detail) - 1] = '\0';
 
       zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
-                                    "IEBCOPY failed with RC=%d. SYSPRINT: %s",
-                                    rc, truncated_detail);
+                                     "IEBCOPY failed with RC=%d. SYSPRINT: %s",
+                                     rc, truncated_detail);
 
-      if (zds->diag.e_msg_len >= sizeof(zds->diag.e_msg)) {
-          zds->diag.e_msg_len = sizeof(zds->diag.e_msg) - 1;
+      if (zds->diag.e_msg_len >= sizeof(zds->diag.e_msg))
+      {
+        zds->diag.e_msg_len = sizeof(zds->diag.e_msg) - 1;
       }
     }
     zut_free_dynalloc_dds(zds->diag, dds);
@@ -398,34 +401,39 @@ static int copy_partitioned(ZDS *zds, const ZDSTypeInfo &sourceInfo, const ZDSTy
   return rc;
 }
 
-static int validate_attributes(ZDS *zds, const ZDSTypeInfo &src, const ZDSTypeInfo &tgt) {
-    // fail if mistaching recfm
-    if (src.entry.recfm != tgt.entry.recfm) {
-        zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
-            "Expected target RECFM to match source (%s), but the destination RECFM is %s",
-            src.entry.recfm.c_str(), tgt.entry.recfm.c_str());
-        return RTNCD_FAILURE;
-    }
+static int validate_attributes(ZDS *zds, const ZDSTypeInfo &src, const ZDSTypeInfo &tgt)
+{
+  // fail if mistaching recfm
+  if (src.entry.recfm != tgt.entry.recfm)
+  {
+    zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
+                                   "Expected target RECFM to match source (%s), but the destination RECFM is %s",
+                                   src.entry.recfm.c_str(), tgt.entry.recfm.c_str());
+    return RTNCD_FAILURE;
+  }
 
-    // fail if mismatching lrecl
-    if (src.entry.lrecl != tgt.entry.lrecl) {
-        zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
-            "Expected target LRECL to match source (%d), but the destination LRECL is %d",
-            src.entry.lrecl, tgt.entry.lrecl);
-        return RTNCD_FAILURE;
-    }
+  // fail if mismatching lrecl
+  if (src.entry.lrecl != tgt.entry.lrecl)
+  {
+    zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
+                                   "Expected target LRECL to match source (%d), but the destination LRECL is %d",
+                                   src.entry.lrecl, tgt.entry.lrecl);
+    return RTNCD_FAILURE;
+  }
 
-   // fail if pds to pds and block size mismatch
-    if(src.type == ZDS_TYPE_PDS || tgt.type == ZDS_TYPE_PDS) {
-       // fail if mismatching blcsize
-      if (src.entry.blksize != tgt.entry.blksize) {
-            zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
-              "Expected target block size to match source (%d), but the destination block size is %d",
-              src.entry.blksize, tgt.entry.blksize);
-          return RTNCD_FAILURE;
-      }
+  // fail if pds to pds and block size mismatch
+  if (src.type == ZDS_TYPE_PDS || tgt.type == ZDS_TYPE_PDS)
+  {
+    // fail if mismatching blcsize
+    if (src.entry.blksize != tgt.entry.blksize)
+    {
+      zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
+                                     "Expected target block size to match source (%d), but the destination block size is %d",
+                                     src.entry.blksize, tgt.entry.blksize);
+      return RTNCD_FAILURE;
     }
-    return RTNCD_SUCCESS;
+  }
+  return RTNCD_SUCCESS;
 }
 
 int zds_copy_dsn(ZDS *zds, const std::string &dsn1, const std::string &dsn2, ZDSCopyOptions *options)
@@ -463,8 +471,8 @@ int zds_copy_dsn(ZDS *zds, const std::string &dsn1, const std::string &dsn2, ZDS
   if (info1.type == ZDS_TYPE_PDS && target_type == ZDS_TYPE_MEMBER)
   {
     ZDIAG_SET_MSG(&zds->diag,
-                                  "Cannot copy a partitioned data set to a member. "
-                                  "Target must be a partitioned data set.");
+                  "Cannot copy a partitioned data set to a member. "
+                  "Target must be a partitioned data set.");
     return RTNCD_FAILURE;
   }
 
@@ -472,7 +480,7 @@ int zds_copy_dsn(ZDS *zds, const std::string &dsn1, const std::string &dsn2, ZDS
   if (info1.type == ZDS_TYPE_MEMBER && target_type == ZDS_TYPE_PS)
   {
     ZDIAG_SET_MSG(&zds->diag,
-                                  "Cannot copy partitioned data set member to a sequential data set. Target must be a data set member");
+                  "Cannot copy partitioned data set member to a sequential data set. Target must be a data set member");
     return RTNCD_FAILURE;
   }
 
@@ -480,8 +488,8 @@ int zds_copy_dsn(ZDS *zds, const std::string &dsn1, const std::string &dsn2, ZDS
   if (info1.type == ZDS_TYPE_PS && target_type == ZDS_TYPE_MEMBER)
   {
     ZDIAG_SET_MSG(&zds->diag,
-                                  "Cannot copy sequential data set to a data set member. "
-                                  "Target must be a sequential data set.");
+                  "Cannot copy sequential data set to a data set member. "
+                  "Target must be a sequential data set.");
     return RTNCD_FAILURE;
   }
 
@@ -489,17 +497,19 @@ int zds_copy_dsn(ZDS *zds, const std::string &dsn1, const std::string &dsn2, ZDS
   if (info1.type == ZDS_TYPE_PDS && target_type == ZDS_TYPE_PS)
   {
     ZDIAG_SET_MSG(&zds->diag,
-                                  "Cannot copy a partitioned data set to a sequential data set. "
-                                  "Target must be a partitioned data set.");
+                  "Cannot copy a partitioned data set to a sequential data set. "
+                  "Target must be a partitioned data set.");
     return RTNCD_FAILURE;
   }
 
   bool target_ds_exists = zds_dataset_exists(info2.base_dsn);
   options->target_exists = info2.member_name.empty() ? target_ds_exists : zds_member_exists(info2.base_dsn, info2.member_name);
 
-  if (zds_dataset_exists(info1.base_dsn) && target_ds_exists) {
+  if (zds_dataset_exists(info1.base_dsn) && target_ds_exists)
+  {
     rc = validate_attributes(zds, info1, info2);
-    if(rc != RTNCD_SUCCESS) {
+    if (rc != RTNCD_SUCCESS)
+    {
       return rc;
     }
   }
@@ -514,7 +524,7 @@ int zds_copy_dsn(ZDS *zds, const std::string &dsn1, const std::string &dsn2, ZDS
     if (rc != RTNCD_SUCCESS)
     {
       ZDIAG_SET_MSG(&zds->diag, "Failed to create target data set '%s' using LIKE('%s'): %s",
-                                    dsn2.c_str(), dsn1.c_str(), create_resp.c_str());
+                    dsn2.c_str(), dsn1.c_str(), create_resp.c_str());
       return RTNCD_FAILURE;
     }
     zut_bpxwdyn("FREE DA('" + dsn2 + "')", &code, create_resp);
@@ -1052,7 +1062,7 @@ static int validate_iconv_setup(const EncodingSetup &setup, const IconvGuard &ic
   if (!iconv_guard.is_valid())
   {
     ZDIAG_SET_MSG(&diag, "Cannot open converter from %s to %s",
-                             setup.source_encoding.c_str(), setup.codepage.c_str());
+                  setup.source_encoding.c_str(), setup.codepage.c_str());
     return RTNCD_FAILURE;
   }
   return RTNCD_SUCCESS;
@@ -1088,7 +1098,7 @@ static int encode_chunk_if_needed(const char *&chunk, int &chunk_len, std::vecto
   catch (std::exception &e)
   {
     ZDIAG_SET_MSG(&diag, "Failed to convert input data from %s to %s",
-                             setup.source_encoding.c_str(), setup.codepage.c_str());
+                  setup.source_encoding.c_str(), setup.codepage.c_str());
     return RTNCD_FAILURE;
   }
 }
@@ -1151,7 +1161,7 @@ static int encode_line_if_needed(std::string &line, const EncodingSetup &setup, 
   catch (std::exception &e)
   {
     ZDIAG_SET_MSG(&diag, "Failed to convert input data from %s to %s",
-                             setup.source_encoding.c_str(), setup.codepage.c_str());
+                  setup.source_encoding.c_str(), setup.codepage.c_str());
     return RTNCD_FAILURE;
   }
 }
@@ -1658,7 +1668,7 @@ int zds_validate_etag(ZDS *zds, const std::string &dsn, bool has_encoding)
     strncpy(truncated_detail, read_zds.diag.e_msg, sizeof(truncated_detail) - 1);
     truncated_detail[sizeof(truncated_detail) - 1] = '\0';
     ZDIAG_SET_MSG(&zds->diag,
-                                  "Failed to read contents of data set for e-tag comparison: %s", truncated_detail);
+                  "Failed to read contents of data set for e-tag comparison: %s", truncated_detail);
     return RTNCD_FAILURE;
   }
 
@@ -2591,7 +2601,7 @@ typedef struct
 typedef struct
 {
   ZDS_CSI_HEADER header;
-  ZDS_CSI_CATALOG catalog;
+  ZDS_CSI_CATALOG catalog[0];
   ZDS_CSI_ENTRY entry;
 } ZDS_CSI_WORK_AREA;
 
@@ -3321,7 +3331,7 @@ int zds_list_data_sets(ZDS *zds, std::string dsn, std::vector<ZDSEntry> &dataset
   memset(&selection_criteria->csicldi, 'Y', sizeof(selection_criteria->csicldi));
   memset(&selection_criteria->csiresum, ' ', sizeof(selection_criteria->csiresum));
   memset(&selection_criteria->csicatnm, ' ', sizeof(selection_criteria->csicatnm));
-  memset(&selection_criteria->csis1cat, 'Y', sizeof(selection_criteria->csis1cat)); // do not search master catalog if alias is found
+  memset(&selection_criteria->csis1cat, ' ', sizeof(selection_criteria->csis1cat));
   memset(&selection_criteria->csioptns, FOUR_BYTE_RETURN, sizeof(selection_criteria->csioptns));
   memset(selection_criteria->csidtyps, ' ', sizeof(selection_criteria->csidtyps));
 
@@ -3333,6 +3343,7 @@ int zds_list_data_sets(ZDS *zds, std::string dsn, std::vector<ZDSEntry> &dataset
   }
 
   selection_criteria->csinumen = number_of_fields;
+  bool found_in_catalog = false;
 
   do
   {
@@ -3342,10 +3353,6 @@ int zds_list_data_sets(ZDS *zds, std::string dsn, std::vector<ZDSEntry> &dataset
     {
       free(area);
       ZDSDEL(zds);
-      strcpy(zds->diag.service_name, "ZDSCSI00");
-      zds->diag.service_rc = rc;
-      zds->diag.detail_rc = ZDS_RTNCD_SERVICE_FAILURE;
-      ZDIAG_SET_MSG(&zds->diag, "ZDSCSI00 failed with rc %d", rc);
       return RTNCD_FAILURE;
     }
 
@@ -3363,52 +3370,11 @@ int zds_list_data_sets(ZDS *zds, std::string dsn, std::vector<ZDSEntry> &dataset
       return RTNCD_FAILURE;
     }
 
-    if (ERROR_CONDITION == csi_work_area->catalog.flag)
-    {
-      free(area);
-      ZDSDEL(zds);
-      zds->diag.detail_rc = ZDS_RTNCD_PARSING_ERROR;
-      zds->diag.service_rc = ZDS_RTNCD_CATALOG_ERROR;
-      ZDIAG_SET_MSG(&zds->diag, "Unexpected catalog flag '%x' ", csi_work_area->catalog.flag);
-      return RTNCD_FAILURE;
-    }
-
-    if (DATA_NOT_COMPLETE & csi_work_area->catalog.flag)
-    {
-      free(area);
-      ZDSDEL(zds);
-      zds->diag.detail_rc = ZDS_RTNCD_PARSING_ERROR;
-      zds->diag.service_rc = ZDS_RTNCD_CATALOG_ERROR;
-      ZDIAG_SET_MSG(&zds->diag, "Unexpected catalog flag '%x' ", csi_work_area->catalog.flag);
-      return RTNCD_FAILURE;
-    }
-
-    if (NO_ENTRY & csi_work_area->catalog.flag)
-    {
-      free(area);
-      ZDSDEL(zds);
-      zds->diag.detail_rc = ZDS_RSNCD_NOT_FOUND;
-      zds->diag.service_rc = ZDS_RTNCD_CATALOG_ERROR;
-      ZDIAG_SET_MSG(&zds->diag, "Not found in catalog, flag '%x' ", csi_work_area->catalog.flag);
-      return RTNCD_WARNING;
-    }
-
-    if (CATALOG_TYPE != csi_work_area->catalog.type)
-    {
-      free(area);
-      ZDSDEL(zds);
-      zds->diag.detail_rc = ZDS_RTNCD_PARSING_ERROR;
-      zds->diag.service_rc = ZDS_RTNCD_CATALOG_ERROR;
-      ZDIAG_SET_MSG(&zds->diag, "Unexpected type '%x' ", csi_work_area->catalog.type);
-      return RTNCD_FAILURE;
-    }
-
     int work_area_total = csi_work_area->header.used_size;
-    unsigned char *p = (unsigned char *)&csi_work_area->entry;
+    unsigned char *p = (unsigned char *)csi_work_area->catalog;
     ZDS_CSI_ENTRY *f = nullptr;
 
     work_area_total -= sizeof(ZDS_CSI_HEADER);
-    work_area_total -= sizeof(ZDS_CSI_CATALOG);
 
     char buffer[sizeof(f->name) + 1] = {};
 
@@ -3416,6 +3382,42 @@ int zds_list_data_sets(ZDS *zds, std::string dsn, std::vector<ZDSEntry> &dataset
     {
       ZDSEntry entry{};
       f = (ZDS_CSI_ENTRY *)p;
+
+      if (CATALOG_TYPE == f->type)
+      {
+        if (ERROR_CONDITION == f->flag)
+        {
+          free(area);
+          ZDSDEL(zds);
+          zds->diag.detail_rc = ZDS_RTNCD_PARSING_ERROR;
+          zds->diag.service_rc = ZDS_RTNCD_CATALOG_ERROR;
+          ZDIAG_SET_MSG(&zds->diag, "Unexpected catalog flag '%x' ", f->flag);
+          return RTNCD_FAILURE;
+        }
+
+        if (DATA_NOT_COMPLETE & f->flag)
+        {
+          free(area);
+          ZDSDEL(zds);
+          zds->diag.detail_rc = ZDS_RTNCD_PARSING_ERROR;
+          zds->diag.service_rc = ZDS_RTNCD_CATALOG_ERROR;
+          ZDIAG_SET_MSG(&zds->diag, "Unexpected catalog flag '%x' ", f->flag);
+          return RTNCD_FAILURE;
+        }
+
+        if (NO_ENTRY & f->flag)
+        {
+          // do nothing and continue to the next catalog
+        }
+        else
+        {
+          found_in_catalog = true;
+        }
+
+        p += sizeof(ZDS_CSI_CATALOG);
+        work_area_total -= sizeof(ZDS_CSI_CATALOG);
+        continue;
+      }
 
       if (ERROR == f->flag)
       {
@@ -3534,7 +3536,7 @@ int zds_list_data_sets(ZDS *zds, std::string dsn, std::vector<ZDSEntry> &dataset
           ZDSDEL(zds);
           zds->diag.detail_rc = ZDS_RTNCD_SERVICE_FAILURE;
           zds->diag.service_rc = ZDS_RTNCD_UNSUPPORTED_ERROR;
-          ZDIAG_SET_MSG(&zds->diag, "Unsupported entry type '%x' ", f->type);
+          ZDIAG_SET_MSG(&zds->diag, "Unexpected entry type '%x' ", f->type);
           return RTNCD_FAILURE;
         };
 
@@ -3563,6 +3565,14 @@ int zds_list_data_sets(ZDS *zds, std::string dsn, std::vector<ZDSEntry> &dataset
 
   free(area);
   ZDSDEL(zds);
+
+  if (!found_in_catalog)
+  {
+    zds->diag.detail_rc = ZDS_RSNCD_NOT_FOUND;
+    zds->diag.service_rc = ZDS_RTNCD_CATALOG_ERROR;
+    ZDIAG_SET_MSG(&zds->diag, "Not found in any catalog");
+    return RTNCD_WARNING;
+  }
 
   return RTNCD_SUCCESS;
 }
