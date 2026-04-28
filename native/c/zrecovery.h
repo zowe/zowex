@@ -288,7 +288,7 @@ static int ZRCVYARR(SDWA sdwa)
   SETRP_RETRY(
       4, // RTNCD_RETRY
       retry_function,
-      zenv);
+      &sdwa); // SETRP operates on an SDWA pointer, not a ZRCVY_ENV pointer
 
   return RTNCD_RETRY;
 }
@@ -338,7 +338,7 @@ static int enable_recovery(ZRCVY_ENV *PTR64 zenv)
       ZRCVYRTE,
       &zenv,
       ZRCVYARR,
-      &zenv);
+      zenv); // NOTE(Kelosky): passing zenv by reference may have unintended side effects since IEAARR alters GPR2
 
   // jump back to main whenever drop was called
   JUMP_ENV(zenv->final_f4sa, 0);
