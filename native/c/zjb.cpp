@@ -533,7 +533,7 @@ int zjb_submit(ZJB *zjb, const std::string &contents, std::string &jobid)
     rc = dynfree(&ip);
     dynfree_needed = false;
 
-    if (0 == zjb_get_jobid_from_syslog(zjb, jobid))
+    if (0 != zjb_get_jobid_from_syslog(zjb, jobid))
     {
       strcpy(zjb->diag.service_name, "intrdr");
       ZDIAG_SET_MSG(&zjb->diag, "job submission failed");

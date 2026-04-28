@@ -24,7 +24,6 @@
 #include "ihapsa.h"
 #include "cvt.h"
 #include "iefjesct.h"
-#include <string.h>
 
 // TODO(Kelosky):
 // https://www.ibm.com/docs/en/zos/3.1.0?topic=79-putget-requests
