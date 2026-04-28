@@ -65,9 +65,9 @@ export abstract class AbstractConfigManager {
 
     public async promptForProfile(
         profileName?: string,
-        options: PromptForProfileOptions = {},
+        options?: PromptForProfileOptions,
     ): Promise<IProfileLoaded | undefined> {
-        const { setExistingProfile = true, prioritizeProjectLevelConfig = true } = options;
+        const { setExistingProfile = true, prioritizeProjectLevelConfig = true } = options ?? {};
         this.validationResult = undefined;
         if (profileName) {
             return { profile: this.getMergedAttrs(profileName), message: "", failNotFound: false, type: "ssh" };
