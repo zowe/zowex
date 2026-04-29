@@ -48,4 +48,5 @@ export interface IDisposable {
 export interface PromptForProfileOptions {
     setExistingProfile?: boolean;
     prioritizeProjectLevelConfig?: boolean;
+    disableCreateNewProfile?: boolean;
 }
