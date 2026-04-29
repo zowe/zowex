@@ -341,7 +341,7 @@ public:
   }
 
   // mark command as APF authorized (and propagate to children)
-  Command &set_apf_authorized(bool authorized = false)
+  Command &set_apf_authorized(bool authorized = true)
   {
     m_apf_authorized = authorized;
     for (auto &pair : m_commands)
@@ -357,6 +357,20 @@ public:
   bool is_apf_authorized() const
   {
     return m_apf_authorized;
+  }
+
+  // propagate pre_hooks recursively
+  Command &set_pre_hooks(std::shared_ptr<std::vector<PreCommandHook>> hooks)
+  {
+    m_pre_hooks = hooks;
+    for (auto &pair : m_commands)
+    {
+      if (pair.second)
+      {
+        pair.second->set_pre_hooks(hooks);
+      }
+    }
+    return *this;
   }
 
   // add an argument
@@ -477,11 +491,16 @@ public:
       return *this;
 
     sub->ensure_help_argument();
-    
+
     // Only propagate APF authorization if the parent is authorized
     if (m_apf_authorized)
     {
       sub->set_apf_authorized(true);
+    }
+
+    if (m_pre_hooks)
+    {
+      sub->set_pre_hooks(m_pre_hooks);
     }
 
     std::string sub_name = sub->get_name();
@@ -573,8 +592,7 @@ public:
 
   ParseResult parse(const std::vector<lexer::Token> &tokens,
                     size_t &current_token_index,
-                    const std::string &command_path_prefix,
-                    const std::vector<PreCommandHook> *pre_hooks = nullptr) const;
+                    const std::string &command_path_prefix) const;
 
   // generate help text for this command and its subcommands
   void generate_help(std::ostream &os,
@@ -825,6 +843,25 @@ private:
   bool m_allow_passthrough;
   bool m_apf_authorized;
   std::string m_passthrough_description;
+  std::shared_ptr<std::vector<PreCommandHook>> m_pre_hooks;
+
+  // helper to execute pre-command hooks
+  bool execute_pre_hooks(bool is_help_request, const char *context_msg) const
+  {
+    if (m_pre_hooks)
+    {
+      for (size_t i = 0; i < m_pre_hooks->size(); ++i)
+      {
+        const auto &hook = (*m_pre_hooks)[i];
+        if (!hook(*this, is_help_request))
+        {
+          ZLOG_TRACE("Pre-command hook aborted execution for %s '%s'", context_msg, m_name.c_str());
+          return false;
+        }
+      }
+    }
+    return true;
+  }
 
   // helper to check if the token at the given index is a flag/option token
   bool is_flag_token(const std::vector<lexer::Token> &tokens,
@@ -1214,8 +1251,7 @@ inline bool ParseResult::get_value<bool>(const std::string &name,
 inline ParseResult
 Command::parse(const std::vector<lexer::Token> &tokens,
                size_t &current_token_index,
-               const std::string &command_path_prefix,
-               const std::vector<PreCommandHook> *pre_hooks) const
+               const std::string &command_path_prefix) const
 {
   ZLOG_TRACE("Command::parse entry: command='%s', prefix='%s', tokens=%zu, current_index=%zu",
              m_name.c_str(), command_path_prefix.c_str(), tokens.size(), current_token_index);
@@ -1500,17 +1536,10 @@ Command::parse(const std::vector<lexer::Token> &tokens,
         ZLOG_TRACE("Help flag detected, showing help and exiting");
 
         // Execute pre-command hooks before the help runs
-        if (pre_hooks)
+        if (!execute_pre_hooks(true, "help command"))
         {
-          for (const auto &hook : *pre_hooks)
-          {
-            if (!hook(*this, true))
-            {
-              ZLOG_TRACE("Pre-command hook aborted execution for help command '%s'", m_name.c_str());
-              result.exit_code = 1;
-              return result;
-            }
-          }
+          result.exit_code = 1;
+          return result;
         }
 
         generate_help(std::cout, command_path_prefix);
@@ -1702,7 +1731,7 @@ Command::parse(const std::vector<lexer::Token> &tokens,
         ZLOG_TRACE("Subcommand '%s' matched, delegating parse", potential_subcommand_or_alias.c_str());
         current_token_index++; // consume the subcommand/alias token
         ParseResult sub_result = matched_subcommand->parse(
-            tokens, current_token_index, result.command_path + " ", pre_hooks);
+            tokens, current_token_index, result.command_path + " ");
 
         // propagate the result (success, error, or help request) from the
         // subcommand.
@@ -1939,17 +1968,10 @@ Command::parse(const std::vector<lexer::Token> &tokens,
     ZLOG_TRACE("Executing handler for command '%s'", m_name.c_str());
 
     // Execute pre-command hooks before the handler
-    if (pre_hooks)
+    if (!execute_pre_hooks(false, "command"))
     {
-      for (const auto &hook : *pre_hooks)
-      {
-        if (!hook(*this, false))
-        {
-          ZLOG_TRACE("Pre-command hook aborted execution for command '%s'", m_name.c_str());
-          result.exit_code = 1;
-          return result;
-        }
-      }
+      result.exit_code = 1;
+      return result;
     }
 
     plugin::ArgumentMap invocation_args;
@@ -1976,17 +1998,10 @@ Command::parse(const std::vector<lexer::Token> &tokens,
     ZLOG_TRACE("Command group with no handler, showing help");
 
     // Execute pre-command hooks before the help runs
-    if (pre_hooks)
+    if (!execute_pre_hooks(true, "help command group"))
     {
-      for (const auto &hook : *pre_hooks)
-      {
-        if (!hook(*this, true))
-        {
-          ZLOG_TRACE("Pre-command hook aborted execution for help command group '%s'", m_name.c_str());
-          result.exit_code = 1;
-          return result;
-        }
-      }
+      result.exit_code = 1;
+      return result;
     }
 
     generate_help(std::cout, command_path_prefix);
@@ -2005,8 +2020,10 @@ public:
   ArgumentParser() = default;
   explicit ArgumentParser(std::string prog_name, std::string description = "")
       : m_program_name(prog_name), m_program_desc(description),
-        m_root_cmd(command_ptr(new Command(prog_name, description)))
+        m_root_cmd(command_ptr(new Command(prog_name, description))),
+        m_pre_hooks(std::make_shared<std::vector<PreCommandHook>>())
   {
+    m_root_cmd->set_pre_hooks(m_pre_hooks);
   }
 
   ~ArgumentParser() = default;
@@ -2051,7 +2068,10 @@ public:
    */
   void add_pre_command_hook(PreCommandHook hook)
   {
-    m_pre_hooks.push_back(std::move(hook));
+    m_pre_hooks->push_back(std::move(hook));
+    if (m_root_cmd) {
+      m_root_cmd->set_pre_hooks(m_pre_hooks);
+    }
   }
 
   /**
@@ -2206,7 +2226,7 @@ public:
     }
 
     ZLOG_TRACE("Starting parse with %zu tokens", tokens.size());
-    ParseResult result = m_root_cmd->parse(tokens, token_index, "", &m_pre_hooks);
+    ParseResult result = m_root_cmd->parse(tokens, token_index, "");
     if (result.status == ParseResult::ParserStatus_Success &&
         token_index < tokens.size())
     {
@@ -2256,7 +2276,7 @@ public:
 
       ZLOG_TRACE("Lexer produced %zu tokens for string parse", tokens.size());
       size_t token_index = 0;
-      ParseResult result = m_root_cmd->parse(tokens, token_index, "", &m_pre_hooks);
+      ParseResult result = m_root_cmd->parse(tokens, token_index, "");
 
       // return early in the event of an error or help request from the parse
       // call
@@ -2318,7 +2338,7 @@ private:
   std::string m_program_name;
   std::string m_program_desc;
   command_ptr m_root_cmd;
-  std::vector<PreCommandHook> m_pre_hooks;
+  std::shared_ptr<std::vector<PreCommandHook>> m_pre_hooks;
 }; // class ArgumentParser
 
 /**
