@@ -10,7 +10,7 @@ Identify and fix code quality issues in the native Metal C codebase (`native/c/`
 ## Environment Constraints
 
 **Compiler:** IBM XL C/C++ or Open XL C/C++ Metal C compiler.
-**Runtime:** No standard C library (LE) is available. You cannot use standard `malloc`, `free`, or standard I/O streams directly.
+**Runtime:** No standard C library (LE) is available. You cannot use standard `malloc`, `free`, or standard I/O streams directly. Avoid using the following functions in Metal C code that have a pre-requisite of using `__cinit()`: `calloc`, `free`, `malloc`, `__malloc31`, `rand`, `realloc`, `snprintf`, `srand`, `strdup`, `strtok`, `strtok_r`, `vsnprintf`, `vsprintf`, and `vsscanf`.
 **Addressing Mode (AMODE):** Mixed AMODE 64 and AMODE 31. Explicit pointer sizing (`PTR32`, `PTR64`) and thunking is required.
 
 ## Quality Checklist
