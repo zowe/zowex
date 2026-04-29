@@ -6,7 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
-- Added `disableCreateNewProfile` option to `promptForProfile` to restrict profile creation during setup operations and allow selection from existing profiles only. [#971](https://github.com/zowe/zowex/pull/971)
+- Added `disableCreateNewProfile` option to the `promptForProfile` function to restrict profile creation during set-up operations. This allows selection from existing profiles only. [#971](https://github.com/zowe/zowex/pull/971)
 
 ## `0.4.0`
 
