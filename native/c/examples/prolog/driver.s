@@ -41,8 +41,8 @@ CALLER  USING SAVER,R13
         JAS   R14,PRNTAMD
 *
         L     R15,=V(SUB)
-*        OILH  R15,X'8000'          Set AMODE 31 bit for BASSM
-        OILL  R15,X'0001'          Set AMODE 64 bit for BASSM
+        OILH  R15,X'8000'          Set AMODE 31 bit for BASSM
+*        OILL  R15,X'0001'          Set AMODE 64 bit for BASSM
         BASSM R14,R15
 *
         JAS   R14,PRNTAMD

@@ -64,7 +64,7 @@
                &SAM64=NO,                                              +
                &LOC24=NO,                                              +
                &USENAB=NO,                                             +
-               &BSM=YES
+               &BSM=
 .*
          COPY  CCNZGBL
          GBLA  &ZG_DSASZ
@@ -83,7 +83,7 @@
 &ZG_BAKR  SETB  0
 &ZG_LOC24 SETB  0
 &ZG_SAM64 SETB  0
-&ZG_BSM   SETB  0
+&ZG_BSM   SETB  1
 &ZG_UNAB  SETB  0
 &IS_64    SETB  (&CCN_LP64 OR '&SAM64' EQ 'YES')
 &IS_AR    SETB  ('&CCN_ASCM' EQ 'AR')
@@ -117,15 +117,19 @@
                AND '&SAVE' NE 'BAKR'                                   +
                AND '&SAVE' NE 'NO').ERR020
          AIF   ('&SAM64' NE 'NO' AND '&SAM64' NE 'YES').ERR030
-         AIF   ('&SAVE' NE 'BAKR' AND '&SAM64' EQ 'YES').ERR040
+         AIF   ('&USENAB' NE 'NO' AND '&USENAB' NE 'YES').ERR070
          AIF   ('&LOC24' NE 'NO' AND '&LOC24' NE 'YES').ERR050
-         AIF   ('&BSM' NE 'YES' AND '&BSM' NE 'NO').ERR090
+         AIF   ('&BSM' NE ''                                           +
+               AND ('&BSM' NE 'NO'                                     +
+               AND '&BSM' NE 'YES')).ERR090
 .*
 .*       Validate conflicting options
 .*
+         AIF   ('&SAVE' NE 'BAKR' AND '&SAM64' EQ 'YES').ERR040
+         AIF   ('&SAVE' NE 'BAKR' AND '&BSM' EQ 'YES').ERR100
          AIF   ('&NEWDSA(1)' EQ 'YES' AND '&USENAB' EQ 'YES').ERR060
-         AIF   ('&USENAB' NE 'NO' AND '&USENAB' NE 'YES').ERR070
          AIF   ('&USENAB' EQ 'YES' AND '&SAVE' EQ 'NO').ERR080
+         AIF   ('&NEWDSA(1)' EQ 'YES' AND '&SAVE' EQ 'NO').ERR120
 .*
 .*       Process SAVE=
 .*
@@ -138,8 +142,8 @@
 &ZG_BAKR SETB  1
 .*
 .CONT130 ANOP ,
-         AIF   ('&BSM' EQ 'NO').CONT140
-&ZG_BSM SETB  1
+         AIF   ('&BSM' EQ 'YES').CONT140
+&ZG_BSM SETB  0
 .CONT140 ANOP ,
 .*
 .*       Process SAM64=
@@ -296,7 +300,7 @@
 .*       Errors
 .*
 .ERR010  ANOP  ,
-         MNOTE 8,'&MACNM. - DSA= must be YES|NO'
+         MNOTE 8,'&MACNM. - NEWDSA= must be YES|NO'
          AGO   .EXIT
 .ERR020  ANOP  ,
          MNOTE 8,'&MACNM. - SAVE= must be SA|BAKR|NO'
@@ -311,7 +315,8 @@
          MNOTE 8,'&MACNM. - LOC24= must be NO|YES'
          AGO   .EXIT
 .ERR060  ANOP  ,
-         MNOTE 8,'&MACNM. - Must use either USENAB=YES or NEWDSA=YES'
+         MNOTE 8,'&MACNM. - NEWDSA=(YES...) may not be used with USENAB+
+               =YES'
          AGO   .EXIT
 .ERR070  ANOP  ,
          MNOTE 8,'&MACNM. - USENAB= must be NO|YES'
@@ -321,6 +326,12 @@
          AGO   .EXIT
 .ERR090  ANOP  ,
          MNOTE 8,'&MACNM. - BSM= must be YES|NO'
+         AGO   .EXIT
+.ERR100  ANOP  ,
+         MNOTE 8,'&MACNM. - BSM=YES may only be used with SAVE=BAKR'
+         AGO   .EXIT
+.ERR120  ANOP  ,
+         MNOTE 8,'&MACNM. - NEWDSA=YES may not be used with SAVE=NO'
          AGO   .EXIT
 .*
 .* Common exit
