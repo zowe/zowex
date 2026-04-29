@@ -4,6 +4,10 @@ All notable changes to the Client code for "zowex-for-zowe-cli" are documented i
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## Recent Changes
+
+- Added `disableCreateNewProfile` option to `promptForProfile` to restrict profile creation during setup operations and allow selection from existing profiles only. [#971](https://github.com/zowe/zowex/pull/971)
+
 ## `0.4.0`
 
 - Added an `--attributes` flag to list ISPF statistics for member attributes. [#630](https://github.com/zowe/zowex/issues/630)
