@@ -82,18 +82,16 @@ inline std::vector<std::string> make_aliases(const char *a1 = 0,
 }
 
 class Command;
-typedef std::shared_ptr<Command> command_ptr;
-typedef std::enable_shared_from_this<Command> enable_shared_command;
+using command_ptr = std::shared_ptr<Command>;
+using enable_shared_command = std::enable_shared_from_this<Command>;
 
 class ArgumentParser;
 class ParseResult;
 
-typedef plugin::Argument ArgValue;
-
-class Command;
+using ArgValue = plugin::Argument;
 
 // Return value signals whether the hook succeeded
-typedef std::function<bool(const Command &command, bool is_help_request)> PreCommandHook;
+using PreCommandHook = std::function<bool(const Command &command, bool is_help_request)>;
 
 enum ArgType
 {
@@ -325,7 +323,7 @@ struct CmdExample
 class Command : public enable_shared_command
 {
 public:
-  typedef int (*CommandHandler)(plugin::InvocationContext &context);
+  using CommandHandler = int (*)(plugin::InvocationContext &context);
 
   Command(std::string name, std::string help)
       : m_name(name), m_help(help), m_handler(nullptr),
