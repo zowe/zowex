@@ -40,8 +40,7 @@ $(OUT_DIR)/driver.o: driver.s
 
 $(OUT_DIR)/prolog: $(OUT_DIR)/prolog.o $(OUT_DIR)/driver.o
 	@echo 'Building $(OUT_DIR)/prolog'
-	@echo 'Bind is $(BIND)'
-	ld -V -bRMODE=24,AMODE=24 -eDRIVER -o $@ $^ > $*.bind.lst
+	$(BIND) -V -bRMODE=24,AMODE=24 -eDRIVER -o $@ $^ > $*.bind.lst
 
 clean:
 	rm -f *.o
