@@ -1,6 +1,6 @@
 # Change Log
 
-All notable changes to the Client code for "zowex-cli" are documented in this file.
+All notable changes to the Client code for "zowex-for-zowe-cli" are documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
