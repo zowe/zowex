@@ -2068,8 +2068,13 @@ public:
    */
   void add_pre_command_hook(PreCommandHook hook)
   {
+    if (m_pre_hooks == nullptr)
+    {
+      m_pre_hooks = std::make_shared<std::vector<PreCommandHook>>();
+    }
     m_pre_hooks->push_back(std::move(hook));
-    if (m_root_cmd) {
+    if (m_root_cmd)
+    {
       m_root_cmd->set_pre_hooks(m_pre_hooks);
     }
   }

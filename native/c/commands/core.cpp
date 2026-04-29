@@ -216,7 +216,8 @@ Command &setup_root_command(char *argv[])
   g_arg_parser = std::make_shared<ArgumentParser>(argv[0], "Zowe Remote SSH CLI");
   g_arg_parser->add_pre_command_hook([](const Command &command, bool is_help_request)
                                      {
-    if (!is_help_request && command.is_apf_authorized()) {
+    if (!is_help_request && command.is_apf_authorized())
+    {
       return true;
     }
 
