@@ -595,8 +595,6 @@ void parser_tests()
                  return true;
                });
                
-               Command &root = arg_parser.get_root_command();
-               
                std::vector<std::string> raw = {"prog", "--help"};
                std::vector<char *> argv = to_argv(raw);
                
