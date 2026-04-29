@@ -162,7 +162,14 @@ static void traverse_and_register_impl(parser::Command *cmd, std::string &path_p
 
 void register_commands_with_server(CommandDispatcher &dispatcher)
 {
-  const auto &server_commands = core::get_plugin_manager()->get_server_commands();
+  const auto *manager = core::get_plugin_manager();
+  if (manager == nullptr)
+  {
+    LOG_ERROR("Plugin manager not initialized");
+    return;
+  }
+
+  const auto &server_commands = manager->get_server_commands();
   if (!server_commands.empty())
   {
     LOG_DEBUG("Registering plugin commands to middleware");

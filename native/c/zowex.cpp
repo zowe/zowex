@@ -47,6 +47,11 @@ static std::string get_plugins_dir(const std::string &exec_dir)
   {
     return exec_dir + "/plugins";
   }
+  else if (plugins_path.back() == '/')
+  {
+    plugins_path.pop_back(); // Remove trailing slash if present
+  }
+
   return plugins_path;
 }
 
