@@ -48,7 +48,7 @@ export default class ServerInstallHandler implements ICommandHandler {
             allBeforeMergedProf.push(profInfo.mergeArgsForProfile(profile));
         }
 
-        const profile = await cliPromptApi.promptForProfile(undefined, false);
+        const profile = await cliPromptApi.promptForProfile(undefined, { setExistingProfile: false });
 
         if (!profile) {
             params.response.console.error(
