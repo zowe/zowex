@@ -59,7 +59,7 @@ int sub2()
 }
 
 // .ERR040 - SAM64=YES may only be used with SAVE=BAKR
-#pragma prolog(sub3, " ZWEPROLG NEWDSA=(YES,128),SAVE=YES,SAM64=YES ")
+#pragma prolog(sub3, " ZWEPROLG NEWDSA=(YES,128),SAVE=SA,SAM64=YES ")
 #pragma epilog(sub3, " ZWEEPILG ")
 int sub3()
 {
@@ -68,7 +68,7 @@ int sub3()
 }
 
 // .ERR100 - BSM=YES may only be used with SAVE=BAKR
-#pragma prolog(sub4, " ZWEPROLG NEWDSA=(YES,128),SAVE=YES,BSM=YES ")
+#pragma prolog(sub4, " ZWEPROLG NEWDSA=(YES,128),SAVE=SA,BSM=YES ")
 #pragma epilog(sub4, " ZWEEPILG ")
 int sub4()
 {
