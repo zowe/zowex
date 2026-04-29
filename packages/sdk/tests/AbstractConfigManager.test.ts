@@ -302,6 +302,98 @@ describe("AbstractConfigManager", async () => {
                         expect(setSpy).toHaveBeenCalledWith(profileWithName);
                     });
 
+                    it("should use project-level config when prioritizeProjectLevelConfig is true and current directory exists", async () => {
+                        const profileWithName = {
+                            user: "user1",
+                            name: "nameValue",
+                            port: 222,
+                            privateKey: "/path/to/id_dsa",
+                            hostname: "example1.com",
+                        };
+                        vi.spyOn(testManager, "showCustomMenu").mockResolvedValueOnce({
+                            label: "$(plus) Add New SSH Host...",
+                        });
+                        vi.spyOn(testManager, "showInputBox").mockResolvedValue(
+                            `ssh ${profileWithName.user}@${profileWithName.hostname} -p ${profileWithName.port} -i ${profileWithName.privateKey}`,
+                        );
+                        vi.spyOn(testManager as any, "getNewProfileName").mockReturnValue(profileWithName);
+                        vi.spyOn(testManager as any, "attemptConnection").mockResolvedValue(true);
+                        testManager.getCurrentDir.mockReturnValue("/mock/project/dir"); // Ensure current directory exists
+                        const createZoweSchemaSpy = vi.spyOn(testManager as any, "createZoweSchema");
+                        const setSpy = vi.spyOn(testManager as any, "setProfile").mockImplementation(() => {});
+
+                        await testManager.promptForProfile(undefined, {
+                            setExistingProfile: true,
+                            prioritizeProjectLevelConfig: true,
+                        });
+
+                        // When prioritizeProjectLevelConfig=true and getCurrentDir() returns a directory,
+                        // createZoweSchema should be called with false (project-level, not global)
+                        expect(createZoweSchemaSpy).toHaveBeenCalledWith(false);
+                        expect(setSpy).toHaveBeenCalledWith(profileWithName);
+                    });
+
+                    it("should use global config when prioritizeProjectLevelConfig is false", async () => {
+                        const profileWithName = {
+                            user: "user1",
+                            name: "nameValue",
+                            port: 222,
+                            privateKey: "/path/to/id_dsa",
+                            hostname: "example1.com",
+                        };
+                        vi.spyOn(testManager, "showCustomMenu").mockResolvedValueOnce({
+                            label: "$(plus) Add New SSH Host...",
+                        });
+                        vi.spyOn(testManager, "showInputBox").mockResolvedValue(
+                            `ssh ${profileWithName.user}@${profileWithName.hostname} -p ${profileWithName.port} -i ${profileWithName.privateKey}`,
+                        );
+                        vi.spyOn(testManager as any, "getNewProfileName").mockReturnValue(profileWithName);
+                        vi.spyOn(testManager as any, "attemptConnection").mockResolvedValue(true);
+                        testManager.getCurrentDir.mockReturnValue("/mock/project/dir"); // Ensure current directory exists
+                        const createZoweSchemaSpy = vi.spyOn(testManager as any, "createZoweSchema");
+                        const setSpy = vi.spyOn(testManager as any, "setProfile").mockImplementation(() => {});
+
+                        await testManager.promptForProfile(undefined, {
+                            setExistingProfile: true,
+                            prioritizeProjectLevelConfig: false,
+                        });
+
+                        // When prioritizeProjectLevelConfig=false, createZoweSchema should be called with true (global)
+                        expect(createZoweSchemaSpy).toHaveBeenCalledWith(true);
+                        expect(setSpy).toHaveBeenCalledWith(profileWithName);
+                    });
+
+                    it("should use global config when prioritizeProjectLevelConfig is true but current directory is undefined", async () => {
+                        const profileWithName = {
+                            user: "user1",
+                            name: "nameValue",
+                            port: 222,
+                            privateKey: "/path/to/id_dsa",
+                            hostname: "example1.com",
+                        };
+                        vi.spyOn(testManager, "showCustomMenu").mockResolvedValueOnce({
+                            label: "$(plus) Add New SSH Host...",
+                        });
+                        vi.spyOn(testManager, "showInputBox").mockResolvedValue(
+                            `ssh ${profileWithName.user}@${profileWithName.hostname} -p ${profileWithName.port} -i ${profileWithName.privateKey}`,
+                        );
+                        vi.spyOn(testManager as any, "getNewProfileName").mockReturnValue(profileWithName);
+                        vi.spyOn(testManager as any, "attemptConnection").mockResolvedValue(true);
+                        testManager.getCurrentDir.mockReturnValue(undefined); // No current directory
+                        const createZoweSchemaSpy = vi.spyOn(testManager as any, "createZoweSchema");
+                        const setSpy = vi.spyOn(testManager as any, "setProfile").mockImplementation(() => {});
+
+                        await testManager.promptForProfile(undefined, {
+                            setExistingProfile: true,
+                            prioritizeProjectLevelConfig: true,
+                        });
+
+                        // When prioritizeProjectLevelConfig=true but getCurrentDir() returns undefined,
+                        // createZoweSchema should be called with true (global)
+                        expect(createZoweSchemaSpy).toHaveBeenCalledWith(true);
+                        expect(setSpy).toHaveBeenCalledWith(profileWithName);
+                    });
+
                     it("should return undefined when profile creation fails", async () => {
                         vi.spyOn(testManager, "showCustomMenu").mockResolvedValueOnce({
                             label: "$(plus) Add New SSH Host...",
