@@ -4,6 +4,11 @@ All notable changes to the native code for "zowex" are documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## Recent Changes
+
+- `c`: Fixed an issue where `zoweax` could run the `server` command or `plugin` command group as APF-authorized. Now, `zoweax` disables APF authorization before commands are executed. Commands in the `console` group continue to run as APF authorized. [#958](https://github.com/zowe/zowex/issues/958)
+- `c`: Added support for pre-command hooks in the command-line parser utility. [#958](https://github.com/zowe/zowex/issues/958)
+
 ## `0.5.0`
 
 - `c`: Fixes wildcard search for listing data sets on multiple catalogs. [#947](https://github.com/zowe/zowex/issues/947)
