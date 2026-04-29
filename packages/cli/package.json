@@ -1,5 +1,5 @@
 {
-  "name": "zowex-cli",
+  "name": "zowex-for-zowe-cli",
   "version": "0.5.0",
   "main": "lib/index.js",
   "scripts": {
