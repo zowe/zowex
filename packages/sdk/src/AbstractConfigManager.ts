@@ -35,6 +35,7 @@ import {
     MESSAGE_TYPE,
     type PrivateKeyWarningOptions,
     type ProgressCallback,
+    type PromptForProfileOptions,
     type qpItem,
     type qpOpts,
 } from "./doc";
@@ -64,8 +65,9 @@ export abstract class AbstractConfigManager {
 
     public async promptForProfile(
         profileName?: string,
-        setExistingProfile = true,
+        options?: PromptForProfileOptions,
     ): Promise<IProfileLoaded | undefined> {
+        const { setExistingProfile = true, prioritizeProjectLevelConfig = true } = options ?? {};
         this.validationResult = undefined;
         if (profileName) {
             return { profile: this.getMergedAttrs(profileName), message: "", failNotFound: false, type: "ssh" };
@@ -151,12 +153,8 @@ export abstract class AbstractConfigManager {
             }
         }
 
-        // Prioritize creating a team config in the local workspace if it exists even if a global config exists
-        // TODO: This behavior is only for the POC phase
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////
-        const useProject = this.getCurrentDir() !== undefined;
+        const useProject = prioritizeProjectLevelConfig && this.getCurrentDir() !== undefined;
         await this.createZoweSchema(!useProject);
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
         // Prompt for a new profile name with the hostname (for adding a new config) or host value (for migrating from a config)
         this.selectedProfile = await this.getNewProfileName(this.selectedProfile!, this.mProfilesCache.getTeamConfig());
