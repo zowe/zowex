@@ -427,6 +427,69 @@ describe("AbstractConfigManager", async () => {
                     });
                 });
             });
+
+            describe("disableCreateNewProfile option", () => {
+                beforeEach(() => {
+                    // Mock team config to prevent undefined errors
+                    const mockTeamConfig = {
+                        api: {
+                            profiles: {
+                                defaultGet: vi.fn(),
+                                defaultSet: vi.fn(),
+                                set: vi.fn(),
+                                getProfileNameFromPath: vi.fn(),
+                            },
+                            layers: {
+                                get: vi.fn().mockReturnValue({ properties: { defaults: { ssh: null } } }),
+                                write: vi.fn(),
+                            },
+                        },
+                        save: vi.fn(),
+                    };
+                    vi.spyOn(testManager as any, "mProfilesCache", "get").mockReturnValue({
+                        getTeamConfig: () => mockTeamConfig,
+                        isSecured: () => false,
+                    });
+                });
+
+                it("should disable profile creation when disableCreateNewProfile is true", async () => {
+                    const showMenuSpy = vi.spyOn(testManager, "showMenu").mockResolvedValueOnce("ssh1");
+                    const showCustomMenuSpy = vi.spyOn(testManager, "showCustomMenu");
+                    vi.spyOn(testManager as any, "validateConfig").mockReturnValue({});
+                    vi.spyOn(testManager as any, "setProfile").mockImplementation(() => {});
+
+                    await testManager.promptForProfile(undefined, { disableCreateNewProfile: true });
+
+                    expect(showMenuSpy).toHaveBeenCalledWith({
+                        items: [
+                            { description: "lpar1.com", label: "ssh1" },
+                            { description: "lpar2.com", label: "ssh2" },
+                        ],
+                        placeholder: "Select configured SSH host",
+                    });
+                    expect(showCustomMenuSpy).not.toHaveBeenCalled();
+                });
+
+                it("should allow profile creation when disableCreateNewProfile is false", async () => {
+                    const showCustomMenuSpy = vi.spyOn(testManager, "showCustomMenu").mockResolvedValueOnce(undefined);
+                    const showMenuSpy = vi.spyOn(testManager, "showMenu");
+
+                    await testManager.promptForProfile(undefined, { disableCreateNewProfile: false });
+
+                    expect(showCustomMenuSpy).toHaveBeenCalledWith({
+                        items: [
+                            { label: "$(plus) Add New SSH Host..." },
+                            { description: "lpar1.com", label: "ssh1" },
+                            { description: "lpar2.com", label: "ssh2" },
+                            { label: "Migrate From SSH Config", separator: true },
+                            { description: "lpar3.com", label: "SSHlpar3" },
+                            { description: "lpar4.com", label: "SSHlpar4" },
+                        ],
+                        placeholder: "Select configured SSH host or enter user@host",
+                    });
+                    expect(showMenuSpy).not.toHaveBeenCalled();
+                });
+            });
         });
         describe("profile validation sequence", async () => {
             // Common mock data

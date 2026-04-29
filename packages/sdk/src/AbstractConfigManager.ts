@@ -67,7 +67,11 @@ export abstract class AbstractConfigManager {
         profileName?: string,
         options?: PromptForProfileOptions,
     ): Promise<IProfileLoaded | undefined> {
-        const { setExistingProfile = true, prioritizeProjectLevelConfig = true } = options ?? {};
+        const {
+            setExistingProfile = true,
+            prioritizeProjectLevelConfig = true,
+            disableCreateNewProfile = false,
+        } = options ?? {};
         this.validationResult = undefined;
         if (profileName) {
             return { profile: this.getMergedAttrs(profileName), message: "", failNotFound: false, type: "ssh" };
@@ -84,25 +88,53 @@ export abstract class AbstractConfigManager {
                 !this.sshProfiles.some((sshProfile) => sshProfile.profile?.host === migratedConfig.hostname),
         );
 
-        // Prompt user for ssh (new config, existing, migrating)
-        const result = await this.showCustomMenu({
-            items: [
-                { label: "$(plus) Add New SSH Host..." },
-                ...this.sshProfiles.map(({ name, profile }) => ({
-                    label: name!,
-                    description: profile!.host!,
-                })),
-                {
-                    label: "Migrate From SSH Config",
-                    separator: true,
-                },
-                ...this.filteredMigratedConfigs.map(({ name, hostname }) => ({
+        const menuItems: qpItem[] = [];
+
+        // Add "Create New SSH Host" option if profile creation is enabled
+        if (!disableCreateNewProfile) {
+            menuItems.push({ label: "$(plus) Add New SSH Host..." });
+        }
+
+        // Add existing SSH profiles
+        this.sshProfiles.forEach(({ name, profile }) => {
+            menuItems.push({
+                label: name!,
+                description: profile!.host!,
+            });
+        });
+
+        // Add migration options if profile creation is enabled and configs are available
+        if (!disableCreateNewProfile && this.filteredMigratedConfigs.length > 0) {
+            menuItems.push({
+                label: "Migrate From SSH Config",
+                separator: true,
+            });
+
+            this.filteredMigratedConfigs.forEach(({ name, hostname }) => {
+                menuItems.push({
                     label: name!,
                     description: hostname,
-                })),
-            ],
-            placeholder: "Select configured SSH host or enter user@host",
-        });
+                });
+            });
+        }
+
+        let result: qpItem | undefined;
+
+        if (disableCreateNewProfile) {
+            const selectedLabel = await this.showMenu({
+                items: menuItems,
+                placeholder: "Select configured SSH host",
+            });
+
+            if (!selectedLabel) return;
+
+            result = menuItems.find((item) => item.label === selectedLabel);
+        } else {
+            result = await this.showCustomMenu({
+                items: menuItems,
+                placeholder: "Select configured SSH host or enter user@host",
+            });
+        }
 
         // If nothing selected, return
         if (!result) return;
