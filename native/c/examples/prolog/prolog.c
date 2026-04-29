@@ -12,7 +12,7 @@
 #include "zwto.h"
 #include "zmetal.h"
 
-// Define FAIL at compile time to enable failure HLASM cases.
+// #define FAIL 1 //  enable at compile time to enable failure HLASM cases.
 
 #pragma prolog(sub5, " ZWEPROLG NEWDSA=(YES,128),SAVE=BAKR,BSM=YES,SAM64=YES ")
 #pragma epilog(sub5, " ZWEEPILG ")
