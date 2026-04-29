@@ -20,6 +20,7 @@
 #include <string>
 #include <vector>
 #include <cstddef>
+#include <set>
 
 #include <unordered_map>
 
@@ -429,6 +430,7 @@ inline Node nil()
 namespace parser
 {
 class Command;
+typedef std::shared_ptr<Command> command_ptr;
 } // namespace parser
 
 namespace plugin
@@ -826,36 +828,30 @@ public:
 
   void print(const char *s) const
   {
-    if (m_output_stream && s)
+    if (s)
     {
-      m_output_stream->write(s, std::strlen(s));
+      output_stream().write(s, std::strlen(s));
     }
   }
 
   void println(const char *s) const
   {
     print(s);
-    if (m_output_stream)
-    {
-      m_output_stream->put('\n');
-    }
+    output_stream().put('\n');
   }
 
   void err(const char *e) const
   {
-    if (m_error_stream && e)
+    if (e)
     {
-      m_error_stream->write(e, std::strlen(e));
+      error_stream().write(e, std::strlen(e));
     }
   }
 
   void errln(const char *e) const
   {
     err(e);
-    if (m_error_stream)
-    {
-      m_error_stream->put('\n');
-    }
+    error_stream().put('\n');
   }
 
   void to_err(const std::stringstream &sstr)
@@ -1133,6 +1129,7 @@ public:
                                     const CommandDefaultValue *defaultValue) = 0;
     virtual void set_handler(CommandHandle command, CommandHandler handler) = 0;
     virtual void add_subcommand(CommandHandle parent, CommandHandle child) = 0;
+    virtual void add_to_server(CommandHandle command) = 0;
   };
 
   virtual ~CommandProviderImpl()
@@ -1193,11 +1190,21 @@ public:
   // Register commands from all providers, attaching them under the supplied root command.
   void register_commands(parser::Command &rootCommand);
 
-  void load_plugins();
+  void load_plugins(const std::string &plugins_path);
+
+  const std::string &get_plugins_path() const
+  {
+    return m_plugins_path;
+  }
 
   const std::vector<LoadedPlugin> &get_loaded_plugins() const
   {
     return m_plugins;
+  }
+
+  const std::set<parser::command_ptr> &get_server_commands() const
+  {
+    return m_server_commands;
   }
 
   PluginManager(const PluginManager &) = delete;
@@ -1210,6 +1217,8 @@ private:
   void discard_command_providers_from(std::size_t start_index);
 
   std::vector<std::unique_ptr<CommandProvider>> m_command_providers;
+  std::set<parser::command_ptr> m_server_commands;
+  std::string m_plugins_path;
   std::vector<LoadedPlugin> m_plugins;
   PluginMetadata m_pending_metadata;
   bool m_metadata_pending;
@@ -1268,9 +1277,8 @@ inline bool PluginManager::is_display_name_in_use(const std::string &name) const
     return false;
   }
 
-  return std::any_of(m_plugins.begin(), m_plugins.end(), [&name](const auto &plugin) {
-    return plugin.metadata.display_name == name;
-  });
+  return std::any_of(m_plugins.begin(), m_plugins.end(), [&name](const auto &plugin)
+                     { return plugin.metadata.display_name == name; });
 }
 
 inline void PluginManager::discard_command_providers_from(std::size_t start_index)
