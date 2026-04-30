@@ -1,12 +1,13 @@
 # Change Log
 
-All notable changes to the Client code for "zowex-cli" are documented in this file.
+All notable changes to the Client code for "zowex-for-zowe-cli" are documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## Recent Changes
+## `0.6.0`
 
 - Added the `zssh system view-syslog` command to the CLI.
+- Added `disableCreateNewProfile` option to the `promptForProfile` function to restrict profile creation during set-up operations. This allows selection from existing profiles only. [#971](https://github.com/zowe/zowex/pull/971)
 
 ## `0.4.0`
 

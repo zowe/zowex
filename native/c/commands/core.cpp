@@ -117,9 +117,16 @@ int handle_version_simple(plugin::InvocationContext &context)
 int handle_plugins_list(plugin::InvocationContext &context)
 {
   std::ostream &out = context.output_stream();
-
   std::vector<std::string> plugin_files;
-  DIR *plugins_dir = opendir("./plugins");
+
+  auto *manager = get_plugin_manager();
+  if (manager == nullptr)
+  {
+    context.error_stream() << "Error: Plugin manager not initialized" << std::endl;
+    return 1;
+  }
+
+  DIR *plugins_dir = opendir(manager->get_plugins_path().c_str());
   if (plugins_dir != nullptr)
   {
     struct dirent *entry;
@@ -136,7 +143,6 @@ int handle_plugins_list(plugin::InvocationContext &context)
   std::sort(plugin_files.begin(), plugin_files.end());
 
   std::set<std::string> registered_files;
-  auto *manager = get_plugin_manager();
   if (manager != nullptr)
   {
     const auto &loaded_plugins = manager->get_loaded_plugins();
