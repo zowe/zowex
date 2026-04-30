@@ -142,7 +142,7 @@
 &ZG_BAKR SETB  1
 .*
 .CONT130 ANOP ,
-         AIF   ('&BSM' EQ 'YES').CONT140
+         AIF   ('&BSM' EQ 'YES' OR '&BSM' EQ '').CONT140
 &ZG_BSM SETB  0
 .CONT140 ANOP ,
 .*
