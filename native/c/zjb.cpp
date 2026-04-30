@@ -300,15 +300,15 @@ static int zjb_free_job_dynamic_allocation(ZJB *zjb, std::string ddname)
   return rc;
 }
 
-int zjb_read_syslog(ZJB *zjb, std::string &response, ZJBSyslogOptions &opts)
+int zjb_read_syslog(ZJB *zjb, ZJBSyslogOptions &opts, ZJBSyslogResponse &response)
 {
   int rc = 0;
   std::string ddname;
   ZDS zds = {};
-  opts.has_more = false;
-  opts.end_date.clear();
-  opts.end_time.clear();
-  opts.returned_lines = 0;
+  response.has_more = false;
+  response.end_date.clear();
+  response.end_time.clear();
+  response.returned_lines = 0;
 
   //
   // get system name
@@ -354,16 +354,16 @@ int zjb_read_syslog(ZJB *zjb, std::string &response, ZJBSyslogOptions &opts)
   zds.encoding_opts.data_type = zjb->encoding_opts.data_type;
   memcpy((void *)&zds.encoding_opts.codepage, (const void *)&zjb->encoding_opts.codepage, sizeof(zjb->encoding_opts.codepage));
 
-  rc = zds_read_vsam(&zds, ddname, response);
+  rc = zds_read_vsam(&zds, ddname, response.data);
   memcpy(&zjb->diag, &zds.diag, sizeof(ZDIAG));
-  opts.has_more = (zds.has_more != 0);
-  opts.returned_lines = zds.returned_lines;
+  response.has_more = (zds.has_more != 0);
+  response.returned_lines = zds.returned_lines;
 
-  if (rc == 0 && !response.empty())
+  if (rc == 0 && !response.data.empty())
   {
     char ebcdic_date_formatted[8 + 1 + 1 + 1] = {}; // date + hypens + null
     snprintf(&ebcdic_date_formatted[0], sizeof(ebcdic_date_formatted), "%.4s-%.2s-%.2s", zds.ebcdic_date, 4 + zds.ebcdic_date, 6 + zds.ebcdic_date);
-    opts.end_date = std::string(ebcdic_date_formatted);
+    response.end_date = std::string(ebcdic_date_formatted);
 
     //
     // Inverse of the ts_binary pack above: read the same 4 bytes, then undo local→UTC (uint32 wrap).
@@ -378,7 +378,7 @@ int zjb_read_syslog(ZJB *zjb, std::string &response, ZJBSyslogOptions &opts)
     // unsigned end_cs = local_cs % 100U;
     char end_time_buf[16] = {};
     snprintf(end_time_buf, sizeof(end_time_buf), "%02u:%02u:%02u", end_hh, end_mm, end_ss);
-    opts.end_time = end_time_buf;
+    response.end_time = end_time_buf;
   }
 
   int newrc = zjb_free_job_dynamic_allocation(zjb, ddname);

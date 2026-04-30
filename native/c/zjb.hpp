@@ -157,14 +157,18 @@ struct ZJBSyslogOptions
   std::string date;
   std::string time;
   int max_lines = 0;
-  // Outputs
-  bool has_more = false;
-  std::string end_date;
-  std::string end_time;
-  int returned_lines = 0;
 };
 
-int zjb_read_syslog(ZJB *zjb, std::string &response, ZJBSyslogOptions &opts);
+struct ZJBSyslogResponse
+{
+  std::string data;
+  bool has_more;
+  std::string end_date;
+  std::string end_time;
+  int returned_lines;
+};
+
+int zjb_read_syslog(ZJB *zjb, ZJBSyslogOptions &opts, ZJBSyslogResponse &response);
 
 /**
  * @brief Wait for a job to reach a specific status

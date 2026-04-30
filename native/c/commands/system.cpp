@@ -242,14 +242,14 @@ int handle_system_view_syslog(InvocationContext &context)
   ZLOG_DEBUG("view-syslog options in effect: date='%s', time='%s', max_lines=%lld",
              date_value.c_str(), time_value.c_str(), static_cast<long long>(max_lines));
 
-  string response;
+  ZJBSyslogResponse response;
   ZJB zjb = {};
   ZJBSyslogOptions opts;
   opts.date = date_value;
   opts.time = time_value;
   opts.max_lines = static_cast<int>(max_lines);
 
-  rc = zjb_read_syslog(&zjb, response, opts);
+  rc = zjb_read_syslog(&zjb, opts, response);
   if (0 != rc)
   {
     context.error_stream() << "Error: could not view syslog, rc: '" << rc << "'" << endl;
@@ -260,21 +260,21 @@ int handle_system_view_syslog(InvocationContext &context)
   const auto result = obj();
   result->set("startDate", str(date_value));
   result->set("startTime", str(time_value));
-  result->set("endDate", str(opts.end_date));
-  result->set("endTime", str(opts.end_time));
-  result->set("returnedLines", i64(opts.returned_lines));
-  result->set("hasMore", boolean(opts.has_more));
+  result->set("endDate", str(response.end_date));
+  result->set("endTime", str(response.end_time));
+  result->set("returnedLines", i64(response.returned_lines));
+  result->set("hasMore", boolean(response.has_more));
   context.set_object(result);
 
-  context.output_stream() << response;
+  context.output_stream() << response.data;
 
   if (!context.is_redirecting_output())
   {
     context.error_stream() << endl
                            << "Start: " << date_value << " " << time_value
-                           << " | End: " << opts.end_date << " " << opts.end_time
-                           << " | Lines: " << opts.returned_lines
-                           << " | Has more: " << (opts.has_more ? "yes" : "no") << endl;
+                           << " | End: " << response.end_date << " " << response.end_time
+                           << " | Lines: " << response.returned_lines
+                           << " | Has more: " << (response.has_more ? "yes" : "no") << endl;
   }
 
   return RTNCD_SUCCESS;
