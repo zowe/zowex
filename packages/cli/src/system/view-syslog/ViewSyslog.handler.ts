@@ -10,7 +10,7 @@
  */
 
 import type { IHandlerParameters } from "@zowe/imperative";
-import type { system, ZSshClient } from "zowex-sdk";
+import type { system, ZSshClient } from "@zowe/zowex-for-zowe-sdk";
 import { SshBaseHandler } from "../../SshBaseHandler";
 
 export default class ViewSyslogHandler extends SshBaseHandler {
