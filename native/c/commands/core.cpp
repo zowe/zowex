@@ -12,6 +12,7 @@
 #include "core.hpp"
 #include "../extend/plugin.hpp"
 #include "../zmetal.h"
+#include "../zutm.h"
 #include <dirent.h>
 #include <algorithm>
 #include <set>
@@ -221,7 +222,7 @@ Command &setup_root_command(char *argv[])
       return true;
     }
 
-    auth_off(); 
+    ZUTNOAUT(); 
     return true; });
   auto &root_command = g_arg_parser->get_root_command();
 
