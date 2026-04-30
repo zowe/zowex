@@ -327,7 +327,7 @@ public:
 
   Command(std::string name, std::string help)
       : m_name(name), m_help(help), m_handler(nullptr),
-        m_allow_dynamic_keywords(false), m_allow_passthrough(false), m_apf_authorized(false)
+        m_allow_dynamic_keywords(false), m_allow_passthrough(false), m_privileged(false)
   {
     ensure_help_argument();
   }
@@ -338,23 +338,23 @@ public:
     m_commands.clear();
   }
 
-  // mark command as APF authorized (and propagate to children)
-  Command &set_apf_authorized(bool authorized = true)
+  // mark command as privileged (and propagate to children)
+  Command &set_privileged(bool privileged = true)
   {
-    m_apf_authorized = authorized;
+    m_privileged = privileged;
     for (auto &pair : m_commands)
     {
       if (pair.second)
       {
-        pair.second->set_apf_authorized(authorized);
+        pair.second->set_privileged(privileged);
       }
     }
     return *this;
   }
 
-  bool is_apf_authorized() const
+  bool is_privileged() const
   {
-    return m_apf_authorized;
+    return m_privileged;
   }
 
   // propagate pre_hooks recursively
@@ -490,10 +490,10 @@ public:
 
     sub->ensure_help_argument();
 
-    // Only propagate APF authorization if the parent is authorized
-    if (m_apf_authorized)
+    // Only propagate privileges if the parent is privileged
+    if (m_privileged)
     {
-      sub->set_apf_authorized(true);
+      sub->set_privileged(true);
     }
 
     if (m_pre_hooks)
@@ -839,7 +839,7 @@ public:
 private:
   bool m_allow_dynamic_keywords;
   bool m_allow_passthrough;
-  bool m_apf_authorized;
+  bool m_privileged;
   std::string m_passthrough_description;
   std::shared_ptr<std::vector<PreCommandHook>> m_pre_hooks;
 
