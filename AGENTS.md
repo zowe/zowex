@@ -87,4 +87,4 @@ public:
 - ✅ **Always do:** Sanitize user inputs before passing them to native shell commands. Apply DRY principles and keep comments minimal unless they add value.
 - ⚠️ **Ask first:** Before making breaking changes to code additions or refactoring existing logic.
 - 🚫 **Never do:** Log user credentials or passwords to the console.
-- 🚫 **Never do:** Read `config.yaml` or user's Zowe config for more context (`**/zowe.config.json`).
+- 🚫 **Never do:** Read `config.yaml` or user's Zowe config for more context (`**/zowe.config.*json`).
