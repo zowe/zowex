@@ -52,6 +52,8 @@ let deployDirs: {
     cTestDir: string;
     pythonDir: string;
     pythonTestDir: string;
+    javaDir: string;
+    javaBindingsDir: string;
 };
 
 // python3 -c "import sys; sys.stdout.buffer.write(bytes(range(256)))" \
@@ -1534,6 +1536,8 @@ async function main() {
         cTestDir: `${config.deployDir}/c/test`,
         pythonDir: `${config.deployDir}/python/bindings`,
         pythonTestDir: `${config.deployDir}/python/bindings/test`,
+        javaDir: `${config.deployDir}/java/app`,
+        javaBindingsDir: `${config.deployDir}/java/bindings`,
     };
     const sshClient = await buildSshClient(config.sshProfile as IProfile);
     await testConnection(sshClient);
@@ -1550,6 +1554,24 @@ async function main() {
                 break;
             case "build:python":
                 await make(sshClient, deployDirs.pythonDir);
+                break;
+            case "build:java_bindings":
+                await make(sshClient, deployDirs.javaBindingsDir);
+                break;
+            case "build:java_app":
+                console.log("Building Java App locally...");
+                childProcess.execSync("./gradlew build -x test", { stdio: "inherit", cwd: path.resolve(__dirname, "../native/java/app") });
+                console.log("Uploading Java App JAR to remote...");
+                await runCommandInShell(sshClient, `mkdir -p ${deployDirs.javaDir}/build/libs\n`, { stepName: "Create remote libs dir" });
+                {
+                    const sftp = await promisify(sshClient.sftp.bind(sshClient))();
+                    await promisify(sftp.fastPut.bind(sftp))(
+                        path.resolve(__dirname, "../native/java/app/build/libs/zowex-java-app-0.5.0.jar"),
+                        `${deployDirs.javaDir}/build/libs/zowex-java-app-0.5.0.jar`
+                    );
+                    sftp.end();
+                }
+                console.log("Java App uploaded successfully.");
                 break;
             case "clean":
                 await clean(sshClient);
