@@ -34,24 +34,24 @@ export const ViewSyslogDefinition: ICommandDefinition = {
     ],
     options: [
         {
+            name: "seconds-ago",
+            aliases: ["s"],
+            description:
+                "Relative offset in seconds from the current z/OS time. " + "For example, 300 for the last 5 minutes.",
+            type: "number",
+            conflictsWith: ["date", "time"],
+        },
+        {
             name: "date",
             aliases: ["d"],
-            description: "Start date in yyyy-mm-dd format. Mutually exclusive with --seconds-ago.",
+            description: "Start date in yyyy-mm-dd format.",
             type: "string",
         },
         {
             name: "time",
             aliases: ["t"],
-            description: "Start time in hh:mm:ss format. Mutually exclusive with --seconds-ago.",
+            description: "Start time in hh:mm:ss format.",
             type: "string",
-        },
-        {
-            name: "seconds-ago",
-            aliases: ["s"],
-            description:
-                "Relative offset in seconds from the current z/OS time. " +
-                "For example, 300 for the last 5 minutes. Mutually exclusive with --date and --time.",
-            type: "number",
         },
         {
             name: "max-lines",
