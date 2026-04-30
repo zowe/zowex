@@ -329,16 +329,14 @@ export const SshErrors: Record<string, ISshErrorDefinition> = {
             },
         ],
     },
-
-    // Server Version Mismatch
     UNRECOGNIZED_COMMAND: {
         summary:
             "The Zowe server on z/OS does not recognize the requested command. This usually means the server is outdated and needs to be updated.",
         matches: [/Unrecognized command \w+/],
         tips: [
-            'Run "zowe zssh server install" to update the server with the latest version.',
-            "Ensure the CLI plug-in version matches the server version installed on z/OS.",
-            "If you recently updated the CLI plug-in, the server must also be updated.",
+            "Redeploy the server with the latest version.",
+            "Ensure the client version is compatible with the server version installed on z/OS.",
+            "If you recently updated your client, the server may need to be redeployed.",
         ],
     },
 };
