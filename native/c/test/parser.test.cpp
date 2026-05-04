@@ -520,6 +520,125 @@ void parser_tests()
              });
              });
 
+             describe("pre-command hooks", []() -> void
+                      {
+             it("executes hooks before command handler", []() {
+               g_handler_called = false;
+               bool hook_called = false;
+               bool hook_is_help = true;
+               
+               ArgumentParser arg_parser("prog", "hook sample");
+               arg_parser.add_pre_command_hook([&](const Command &cmd, bool is_help_request) -> bool {
+                 hook_called = true;
+                 hook_is_help = is_help_request;
+                 return true;
+               });
+               
+               Command &root = arg_parser.get_root_command();
+               root.add_keyword_arg("name", make_aliases("-n"), "name to capture", ArgType_Single, true);
+               root.set_handler(&sample_handler);
+               
+               std::vector<std::string> raw = {"prog", "--name", "cli"};
+               std::vector<char *> argv = to_argv(raw);
+               
+               ParseResult result = arg_parser.parse(static_cast<int>(argv.size()), argv.data());
+               
+               Expect(result.status).ToBe(ParseResult::ParserStatus_Success);
+               Expect(hook_called).ToBe(true);
+               Expect(hook_is_help).ToBe(false);
+               Expect(g_handler_called).ToBe(true);
+             });
+             
+             it("aborts execution if hook returns false", []() {
+               g_handler_called = false;
+               bool hook1_called = false;
+               bool hook2_called = false;
+               
+               ArgumentParser arg_parser("prog", "hook abort sample");
+               arg_parser.add_pre_command_hook([&](const Command &cmd, bool is_help_request) -> bool {
+                 hook1_called = true;
+                 return false; // abort
+               });
+               arg_parser.add_pre_command_hook([&](const Command &cmd, bool is_help_request) -> bool {
+                 hook2_called = true;
+                 return true;
+               });
+               
+               Command &root = arg_parser.get_root_command();
+               root.add_keyword_arg("name", make_aliases("-n"), "name to capture", ArgType_Single, true);
+               root.set_handler(&sample_handler);
+               
+               std::vector<std::string> raw = {"prog", "--name", "cli"};
+               std::vector<char *> argv = to_argv(raw);
+               
+               ParseResult result;
+               {
+                 test_utils::ErrorStreamCapture error_capture;
+                 result = arg_parser.parse(static_cast<int>(argv.size()), argv.data());
+               }
+               
+               // Exit code is 1, status is Success but handler wasn't run
+               Expect(result.exit_code).ToBe(1);
+               Expect(hook1_called).ToBe(true);
+               Expect(hook2_called).ToBe(false); // Second hook shouldn't run
+               Expect(g_handler_called).ToBe(false); // Handler shouldn't run
+             });
+             
+             it("executes hooks before help is shown", []() {
+               bool hook_called = false;
+               bool hook_is_help = false;
+               
+               ArgumentParser arg_parser("prog", "hook help sample");
+               arg_parser.add_pre_command_hook([&](const Command &cmd, bool is_help_request) -> bool {
+                 hook_called = true;
+                 hook_is_help = is_help_request;
+                 return true;
+               });
+               
+               std::vector<std::string> raw = {"prog", "--help"};
+               std::vector<char *> argv = to_argv(raw);
+               
+               ParseResult result;
+               {
+                 test_utils::OutputStreamCapture out_capture;
+                 result = arg_parser.parse(static_cast<int>(argv.size()), argv.data());
+               }
+               
+               Expect(result.status).ToBe(ParseResult::ParserStatus_HelpRequested);
+               Expect(hook_called).ToBe(true);
+               Expect(hook_is_help).ToBe(true);
+             });
+             
+             it("executes hooks for command groups without handler when help is shown implicitly", []() {
+               bool hook_called = false;
+               bool hook_is_help = false;
+               
+               ArgumentParser arg_parser("prog", "hook group sample");
+               arg_parser.add_pre_command_hook([&](const Command &cmd, bool is_help_request) -> bool {
+                 hook_called = true;
+                 hook_is_help = is_help_request;
+                 return true;
+               });
+               
+               Command &root = arg_parser.get_root_command();
+               command_ptr sub_cmd(new Command("sub", "sub command"));
+               root.add_command(sub_cmd);
+               
+               std::vector<std::string> raw = {"prog"};
+               std::vector<char *> argv = to_argv(raw);
+               
+               ParseResult result;
+               {
+                 test_utils::OutputStreamCapture out_capture;
+                 result = arg_parser.parse(static_cast<int>(argv.size()), argv.data());
+               }
+               
+               Expect(result.status).ToBe(ParseResult::ParserStatus_HelpRequested);
+               Expect(hook_called).ToBe(true);
+               Expect(hook_is_help).ToBe(true); // Treated as help request
+             });
+             });
+             
              describe("passthrough arguments", []() -> void
                       {
              it("captures arguments after -- delimiter", []() {
