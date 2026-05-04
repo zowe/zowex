@@ -457,14 +457,6 @@ int zds_copy_dsn(ZDS *zds, const std::string &dsn1, const std::string &dsn2, ZDS
 
   if (!zds_dataset_exists(info1.base_dsn))
   {
-    if (!info2.member_name.empty())
-      target_type = ZDS_TYPE_MEMBER;
-    else
-      target_type = info1.type;
-  }
-
-  if (!zds_dataset_exists(info1.base_dsn))
-  {
     ZDIAG_SET_MSG(&zds->diag, "Source data set '%s' not found", info1.base_dsn.c_str());
     return RTNCD_FAILURE;
   }
