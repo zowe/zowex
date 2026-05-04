@@ -6,10 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
-<<<<<<< HEAD
-=======
 - `c`: Fixed several vulnerabilities in C++ and Metal C code to improve stability. [#940](https://github.com/zowe/zowex/pull/940)
->>>>>>> main
 - **Breaking:** `c`: Refactored the backend for copying data sets to use Z/OS utilities IEBCOPY and IEBGENER. Removed `--delete-target-members` flag and added `--overwrite` flag for copying a partitioned data set to an existing partitioned data set. Removed duplicate `member_exists_in_pds` function. [#932] (https://github.com/zowe/zowex/issues/932)
 - `c`: Fix spool read / dynalloc error via optimization assignments. [#945](https://github.com/zowe/zowex/issues/945)
 - `c`: Updated `zut_read_input` so that all tests pass on `zowex`. Now there is no specific handling for line-based TTY input so that data is more consistently preserved.[#953](https://github.com/zowe/zowex/pull/953)

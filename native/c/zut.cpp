@@ -457,11 +457,7 @@ int zut_bpxwdyn_common(const std::string &parm, unsigned int *code, std::string 
     bparm->rtdsn = 1; // set bit flag indicating we want to return the DS name
   }
 
-<<<<<<< HEAD
-  bparm->len = sprintf(bparm->str, "%s", parm.c_str());
-=======
   bparm->len = snprintf(bparm->str, sizeof(bparm->str), "%s", parm.c_str());
->>>>>>> main
 
   int rc = ZUTWDYN(bparm, response);
 
@@ -983,11 +979,7 @@ int zut_loop_dynalloc(ZDIAG &diag, const std::vector<std::string> &list)
       diag.detail_rc = ZUT_RTNCD_SERVICE_FAILURE;
       diag.service_rc = rc;
       strcpy(diag.service_name, "bpxwdyn");
-<<<<<<< HEAD
-      diag.e_msg_len = sprintf(diag.e_msg, "bpxwdyn failed with '%s' rc: '%d', emsg: '%s'", diag.service_name, rc, response.c_str());
-=======
       ZDIAG_SET_MSG(&diag, "bpxwdyn failed with '%s' rc: '%d', emsg: '%s'", diag.service_name, rc, response.c_str());
->>>>>>> main
       return RTNCD_FAILURE;
     }
   }
