@@ -17,7 +17,6 @@ import {
     type AttributeInfo,
     type DataSetAttributesProvider,
     type DsInfo,
-    Gui,
     type IAttributesProvider,
     imperative,
     type MainframeInteraction,
@@ -285,31 +284,20 @@ export class SshMvsApi extends SshCommonApi implements MainframeInteraction.IMvs
                 attributes: datasetAttributes,
             });
         } catch (error) {
-            if (error instanceof imperative.ImperativeError) {
-                Gui.errorMessage(error.additionalDetails);
-            }
+            throw this.buildRequestError(error);
         }
-        return this.buildZosFilesResponse(response, response.success);
+        return this.buildZosFilesResponse(response);
     }
 
     public async createDataSetMember(
         dataSetName: string,
         _options?: zosfiles.IUploadOptions,
     ): Promise<zosfiles.IZosFilesResponse> {
-        let response: ds.CreateMemberResponse = { success: false };
-        try {
-            response = await (await this.client).ds.createMember({
-                dsname: dataSetName,
-                overwrite: true, // Overwrite detection already handled on client side
-            });
-            if (!response.success) {
-                Gui.errorMessage(`Failed to create data set member: ${dataSetName}`);
-            }
-        } catch (error) {
-            Gui.errorMessage(`Failed to create data set member: ${dataSetName}`);
-            Gui.errorMessage(`Error: ${error}`);
-        }
-        return this.buildZosFilesResponse(response, response.success);
+        const response = await (await this.client).ds.createMember({
+            dsname: dataSetName,
+            overwrite: true, // Overwrite detection already handled on client side
+        });
+        return this.buildZosFilesResponse(response);
     }
 
     public async allocateLikeDataSet(
@@ -335,9 +323,7 @@ export class SshMvsApi extends SshCommonApi implements MainframeInteraction.IMvs
             dsnameBefore: currentDataSetName,
             dsnameAfter: newDataSetName,
         });
-        return this.buildZosFilesResponse({
-            success: response.success,
-        });
+        return this.buildZosFilesResponse(response);
     }
 
     public async renameDataSetMember(
@@ -350,9 +336,7 @@ export class SshMvsApi extends SshCommonApi implements MainframeInteraction.IMvs
             memberBefore,
             memberAfter,
         });
-        return this.buildZosFilesResponse({
-            success: response.success,
-        });
+        return this.buildZosFilesResponse(response);
     }
 
     public async hMigrateDataSet(_dataSetName: string): Promise<zosfiles.IZosFilesResponse> {
@@ -360,18 +344,9 @@ export class SshMvsApi extends SshCommonApi implements MainframeInteraction.IMvs
     }
 
     public async hRecallDataSet(dataSetName: string): Promise<zosfiles.IZosFilesResponse> {
-        let response: ds.RestoreDatasetResponse = { success: false };
-        try {
-            response = await (await this.client).ds.restoreDataset({
-                dsname: dataSetName,
-            });
-            if (!response.success) {
-                Gui.errorMessage(`Failed to restore dataset ${dataSetName}`);
-            }
-        } catch (error) {
-            Gui.errorMessage(`Failed to restore dataset ${dataSetName}`);
-            Gui.errorMessage(`Error: ${error}`);
-        }
+        const response = await (await this.client).ds.restoreDataset({
+            dsname: dataSetName,
+        });
         return this.buildZosFilesResponse(response);
     }
 
@@ -382,13 +357,11 @@ export class SshMvsApi extends SshCommonApi implements MainframeInteraction.IMvs
         const response = await (await this.client).ds.deleteDataset({
             dsname: dataSetName,
         });
-        return this.buildZosFilesResponse({
-            success: response.success,
-        });
+        return this.buildZosFilesResponse(response);
     }
 
     // biome-ignore lint/suspicious/noExplicitAny: apiResponse has no strong type
     private buildZosFilesResponse(apiResponse: any, success = true, errorText?: string): zosfiles.IZosFilesResponse {
-        return { apiResponse, commandResponse: "", success, errorMessage: errorText };
+        return { apiResponse, commandResponse: "", success: apiResponse?.success ?? success, errorMessage: errorText };
     }
 }
