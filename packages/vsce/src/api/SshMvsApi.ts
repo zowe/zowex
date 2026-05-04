@@ -284,11 +284,9 @@ export class SshMvsApi extends SshCommonApi implements MainframeInteraction.IMvs
                 attributes: datasetAttributes,
             });
         } catch (error) {
-            throw error instanceof imperative.ImperativeError
-                ? new Error(`${error.message}\n${error.additionalDetails}`)
-                : error;
+            throw this.buildRequestError(error);
         }
-        return this.buildZosFilesResponse(response, response.success);
+        return this.buildZosFilesResponse(response);
     }
 
     public async createDataSetMember(
@@ -299,7 +297,7 @@ export class SshMvsApi extends SshCommonApi implements MainframeInteraction.IMvs
             dsname: dataSetName,
             overwrite: true, // Overwrite detection already handled on client side
         });
-        return this.buildZosFilesResponse(response, response.success);
+        return this.buildZosFilesResponse(response);
     }
 
     public async allocateLikeDataSet(
@@ -325,7 +323,7 @@ export class SshMvsApi extends SshCommonApi implements MainframeInteraction.IMvs
             dsnameBefore: currentDataSetName,
             dsnameAfter: newDataSetName,
         });
-        return this.buildZosFilesResponse(response, response.success);
+        return this.buildZosFilesResponse(response);
     }
 
     public async renameDataSetMember(
@@ -338,7 +336,7 @@ export class SshMvsApi extends SshCommonApi implements MainframeInteraction.IMvs
             memberBefore,
             memberAfter,
         });
-        return this.buildZosFilesResponse(response, response.success);
+        return this.buildZosFilesResponse(response);
     }
 
     public async hMigrateDataSet(_dataSetName: string): Promise<zosfiles.IZosFilesResponse> {
@@ -349,7 +347,7 @@ export class SshMvsApi extends SshCommonApi implements MainframeInteraction.IMvs
         const response = await (await this.client).ds.restoreDataset({
             dsname: dataSetName,
         });
-        return this.buildZosFilesResponse(response, response.success);
+        return this.buildZosFilesResponse(response);
     }
 
     public async deleteDataSet(
@@ -359,11 +357,11 @@ export class SshMvsApi extends SshCommonApi implements MainframeInteraction.IMvs
         const response = await (await this.client).ds.deleteDataset({
             dsname: dataSetName,
         });
-        return this.buildZosFilesResponse(response, response.success);
+        return this.buildZosFilesResponse(response);
     }
 
     // biome-ignore lint/suspicious/noExplicitAny: apiResponse has no strong type
     private buildZosFilesResponse(apiResponse: any, success = true, errorText?: string): zosfiles.IZosFilesResponse {
-        return { apiResponse, commandResponse: "", success, errorMessage: errorText };
+        return { apiResponse, commandResponse: "", success: apiResponse?.success ?? success, errorMessage: errorText };
     }
 }
