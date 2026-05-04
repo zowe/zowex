@@ -8,7 +8,15 @@ public class ZusfBindings {
     private static final MethodHandle zusf_c_list_uss_dir;
     private static final MethodHandle zusf_c_read_uss_file;
     private static final MethodHandle zusf_c_write_uss_file;
+    private static final MethodHandle zusf_c_create_uss_file;
+    private static final MethodHandle zusf_c_create_uss_dir;
+    private static final MethodHandle zusf_c_move_uss_file_or_dir;
+    private static final MethodHandle zusf_c_chmod_uss_item;
+    private static final MethodHandle zusf_c_delete_uss_item;
+    private static final MethodHandle zusf_c_chown_uss_item;
+    private static final MethodHandle zusf_c_chtag_uss_item;
     private static final MethodHandle zusf_c_free_string_response;
+    private static final MethodHandle zusf_c_free_basic_response;
 
     static {
         Linker linker = NativeLoader.LINKER;
@@ -29,8 +37,48 @@ public class ZusfBindings {
             FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS)
         );
 
+        zusf_c_create_uss_file = linker.downcallHandle(
+            lookup.find("zusf_c_create_uss_file").orElseThrow(),
+            FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS)
+        );
+
+        zusf_c_create_uss_dir = linker.downcallHandle(
+            lookup.find("zusf_c_create_uss_dir").orElseThrow(),
+            FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS)
+        );
+
+        zusf_c_move_uss_file_or_dir = linker.downcallHandle(
+            lookup.find("zusf_c_move_uss_file_or_dir").orElseThrow(),
+            FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS)
+        );
+
+        zusf_c_chmod_uss_item = linker.downcallHandle(
+            lookup.find("zusf_c_chmod_uss_item").orElseThrow(),
+            FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_BOOLEAN)
+        );
+
+        zusf_c_delete_uss_item = linker.downcallHandle(
+            lookup.find("zusf_c_delete_uss_item").orElseThrow(),
+            FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_BOOLEAN)
+        );
+
+        zusf_c_chown_uss_item = linker.downcallHandle(
+            lookup.find("zusf_c_chown_uss_item").orElseThrow(),
+            FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_BOOLEAN)
+        );
+
+        zusf_c_chtag_uss_item = linker.downcallHandle(
+            lookup.find("zusf_c_chtag_uss_item").orElseThrow(),
+            FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_BOOLEAN)
+        );
+
         zusf_c_free_string_response = linker.downcallHandle(
             lookup.find("zusf_c_free_string_response").orElseThrow(),
+            FunctionDescriptor.ofVoid(ValueLayout.ADDRESS)
+        );
+
+        zusf_c_free_basic_response = linker.downcallHandle(
+            lookup.find("zusf_c_free_basic_response").orElseThrow(),
             FunctionDescriptor.ofVoid(ValueLayout.ADDRESS)
         );
     }
@@ -120,6 +168,105 @@ public class ZusfBindings {
             String outEtag = FfmUtils.readString(outDataSeg);
             zusf_c_free_string_response.invokeExact(responsePtr);
             return outEtag;
+        } catch (Throwable e) {
+            if (e instanceof Exception) throw (Exception) e;
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static void handleBasicResponse(MemorySegment responsePtr) throws Exception {
+        if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
+        responsePtr = responsePtr.reinterpret(8);
+        MemorySegment errorMsgSeg = responsePtr.get(ValueLayout.ADDRESS, 0);
+        String errorMsg = FfmUtils.readString(errorMsgSeg);
+        try {
+            zusf_c_free_basic_response.invokeExact(responsePtr);
+        } catch (Throwable e) {
+            if (e instanceof Exception) throw (Exception) e;
+            throw new RuntimeException(e);
+        }
+        if (errorMsg != null) {
+            throw new RuntimeException(errorMsg);
+        }
+    }
+
+    public static void createUssFile(String file, String mode) throws Exception {
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment fileSeg = FfmUtils.allocateString(arena, file);
+            MemorySegment modeSeg = FfmUtils.allocateString(arena, mode);
+            MemorySegment responsePtr = (MemorySegment) zusf_c_create_uss_file.invokeExact(fileSeg, modeSeg);
+            handleBasicResponse(responsePtr);
+        } catch (Throwable e) {
+            if (e instanceof Exception) throw (Exception) e;
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static void createUssDir(String file, String mode) throws Exception {
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment fileSeg = FfmUtils.allocateString(arena, file);
+            MemorySegment modeSeg = FfmUtils.allocateString(arena, mode);
+            MemorySegment responsePtr = (MemorySegment) zusf_c_create_uss_dir.invokeExact(fileSeg, modeSeg);
+            handleBasicResponse(responsePtr);
+        } catch (Throwable e) {
+            if (e instanceof Exception) throw (Exception) e;
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static void moveUssFileOrDir(String source, String destination) throws Exception {
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment srcSeg = FfmUtils.allocateString(arena, source);
+            MemorySegment destSeg = FfmUtils.allocateString(arena, destination);
+            MemorySegment responsePtr = (MemorySegment) zusf_c_move_uss_file_or_dir.invokeExact(srcSeg, destSeg);
+            handleBasicResponse(responsePtr);
+        } catch (Throwable e) {
+            if (e instanceof Exception) throw (Exception) e;
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static void chmodUssItem(String file, String mode, boolean recursive) throws Exception {
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment fileSeg = FfmUtils.allocateString(arena, file);
+            MemorySegment modeSeg = FfmUtils.allocateString(arena, mode);
+            MemorySegment responsePtr = (MemorySegment) zusf_c_chmod_uss_item.invokeExact(fileSeg, modeSeg, recursive);
+            handleBasicResponse(responsePtr);
+        } catch (Throwable e) {
+            if (e instanceof Exception) throw (Exception) e;
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static void deleteUssItem(String file, boolean recursive) throws Exception {
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment fileSeg = FfmUtils.allocateString(arena, file);
+            MemorySegment responsePtr = (MemorySegment) zusf_c_delete_uss_item.invokeExact(fileSeg, recursive);
+            handleBasicResponse(responsePtr);
+        } catch (Throwable e) {
+            if (e instanceof Exception) throw (Exception) e;
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static void chownUssItem(String file, String owner, boolean recursive) throws Exception {
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment fileSeg = FfmUtils.allocateString(arena, file);
+            MemorySegment ownerSeg = FfmUtils.allocateString(arena, owner);
+            MemorySegment responsePtr = (MemorySegment) zusf_c_chown_uss_item.invokeExact(fileSeg, ownerSeg, recursive);
+            handleBasicResponse(responsePtr);
+        } catch (Throwable e) {
+            if (e instanceof Exception) throw (Exception) e;
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static void chtagUssItem(String file, String tag, boolean recursive) throws Exception {
+        try (Arena arena = Arena.ofConfined()) {
+            MemorySegment fileSeg = FfmUtils.allocateString(arena, file);
+            MemorySegment tagSeg = FfmUtils.allocateString(arena, tag);
+            MemorySegment responsePtr = (MemorySegment) zusf_c_chtag_uss_item.invokeExact(fileSeg, tagSeg, recursive);
+            handleBasicResponse(responsePtr);
         } catch (Throwable e) {
             if (e instanceof Exception) throw (Exception) e;
             throw new RuntimeException(e);
