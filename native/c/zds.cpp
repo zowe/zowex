@@ -2196,13 +2196,13 @@ int zds_delete_dsn(ZDS *zds, std::string dsn)
 
   if (0 != rc)
   {
-    constexpr auto EOPEN = 91;
+    const auto EOPEN = dsn.find("(") == std::string::npos ? 46 : 91;
     strcpy(zds->diag.service_name, "remove");
     zds->diag.service_rc = errno;
     if (errno == EOPEN)
     {
       // Data set is open in another process so allocating with DISP=OLD failed
-      ZDIAG_SET_MSG(&zds->diag, "Failed to allocate data set '%s' for deletion (errno=91). It may be in use by another process.", dsn.c_str());
+      ZDIAG_SET_MSG(&zds->diag, "Failed to allocate data set '%s' for deletion (errno=%d). Check that it exists and is not in use by another process.", dsn.c_str(), errno);
     }
     else
     {
