@@ -77,6 +77,7 @@ void register_commands(parser::Command &root_command)
 {
   auto console_group = command_ptr(new Command("console", "z/OS console operations"));
   console_group->add_alias("cn");
+  console_group->set_privileged(true);
   {
     auto issue_cmd = command_ptr(new Command("issue", "issue a console command"));
     issue_cmd->add_keyword_arg("console-name",

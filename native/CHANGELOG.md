@@ -6,8 +6,18 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- `c`: Fixed an issue where the `zoweax` authorized CLI binary could run the `server` command or `plugin` command group as privileged. Now, `zoweax` disables privileges before commands are executed. Commands in the `console` group continue to run as privileged. [#958](https://github.com/zowe/zowex/issues/958)
+- `c`: Added support for pre-command hooks in the command-line parser utility. [#958](https://github.com/zowe/zowex/issues/958)
+- `c`: Fixes issue where ZWEPROLG could return to caller in an incorrect AMODE. [#951](https://github.com/zowe/zowex/issues/951)
+
+## `0.6.0`
+
+- `c`: Fixes wildcard search for listing data sets on multiple catalogs. [#947](https://github.com/zowe/zowex/issues/947)
+
+## `0.5.0`
+
 - `c`: Fixed several vulnerabilities in C++ and Metal C code to improve stability. [#940](https://github.com/zowe/zowex/pull/940)
-- **Breaking:** `c`: Refactored the backend for copying data sets to use Z/OS utilities IEBCOPY and IEBGENER. Removed `--delete-target-members` flag and added `--overwrite` flag for copying a partitioned data set to an existing partitioned data set. Removed duplicate `member_exists_in_pds` function. [#932] (https://github.com/zowe/zowex/issues/932)
+- **Breaking:** `c`: Refactored the backend for copying data sets to use Z/OS utilities IEBCOPY and IEBGENER. Removed `--delete-target-members` flag and added `--overwrite` flag for copying a partitioned data set to an existing partitioned data set. Removed duplicate `member_exists_in_pds` function. [#932](https://github.com/zowe/zowex/issues/932)
 - `c`: Fix spool read / dynalloc error via optimization assignments. [#945](https://github.com/zowe/zowex/issues/945)
 - `c`: Updated `zut_read_input` so that all tests pass on `zowex`. Now there is no specific handling for line-based TTY input so that data is more consistently preserved.[#953](https://github.com/zowe/zowex/pull/953)
 - **Breaking:** `c`: Refactored the `zds_write` function to consolidate data set and DD write logic into a single entry point. [#908](https://github.com/zowe/zowe-native-proto/issues/908)
@@ -248,4 +258,3 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## [Unreleased]
 
 - Initial release
-
