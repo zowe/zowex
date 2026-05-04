@@ -39,8 +39,6 @@
 #include <regex>
 #include <functional>
 
-// TODO(Kelosky): handle test not run
-
 #define Expect(x) expect((x), EXPECT_CONTEXT{__LINE__, __FILE__, "", false})
 #define ExpectWithContext(x, context) expect((x), EXPECT_CONTEXT{__LINE__, __FILE__, std::string(context), true})
 #define TestLog(message) Globals::get_instance().test_log(message)
@@ -196,6 +194,7 @@ struct TEST_SUITE
   bool skipped = false;
   bool hook_failed = false;
   std::string hook_error;
+  bool header_printed = false;
 };
 
 struct EXPECT_CONTEXT
@@ -626,6 +625,23 @@ public:
     }
   }
 
+  // Print suite headers for all unprinted suites in the current stack
+  void print_pending_suite_headers()
+  {
+    for (const auto &idx : suite_stack)
+    {
+      if (idx >= 0 && idx < static_cast<int>(suites.size()))
+      {
+        TEST_SUITE &suite = suites[idx];
+        if (!suite.header_printed)
+        {
+          std::cout << get_indent(suite.nesting_level) << suite.description << std::endl;
+          suite.header_printed = true;
+        }
+      }
+    }
+  }
+
   template <typename Callable,
             typename = typename std::enable_if<
                 std::is_same<void, decltype(std::declval<Callable>()())>::value>::type>
@@ -645,6 +661,7 @@ public:
       return;
     }
 
+    print_pending_suite_headers();
     int suite_idx = get_suite_index();
 
     // Check if the current suite already has a hook failure (skip remaining tests)
@@ -1105,7 +1122,7 @@ void describe(const std::string &description, Callable suite)
   int current_suite_idx = static_cast<int>(g.get_suites().size()) - 1;
   g.push_suite_index(current_suite_idx);
 
-  std::cout << get_indent(ts.nesting_level) << description << std::endl;
+  // Don't print header immediately - defer until first test runs
   g.increment_nesting();
 
   auto cleanup = [&]()
@@ -1130,7 +1147,20 @@ void describe(const std::string &description, Callable suite)
   {
     TEST_SUITE &current_suite = g.get_suites()[current_suite_idx];
     const std::vector<HOOK_WITH_OPTIONS> &after_all_hooks = current_suite.after_all_hooks;
-    if (!after_all_hooks.empty())
+
+    // Check if any non-skipped tests were added to this suite
+    bool has_real_tests = false;
+    for (const auto &test : current_suite.tests)
+    {
+      if (!test.skipped)
+      {
+        has_real_tests = true;
+        break;
+      }
+    }
+
+    // Only run afterAll if real tests were present
+    if (!after_all_hooks.empty() && has_real_tests)
     {
       std::string error_message;
       if (!g.execute_hooks(after_all_hooks, "afterAll", error_message))
@@ -1166,7 +1196,10 @@ void xit(const std::string &description, Callable)
     g.get_suites()[suite_idx].tests.push_back(tc);
   }
 
-  std::cout << get_indent(g.get_nesting()) << colors.skip << " SKIP " << description << std::endl;
+  if (g.matches_filter(description, g.get_matcher()))
+  {
+    std::cout << get_indent(g.get_nesting()) << colors.skip << " SKIP " << description << std::endl;
+  }
 }
 
 template <typename Callable,
@@ -1182,7 +1215,10 @@ void xdescribe(const std::string &description, Callable)
   suite.skipped = true;
   g.get_suites().push_back(suite);
 
-  std::cout << get_indent(g.get_nesting()) << colors.skip << " SKIP " << description << std::endl;
+  if (g.matches_filter(description, g.get_matcher()))
+  {
+    std::cout << get_indent(g.get_nesting()) << colors.skip << " SKIP " << description << std::endl;
+  }
 }
 
 template <typename Callable,
