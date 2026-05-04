@@ -277,16 +277,15 @@ export class SshMvsApi extends SshCommonApi implements MainframeInteraction.IMvs
             lrecl: 80,
             ...(options || {}),
         };
-        let response: ds.CreateDatasetResponse = { success: false };
         try {
-            response = await (await this.client).ds.createDataset({
+            const response = await (await this.client).ds.createDataset({
                 dsname: dataSetName,
                 attributes: datasetAttributes,
             });
-        } catch (error) {
-            throw this.buildRequestError(error);
+            return this.buildZosFilesResponse(response);
+        } catch (err) {
+            throw this.buildRequestError(err);
         }
-        return this.buildZosFilesResponse(response);
     }
 
     public async createDataSetMember(
@@ -354,10 +353,14 @@ export class SshMvsApi extends SshCommonApi implements MainframeInteraction.IMvs
         dataSetName: string,
         _options?: zosfiles.IDeleteDatasetOptions,
     ): Promise<zosfiles.IZosFilesResponse> {
-        const response = await (await this.client).ds.deleteDataset({
-            dsname: dataSetName,
-        });
-        return this.buildZosFilesResponse(response);
+        try {
+            const response = await (await this.client).ds.deleteDataset({
+                dsname: dataSetName,
+            });
+            return this.buildZosFilesResponse(response);
+        } catch (err) {
+            throw this.buildRequestError(err);
+        }
     }
 
     // biome-ignore lint/suspicious/noExplicitAny: apiResponse has no strong type

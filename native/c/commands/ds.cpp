@@ -800,7 +800,8 @@ int handle_data_set_delete(InvocationContext &context)
 
   if (0 != rc)
   {
-    context.error_stream() << "Error: " << zds.diag.e_msg << std::endl;
+    context.error_stream() << "Error: could not delete data set: '" << dsn << "' rc: '" << rc << "'" << std::endl;
+    context.error_stream() << "  Details: " << zds.diag.e_msg << std::endl;
     return RTNCD_FAILURE;
   }
   context.output_stream() << "Data set '" << dsn << "' deleted" << std::endl;
