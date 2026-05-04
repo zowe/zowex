@@ -484,7 +484,7 @@ void zowex_ds_tests()
                              int rc = execute_command_with_output(command, response);
                              ExpectWithContext(rc, response).Not().ToBe(0);
                              Expect(response).ToContain("Error: could not create data set member");
-                             Expect(response).ToContain("Not found in catalog");
+                             Expect(response).ToContain("Not found in any catalog");
                            });
                         it("should create a member in a PDS",
                            [&]() -> void
