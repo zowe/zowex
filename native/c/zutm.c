@@ -21,7 +21,168 @@
 #include "zam.h"
 #include "zuttype.h"
 #include "zssi.h"
-#include "zwto.h"
+#include "ihapsa.h"
+#include "cvt.h"
+#include "ifaedidf.h"
+#include "ifaed.h"
+
+#if defined(__IBM_METAL__)
+#define IFAEDREG(func)                                        \
+  __asm(                                                      \
+      "*                                                  \n" \
+      " LLGT  15,X'10'        CVT                         \n" \
+      " LLGT  15,X'8C'(,15)   ECVT                        \n" \
+      " LLGT  15,X'1C0'(,15)                              \n" \
+      " LLGT  15,4(,15)                                   \n" \
+      " LLGT  15,0(,15)                                   \n" \
+      " ST    15,%0           Save entry point            \n" \
+      "*                                                    " \
+      : "=m"(*func)                                           \
+      :                                                       \
+      : "r15");
+#else
+#define IFAEDREG(func)
+#endif
+
+#if defined(__IBM_METAL__)
+#define IFAEDSTA(func)                                        \
+  __asm(                                                      \
+      "*                                                  \n" \
+      " LLGT  15,X'10'        CVT                         \n" \
+      " LLGT  15,X'8C'(,15)   ECVT                        \n" \
+      " LLGT  15,X'1C0'(,15)                              \n" \
+      " LLGT  15,4(,15)                                   \n" \
+      " LLGT  15,8(,15)                                   \n" \
+      " ST    15,%0           Save entry point            \n" \
+      "*                                                    " \
+      : "=m"(*func)                                           \
+      :                                                       \
+      : "r15");
+#else
+#define IFAEDSTA(func)
+#endif
+
+#if defined(__IBM_METAL__)
+#define IFAEDDRG(func)                                        \
+  __asm(                                                      \
+      "*                                                  \n" \
+      " LLGT  15,X'10'        CVT                         \n" \
+      " LLGT  15,X'8C'(,15)   ECVT                        \n" \
+      " LLGT  15,X'1C0'(,15)                              \n" \
+      " LLGT  15,4(,15)                                   \n" \
+      " LLGT  15,4(,15)                                   \n" \
+      " ST    15,%0           Save entry point            \n" \
+      "*                                                    " \
+      : "=m"(*func)                                           \
+      :                                                       \
+      : "r15");
+#else
+#define IFAEDDRG(func)
+#endif
+
+typedef int (*PTR32 IFAEDREG)(int *type, char *product_owner, char *product_name, char *feature_name, char *prod_version, char *prod_release, char *prod_mod, char *prod_id, int *features_len, void *features, char *prod_token, int *return_code) ATTRIBUTE(amode31);
+typedef int (*PTR32 IFAEDSTA)(char *product_owner, char *product_name, char *feature_name, char *prod_id, void *out_info, int *features_len, void *features, int *return_code) ATTRIBUTE(amode31);
+typedef int (*PTR32 IFAEDDRG)(char *prod_token, int *return_code) ATTRIBUTE(amode31);
+
+#pragma prolog(ZUTREG, " ZWEPROLG NEWDSA=(YES,8) ")
+#pragma epilog(ZUTREG, " ZWEEPILG ")
+int ZUTREG(ZDIAG *diag, IFAEDREG_PARMS *parms, IFAEDREG_RESPONSE *response)
+{
+  IFAEDREG reg = NULL;
+  IFAEDSTA status = NULL;
+  IFAEDDRG dreg = NULL;
+
+  IFAEDREG(reg);
+  IFAEDSTA(status);
+  IFAEDDRG(dreg);
+
+  IFAEDREG_PARMS parms31 = {0};
+  IFAEDREG_RESPONSE response31 = {0};
+
+  memcpy(&parms31, parms, sizeof(IFAEDREG_PARMS));
+
+  int type = ifaedreg___type___required;
+
+  int features_len = 0;
+  void *features = NULL;
+
+  char out_info[16] = {0};
+
+  if (status && reg)
+  {
+    int rc = 0;
+
+    rc = status(parms31.product_owner, parms31.product_name, parms31.feature_name, parms31.prod_id, out_info, &features_len, features, &response31.return_code);
+    memcpy(response, &response31, sizeof(response31));
+    if (response31.return_code == ifaedsta___success)
+    {
+      return RTNCD_WARNING;
+    }
+
+    else if (response31.return_code == ifaedsta___notdefined)
+    {
+      rc = reg(&type, parms31.product_owner, parms31.product_name, parms31.feature_name, parms31.prod_version, parms31.prod_release, parms31.prod_mod, parms31.prod_id, &features_len, features, response31.token.value, &response31.return_code);
+      memcpy(response, &response31, sizeof(response31));
+      if (response31.return_code != ifaedreg___success)
+      {
+        strcpy(diag->service_name, "IFAEDREG");
+        ZDIAG_SET_MSG(diag, "Register service failed with return code: %d", response31.return_code);
+        diag->detail_rc = ZUT_RTNCD_SERVICE_FAILURE;
+        return RTNCD_FAILURE;
+      }
+    }
+
+    else
+    {
+      strcpy(diag->service_name, "IFAEDSTA");
+      ZDIAG_SET_MSG(diag, "Status service failed with return code: %d", response31.return_code);
+      diag->detail_rc = ZUT_RTNCD_SERVICE_FAILURE;
+      return RTNCD_FAILURE;
+    }
+  }
+  else
+  {
+    strcpy(diag->service_name, "IFAEDREG");
+    ZDIAG_SET_MSG(diag, "Register or status service failed, service not found");
+    diag->detail_rc = ZUT_RTNCD_SERVICE_FAILURE;
+    return RTNCD_FAILURE;
+  }
+
+  return RTNCD_SUCCESS;
+}
+
+#pragma prolog(ZUTDRG, " ZWEPROLG NEWDSA=(YES,8) ")
+#pragma epilog(ZUTDRG, " ZWEEPILG ")
+int ZUTDRG(ZDIAG *diag, IFAED_TOKEN *token)
+{
+  IFAEDDRG dreg = NULL;
+  IFAEDDRG(dreg);
+
+  IFAED_TOKEN token31 = {0};
+  memcpy(&token31, token, sizeof(IFAED_TOKEN));
+
+  if (dreg)
+  {
+    int return_code = 0;
+    return_code = dreg(token31.value, &return_code);
+    if (return_code != ifaeddrg___success)
+    {
+      strcpy(diag->service_name, "IFAEDDRG");
+      ZDIAG_SET_MSG(diag, "Deregister service failed with return code: %d", return_code);
+      diag->detail_rc = ZUT_RTNCD_SERVICE_FAILURE;
+      return RTNCD_FAILURE;
+    }
+  }
+  else
+  {
+    strcpy(diag->service_name, "IFAEDDRG");
+    ZDIAG_SET_MSG(diag, "Deregister service failed, service not found");
+    diag->detail_rc = ZUT_RTNCD_SERVICE_FAILURE;
+    return RTNCD_FAILURE;
+  }
+
+  return RTNCD_SUCCESS;
+}
 
 #define ZUT_BPXWDYN_SERVICE_FAILURE -2
 

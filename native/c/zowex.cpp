@@ -25,6 +25,7 @@
 #include "commands/tso.hpp"
 #include "commands/uss.hpp"
 #include "extend/plugin.hpp"
+#include "zut.hpp"
 
 // Version information
 #ifndef PACKAGE_VERSION
@@ -55,6 +56,21 @@ static std::string get_plugins_dir(const std::string &exec_dir)
   return plugins_path;
 }
 
+static std::string get_overrides_dir(const std::string &exec_dir)
+{
+  std::string overrides_path = std::string(getenv("ZOWEX_OVERRIDES_DIR"));
+  if (overrides_path.empty())
+  {
+    return exec_dir + "/overrides";
+  }
+  else if (overrides_path.back() == '/')
+  {
+    overrides_path.pop_back(); // Remove trailing slash if present
+  }
+
+  return overrides_path;
+}
+
 int main(int argc, char *argv[])
 {
   const auto exec_dir = get_executable_dir(argv[0]);
@@ -80,7 +96,12 @@ int main(int argc, char *argv[])
 
     pm.register_commands(root_cmd);
 
-    return core::execute_command(argc, argv);
+    // TODO(Kelosky): support other features, MCP, ZRS, CLI, etc.
+    std::vector<IFAED_TOKEN> tokens;
+    zut_register_service(tokens, "ZOWEX CLI", core::get_version(), get_overrides_dir(exec_dir));
+    auto rc = core::execute_command(argc, argv);
+    zut_deregister_service(tokens);
+    return rc;
   }
   catch (const std::exception &e)
   {

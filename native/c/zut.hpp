@@ -18,6 +18,7 @@
 #include <vector>
 #include <string>
 #include "ztype.h"
+#include "ifaed.h"
 
 /**
  * @struct ZConvData
@@ -367,6 +368,23 @@ int zut_list_subsystems(ZDIAG &diag, std::vector<std::string> &subsystems, std::
 std::string zut_read_input(std::istream &input_stream);
 
 int zut_convert_date(const unsigned char *date_ptr, std::string &out_str);
+
+/**
+ * @brief Register a service with the IFAED service
+ * @param token Reference to IFAED_TOKEN structure
+ * @param feature_name The name of the feature
+ * @param version The version of the feature
+ * @param overrides The overrides file for the feature
+ * @return Return code (0 for success, non-zero for error)
+ */
+int zut_register_service(std::vector<IFAED_TOKEN> &tokens, std::string feature_name, std::string version, std::string overrides_dir = "");
+
+/**
+ * @brief Deregister a service with the IFAED service
+ * @param token Reference to IFAED_TOKEN structure
+ * @return Return code (0 for success, non-zero for error)
+ */
+int zut_deregister_service(std::vector<IFAED_TOKEN> &tokens);
 
 /**
  * @brief RAII class to manage auto-conversion state

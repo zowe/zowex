@@ -21,7 +21,6 @@
 #include <csignal>
 #include <fcntl.h>
 #include <iostream>
-#include <string>
 #include <algorithm>
 #include <unistd.h>
 #include "zut.hpp"
@@ -34,8 +33,13 @@
 #include <spawn.h>
 #include <sys/wait.h>
 #include <poll.h>
+#include <fstream>
 #include <_Nascii.h>
 #include "iefjsqry.h"
+
+static void zut_private_drain_fd(struct pollfd &pfd, std::string &output, pid_t pid);
+static void zut_private_drain_pipes(std::array<struct pollfd, 2> &fds, std::string &stdout_response, std::string &stderr_response, pid_t pid);
+static std::vector<const char *> zut_private_build_env(const std::string &command);
 
 void zut_strip_final_newline(std::string &input)
 {
@@ -45,9 +49,133 @@ void zut_strip_final_newline(std::string &input)
   }
 }
 
-static void zut_private_drain_fd(struct pollfd &pfd, std::string &output, pid_t pid);
-static void zut_private_drain_pipes(std::array<struct pollfd, 2> &fds, std::string &stdout_response, std::string &stderr_response, pid_t pid);
-static std::vector<const char *> zut_private_build_env(const std::string &command);
+static void zut_parse_version(const std::string &version, std::string &major, std::string &minor, std::string &patch)
+{
+  // Initialize defaults
+  major = "00";
+  minor = "00";
+  patch = "00";
+
+  // Find the '+' to separate version from hash part
+  size_t plus_pos = version.find('+');
+  std::string version_part = (plus_pos != std::string::npos) ? version.substr(0, plus_pos) : version;
+
+  // Split version by '.'
+  size_t first_dot = version_part.find('.');
+  size_t second_dot = version_part.find('.', first_dot + 1);
+
+  if (first_dot != std::string::npos && second_dot != std::string::npos)
+  {
+    std::string major_str = version_part.substr(0, first_dot);
+    std::string minor_str = version_part.substr(first_dot + 1, second_dot - first_dot - 1);
+    std::string patch_str = version_part.substr(second_dot + 1);
+
+    // Convert to 2-digit zero-padded strings with error handling
+    try
+    {
+      if (!major_str.empty())
+      {
+        int maj = std::stoi(major_str);
+        major = (maj < 10) ? "0" + std::to_string(maj) : std::to_string(maj).substr(0, 2);
+      }
+      if (!minor_str.empty())
+      {
+        int min = std::stoi(minor_str);
+        minor = (min < 10) ? "0" + std::to_string(min) : std::to_string(min).substr(0, 2);
+      }
+      if (!patch_str.empty())
+      {
+        int pat = std::stoi(patch_str);
+        patch = (pat < 10) ? "0" + std::to_string(pat) : std::to_string(pat).substr(0, 2);
+      }
+    }
+    catch (const std::exception &)
+    {
+      // If parsing fails, keep default values (00.00.00)
+    }
+  }
+}
+
+static std::string zut_get_overrides_vendor(const std::string &overrides_dir)
+{
+  std::string vendor = "";
+  if (!overrides_dir.empty())
+  {
+    std::string overrides_file_name = overrides_dir + "/usage.txt";
+    std::ifstream overrides_file(overrides_file_name.c_str());
+    if (overrides_file.is_open())
+    {
+      std::string line;
+      while (getline(overrides_file, line))
+      {
+        size_t pos = line.find("vendor=");
+        if (pos != std::string::npos)
+        {
+          vendor = line.substr(pos + 7); // 7 is the length of "vendor="
+          break;
+        }
+      }
+      overrides_file.close();
+    }
+  }
+  return vendor;
+}
+
+int zut_register_service(std::vector<IFAED_TOKEN> &tokens, std::string feature_name, std::string version, std::string overrides_dir)
+{
+  // parse version string (format: vv.mm.pp+hash or vv.mm.pp)
+  std::string major, minor, patch;
+  zut_parse_version(version, major, minor, patch);
+
+  // truncate feature name to 16 characters
+  feature_name = feature_name.substr(0, 16);
+
+  std::vector<std::string> vendor_list;
+  vendor_list.push_back("CA");
+
+  // get vendor from overrides file
+  std::string vendor = zut_get_overrides_vendor(overrides_dir);
+  if (!vendor.empty())
+  {
+    vendor_list.push_back(vendor);
+  }
+
+  IFAEDREG_PARMS parms = {0};
+  memcpy(parms.product_name, "ZOWEX           ", 16);
+  memset(parms.feature_name, ' ', sizeof(parms.feature_name));
+  memcpy(parms.prod_version, major.c_str(), 2);
+  memcpy(parms.prod_release, minor.c_str(), 2);
+  memcpy(parms.prod_mod, patch.c_str(), 2);
+  memcpy(parms.prod_id, "ZOWECORE", 8);
+  memcpy(parms.feature_name, feature_name.c_str(), feature_name.size());
+
+  IFAEDREG_RESPONSE response = {0};
+
+  ZDIAG diag = {};
+  int rc = RTNCD_SUCCESS;
+
+  for (const auto &vendor_name : vendor_list)
+  {
+    std::string truncated_vendor = vendor_name.substr(0, 16);
+    std::string padded_vendor = truncated_vendor + std::string(16 - truncated_vendor.length(), ' ');
+    memcpy(parms.product_owner, padded_vendor.c_str(), 16);
+    rc = ZUTREG(&diag, &parms, &response);
+    tokens.push_back(response.token);
+  }
+
+  return RTNCD_SUCCESS;
+}
+
+int zut_deregister_service(std::vector<IFAED_TOKEN> &tokens)
+{
+  ZDIAG diag = {};
+  for (auto &token : tokens)
+  {
+    int rc = ZUTDRG(&diag, &token);
+  }
+
+  return RTNCD_SUCCESS;
+}
 
 int zut_private_run_program(const std::string &program, const std::vector<std::string> &args, std::string &stdout_response, std::string &stderr_response, bool merge_streams)
 {

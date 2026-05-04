@@ -15,6 +15,7 @@
 #include "ztype.h"
 #include "zprmtype.h"
 #include "iefjsqry.h"
+#include "ifaed.h"
 
 #if defined(__cplusplus) && defined(__MVS__)
 extern "OS"
@@ -101,6 +102,8 @@ extern "C"
   int ZUTSSIQ(ZDIAG *, JQRY_HEADER **, const char *filter);
   int ZUTCVTD(const char *ptr, char *time_out);
   int ZUTNOAUT();
+  int ZUTREG(ZDIAG *, IFAEDREG_PARMS *, IFAEDREG_RESPONSE *);
+  int ZUTDRG(ZDIAG *, IFAED_TOKEN *);
 
 #if defined(__cplusplus)
 }
