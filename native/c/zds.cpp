@@ -12,7 +12,6 @@
 
 #ifndef _OPEN_SYS_ITOA_EXT
 #define _OPEN_SYS_ITOA_EXT
-#include "zdbg.h"
 #include "ztype.h"
 #include <cctype>
 #endif
@@ -2608,7 +2607,7 @@ typedef struct
 typedef struct
 {
   ZDS_CSI_HEADER header;
-  ZDS_CSI_CATALOG catalog;
+  ZDS_CSI_CATALOG catalog[0];
   ZDS_CSI_ENTRY entry;
 } ZDS_CSI_WORK_AREA;
 
@@ -3338,7 +3337,7 @@ int zds_list_data_sets(ZDS *zds, std::string dsn, std::vector<ZDSEntry> &dataset
   memset(&selection_criteria->csicldi, 'Y', sizeof(selection_criteria->csicldi));
   memset(&selection_criteria->csiresum, ' ', sizeof(selection_criteria->csiresum));
   memset(&selection_criteria->csicatnm, ' ', sizeof(selection_criteria->csicatnm));
-  memset(&selection_criteria->csis1cat, 'Y', sizeof(selection_criteria->csis1cat)); // do not search master catalog if alias is found
+  memset(&selection_criteria->csis1cat, ' ', sizeof(selection_criteria->csis1cat));
   memset(&selection_criteria->csioptns, FOUR_BYTE_RETURN, sizeof(selection_criteria->csioptns));
   memset(selection_criteria->csidtyps, ' ', sizeof(selection_criteria->csidtyps));
 
@@ -3350,6 +3349,7 @@ int zds_list_data_sets(ZDS *zds, std::string dsn, std::vector<ZDSEntry> &dataset
   }
 
   selection_criteria->csinumen = number_of_fields;
+  bool found_in_catalog = false;
 
   do
   {
@@ -3359,10 +3359,6 @@ int zds_list_data_sets(ZDS *zds, std::string dsn, std::vector<ZDSEntry> &dataset
     {
       free(area);
       ZDSDEL(zds);
-      strcpy(zds->diag.service_name, "ZDSCSI00");
-      zds->diag.service_rc = rc;
-      zds->diag.detail_rc = ZDS_RTNCD_SERVICE_FAILURE;
-      ZDIAG_SET_MSG(&zds->diag, "ZDSCSI00 failed with rc %d", rc);
       return RTNCD_FAILURE;
     }
 
@@ -3380,52 +3376,11 @@ int zds_list_data_sets(ZDS *zds, std::string dsn, std::vector<ZDSEntry> &dataset
       return RTNCD_FAILURE;
     }
 
-    if (ERROR_CONDITION == csi_work_area->catalog.flag)
-    {
-      free(area);
-      ZDSDEL(zds);
-      zds->diag.detail_rc = ZDS_RTNCD_PARSING_ERROR;
-      zds->diag.service_rc = ZDS_RTNCD_CATALOG_ERROR;
-      ZDIAG_SET_MSG(&zds->diag, "Unexpected catalog flag '%x' ", csi_work_area->catalog.flag);
-      return RTNCD_FAILURE;
-    }
-
-    if (DATA_NOT_COMPLETE & csi_work_area->catalog.flag)
-    {
-      free(area);
-      ZDSDEL(zds);
-      zds->diag.detail_rc = ZDS_RTNCD_PARSING_ERROR;
-      zds->diag.service_rc = ZDS_RTNCD_CATALOG_ERROR;
-      ZDIAG_SET_MSG(&zds->diag, "Unexpected catalog flag '%x' ", csi_work_area->catalog.flag);
-      return RTNCD_FAILURE;
-    }
-
-    if (NO_ENTRY & csi_work_area->catalog.flag)
-    {
-      free(area);
-      ZDSDEL(zds);
-      zds->diag.detail_rc = ZDS_RSNCD_NOT_FOUND;
-      zds->diag.service_rc = ZDS_RTNCD_CATALOG_ERROR;
-      ZDIAG_SET_MSG(&zds->diag, "Not found in catalog, flag '%x' ", csi_work_area->catalog.flag);
-      return RTNCD_WARNING;
-    }
-
-    if (CATALOG_TYPE != csi_work_area->catalog.type)
-    {
-      free(area);
-      ZDSDEL(zds);
-      zds->diag.detail_rc = ZDS_RTNCD_PARSING_ERROR;
-      zds->diag.service_rc = ZDS_RTNCD_CATALOG_ERROR;
-      ZDIAG_SET_MSG(&zds->diag, "Unexpected type '%x' ", csi_work_area->catalog.type);
-      return RTNCD_FAILURE;
-    }
-
     int work_area_total = csi_work_area->header.used_size;
-    unsigned char *p = (unsigned char *)&csi_work_area->entry;
+    unsigned char *p = (unsigned char *)csi_work_area->catalog;
     ZDS_CSI_ENTRY *f = nullptr;
 
     work_area_total -= sizeof(ZDS_CSI_HEADER);
-    work_area_total -= sizeof(ZDS_CSI_CATALOG);
 
     char buffer[sizeof(f->name) + 1] = {};
 
@@ -3433,6 +3388,42 @@ int zds_list_data_sets(ZDS *zds, std::string dsn, std::vector<ZDSEntry> &dataset
     {
       ZDSEntry entry{};
       f = (ZDS_CSI_ENTRY *)p;
+
+      if (CATALOG_TYPE == f->type)
+      {
+        if (ERROR_CONDITION == f->flag)
+        {
+          free(area);
+          ZDSDEL(zds);
+          zds->diag.detail_rc = ZDS_RTNCD_PARSING_ERROR;
+          zds->diag.service_rc = ZDS_RTNCD_CATALOG_ERROR;
+          ZDIAG_SET_MSG(&zds->diag, "Unexpected catalog flag '%x' ", f->flag);
+          return RTNCD_FAILURE;
+        }
+
+        if (DATA_NOT_COMPLETE & f->flag)
+        {
+          free(area);
+          ZDSDEL(zds);
+          zds->diag.detail_rc = ZDS_RTNCD_PARSING_ERROR;
+          zds->diag.service_rc = ZDS_RTNCD_CATALOG_ERROR;
+          ZDIAG_SET_MSG(&zds->diag, "Unexpected catalog flag '%x' ", f->flag);
+          return RTNCD_FAILURE;
+        }
+
+        if (NO_ENTRY & f->flag)
+        {
+          // do nothing and continue to the next catalog
+        }
+        else
+        {
+          found_in_catalog = true;
+        }
+
+        p += sizeof(ZDS_CSI_CATALOG);
+        work_area_total -= sizeof(ZDS_CSI_CATALOG);
+        continue;
+      }
 
       if (ERROR == f->flag)
       {
@@ -3551,7 +3542,7 @@ int zds_list_data_sets(ZDS *zds, std::string dsn, std::vector<ZDSEntry> &dataset
           ZDSDEL(zds);
           zds->diag.detail_rc = ZDS_RTNCD_SERVICE_FAILURE;
           zds->diag.service_rc = ZDS_RTNCD_UNSUPPORTED_ERROR;
-          ZDIAG_SET_MSG(&zds->diag, "Unsupported entry type '%x' ", f->type);
+          ZDIAG_SET_MSG(&zds->diag, "Unexpected entry type '%x' ", f->type);
           return RTNCD_FAILURE;
         };
 
@@ -3580,6 +3571,14 @@ int zds_list_data_sets(ZDS *zds, std::string dsn, std::vector<ZDSEntry> &dataset
 
   free(area);
   ZDSDEL(zds);
+
+  if (!found_in_catalog)
+  {
+    zds->diag.detail_rc = ZDS_RSNCD_NOT_FOUND;
+    zds->diag.service_rc = ZDS_RTNCD_CATALOG_ERROR;
+    ZDIAG_SET_MSG(&zds->diag, "Not found in any catalog");
+    return RTNCD_WARNING;
+  }
 
   return RTNCD_SUCCESS;
 }

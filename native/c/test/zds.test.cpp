@@ -630,7 +630,7 @@ void zds_tests()
                              Expect(zds_create_dsn(&zds, src, ps_attr, response)).ToBe(0);
 
                              std::string data = "test data";
-                             ZDSWriteOpts wopts{&zds, .dsname = src};
+                             ZDSWriteOpts wopts{.zds = &zds, .dsname = src};
                              Expect(zds_write(wopts, data)).ToBe(0);
 
                              int rc = zds_copy_dsn(&zds, src, tgt, &opts);
@@ -651,11 +651,11 @@ void zds_tests()
 
                              std::string d1 = "DATA1", d2 = "DATA2", data = "OLD DATA";
 
-                             zds_write(ZDSWriteOpts{&zds, .dsname = src + "(M1)"}, d1);
-                             zds_write(ZDSWriteOpts{&zds, .dsname = src + "(M2)"}, d2);
+                             zds_write(ZDSWriteOpts{.zds = &zds, .dsname = src + "(M1)"}, d1);
+                             zds_write(ZDSWriteOpts{.zds = &zds, .dsname = src + "(M2)"}, d2);
 
                              zds_create_dsn(&zds, tgt, pds_attr, response);
-                             zds_write(ZDSWriteOpts{&zds, .dsname = tgt + "(tgt)"}, data);
+                             zds_write(ZDSWriteOpts{.zds = &zds, .dsname = tgt + "(tgt)"}, data);
 
                              opts.replace = true;
                              int rc = zds_copy_dsn(&zds, src, tgt, &opts);
@@ -676,7 +676,7 @@ void zds_tests()
                              zds_create_dsn(&zds, tgt_pds, pds_attr, response);
 
                              std::string data = "test data";
-                             ZDSWriteOpts wopts{&zds, .dsname = src_pds + "(M1)"};
+                             ZDSWriteOpts wopts{.zds = &zds, .dsname = src_pds + "(M1)"};
                              int rc = zds_write(wopts, data);
                              ExpectWithContext(rc, zds.diag.e_msg).ToBe(0);
 
@@ -698,16 +698,16 @@ void zds_tests()
 
                              zds_create_dsn(&zds, src, pds_attr, response);
                              std::string n = "NEW", o = "OLD";
-                             zds_write(ZDSWriteOpts{&zds, .dsname = src + "(M1)"}, n);
+                             zds_write(ZDSWriteOpts{.zds = &zds, .dsname = src + "(M1)"}, n);
 
                              zds_create_dsn(&zds, tgt, pds_attr, response);
-                             zds_write(ZDSWriteOpts{&zds, .dsname = tgt + "(tgt)"}, o);
+                             zds_write(ZDSWriteOpts{.zds = &zds, .dsname = tgt + "(tgt)"}, o);
 
                              int rc = zds_copy_dsn(&zds, src, tgt, &opts);
                              ExpectWithContext(rc, zds.diag.e_msg).ToBe(0);
 
                              std::string out;
-                             ZDSReadOpts ropts{&zds, .dsname = tgt + "(tgt)"};
+                             ZDSReadOpts ropts{.zds = &zds, .dsname = tgt + "(tgt)"};
                              int read_rc = zds_read(ropts, out);
                              Expect(read_rc).Not().ToBe(0);
                            });
@@ -726,7 +726,7 @@ void zds_tests()
                              zds_create_dsn(&zds, tgt, pds_attr, response);
 
                              std::string data = "test data";
-                             zds_write(ZDSWriteOpts{&zds, .dsname = src + "(MEM#1)"}, data);
+                             zds_write(ZDSWriteOpts{.zds = &zds, .dsname = src + "(MEM#1)"}, data);
 
                              int rc = zds_copy_dsn(&zds, src + "(MEM#1)", tgt + "(MEM#1)", &opts);
                              ExpectWithContext(rc, zds.diag.e_msg).ToBe(0);
@@ -748,9 +748,9 @@ void zds_tests()
 
                             std::string d1 = "DATA1", d2 = "DATA2";
 
-                            zds_write(ZDSWriteOpts{&zds, .dsname = src + "(M1)"}, d1);
+                            zds_write(ZDSWriteOpts{.zds = &zds, .dsname = src + "(M1)"}, d1);
 
-                            zds_write(ZDSWriteOpts{&zds, .dsname = tgt + "(tgt)"}, d2);
+                            zds_write(ZDSWriteOpts{.zds = &zds, .dsname = tgt + "(tgt)"}, d2);
 
                             int rc = zds_copy_dsn(&zds, src, tgt, &opts);
                             ExpectWithContext(rc, zds.diag.e_msg).ToBe(RTNCD_FAILURE);

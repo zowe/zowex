@@ -4,6 +4,13 @@ All notable changes to the Client code for "@zowe/zowex-for-zowe-sdk" are docume
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## `0.6.0`
+
+- Added `disableCreateNewProfile` option to `AbstractConfigManager.promptForProfile` function to prevent profile creation and migration, allowing selection only from existing SSH profiles. [#971](https://github.com/zowe/zowex/pull/971)
+- **Breaking:** Modified `promptForProfile` function to use an options object for `setExistingProfile` and `prioritizeProjectLevelConfig` parameters. [#964](https://github.com/zowe/zowex/pull/964)
+- Added `prioritizeProjectLevelConfig` to the options parameter for `promptForProfile` function to allow toggling between project-level and global configuration creation when setting up new SSH profiles. [#964](https://github.com/zowe/zowex/pull/964)
+- Updated the `russh` dependency for technical currency. [#963](https://github.com/zowe/zowex/pull/963)
+
 ## `0.5.0`
 
 - Added support for copying data sets and members files in the `RpcClientApi` class. [#932](https://github.com/zowe/zowex/issues/932)
