@@ -1560,7 +1560,7 @@ async function main() {
                 break;
             case "build:java_app":
                 console.log("Building Java App locally...");
-                childProcess.execSync("./gradlew build -x test", { stdio: "inherit", cwd: path.resolve(__dirname, "../native/java/app") });
+                childProcess.execSync("./gradlew clean build -x test", { stdio: "inherit", cwd: path.resolve(__dirname, "../native/java/app") });
                 console.log("Uploading Java App JAR to remote...");
                 await runCommandInShell(sshClient, `mkdir -p ${deployDirs.javaDir}/build/libs\n`, { stepName: "Create remote libs dir" });
                 {

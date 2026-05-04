@@ -1,5 +1,6 @@
 #include "zusf_c_api.h"
 #include "../../c/zusf.hpp"
+#include "../../python/bindings/conversion.hpp"
 #include <string>
 #include <cstring>
 #include <cstdlib>
@@ -21,9 +22,14 @@ ZUSFBasicResponse_C* zusf_c_create_uss_file(const char* file, const char* mode) 
         ZUSF ctx = {0};
         std::string file_str = file ? file : "";
         std::string mode_str = mode ? mode : "644";
+        a2e_inplace(file_str);
         mode_t octal_mode = std::stoi(mode_str, nullptr, 8);
         if (zusf_create_uss_file_or_dir(&ctx, file_str, octal_mode, CreateOptions(false)) != 0) {
-            response->error_message = copy_string(ctx.diag.e_msg);
+            std::string diag(ctx.diag.e_msg, ctx.diag.e_msg_len);
+            diag.push_back('\0');
+            e2a_inplace(diag);
+            diag.pop_back();
+            response->error_message = copy_string(diag);
         }
     } catch (const std::exception& e) {
         response->error_message = copy_string(e.what());
@@ -37,9 +43,14 @@ ZUSFBasicResponse_C* zusf_c_create_uss_dir(const char* file, const char* mode) {
         ZUSF ctx = {0};
         std::string file_str = file ? file : "";
         std::string mode_str = mode ? mode : "755";
+        a2e_inplace(file_str);
         mode_t octal_mode = std::stoi(mode_str, nullptr, 8);
         if (zusf_create_uss_file_or_dir(&ctx, file_str, octal_mode, CreateOptions(true)) != 0) {
-            response->error_message = copy_string(ctx.diag.e_msg);
+            std::string diag(ctx.diag.e_msg, ctx.diag.e_msg_len);
+            diag.push_back('\0');
+            e2a_inplace(diag);
+            diag.pop_back();
+            response->error_message = copy_string(diag);
         }
     } catch (const std::exception& e) {
         response->error_message = copy_string(e.what());
@@ -53,8 +64,14 @@ ZUSFBasicResponse_C* zusf_c_move_uss_file_or_dir(const char* source, const char*
         ZUSF ctx = {0};
         std::string source_str = source ? source : "";
         std::string dest_str = destination ? destination : "";
+        a2e_inplace(source_str);
+        a2e_inplace(dest_str);
         if (zusf_move_uss_file_or_dir(&ctx, source_str, dest_str) != 0) {
-            response->error_message = copy_string(ctx.diag.e_msg);
+            std::string diag(ctx.diag.e_msg, ctx.diag.e_msg_len);
+            diag.push_back('\0');
+            e2a_inplace(diag);
+            diag.pop_back();
+            response->error_message = copy_string(diag);
         }
     } catch (const std::exception& e) {
         response->error_message = copy_string(e.what());
@@ -68,6 +85,7 @@ ZUSFStringResponse_C* zusf_c_list_uss_dir(const char* path, const ZUSFListOption
         ZUSF ctx = {0};
         std::string out;
         std::string path_str = path ? path : "";
+        a2e_inplace(path_str);
         ListOptions list_opts(false, false, 1);
         if (options) {
             list_opts.all_files = options->all_files;
@@ -75,8 +93,13 @@ ZUSFStringResponse_C* zusf_c_list_uss_dir(const char* path, const ZUSFListOption
             list_opts.max_depth = options->max_depth;
         }
         if (zusf_list_uss_file_path(&ctx, path_str, out, list_opts, true) != 0) { // pass true for use_csv_format? Python SWIG bindings don't seem to pass it to the C++ code, wait, Python bindings calls zusf_list_uss_file_path with out which returns CSV usually. Let's see, zusf.hpp has `bool use_csv_format = false` as default. The SWIG file didn't pass it. Wait, `list_uss_dir` in `zusf_py.cpp` calls `zusf_list_uss_file_path(&ctx, path.c_str(), out, options)` which uses default `false` for CSV? Oh, wait. In `zusf_py.cpp` it calls `zusf_list_uss_file_path(&ctx, path.c_str(), out, options)`. Wait, let me check. Let's just use what's there.
-            response->error_message = copy_string(ctx.diag.e_msg);
+            std::string diag(ctx.diag.e_msg, ctx.diag.e_msg_len);
+            diag.push_back('\0');
+            e2a_inplace(diag);
+            diag.pop_back();
+            response->error_message = copy_string(diag);
         } else {
+            e2a_inplace(out);
             response->data = copy_string(out);
         }
     } catch (const std::exception& e) {
@@ -95,10 +118,16 @@ ZUSFStringResponse_C* zusf_c_read_uss_file(const char* file, const char* codepag
             strncpy(ctx.encoding_opts.codepage, codepage, sizeof(ctx.encoding_opts.codepage) - 1);
         }
         std::string file_str = file ? file : "";
+        a2e_inplace(file_str);
         std::string data_response;
         if (zusf_read_from_uss_file(&ctx, file_str, data_response) != 0) {
-            response->error_message = copy_string(ctx.diag.e_msg);
+            std::string diag(ctx.diag.e_msg, ctx.diag.e_msg_len);
+            diag.push_back('\0');
+            e2a_inplace(diag);
+            diag.pop_back();
+            response->error_message = copy_string(diag);
         } else {
+            e2a_inplace(data_response);
             response->data = copy_string(data_response);
         }
     } catch (const std::exception& e) {
@@ -121,10 +150,18 @@ ZUSFStringResponse_C* zusf_c_write_uss_file(const char* file, const char* data, 
         }
         std::string file_str = file ? file : "";
         std::string data_copy = data ? data : "";
+        a2e_inplace(file_str);
+        a2e_inplace(data_copy);
         if (zusf_write_to_uss_file(&ctx, file_str, data_copy) != 0) {
-            response->error_message = copy_string(ctx.diag.e_msg);
+            std::string diag(ctx.diag.e_msg, ctx.diag.e_msg_len);
+            diag.push_back('\0');
+            e2a_inplace(diag);
+            diag.pop_back();
+            response->error_message = copy_string(diag);
         } else {
-            response->data = copy_string(ctx.etag);
+            std::string new_etag(ctx.etag);
+            e2a_inplace(new_etag);
+            response->data = copy_string(new_etag);
         }
     } catch (const std::exception& e) {
         response->error_message = copy_string(e.what());
@@ -138,9 +175,14 @@ ZUSFBasicResponse_C* zusf_c_chmod_uss_item(const char* file, const char* mode, b
         ZUSF ctx = {0};
         std::string file_str = file ? file : "";
         std::string mode_str = mode ? mode : "0";
+        a2e_inplace(file_str);
         mode_t octal_mode = std::stoi(mode_str, nullptr, 8);
         if (zusf_chmod_uss_file_or_dir(&ctx, file_str, octal_mode, recursive) != 0) {
-            response->error_message = copy_string(ctx.diag.e_msg);
+            std::string diag(ctx.diag.e_msg, ctx.diag.e_msg_len);
+            diag.push_back('\0');
+            e2a_inplace(diag);
+            diag.pop_back();
+            response->error_message = copy_string(diag);
         }
     } catch (const std::exception& e) {
         response->error_message = copy_string(e.what());
@@ -153,8 +195,13 @@ ZUSFBasicResponse_C* zusf_c_delete_uss_item(const char* file, bool recursive) {
     try {
         ZUSF ctx = {0};
         std::string file_str = file ? file : "";
+        a2e_inplace(file_str);
         if (zusf_delete_uss_item(&ctx, file_str, recursive) != 0) {
-            response->error_message = copy_string(ctx.diag.e_msg);
+            std::string diag(ctx.diag.e_msg, ctx.diag.e_msg_len);
+            diag.push_back('\0');
+            e2a_inplace(diag);
+            diag.pop_back();
+            response->error_message = copy_string(diag);
         }
     } catch (const std::exception& e) {
         response->error_message = copy_string(e.what());
@@ -168,8 +215,14 @@ ZUSFBasicResponse_C* zusf_c_chown_uss_item(const char* file, const char* owner, 
         ZUSF ctx = {0};
         std::string file_str = file ? file : "";
         std::string owner_str = owner ? owner : "";
+        a2e_inplace(file_str);
+        a2e_inplace(owner_str);
         if (zusf_chown_uss_file_or_dir(&ctx, file_str, owner_str, recursive) != 0) {
-            response->error_message = copy_string(ctx.diag.e_msg);
+            std::string diag(ctx.diag.e_msg, ctx.diag.e_msg_len);
+            diag.push_back('\0');
+            e2a_inplace(diag);
+            diag.pop_back();
+            response->error_message = copy_string(diag);
         }
     } catch (const std::exception& e) {
         response->error_message = copy_string(e.what());
@@ -183,8 +236,14 @@ ZUSFBasicResponse_C* zusf_c_chtag_uss_item(const char* file, const char* tag, bo
         ZUSF ctx = {0};
         std::string file_str = file ? file : "";
         std::string tag_str = tag ? tag : "";
+        a2e_inplace(file_str);
+        a2e_inplace(tag_str);
         if (zusf_chtag_uss_file_or_dir(&ctx, file_str, tag_str, recursive) != 0) {
-            response->error_message = copy_string(ctx.diag.e_msg);
+            std::string diag(ctx.diag.e_msg, ctx.diag.e_msg_len);
+            diag.push_back('\0');
+            e2a_inplace(diag);
+            diag.pop_back();
+            response->error_message = copy_string(diag);
         }
     } catch (const std::exception& e) {
         response->error_message = copy_string(e.what());

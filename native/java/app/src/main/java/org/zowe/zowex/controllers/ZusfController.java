@@ -6,7 +6,7 @@ import org.zowe.zowex.ffm.ZusfBindings;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/pythonservice/zosmf/restfiles/fs")
+@RequestMapping("/zosmf/restfiles/fs")
 public class ZusfController {
 
     @GetMapping

@@ -21,13 +21,14 @@ repositories {
 }
 
 ext {
-    set('springCloudVersion', "2024.0.0")
+    set('springCloudVersion', "2025.0.0")
 }
 
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
     implementation 'org.zowe.apiml.sdk:onboarding-enabler-spring:3.5.8'
+    implementation 'com.netflix.archaius:archaius-core:0.7.7'
     
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }

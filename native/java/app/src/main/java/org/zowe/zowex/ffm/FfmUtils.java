@@ -8,7 +8,8 @@ public class FfmUtils {
         if (segment == null || segment.address() == 0) {
             return null;
         }
-        return segment.getString(0);
+        // Reinterpret the segment to maximum size so getString can find the null terminator
+        return segment.reinterpret(Long.MAX_VALUE).getString(0);
     }
     
     public static MemorySegment allocateString(Arena arena, String str) {

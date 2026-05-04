@@ -1,6 +1,5 @@
 package org.zowe.zowex.ffm;
 
-import java.lang.foreign.Arena;
 import java.lang.foreign.Linker;
 import java.lang.foreign.SymbolLookup;
 import java.nio.file.Paths;

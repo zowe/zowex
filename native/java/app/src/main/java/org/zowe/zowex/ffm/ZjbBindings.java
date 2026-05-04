@@ -80,6 +80,8 @@ public class ZjbBindings {
             MemorySegment responsePtr = (MemorySegment) zjb_c_list_jobs_by_owner.invokeExact(ownerSeg, prefixSeg, statusSeg);
             
             if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
+            
+            responsePtr = responsePtr.reinterpret(24);
 
             MemorySegment errorMsgSeg = responsePtr.get(ValueLayout.ADDRESS, 16);
             String errorMsg = FfmUtils.readString(errorMsgSeg);
@@ -112,6 +114,8 @@ public class ZjbBindings {
             MemorySegment responsePtr = (MemorySegment) zjb_c_get_job_status.invokeExact(jobidSeg);
             
             if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
+            
+            responsePtr = responsePtr.reinterpret(16);
 
             MemorySegment errorMsgSeg = responsePtr.get(ValueLayout.ADDRESS, 8);
             String errorMsg = FfmUtils.readString(errorMsgSeg);
@@ -139,6 +143,8 @@ public class ZjbBindings {
             MemorySegment responsePtr = (MemorySegment) zjb_c_submit_job.invokeExact(jclSeg);
             
             if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
+            
+            responsePtr = responsePtr.reinterpret(16);
 
             MemorySegment errorMsgSeg = responsePtr.get(ValueLayout.ADDRESS, 8);
             String errorMsg = FfmUtils.readString(errorMsgSeg);

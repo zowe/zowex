@@ -8,6 +8,13 @@ import org.zowe.apiml.enable.EnableApiDiscovery;
 @EnableApiDiscovery
 public class ZowexApplication {
     public static void main(String[] args) {
-        SpringApplication.run(ZowexApplication.class, args);
+        try {
+            SpringApplication.run(ZowexApplication.class, args);
+        } catch (Throwable t) {
+            System.err.println("========== FATAL STARTUP ERROR ==========");
+            t.printStackTrace();
+            System.err.println("=========================================");
+            System.exit(1);
+        }
     }
 }

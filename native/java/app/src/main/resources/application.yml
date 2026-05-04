@@ -6,6 +6,8 @@ server:
     key-store-type: PKCS12
 
 spring:
+  main:
+    allow-bean-definition-overriding: true
   application:
     name: zowex-java-service
 

@@ -69,6 +69,8 @@ public class ZdsBindings {
             MemorySegment responsePtr = (MemorySegment) zds_c_list_data_sets.invokeExact(dsnSeg);
             
             if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
+            
+            responsePtr = responsePtr.reinterpret(24);
 
             MemorySegment errorMsgSeg = responsePtr.get(ValueLayout.ADDRESS, 16);
             String errorMsg = FfmUtils.readString(errorMsgSeg);
@@ -110,6 +112,8 @@ public class ZdsBindings {
             MemorySegment responsePtr = (MemorySegment) zds_c_read_data_set.invokeExact(dsnSeg, cpSeg);
             
             if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
+            
+            responsePtr = responsePtr.reinterpret(16);
 
             MemorySegment errorMsgSeg = responsePtr.get(ValueLayout.ADDRESS, 8);
             String errorMsg = FfmUtils.readString(errorMsgSeg);
@@ -138,6 +142,8 @@ public class ZdsBindings {
             MemorySegment responsePtr = (MemorySegment) zds_c_write_data_set.invokeExact(dsnSeg, dataSeg, cpSeg, etagSeg);
             
             if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
+            
+            responsePtr = responsePtr.reinterpret(16);
 
             MemorySegment errorMsgSeg = responsePtr.get(ValueLayout.ADDRESS, 8);
             String errorMsg = FfmUtils.readString(errorMsgSeg);
@@ -162,6 +168,8 @@ public class ZdsBindings {
             MemorySegment responsePtr = (MemorySegment) zds_c_delete_data_set.invokeExact(dsnSeg);
             
             if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
+            
+            responsePtr = responsePtr.reinterpret(8);
 
             MemorySegment errorMsgSeg = responsePtr.get(ValueLayout.ADDRESS, 0);
             String errorMsg = FfmUtils.readString(errorMsgSeg);

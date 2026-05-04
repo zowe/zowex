@@ -21,7 +21,7 @@
     "z:all": "npm run z:rebuild && npm run z:test && npm run z:package",
     "z:artifacts": "tsx scripts/buildTools.ts artifacts",
     "z:build": "tsx scripts/buildTools.ts build",
-    "z:build:java_bindings": "tsx scripts/buildTools.ts build:java_bindings",
+    "z:build:java_bindings": "npm run z:upload:java_bindings && tsx scripts/buildTools.ts build:java_bindings",
     "z:build:java_app": "tsx scripts/buildTools.ts build:java_app",
     "z:build:python": "tsx scripts/buildTools.ts build:python",
     "z:chdsect": "tsx scripts/buildTools.ts build:chdsect",
@@ -33,6 +33,7 @@
     "z:test": "npm run z:make all tests && tsx scripts/buildTools.ts test",
     "z:test:python": "tsx scripts/buildTools.ts test:python",
     "z:upload": "tsx scripts/buildTools.ts upload",
+    "z:upload:java_bindings": "tsx scripts/buildTools.ts upload java/bindings",
     "z:watch": "tsx scripts/buildTools.ts watch",
     "z:watch:test": "tsx scripts/buildTools.ts watch:test"
   },

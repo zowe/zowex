@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.HashMap;
 
 @RestController
-@RequestMapping("/pythonservice/zosmf/restfiles/ds")
+@RequestMapping("/zosmf/restfiles/ds")
 public class ZdsController {
 
     @GetMapping

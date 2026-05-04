@@ -49,6 +49,8 @@ public class ZusfBindings {
             MemorySegment responsePtr = (MemorySegment) zusf_c_list_uss_dir.invokeExact(pathSeg, optionsSeg);
             
             if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
+            
+            responsePtr = responsePtr.reinterpret(16);
 
             MemorySegment errorMsgSeg = responsePtr.get(ValueLayout.ADDRESS, 8);
             String errorMsg = FfmUtils.readString(errorMsgSeg);
@@ -74,6 +76,8 @@ public class ZusfBindings {
             MemorySegment responsePtr = (MemorySegment) zusf_c_read_uss_file.invokeExact(fileSeg, cpSeg);
             
             if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
+            
+            responsePtr = responsePtr.reinterpret(16);
 
             MemorySegment errorMsgSeg = responsePtr.get(ValueLayout.ADDRESS, 8);
             String errorMsg = FfmUtils.readString(errorMsgSeg);
@@ -102,6 +106,8 @@ public class ZusfBindings {
             MemorySegment responsePtr = (MemorySegment) zusf_c_write_uss_file.invokeExact(fileSeg, dataSeg, cpSeg, etagSeg);
             
             if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
+            
+            responsePtr = responsePtr.reinterpret(16);
 
             MemorySegment errorMsgSeg = responsePtr.get(ValueLayout.ADDRESS, 8);
             String errorMsg = FfmUtils.readString(errorMsgSeg);
