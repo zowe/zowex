@@ -10,24 +10,28 @@ export default class CopyDatasetOrMemberHandler extends SshBaseHandler {
         const overwrite = params.arguments?.overwrite as boolean;
 
         try {
-            const response = await client.ds.copyDatasetOrMember({ source, target });
+            const response = await client.ds.copyDatasetOrMember({
+                source: fromDataset,
+                target: toDataset,
+                replace,
+                overwrite,
+            });
 
             if (response.success) {
-                const result = response.result;
                 let message = `Successfully copied '${fromDataset}' to '${toDataset}'.`;
 
-                if (result.targetCreated) {
+                if (response.targetCreated) {
                     message = `New data set '${toDataset}' created and copied from '${fromDataset}'.`;
-                } else if (result.memberCreated) {
+                } else if (response.memberCreated) {
                     message = `New member '${toDataset}' created and copied from '${fromDataset}'.`;
-                } else if (result.overwrite) {
+                } else if (response.overwrite) {
                     message = `Target data set '${toDataset}' was overwritten with contents of '${fromDataset}'.`;
-                } else if (result.replace) {
+                } else if (response.replace) {
                     message = `Target '${toDataset}' was updated/replaced with contents of '${fromDataset}'.`;
                 }
 
                 params.response.console.log(message);
-                params.response.data.setObj(result);
+                params.response.data.setObj(response);
             }
             return response;
         } catch (err) {
