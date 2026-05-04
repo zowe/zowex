@@ -1187,6 +1187,7 @@ void xit(const std::string &description, Callable)
 
   if (g.matches_filter(description, g.get_matcher()))
   {
+    g.print_pending_suite_headers();
     std::cout << get_indent(g.get_nesting()) << colors.skip << " SKIP " << description << std::endl;
   }
 }
@@ -1206,6 +1207,7 @@ void xdescribe(const std::string &description, Callable)
 
   if (g.matches_filter(description, g.get_matcher()))
   {
+    g.print_pending_suite_headers();
     std::cout << get_indent(g.get_nesting()) << colors.skip << " SKIP " << description << std::endl;
   }
 }
