@@ -1148,19 +1148,8 @@ void describe(const std::string &description, Callable suite)
     TEST_SUITE &current_suite = g.get_suites()[current_suite_idx];
     const std::vector<HOOK_WITH_OPTIONS> &after_all_hooks = current_suite.after_all_hooks;
 
-    // Check if any non-skipped tests were added to this suite
-    bool has_real_tests = false;
-    for (const auto &test : current_suite.tests)
-    {
-      if (!test.skipped)
-      {
-        has_real_tests = true;
-        break;
-      }
-    }
-
-    // Only run afterAll if real tests were present
-    if (!after_all_hooks.empty() && has_real_tests)
+    // Only run afterAll if real tests executed (indicated by header being printed)
+    if (!after_all_hooks.empty() && current_suite.header_printed)
     {
       std::string error_message;
       if (!g.execute_hooks(after_all_hooks, "afterAll", error_message))
