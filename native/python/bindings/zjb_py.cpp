@@ -72,7 +72,7 @@ vector<ZJob> list_jobs_by_owner(string owner_name, string prefix, string status)
 
 ZJob get_job_status(string jobid)
 {
-  ZJob job = {0};
+  ZJob job{};
   ZJB zjb = {0};
 
   a2e_inplace(jobid);
