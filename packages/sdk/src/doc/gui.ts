@@ -44,3 +44,9 @@ export interface PrivateKeyWarningOptions {
 export interface IDisposable {
     dispose(): void;
 }
+
+export interface PromptForProfileOptions {
+    setExistingProfile?: boolean;
+    prioritizeProjectLevelConfig?: boolean;
+    disableCreateNewProfile?: boolean;
+}

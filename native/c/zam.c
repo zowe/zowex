@@ -63,7 +63,7 @@ static int handle_dcb_abend(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc, const char *P
     if (0 == diag->e_msg_len)
     {
       strcpy(diag->service_name, operation);
-      diag->e_msg_len = sprintf(diag->e_msg, "DCB abend during %s for %8.8s data set: %44.44s",
+      ZDIAG_SET_MSG(diag, "DCB abend during %.16s for %8.8s data set: %44.44s",
                                 operation, ioc->ddname, ioc->jfcb.jfcbdsnm);
       diag->detail_rc = ZDS_RTNCD_DCB_ABEND_ERROR;
     }
@@ -78,7 +78,7 @@ static int validate_jfcb_attributes(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
 
   if (ioc->jfcb.jfcbind1 != jfcpds)
   {
-    diag->e_msg_len = sprintf(diag->e_msg, "DDname: %8.8s data set: %44.44s is not a PDS: %X", ioc->dcb.dcbddnam, ioc->jfcb.jfcbdsnm, ioc->jfcb.jfcbind1);
+    ZDIAG_SET_MSG(diag, "DDname: %8.8s data set: %44.44s is not a PDS: %X", ioc->dcb.dcbddnam, ioc->jfcb.jfcbdsnm, ioc->jfcb.jfcbind1);
     diag->detail_rc = ZDS_RTNCD_UNSUPPORTED_DATA_SET;
     return RTNCD_FAILURE;
   }
@@ -86,7 +86,7 @@ static int validate_jfcb_attributes(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
   // ensure member name (e.g. is a partitioned data set)
   if (ioc->jfcb.jfcbelnm[0] == ' ')
   {
-    diag->e_msg_len = sprintf(diag->e_msg, "DDname: %8.8s data set: %44.44s is not a partitioned data set: %s", ioc->dcb.dcbddnam, ioc->jfcb.jfcbdsnm, ioc->jfcb.jfcbelnm);
+    ZDIAG_SET_MSG(diag, "DDname: %8.8s data set: %44.44s is not a partitioned data set: %.8s", ioc->dcb.dcbddnam, ioc->jfcb.jfcbdsnm, ioc->jfcb.jfcbelnm);
     diag->detail_rc = ZDS_RTNCD_UNSUPPORTED_DSORG;
     return RTNCD_FAILURE;
   }
@@ -107,7 +107,7 @@ static int enq_data_set(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
   {
     diag->service_rc = rc;
     strcpy(diag->service_name, "ENQ");
-    diag->e_msg_len = sprintf(diag->e_msg, "Failed to ENQ ddname: %8.8s data set: %44.44s rc was: %d", ioc->dcb.dcbddnam, ioc->jfcb.jfcbdsnm, rc);
+    ZDIAG_SET_MSG(diag, "Failed to ENQ ddname: %8.8s data set: %44.44s rc was: %d", ioc->dcb.dcbddnam, ioc->jfcb.jfcbdsnm, rc);
     diag->detail_rc = ZDS_RTNCD_ENQ_ERROR;
     return RTNCD_FAILURE;
   }
@@ -147,7 +147,7 @@ static int get_ucb(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
   if (0 == ioc->ucb)
   {
     diag->detail_rc = ZDS_RTNCD_UCB_ERROR;
-    diag->e_msg_len = sprintf(diag->e_msg, "Failed to get UCB for data set: %44.44s", ioc->jfcb.jfcbdsnm);
+    ZDIAG_SET_MSG(diag, "Failed to get UCB for data set: %44.44s", ioc->jfcb.jfcbdsnm);
     return RTNCD_FAILURE;
   }
 
@@ -167,7 +167,7 @@ static int reserve_data_set(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
   {
     diag->service_rc = rc;
     strcpy(diag->service_name, "RESERVE");
-    diag->e_msg_len = sprintf(diag->e_msg, "Failed to RESERVE ddname: %8.8s data set: %44.44s rc was: %d", ioc->dcb.dcbddnam, ioc->jfcb.jfcbdsnm, rc);
+    ZDIAG_SET_MSG(diag, "Failed to RESERVE ddname: %8.8s data set: %44.44s rc was: %d", ioc->dcb.dcbddnam, ioc->jfcb.jfcbdsnm, rc);
     diag->detail_rc = ZDS_RTNCD_RESERVE_ERROR;
     return RTNCD_FAILURE;
   }
@@ -184,7 +184,7 @@ static int open_data_set(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
   {
     diag->service_rc = rc;
     strcpy(diag->service_name, "OPEN");
-    diag->e_msg_len = sprintf(diag->e_msg, "Failed to open ddname: %8.8s for data set: %44.44s rc was: %d", ioc->dcb.dcbddnam, ioc->jfcb.jfcbdsnm, rc);
+    ZDIAG_SET_MSG(diag, "Failed to open ddname: %8.8s for data set: %44.44s rc was: %d", ioc->dcb.dcbddnam, ioc->jfcb.jfcbdsnm, rc);
     diag->detail_rc = ZDS_RTNCD_OPEN_ERROR;
     return RTNCD_FAILURE;
   }
@@ -196,7 +196,7 @@ static int open_data_set(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
 
   if (!(ioc->dcb.dcboflgs & dcbofopn))
   {
-    diag->e_msg_len = sprintf(diag->e_msg, "Data set is not open: %44.44s", ioc->jfcb.jfcbdsnm);
+    ZDIAG_SET_MSG(diag, "Data set is not open: %44.44s", ioc->jfcb.jfcbdsnm);
     diag->detail_rc = ZDS_RTNCD_NOT_OPEN_ERROR;
     return RTNCD_FAILURE;
   }
@@ -210,7 +210,7 @@ static int validate_dcb_attributes(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
 
   if (!(ioc->dcb.dcbrecfm & (dcbrecf | dcbrecv)))
   {
-    diag->e_msg_len = sprintf(diag->e_msg, "Data set is not a fixed or variable record format: %X", ioc->dcb.dcbrecfm);
+    ZDIAG_SET_MSG(diag, "Data set is not a fixed or variable record format: %X", ioc->dcb.dcbrecfm);
     diag->detail_rc = ZDS_RTNCD_UNSUPPORTED_RECFM;
     return RTNCD_FAILURE;
   }
@@ -219,7 +219,7 @@ static int validate_dcb_attributes(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
 
   if (block_size < 1)
   {
-    diag->e_msg_len = sprintf(diag->e_msg, "Data set has less than 1 block size: %X", block_size);
+    ZDIAG_SET_MSG(diag, "Data set has less than 1 block size: %X", block_size);
     diag->detail_rc = ZDS_RTNCD_UNSUPPORTED_BLOCK_SIZE;
     return RTNCD_FAILURE;
   }
@@ -231,7 +231,7 @@ static int validate_dcb_attributes(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
     // Fixed-length record validation
     if (block_size % ioc->dcb.dcblrecl != 0)
     {
-      diag->e_msg_len = sprintf(diag->e_msg, "Data set block size is not a multiple of the record length: %d not evenly divisible by %d", ioc->dcb.dcbblksi, ioc->dcb.dcblrecl);
+      ZDIAG_SET_MSG(diag, "Data set block size is not a multiple of the record length: %d not evenly divisible by %d", ioc->dcb.dcbblksi, ioc->dcb.dcblrecl);
       diag->detail_rc = ZDS_RTNCD_INVALID_BLOCK_SIZE;
       return RTNCD_FAILURE;
     }
@@ -241,7 +241,7 @@ static int validate_dcb_attributes(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
     // Variable-length record validation: block size must be >= LRECL + 4 (for BDW)
     if (block_size < ioc->dcb.dcblrecl + sizeof(BDW))
     {
-      diag->e_msg_len = sprintf(diag->e_msg, "Data set block size is too small for variable records: %d < %d (LRECL + 4)", block_size, ioc->dcb.dcblrecl + sizeof(BDW));
+      ZDIAG_SET_MSG(diag, "Data set block size is too small for variable records: %d < %d (LRECL + 4)", block_size, ioc->dcb.dcblrecl + sizeof(BDW));
       diag->detail_rc = ZDS_RTNCD_INVALID_BLOCK_SIZE;
       return RTNCD_FAILURE;
     }
@@ -263,7 +263,7 @@ static int note_member(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc, NOTE_RESPONSE *PTR
     {
       diag->service_rc = rc;
       strcpy(diag->service_name, "NOTE");
-      diag->e_msg_len = sprintf(diag->e_msg, "Failed to NOTE ddname: %8.8s data set: %44.44s rc was: %d", ioc->ddname, ioc->jfcb.jfcbdsnm, rc);
+      ZDIAG_SET_MSG(diag, "Failed to NOTE ddname: %8.8s data set: %44.44s rc was: %d", ioc->ddname, ioc->jfcb.jfcbdsnm, rc);
       diag->detail_rc = ZDS_RTNCD_NOTE_ERROR;
     }
   }
@@ -303,7 +303,7 @@ int open_input_vsam(ZDIAG *PTR32 diag, IO_CTRL *PTR32 *PTR32 ioc, const char *PT
   {
     diag->detail_rc = ZDS_RTNCD_SERVICE_FAILURE;
     strcpy(diag->service_name, "MODCB");
-    diag->e_msg_len = sprintf(diag->e_msg, "MODCB failed rc was: %d rsn was: %d", rc, rsn);
+    ZDIAG_SET_MSG(diag, "MODCB failed rc was: %d rsn was: %d", rc, rsn);
     diag->service_rc = rc;
     diag->service_rsn = rsn;
     return RTNCD_FAILURE;
@@ -314,7 +314,7 @@ int open_input_vsam(ZDIAG *PTR32 diag, IO_CTRL *PTR32 *PTR32 ioc, const char *PT
   {
     diag->detail_rc = ZDS_RTNCD_SERVICE_FAILURE;
     strcpy(diag->service_name, "OPEN");
-    diag->e_msg_len = sprintf(diag->e_msg, "Failed to open acb rc was: %d", rc);
+    ZDIAG_SET_MSG(diag, "Failed to open acb rc was: %d", rc);
     diag->service_rc = rc;
     return RTNCD_FAILURE;
   }
@@ -341,7 +341,7 @@ int point_input_vsam(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc, TIME_STRUCT *time_st
   {
     diag->detail_rc = ZDS_RTNCD_SERVICE_FAILURE;
     strcpy(diag->service_name, "CONVTOD");
-    diag->e_msg_len = sprintf(diag->e_msg, "Failed to CONVTOD rc was: %d", rc);
+    ZDIAG_SET_MSG(diag, "Failed to CONVTOD rc was: %d", rc);
     diag->service_rc = rc;
     return rc;
   }
@@ -358,7 +358,7 @@ int point_input_vsam(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc, TIME_STRUCT *time_st
   {
     diag->detail_rc = ZDS_RTNCD_SERVICE_FAILURE;
     strcpy(diag->service_name, "POINT");
-    diag->e_msg_len = sprintf(diag->e_msg, "Failed to POINT rc was: %d", rc);
+    ZDIAG_SET_MSG(diag, "Failed to POINT rc was: %d", rc);
     diag->service_rc = rc;
     return rc;
   }
@@ -392,7 +392,7 @@ int read_input_vsam(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
       diag->detail_rc = ZDS_RTNCD_SERVICE_FAILURE;
       strcpy(diag->service_name, "GET");
       memcpy(rplrdbk, &rplp->rplfdbwd.rplfdbk, sizeof(rplrdbk));
-      diag->e_msg_len = sprintf(diag->e_msg, "Failed to GET rc was: %d, RPLRDBK was: %02X%02X%02X", rc, rplrdbk[0], rplrdbk[1], rplrdbk[2]);
+      ZDIAG_SET_MSG(diag, "Failed to GET rc was: %d, RPLRDBK was: %02X%02X%02X", rc, rplrdbk[0], rplrdbk[1], rplrdbk[2]);
       diag->service_rc = rc;
       return rc;
     }
@@ -410,7 +410,7 @@ int close_input_vsam(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
   {
     diag->detail_rc = ZDS_RTNCD_SERVICE_FAILURE;
     strcpy(diag->service_name, "CLOSE");
-    diag->e_msg_len = sprintf(diag->e_msg, "Failed to close acb rc was: %d", rc);
+    ZDIAG_SET_MSG(diag, "Failed to close acb rc was: %d", rc);
     diag->service_rc = rc;
     return RTNCD_FAILURE;
   }
@@ -454,7 +454,7 @@ int open_output_bpam(ZDIAG *PTR32 diag, IO_CTRL *PTR32 *PTR32 ioc, const char *P
   {
     diag->detail_rc = ZDS_RTNCD_SERVICE_FAILURE;
     strcpy(diag->service_name, "RDJFCB");
-    diag->e_msg_len = sprintf(diag->e_msg, "Failed to read output JFCB rc was: %d", rc);
+    ZDIAG_SET_MSG(diag, "Failed to read output JFCB rc was: %d", rc);
     diag->service_rc = rc;
     return RTNCD_FAILURE;
   }
@@ -559,7 +559,7 @@ static int handle_fixed_record(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc, const char
 
     if (0 != rc)
     {
-      diag->e_msg_len = sprintf(diag->e_msg, "Failed to write record rc was: %d", rc);
+      ZDIAG_SET_MSG(diag, "Failed to write record rc was: %d", rc);
       diag->detail_rc = ZDS_RTNCD_SERVICE_FAILURE;
       diag->service_rc = rc;
       return RTNCD_FAILURE;
@@ -607,7 +607,7 @@ static int write_variable_record(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc, const ch
 
   if (0 != rc)
   {
-    diag->e_msg_len = sprintf(diag->e_msg, "Failed to write record rc was: %d", rc);
+    ZDIAG_SET_MSG(diag, "Failed to write record rc was: %d", rc);
     diag->detail_rc = ZDS_RTNCD_SERVICE_FAILURE;
     diag->service_rc = rc;
     return RTNCD_FAILURE;
@@ -626,7 +626,8 @@ static void copy_variable_record(IO_CTRL *PTR32 ioc, const char *PTR32 data, int
   ioc->lines_written++;
   RDW *PTR32 rdw_ptr = (RDW * PTR32) ioc->free_location;
   rdw_ptr->unused = 0;
-  rdw_ptr->len = sprintf(ioc->free_location + sizeof(RDW), "%.*s", length, data) + sizeof(RDW);
+  memcpy(ioc->free_location + sizeof(RDW), data, length);
+  rdw_ptr->len = length + sizeof(RDW);
   ioc->bytes_in_buffer += rdw_ptr->len;
   ioc->free_location += rdw_ptr->len;
 }
@@ -736,7 +737,7 @@ static int write_flush(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
 
       if (0 != rc)
       {
-        diag->e_msg_len = sprintf(diag->e_msg, "Failed to write record rc was: %d", rc);
+        ZDIAG_SET_MSG(diag, "Failed to write record rc was: %d", rc);
         diag->detail_rc = ZDS_RTNCD_SERVICE_FAILURE;
         diag->service_rc = rc;
         return RTNCD_FAILURE;
@@ -763,7 +764,7 @@ static int bldl_member(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc, BLDL_PL *PTR32 bld
   {
     diag->service_rc = rc;
     strcpy(diag->service_name, "BLDL");
-    diag->e_msg_len = sprintf(diag->e_msg, "Failed to BLDL ddname: %8.8s data set: %44.44s rc was: %d", ioc->ddname, ioc->jfcb.jfcbdsnm, rc);
+    ZDIAG_SET_MSG(diag, "Failed to BLDL ddname: %8.8s data set: %44.44s rc was: %d", ioc->ddname, ioc->jfcb.jfcbdsnm, rc);
     diag->detail_rc = ZDS_RTNCD_BLDL_ERROR;
   }
   return rc;
@@ -818,7 +819,7 @@ static int update_ispf_statistics(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
       rc = zutm1gur(user);
       if (0 != rc)
       {
-        diag->e_msg_len = sprintf(diag->e_msg, "Failed to get userid rc was: %d", rc);
+        ZDIAG_SET_MSG(diag, "Failed to get userid rc was: %d", rc);
         diag->detail_rc = ZDS_RTNCD_SERVICE_FAILURE;
         diag->service_rc = rc;
         return RTNCD_FAILURE;
@@ -868,7 +869,7 @@ static int update_ispf_statistics(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
       rc = zutm1gur(user);
       if (0 != rc)
       {
-        diag->e_msg_len = sprintf(diag->e_msg, "Failed to get userid rc was: %d", rc);
+        ZDIAG_SET_MSG(diag, "Failed to get userid rc was: %d", rc);
         diag->detail_rc = ZDS_RTNCD_SERVICE_FAILURE;
         diag->service_rc = rc;
         return RTNCD_FAILURE;
@@ -922,7 +923,7 @@ static int stow_data_set(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
       {
         diag->service_rc = rc;
         strcpy(diag->service_name, "STOW");
-        diag->e_msg_len = sprintf(diag->e_msg, "Failed to STOW ISPF statistics: %8.8s data set: %44.44s rsn was: %d", ioc->ddname, ioc->jfcb.jfcbdsnm, rsn);
+        ZDIAG_SET_MSG(diag, "Failed to STOW ISPF statistics: %8.8s data set: %44.44s rsn was: %d", ioc->ddname, ioc->jfcb.jfcbdsnm, rsn);
         diag->detail_rc = ZDS_RTNCD_STOW_ERROR;
       }
     }
@@ -946,7 +947,7 @@ static int close_data_set(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
     {
       diag->service_rc = rc;
       strcpy(diag->service_name, "CLOSE");
-      diag->e_msg_len = sprintf(diag->e_msg, "Failed to close ddname: %8.8s data set: %44.44s rc was: %d", ioc->ddname, ioc->jfcb.jfcbdsnm, rc);
+      ZDIAG_SET_MSG(diag, "Failed to close ddname: %8.8s data set: %44.44s rc was: %d", ioc->ddname, ioc->jfcb.jfcbdsnm, rc);
       diag->detail_rc = ZDS_RTNCD_CLOSE_ERROR;
     }
   }
@@ -969,7 +970,7 @@ static int deq_reserve_data_set(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
       {
         diag->service_rc = rc;
         strcpy(diag->service_name, "DEQ RESERVE");
-        diag->e_msg_len = sprintf(diag->e_msg, "Failed to DEQ RESERVE ddname: %8.8s data set: %44.44s rc was: %d", ioc->ddname, ioc->jfcb.jfcbdsnm, rc);
+        ZDIAG_SET_MSG(diag, "Failed to DEQ RESERVE ddname: %8.8s data set: %44.44s rc was: %d", ioc->ddname, ioc->jfcb.jfcbdsnm, rc);
         diag->detail_rc = ZDS_RTNCD_DEQ_RESERVE_ERROR;
       }
       return rc;
@@ -995,7 +996,7 @@ static int deq_data_set(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
       {
         diag->service_rc = rc;
         strcpy(diag->service_name, "DEQ");
-        diag->e_msg_len = sprintf(diag->e_msg, "Failed to DEQ ddname: %8.8s data set: %44.44s rc was: %d", ioc->ddname, ioc->jfcb.jfcbdsnm, rc);
+        ZDIAG_SET_MSG(diag, "Failed to DEQ ddname: %8.8s data set: %44.44s rc was: %d", ioc->ddname, ioc->jfcb.jfcbdsnm, rc);
         diag->detail_rc = ZDS_RTNCD_DEQ_ERROR;
       }
     }

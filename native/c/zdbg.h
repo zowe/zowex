@@ -34,7 +34,8 @@ static void zut_dump_storage_common(const char *title, const void *data, int siz
 {
   int len = 0;
   char buf[1024] = {0};
-  len += sprintf(buf + len, "--- Dumping storage for '%s' at x'%016llx' ---", title, (unsigned long long)data);
+  /* Safe title length limit (100) to avoid buf overflow */
+  len += sprintf(buf + len, "--- Dumping storage for '%.100s' at x'%016llx' ---", title, (unsigned long long)data);
   if (new_line)
   {
     len += sprintf(buf + len, "\n");

@@ -102,7 +102,7 @@ int ZUTWDYN(BPXWDYN_PARM *parm, BPXWDYN_RESPONSE *response)
     msg_index--;
     input_parameters--;
   }
-  parameters[msg_index].len = sprintf(parameters[msg_index].str, "MSG");
+  parameters[msg_index].len = sprintf(parameters[msg_index].str, "%s", "MSG");
 
   int index = 0;
 
@@ -169,7 +169,13 @@ int ZUTWDYN(BPXWDYN_PARM *parm, BPXWDYN_RESPONSE *response)
       return (0 != rc) ? ZUT_BPXWDYN_SERVICE_FAILURE : RTNCD_SUCCESS;
     }
     // otherwise, append the message to the response
-    int len = sprintf(respp, "%.*s\n", parameters[i + input_parameters].len, parameters[i + input_parameters].str);
+    size_t remaining = sizeof(response->response) - (respp - response->response);
+    if (remaining <= 1)
+      break;
+    size_t write_len = parameters[i + input_parameters].len;
+    if (write_len > remaining - 2)
+      write_len = remaining - 2;
+    int len = sprintf(respp, "%.*s\n", (int)write_len, parameters[i + input_parameters].str);
     respp = respp + len;
   }
 
@@ -232,7 +238,7 @@ int ZUTSRCH(const char *parms)
   int rc = 0;
 
   PARMS p = {0};
-  p.len = sprintf(p.parms, "%s", parms);
+  p.len = sprintf(p.parms, "%.*s", (int)(sizeof(p.parms) - 1), parms);
 
   ISRSUPC search = (ISRSUPC)load_module31("ISRSUPC");
   rc = search(&p);
@@ -253,7 +259,7 @@ int ZUTRUN(ZDIAG *diag, const char *program, const char *parms)
   PARMS pstruct = {0};
   if (parms)
   {
-    pstruct.len = sprintf(pstruct.parms, "%s", parms);
+    pstruct.len = sprintf(pstruct.parms, "%.*s", (int)(sizeof(pstruct.parms) - 1), parms);
   }
 
   PARMS *pptr = &pstruct;
@@ -283,7 +289,7 @@ int ZUTRUN(ZDIAG *diag, const char *program, const char *parms)
   }
   else
   {
-    diag->e_msg_len = sprintf(diag->e_msg, "Load failure for program '%s', not found", name_truncated);
+    ZDIAG_SET_MSG(diag, "Load failure for program '%.8s', not found", name_truncated);
     diag->detail_rc = ZUT_RTNCD_LOAD_FAILURE;
     return RTNCD_FAILURE;
   }
@@ -308,7 +314,7 @@ int ZUTEDSCT()
 
   CCNEDSCT convert = (CCNEDSCT)load_module31("CCNEDSCT");
   EDSCT_PARMS p = {0};
-  p.len = sprintf(p.parms, "PPCOND,EQUATE(DEF),BITF0XL,HDRSKIP,UNIQ,LP64,LEGACY,SECT(ALL)");
+  p.len = sprintf(p.parms, "%.100s", "PPCOND,EQUATE(DEF),BITF0XL,HDRSKIP,UNIQ,LP64,LEGACY,SECT(ALL)");
   rc = convert(&p);
   delete_module("CCNEDSCT");
   return rc;
@@ -376,8 +382,8 @@ void ZUTDBGMG(const char *msg)
 {
   IO_CTRL *sysprintIoc = open_output_assert("ZOWEXDBG", 132, 132, dcbrecf + dcbrecbr);
   char writeBuf[132] = {0};
-  memset(writeBuf, ' ', sizeof(132));
-  int len = snprintf(writeBuf, 132, "%s", msg);
+  memset(writeBuf, ' ', sizeof(writeBuf));
+  sprintf(writeBuf, "%.131s", msg);
 
   write_sync(sysprintIoc, writeBuf);
   close_assert(sysprintIoc);
@@ -393,12 +399,20 @@ int ZUTSSIQ(ZDIAG *diag, JQRY_HEADER **area, const char *filter)
   rc = iefssi_query(&area31, &rsn, filter);
   if (0 != rc)
   {
-    diag->e_msg_len = sprintf(diag->e_msg, "IEFSSI_QUERY rc was: '%d', RSN was: '%d'", rc, rsn);
+    ZDIAG_SET_MSG(diag, "IEFSSI_QUERY rc was: '%d', RSN was: '%d'", rc, rsn);
     diag->detail_rc = ZUT_RTNCD_SERVICE_FAILURE;
     return RTNCD_FAILURE;
   }
   *area = area31;
   return rc;
+}
+
+#pragma prolog(ZUTNOAUT, " ZWEPROLG NEWDSA=(YES,1) ")
+#pragma epilog(ZUTNOAUT, " ZWEEPILG ")
+int ZUTNOAUT()
+{
+  auth_off();
+  return 0;
 }
 
 #pragma prolog(ZUTMSREL, " ZWEPROLG NEWDSA=(YES,4) ")

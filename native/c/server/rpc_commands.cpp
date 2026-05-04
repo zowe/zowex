@@ -85,6 +85,9 @@ void register_ds_commands(CommandDispatcher &dispatcher)
                                   .handle_fifo("stream", "pipe-path", FifoMode::PUT));
   dispatcher.register_command("renameDataset", create_ds_builder(ds::handle_data_set_rename).validate<RenameDatasetRequest, RenameDatasetResponse>());
   dispatcher.register_command("renameMember", create_ds_builder(ds::handle_rename_member).validate<RenameMemberRequest, RenameMemberResponse>());
+  dispatcher.register_command("copyDatasetOrMember",
+                              CommandBuilder(ds::handle_data_set_copy)
+                                  .validate<CopyDatasetRequest, CopyDatasetResponse>());
 }
 
 void register_job_commands(CommandDispatcher &dispatcher)
@@ -159,7 +162,6 @@ void register_uss_commands(CommandDispatcher &dispatcher)
   dispatcher.register_command("deleteFile",
                               create_uss_builder(uss::handle_uss_delete)
                                   .validate<DeleteFileRequest, DeleteFileResponse>());
-  // {"id": 1, "jsonrpc": "2.0", "method": "moveFile", "params": {"source": "source-path", "target": "target-path", "force": false}}
   dispatcher.register_command("moveFile",
                               create_uss_builder(uss::handle_uss_move)
                                   .validate<MoveFileRequest, MoveFileResponse>()

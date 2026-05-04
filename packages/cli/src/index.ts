@@ -9,4 +9,4 @@
  *
  */
 
-export * from "zowex-sdk";
+export * from "@zowe/zowex-for-zowe-sdk";

@@ -4,7 +4,7 @@ All notable changes to the "zowex-vsce" extension will be documented in this fil
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## Recent Changes
+## `0.5.0`
 
 - **Breaking:** Renamed contributed setting IDs from `zowe-native-proto` to `zowex`. All references to `zowe-native-proto` should be replaced with `zowex` in VS Code `settings.json` files. [#831](https://github.com/zowe/zowex/issues/831)
 - Fixed an error that would overwrite a member that already existed when creating a member with the "Replace" option. [#642](https://github.com/zowe/zowex/issues/642)

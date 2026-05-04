@@ -100,6 +100,7 @@ extern "C"
   int ZUTMLPLB(ZDIAG *, int *, PARMLIB_DSNS *);
   int ZUTSSIQ(ZDIAG *, JQRY_HEADER **, const char *filter);
   int ZUTCVTD(const char *ptr, char *time_out);
+  int ZUTNOAUT();
 
 #if defined(__cplusplus)
 }

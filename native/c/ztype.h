@@ -18,6 +18,10 @@
 #define RTNCD_SUCCESS 0
 #define RTNCD_FAILURE -1
 
+#ifndef ZMIN
+#define ZMIN(a, b) ((a) < (b) ? (a) : (b))
+#endif
+
 #if defined(__IBM_METAL__) || defined(__open_xl__)
 #define PTR32 __ptr32
 #else
@@ -96,5 +100,23 @@ typedef struct _ZEncode
 } ZEncode;
 
 #define FIFO_CHUNK_SIZE 32768
+
+// Safe diagnostic message macro to prevent buffer overflow
+#if defined(__IBM_METAL__) && !defined(__cplusplus)
+#define ZDIAG_SET_MSG(diag, fmt, ...)                                 \
+  {                                                                   \
+    (diag)->e_msg_len = sprintf((diag)->e_msg, (fmt), ##__VA_ARGS__); \
+  }
+#else
+#define ZDIAG_SET_MSG(diag, fmt, ...)                                                         \
+  {                                                                                           \
+    (diag)->e_msg_len = snprintf((diag)->e_msg, sizeof((diag)->e_msg), (fmt), ##__VA_ARGS__); \
+    if ((diag)->e_msg_len >= sizeof((diag)->e_msg))                                           \
+    {                                                                                         \
+      (diag)->e_msg_len = sizeof((diag)->e_msg) - 1;                                          \
+      (diag)->e_msg[sizeof((diag)->e_msg) - 1] = '\0';                                        \
+    }                                                                                         \
+  }
+#endif
 
 #endif
