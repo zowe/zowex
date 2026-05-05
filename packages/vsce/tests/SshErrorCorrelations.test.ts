@@ -17,6 +17,7 @@ import {
     ZoweVsCodeExtension,
 } from "@zowe/zowe-explorer-api";
 import { afterEach, beforeEach, describe, expect, it, type MockedFunction, vi } from "vitest";
+import { SshErrors } from "zowex-sdk";
 import { registerSshErrorCorrelations } from "../src/SshErrorCorrelations";
 
 // Mock Zowe Explorer API (shared structure with SshErrorHandler.test.ts)
@@ -69,8 +70,7 @@ describe("SshErrorCorrelations", () => {
             expect(mockZoweExplorerApi.getExplorerExtenderApi).toHaveBeenCalled();
             expect(mockExtenderApi.getErrorCorrelator).toHaveBeenCalled();
 
-            // Should register multiple correlations (connection failures, memory failures, filesystem errors, expired password)
-            expect(mockErrorCorrelator.addCorrelation).toHaveBeenCalledTimes(17); // 1 request timeout + 6 connection (incl. FOTS1668) + 4 memory + 6 filesystem
+            expect(mockErrorCorrelator.addCorrelation).toHaveBeenCalledTimes(Object.keys(SshErrors).length);
         });
 
         it("should handle missing Zowe Explorer API gracefully", () => {

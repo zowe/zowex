@@ -4,6 +4,10 @@ All notable changes to the Client code for "@zowe/zowex-for-zowe-sdk" are docume
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## Recent Changes
+
+- Added support for viewing syslog.
+
 ## `0.6.0`
 
 - Added `disableCreateNewProfile` option to `AbstractConfigManager.promptForProfile` function to prevent profile creation and migration, allowing selection only from existing SSH profiles. [#971](https://github.com/zowe/zowex/pull/971)
