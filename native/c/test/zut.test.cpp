@@ -44,6 +44,10 @@ void zut_tests()
                             Expect(rc).ToBe(0);
                             Expect(tokens.size()).ToBe(1);
 
+                            rc = zut_register_service(tokens, "ZOWEX TEST2", "1.0.0");
+                            Expect(rc).ToBe(0);
+                            Expect(tokens.size()).ToBe(2);
+
                             // should return success for deregistration
                             rc = zut_deregister_service(tokens);
                             Expect(rc).ToBe(0);
