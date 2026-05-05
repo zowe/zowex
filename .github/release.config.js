@@ -11,7 +11,6 @@ module.exports = {
             "@octorelease/changelog",
             {
                 displayNames: {
-                    "vsce": "VS Code Extension",
                     "cli": "CLI Plug-in",
                     "sdk": "Client SDK",
                     "native": "z/OS Components"
@@ -41,14 +40,6 @@ module.exports = {
                 $cwd: "packages/sdk",
                 npmPublish: true,
                 tarballDir: "dist",
-            },
-        ],
-        [
-            "@octorelease/vsce",
-            {
-                $cwd: "packages/vsce",
-                vscePublish: false,
-                vsixDir: "dist",
             },
         ],
         [

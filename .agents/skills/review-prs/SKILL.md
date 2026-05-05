@@ -71,7 +71,7 @@ Optional improvements:
 Use the [cpp-code-quality](../cpp-code-quality) skill to evaluate quality of new or changed C++ code.
 Use the [metalc-code-quality](../metalc-code-quality/) skill to evaluate quality of new or changed Metal C code.
 
-### TypeScript Clients (`packages/cli/`, `packages/sdk/`, `packages/vsce/`)
+### TypeScript Clients (`packages/cli/`, `packages/sdk/`)
 
 **Check for:**
 
