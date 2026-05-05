@@ -54,6 +54,7 @@ let deployDirs: {
     pythonTestDir: string;
     javaDir: string;
     javaBindingsDir: string;
+    javaSecurDir: string;
 };
 
 // python3 -c "import sys; sys.stdout.buffer.write(bytes(range(256)))" \
@@ -1538,6 +1539,7 @@ async function main() {
         pythonTestDir: `${config.deployDir}/python/bindings/test`,
         javaDir: `${config.deployDir}/java/app`,
         javaBindingsDir: `${config.deployDir}/java/bindings`,
+        javaSecurDir: `${config.deployDir}/java/secur`,
     };
     const sshClient = await buildSshClient(config.sshProfile as IProfile);
     await testConnection(sshClient);
@@ -1554,6 +1556,9 @@ async function main() {
                 break;
             case "build:python":
                 await make(sshClient, deployDirs.pythonDir);
+                break;
+            case "build:java_secur":
+                await make(sshClient, deployDirs.javaSecurDir);
                 break;
             case "build:java_bindings":
                 await make(sshClient, deployDirs.javaBindingsDir);
