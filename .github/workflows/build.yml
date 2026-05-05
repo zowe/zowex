@@ -62,13 +62,6 @@ jobs:
           path: dist/zowex-for-zowe-cli-*.tgz
 
       - uses: actions/upload-artifact@v4
-        id: vsce-artifact-upload
-        if: ${{ matrix.os == 'ubuntu' }}
-        with:
-          name: zowex-vsce
-          path: dist/*.vsix
-
-      - uses: actions/upload-artifact@v4
         id: sdk-artifact-upload
         if: ${{ matrix.os == 'ubuntu' }}
         with:
@@ -84,5 +77,4 @@ jobs:
           message: |
             Client artifacts:
              - CLI Plug-in: ${{ steps.cli-artifact-upload.outputs.artifact-url }}
-             - VSCode Extension: ${{ steps.vsce-artifact-upload.outputs.artifact-url }}
              - SDK: ${{ steps.sdk-artifact-upload.outputs.artifact-url }}

@@ -30,12 +30,6 @@ An open-source, native protocol for z/OS mainframe operations via SSH with minim
 
 ## Usage
 
-### VS Code extension
-
-To run the VS Code extension, open the repository in VS Code and launch the "Run Extension" debug task. Then you can use SSH profiles in Zowe Explorer.
-
-See the [VSCE readme](./packages/vsce/README.md) for more details about using the VS Code extension.
-
 ### Zowe CLI plug-in
 
 To install the CLI plug-in from source, run `zowe plugins install ./packages/cli`. Then run `zowe zssh --help` to see available commands.
@@ -127,7 +121,6 @@ graph LR
   subgraph Client
   sdk[Node.js SDK Package]
   cli[Zowe CLI Plug-in]-->sdk
-  vsce[VS Code Extension]-->sdk
   other[&lt;My Custom App&gt;]-->sdk
   end
   subgraph z/OS Server
@@ -146,7 +139,6 @@ graph LR
   end
   click sdk "https://github.com/zowe/zowex/blob/main/doc/client/architecture.md#sdk-package"
   click cli "https://github.com/zowe/zowex/blob/main/doc/client/architecture.md#cli-plug-in"
-  click vsce "https://github.com/zowe/zowex/blob/main/doc/client/architecture.md#vs-code-extension"
   click ioserver "https://github.com/zowe/zowex/blob/main/doc/backend/server/architecture.md"
   click zowex "https://github.com/zowe/zowex/blob/main/doc/backend/zowex_architecture.md"
 ```
