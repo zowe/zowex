@@ -6,6 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- `c`: Add usage information registration and overrides. Also adds support for post-command hooks in the command-line parser utility.
 - `c`: Fixed an issue where the `zoweax` authorized CLI binary could run the `server` command or `plugin` command group as privileged. Now, `zoweax` disables privileges before commands are executed. Commands in the `console` group continue to run as privileged. [#958](https://github.com/zowe/zowex/issues/958)
 - `c`: Added support for pre-command hooks in the command-line parser utility. [#958](https://github.com/zowe/zowex/issues/958)
 - `c`: Fixes issue where ZWEPROLG could return to caller in an incorrect AMODE. [#951](https://github.com/zowe/zowex/issues/951)
