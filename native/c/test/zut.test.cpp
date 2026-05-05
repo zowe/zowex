@@ -16,6 +16,7 @@
 #include "ztest.hpp"
 #include "zut.hpp"
 #include "../zlogger.hpp"
+#include "../ifaed.h"
 #include "zstorage.metal.test.h"
 
 using namespace ztst;
@@ -26,6 +27,30 @@ void zut_tests()
   describe("zut tests",
            []() -> void
            {
+             describe("registration services",
+                      []() -> void
+                      {
+                        it("should register and deregister services", []() -> void
+                           {
+                            std::vector<IFAED_TOKEN> tokens;
+
+                            // should return success for first registration
+                            int rc = zut_register_service(tokens, "ZOWEX TEST", "1.0.0");
+                            expect(rc).ToBe(0);
+
+                            // should return warning for duplicate registration
+                            rc = zut_register_service(tokens, "ZOWEX TEST", "1.0.0");
+                            expect(rc).ToBe(RTNCD_WARNING);
+
+                            // should return success for deregistration
+                            rc = zut_deregister_service(tokens);
+                            expect(rc).ToBe(0);
+
+                            // should return failure for deregistration of already deregistered service
+                            rc = zut_deregister_service(tokens);
+                            expect(rc).ToBe(RTNCD_FAILURE); });
+                      });
+
              it("should run shell program", []() -> void
                 {
                   std::string stdout_response;
@@ -36,7 +61,7 @@ void zut_tests()
                   int rc = zut_spawn_shell_command(shell_command, stdout_response, stderr_response);
                   ExpectWithContext(rc, stderr_response).ToBe(0);
                   ExpectWithContext(stdout_response, "Expected all lines").ToBe(args);
-                  ExpectWithContext(stderr_response, "std err should be empty").ToBe(""); 
+                  ExpectWithContext(stderr_response, "std err should be empty").ToBe("");
 
                   shell_command = "fakeutility";
                   rc = zut_spawn_shell_command(shell_command, stdout_response, stderr_response);
