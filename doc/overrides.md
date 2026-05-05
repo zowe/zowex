@@ -9,3 +9,12 @@ There is limited support for overriding behaviors and attributes of `zowex`.
 - `vendor=`, e.g. `vendor=some mainframe vendor`
 
 The location of the directory can also be specified via an environmental variable `ZOWEX_OVERRIDES_DIR`.
+
+## Features
+
+Valid features of register products are:
+
+- `ZRS VSCE`
+- `ZRS CLI` (zowe CLI plugin)
+- `ZRS MCP`
+- `CLI` (zowex CLI)
