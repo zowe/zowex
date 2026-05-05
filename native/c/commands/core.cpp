@@ -11,6 +11,8 @@
 
 #include "core.hpp"
 #include "../extend/plugin.hpp"
+#include "../zmetal.h"
+#include "../zutm.h"
 #include <dirent.h>
 #include <algorithm>
 #include <set>
@@ -213,6 +215,15 @@ int execute_command(int argc, char *argv[])
 Command &setup_root_command(char *argv[])
 {
   g_arg_parser = std::make_shared<ArgumentParser>(argv[0], "Zowe Remote SSH CLI");
+  g_arg_parser->add_pre_command_hook([](const Command &command, bool is_help_request)
+                                     {
+    if (!is_help_request && command.is_privileged())
+    {
+      return true;
+    }
+
+    ZUTNOAUT(); 
+    return true; });
   auto &root_command = g_arg_parser->get_root_command();
 
   root_command.add_keyword_arg("interactive",

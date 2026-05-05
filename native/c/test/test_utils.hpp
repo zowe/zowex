@@ -100,6 +100,42 @@ private:
   std::streambuf *original_cerr_; ///< Original std::cerr buffer to restore
 };
 
+/**
+ * @brief RAII utility class for capturing stdout output during tests
+ */
+class OutputStreamCapture
+{
+public:
+  OutputStreamCapture()
+      : original_cout_(std::cout.rdbuf())
+  {
+    std::cout.rdbuf(buffer_.rdbuf());
+  }
+
+  ~OutputStreamCapture()
+  {
+    std::cout.rdbuf(original_cout_);
+  }
+
+  OutputStreamCapture(const OutputStreamCapture &) = delete;
+  OutputStreamCapture &operator=(const OutputStreamCapture &) = delete;
+
+  std::string get_output() const
+  {
+    return buffer_.str();
+  }
+
+  void clear()
+  {
+    buffer_.str("");
+    buffer_.clear();
+  }
+
+private:
+  std::stringstream buffer_;
+  std::streambuf *original_cout_;
+};
+
 } // namespace test_utils
 
 #endif // TEST_UTILS_HPP
