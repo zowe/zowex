@@ -20,7 +20,7 @@ void create_uss_file(const std::string &file, const std::string &mode);
 
 void create_uss_dir(const std::string &file, const std::string &mode);
 
-std::string list_uss_dir(const std::string &path, ListOptions options = ListOptions{false, false});
+std::string list_uss_dir(const std::string &path, ListOptions options = ListOptions(false, false));
 
 void move_uss_file_or_dir(const std::string &source, const std::string &destination);
 
