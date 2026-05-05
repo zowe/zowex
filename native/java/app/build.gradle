@@ -26,8 +26,10 @@ ext {
 
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
     implementation 'org.zowe.apiml.sdk:onboarding-enabler-spring:3.5.8'
+    implementation 'org.zowe.apiml.sdk:zaas-client:3.5.8'
     implementation 'com.netflix.archaius:archaius-core:0.7.7'
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.17'
     
