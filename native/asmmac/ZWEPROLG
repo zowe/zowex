@@ -30,8 +30,6 @@
 .*         NO:  (default) use 31-bit LOC
 .*         YES: use 24-bit LOC
 .*
-.*       SAVE=[SA,BAKR]
-.*         SA: (default) save input regs
 .*       SAVE=[SA,BAKR,NO]
 .*         SA: (default) save input regs
 .*         BAKR: save registers on linkage stack
@@ -40,6 +38,10 @@
 .*       USENAB=[NO,YES]
 .*         NO: (default) do not attempt to use NAB
 .*         YES: use NAB
+.*
+.*       BSM=[YES,NO]
+.*         YES: (default) generate BSM instruction
+.*         NO:  skip generating BSM instruction
 .*
 .*       SAM64=[NO,YES]
 .*         NO:  (default) use 31-bit AMODE
@@ -57,7 +59,12 @@
 .*    &CCN_CSECT
 .*    CCN_IASM_MACRO
 .*
-&NAME    ZWEPROLG &NEWDSA=,&SAVE=SA,&SAM64=NO,&LOC24=NO,&USENAB=NO
+&NAME    ZWEPROLG &NEWDSA=,                                            +
+               &SAVE=SA,                                               +
+               &SAM64=NO,                                              +
+               &LOC24=NO,                                              +
+               &USENAB=NO,                                             +
+               &BSM=
 .*
          COPY  CCNZGBL
          GBLA  &ZG_DSASZ
@@ -66,6 +73,7 @@
          GBLB  &ZG_BAKR
          GBLB  &ZG_LOC24
          GBLB  &ZG_SAM64
+         GBLB  &ZG_BSM
 .*
 &MACNM   SETC  '&SYSMAC(0)'
 .*
@@ -75,6 +83,7 @@
 &ZG_BAKR  SETB  0
 &ZG_LOC24 SETB  0
 &ZG_SAM64 SETB  0
+&ZG_BSM   SETB  1
 &ZG_UNAB  SETB  0
 &IS_64    SETB  (&CCN_LP64 OR '&SAM64' EQ 'YES')
 &IS_AR    SETB  ('&CCN_ASCM' EQ 'AR')
@@ -102,41 +111,59 @@
 &SLRx    SETC  'SLGR '
 .CONT000 ANOP  ,
 .*
-.*       Validate macro operands
+.*       Validate macro operand values
 .*
          AIF   ('&SAVE' NE 'SA'                                        +
                AND '&SAVE' NE 'BAKR'                                   +
                AND '&SAVE' NE 'NO').ERR020
-         AIF   ('&SAVE' EQ 'BAKR').CONT020
+         AIF   ('&SAM64' NE 'NO' AND '&SAM64' NE 'YES').ERR030
+         AIF   ('&USENAB' NE 'NO' AND '&USENAB' NE 'YES').ERR070
+         AIF   ('&LOC24' NE 'NO' AND '&LOC24' NE 'YES').ERR050
+         AIF   ('&BSM' NE ''                                           +
+               AND ('&BSM' NE 'NO'                                     +
+               AND '&BSM' NE 'YES')).ERR090
+.*
+.*       Validate conflicting options
+.*
+         AIF   ('&SAVE' NE 'BAKR' AND '&SAM64' EQ 'YES').ERR040
+         AIF   ('&SAVE' NE 'BAKR' AND '&BSM' EQ 'YES').ERR100
+         AIF   ('&NEWDSA(1)' EQ 'YES' AND '&USENAB' EQ 'YES').ERR060
+         AIF   ('&USENAB' EQ 'YES' AND '&SAVE' EQ 'NO').ERR080
+         AIF   ('&NEWDSA(1)' EQ 'YES' AND '&SAVE' EQ 'NO').ERR120
+.*
+.*       Process SAVE=
+.*
+         AIF   ('&SAVE' EQ 'BAKR').CONT120
          AIF   ('&SAVE' EQ 'NO').CONT200
 &ZG_SAVE SETB  1
-         AGO   .CONT100
-.*
-.CONT020 ANOP ,
-&ZG_BAKR SETB  1
-         AGO   .CONT100
-.*
-.CONT100 ANOP ,
-         AIF   ('&SAM64' NE 'NO' AND '&SAM64' NE 'YES').ERR030
-         AIF   ('&SAVE' NE 'BAKR' AND '&SAM64' EQ 'YES').ERR040
-         AIF   ('&NEWDSA(1)' EQ 'YES' AND '&USENAB' EQ 'YES').ERR060
-         AIF   ('&USENAB' NE 'NO' AND '&USENAB' NE 'YES').ERR070
-         AIF   ('&USENAB' EQ 'YES' AND '&SAVE' EQ 'NO').ERR080
-.*
-.*       Set SAM64=YES if requested
-.*
-         AIF   ('&SAM64' NE 'YES').CONT120
-&ZG_SAM64 SETB  1
+         AGO   .CONT130
 .*
 .CONT120 ANOP ,
-         AIF   ('&LOC24' NE 'NO' AND '&LOC24' NE 'YES').ERR050
-         AIF   ('&LOC24' EQ 'NO').CONT140
-&ZG_LOC24 SETB  1
-         AGO   .CONT140
+&ZG_BAKR SETB  1
 .*
+.CONT130 ANOP ,
+         AIF   ('&BSM' EQ 'YES' OR '&BSM' EQ '').CONT140
+&ZG_BSM SETB  0
 .CONT140 ANOP ,
+.*
+.*       Process SAM64=
+.*
+         AIF   ('&SAM64' NE 'YES').CONT160
+&ZG_SAM64 SETB  1
+.*
+.*       Process LOC24=
+.*
+.CONT160 ANOP ,
+         AIF   ('&LOC24' EQ 'NO').CONT180
+&ZG_LOC24 SETB  1
+.*
+.*       Process USENAB=
+.*
+.CONT180 ANOP ,
          AIF   ('&USENAB' NE 'YES').CONT200
 &ZG_UNAB SETB  1
+.*
+.*       Process NEWDSA=
 .*
 .CONT200 ANOP ,
          AIF   ('&NEWDSA(1)' EQ 'YES').CONT240
@@ -162,11 +189,7 @@
 .CONT300 ANOP ,
          AIF   (&ZG_SAVE).CONT340
          AIF   (NOT &ZG_BAKR).CONT500
-.*
-.*       NOTE(Kelosky): in the future, if 31-bit caller BASSMs here
-.*       we would not want to do this because we would return in
-.*       the wrong AMODE.
-.*
+         AIF   (NOT &ZG_BSM).CONT310
          BSM   14,0
 .*
 .*       If SAM64=YES, set AMODE to 64
@@ -277,7 +300,7 @@
 .*       Errors
 .*
 .ERR010  ANOP  ,
-         MNOTE 8,'&MACNM. - DSA= must be YES|NO'
+         MNOTE 8,'&MACNM. - NEWDSA= must be YES|NO'
          AGO   .EXIT
 .ERR020  ANOP  ,
          MNOTE 8,'&MACNM. - SAVE= must be SA|BAKR|NO'
@@ -292,13 +315,23 @@
          MNOTE 8,'&MACNM. - LOC24= must be NO|YES'
          AGO   .EXIT
 .ERR060  ANOP  ,
-         MNOTE 8,'&MACNM. - Must use either USENAB=YES or NEWDSA=YES'
+         MNOTE 8,'&MACNM. - NEWDSA=(YES...) may not be used with USENAB+
+               =YES'
          AGO   .EXIT
 .ERR070  ANOP  ,
          MNOTE 8,'&MACNM. - USENAB= must be NO|YES'
          AGO   .EXIT
 .ERR080  ANOP  ,
          MNOTE 8,'&MACNM. - USENAB=YES may not be used with SAVE=NO'
+         AGO   .EXIT
+.ERR090  ANOP  ,
+         MNOTE 8,'&MACNM. - BSM= must be YES|NO'
+         AGO   .EXIT
+.ERR100  ANOP  ,
+         MNOTE 8,'&MACNM. - BSM=YES may only be used with SAVE=BAKR'
+         AGO   .EXIT
+.ERR120  ANOP  ,
+         MNOTE 8,'&MACNM. - NEWDSA=YES may not be used with SAVE=NO'
          AGO   .EXIT
 .*
 .* Common exit

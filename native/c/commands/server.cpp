@@ -30,6 +30,7 @@
 #include "../server/dispatcher.hpp"
 #include "../server/logger.hpp"
 #include "../server/worker.hpp"
+#include "../server/plugin_bridge.hpp"
 
 using namespace parser;
 
@@ -162,6 +163,7 @@ void ZServer::run(const server::Options &opts)
 
   LOG_DEBUG("Registering command handlers");
   register_all_commands(dispatcher);
+  plugin::register_commands_with_server(dispatcher);
 
   worker_pool.reset(new WorkerPool(options.num_workers, std::chrono::seconds(options.request_timeout)));
 

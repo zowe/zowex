@@ -19,14 +19,14 @@ Access the latest version of the CLI plug-in from the GitHub Releases page.
 Install the CLI plug-in from the tarball:
 
 ```
-zowe plugins install zowex-cli-*.tgz
+zowe plugins install zowex-for-zowe-cli-*.tgz
 ```
 
 Once complete, the Zowe CLI plug-in is installed and ready to use.
 
 ## Usage
 
-Run the `zowe plugins show-first-steps zowex-cli` command to see the first steps for using the plug-in.
+Run the `zowe plugins show-first-steps zowex-for-zowe-cli` command to see the first steps for using the plug-in.
 
 ## Building from source
 
@@ -38,7 +38,7 @@ The plug-in is created and saved in the `dist` folder.
 Install the plug-in by running the following Zowe CLI command:
 
 ```
-zowe plugins install dist/zowex-cli-*.tgz
+zowe plugins install dist/zowex-for-zowe-cli-*.tgz
 ```
 
 Zowe Remote SSH plug-in commands are accessible through the `zowe zssh` command group.
@@ -46,4 +46,3 @@ Zowe Remote SSH plug-in commands are accessible through the `zowe zssh` command 
 ```
 zowe zssh --help
 ```
-

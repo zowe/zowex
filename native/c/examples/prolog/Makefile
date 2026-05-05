@@ -33,10 +33,14 @@ $(OUT_DIR)/prolog.s: prolog.c
 $(OUT_DIR)/prolog.o: $(OUT_DIR)/prolog.s
 	@echo 'Building $(OUT_DIR)/prolog.o'
 	$(ASM) $(ASM_FLAGS) -a=$*.s.lst $(MACLIBS) -o $@ $^
-	
-$(OUT_DIR)/prolog: $(OUT_DIR)/prolog.o
+
+$(OUT_DIR)/driver.o: driver.s
+	@echo 'Building $(OUT_DIR)/driver.o'
+	$(ASM) $(ASM_FLAGS) -a=$*.s.lst $(MACLIBS) -o $@ $^
+
+$(OUT_DIR)/prolog: $(OUT_DIR)/prolog.o $(OUT_DIR)/driver.o
 	@echo 'Building $(OUT_DIR)/prolog'
-	$(BIND) $(BIND_FLAGS_64) -V -eMAIN -o $@ $^ > $*.bind.lst
+	$(BIND) -V -bRMODE=24,AMODE=24 -eDRIVER -o $@ $^ > $*.bind.lst
 
 clean:
 	rm -f *.o
