@@ -10,6 +10,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 - `c`: Added support for pre-command hooks in the command-line parser utility. [#958](https://github.com/zowe/zowex/issues/958)
 - `c`: Fixes issue where ZWEPROLG could return to caller in an incorrect AMODE. [#951](https://github.com/zowe/zowex/issues/951)
 - `c`: Improved error message when deleting a member fails because its parent PDS is open in ISPF. [#916](https://github.com/zowe/zowe-native-proto/issues/916)
+- `c`: Fixed an issue where incorrect values could be returned for the `usedp` (Used Space) and `volsers` (Volumes) attributes when listing data sets. [#981](https://github.com/zowe/zowex/pull/981)
 
 ## `0.6.0`
 

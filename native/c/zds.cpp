@@ -2785,6 +2785,9 @@ static inline uint32_t parse_cchh_cylinder(const char *cchh)
   return (cyl_high << 16) | cyl_low;
 }
 
+// Tracks per cylinder - constant for supported mainframe DASD types
+static constexpr int TRACKS_PER_CYLINDER = 15;
+
 // Get bytes per track for a given device type
 static inline int get_bytes_per_track(const uint16_t &devtype)
 {
@@ -2811,8 +2814,7 @@ static inline int calculate_extent_tracks(const char *extent, const uint16_t &de
   if (upper_cyl < lower_cyl)
     return 0;
 
-  const auto tracks_per_cyl = 15;
-  return ((upper_cyl - lower_cyl) * tracks_per_cyl) + (upper_head - lower_head) + 1;
+  return ((upper_cyl - lower_cyl) * TRACKS_PER_CYLINDER) + (upper_head - lower_head) + 1;
 }
 
 // Load space unit (spacu) from DSCB
@@ -3124,7 +3126,7 @@ void load_used_attrs_from_dscb(const DSCBFormat1 *dscb, ZDSEntry &entry)
   {
     // Always use tracks for percentage calculation to ensure accuracy
     int used_value = last_used_track + 1; // Precise track count
-    long long alloc_value = use_cylinders ? entry.alloc * 15 : entry.alloc;
+    long long alloc_value = use_cylinders ? entry.alloc * TRACKS_PER_CYLINDER : entry.alloc;
 
     // For BYTES space unit, convert to track-based calculation for percentage
     if (entry.spacu == "BYTES" && entry.blksize > 0)
