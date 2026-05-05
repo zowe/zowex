@@ -32,6 +32,21 @@ struct Options
   std::string exec_dir = ".";
 };
 
+static std::string get_overrides_dir(const std::string &exec_dir)
+{
+  std::string overrides_path = std::string(getenv("ZOWEX_OVERRIDES_DIR"));
+  if (overrides_path.empty())
+  {
+    return exec_dir + "/overrides";
+  }
+  else if (overrides_path.back() == '/')
+  {
+    overrides_path.pop_back(); // Remove trailing slash if present
+  }
+
+  return overrides_path;
+}
+
 void register_commands(parser::Command &root_command);
 
 } // namespace server
@@ -60,8 +75,14 @@ public:
   ~ZServer();
 
   static ZServer &get_instance();
-  void set_exec_dir(const std::string &dir) { exec_dir = dir; }
-  const std::string &get_exec_dir() const { return exec_dir; }
+  void set_exec_dir(const std::string &dir)
+  {
+    exec_dir = dir;
+  }
+  const std::string &get_exec_dir() const
+  {
+    return exec_dir;
+  }
   void run(const server::Options &opts);
 };
 

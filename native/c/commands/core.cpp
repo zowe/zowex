@@ -42,6 +42,11 @@ const std::string &get_version()
   return g_version;
 }
 
+std::shared_ptr<ArgumentParser> get_argument_parser()
+{
+  return g_arg_parser;
+}
+
 void set_plugin_manager(plugin::PluginManager *manager)
 {
   g_plugin_manager = manager;
@@ -222,8 +227,9 @@ Command &setup_root_command(char *argv[])
       return true;
     }
 
-    ZUTNOAUT(); 
+    ZUTNOAUT();
     return true; });
+
   auto &root_command = g_arg_parser->get_root_command();
 
   root_command.add_keyword_arg("interactive",

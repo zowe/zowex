@@ -160,7 +160,19 @@ int zut_register_service(std::vector<IFAED_TOKEN> &tokens, std::string feature_n
     std::string padded_vendor = truncated_vendor + std::string(16 - truncated_vendor.length(), ' ');
     memcpy(parms.product_owner, padded_vendor.c_str(), 16);
     rc = ZUTREG(&diag, &parms, &response);
-    tokens.push_back(response.token);
+    if (rc != RTNCD_SUCCESS)
+    {
+      if (rc == RTNCD_WARNING)
+      {
+        // ignore already registered warning
+        continue;
+      }
+      // ignore errors
+    }
+    else
+    {
+      tokens.push_back(response.token);
+    }
   }
 
   return RTNCD_SUCCESS;
@@ -172,6 +184,10 @@ int zut_deregister_service(std::vector<IFAED_TOKEN> &tokens)
   for (auto &token : tokens)
   {
     int rc = ZUTDRG(&diag, &token);
+    if (rc != RTNCD_SUCCESS)
+    {
+      // quietly ignore errors
+    }
   }
 
   return RTNCD_SUCCESS;

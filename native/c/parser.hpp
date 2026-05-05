@@ -93,6 +93,9 @@ using ArgValue = plugin::Argument;
 // Return value signals whether the hook succeeded
 using PreCommandHook = std::function<bool(const Command &command, bool is_help_request)>;
 
+// Return value signals whether the hook succeeded
+using PostCommandHook = std::function<bool(const Command &command, bool is_help_request, int exit_code)>;
+
 enum ArgType
 {
   ArgType_Flag,     // boolean switch (e.g., --verbose)
@@ -371,6 +374,20 @@ public:
     return *this;
   }
 
+  // propagate post_hooks recursively
+  Command &set_post_hooks(std::shared_ptr<std::vector<PostCommandHook>> hooks)
+  {
+    m_post_hooks = hooks;
+    for (auto &pair : m_commands)
+    {
+      if (pair.second)
+      {
+        pair.second->set_post_hooks(hooks);
+      }
+    }
+    return *this;
+  }
+
   // add an argument
   Command &add_arg(std::string name, const std::vector<std::string> &aliases,
                    std::string help, ArgType type = ArgType_Flag,
@@ -499,6 +516,11 @@ public:
     if (m_pre_hooks)
     {
       sub->set_pre_hooks(m_pre_hooks);
+    }
+
+    if (m_post_hooks)
+    {
+      sub->set_post_hooks(m_post_hooks);
     }
 
     std::string sub_name = sub->get_name();
@@ -842,6 +864,7 @@ private:
   bool m_privileged;
   std::string m_passthrough_description;
   std::shared_ptr<std::vector<PreCommandHook>> m_pre_hooks;
+  std::shared_ptr<std::vector<PostCommandHook>> m_post_hooks;
 
   // helper to execute pre-command hooks
   bool execute_pre_hooks(bool is_help_request, const char *context_msg) const
@@ -854,6 +877,24 @@ private:
         if (!hook(*this, is_help_request))
         {
           ZLOG_TRACE("Pre-command hook aborted execution for %s '%s'", context_msg, m_name.c_str());
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  // helper to execute post-command hooks
+  bool execute_post_hooks(bool is_help_request, int exit_code, const char *context_msg) const
+  {
+    if (m_post_hooks)
+    {
+      for (size_t i = 0; i < m_post_hooks->size(); ++i)
+      {
+        const auto &hook = (*m_post_hooks)[i];
+        if (!hook(*this, is_help_request, exit_code))
+        {
+          ZLOG_TRACE("Post-command hook %zu failed execution for %s '%s'", i, context_msg, m_name.c_str());
           return false;
         }
       }
@@ -1543,6 +1584,9 @@ Command::parse(const std::vector<lexer::Token> &tokens,
         generate_help(std::cout, command_path_prefix);
         result.status = ParseResult::ParserStatus_HelpRequested;
         result.exit_code = 0; // help request is a successful exit
+
+        // Execute post-command hooks after help generation
+        execute_post_hooks(true, result.exit_code, "help command");
         return result;
       }
 
@@ -1986,6 +2030,9 @@ Command::parse(const std::vector<lexer::Token> &tokens,
     plugin::InvocationContext context(context_args);
     result.exit_code = m_handler(context);
     ZLOG_TRACE("Handler returned exit code: %d", result.exit_code);
+
+    // Execute post-command hooks after the handler
+    execute_post_hooks(false, result.exit_code, "command");
   }
 
   // If this command is a group (has subcommands), has no handler, and parsing
@@ -2005,6 +2052,9 @@ Command::parse(const std::vector<lexer::Token> &tokens,
     generate_help(std::cout, command_path_prefix);
     result.status = ParseResult::ParserStatus_HelpRequested;
     result.exit_code = 0;
+
+    // Execute post-command hooks after help generation
+    execute_post_hooks(true, result.exit_code, "help command group");
   }
 
   ZLOG_TRACE("Command::parse exit: command='%s', status=%d, exit_code=%d",
@@ -2019,9 +2069,11 @@ public:
   explicit ArgumentParser(std::string prog_name, std::string description = "")
       : m_program_name(prog_name), m_program_desc(description),
         m_root_cmd(command_ptr(new Command(prog_name, description))),
-        m_pre_hooks(std::make_shared<std::vector<PreCommandHook>>())
+        m_pre_hooks(std::make_shared<std::vector<PreCommandHook>>()),
+        m_post_hooks(std::make_shared<std::vector<PostCommandHook>>())
   {
     m_root_cmd->set_pre_hooks(m_pre_hooks);
+    m_root_cmd->set_post_hooks(m_post_hooks);
   }
 
   ~ArgumentParser() = default;
@@ -2074,6 +2126,28 @@ public:
     if (m_root_cmd)
     {
       m_root_cmd->set_pre_hooks(m_pre_hooks);
+    }
+  }
+
+  /**
+   * @brief Register a post-command hook to be called after any command handler executes.
+   *
+   * Hooks receive the command, help request flag, and exit code for information.
+   * They run in registration order and should return true on success, false on failure.
+   * All hooks will execute regardless of individual failures.
+   *
+   * @param hook Callback invoked with command, help flag, and exit code after handler runs
+   */
+  void add_post_command_hook(PostCommandHook hook)
+  {
+    if (m_post_hooks == nullptr)
+    {
+      m_post_hooks = std::make_shared<std::vector<PostCommandHook>>();
+    }
+    m_post_hooks->push_back(std::move(hook));
+    if (m_root_cmd)
+    {
+      m_root_cmd->set_post_hooks(m_post_hooks);
     }
   }
 
@@ -2342,6 +2416,7 @@ private:
   std::string m_program_desc;
   command_ptr m_root_cmd;
   std::shared_ptr<std::vector<PreCommandHook>> m_pre_hooks;
+  std::shared_ptr<std::vector<PostCommandHook>> m_post_hooks;
 }; // class ArgumentParser
 
 /**

@@ -25,4 +25,5 @@ void set_plugin_manager(plugin::PluginManager *manager);
 plugin::PluginManager *get_plugin_manager();
 void set_version(const std::string &version);
 const std::string &get_version();
+std::shared_ptr<parser::ArgumentParser> get_argument_parser();
 } // namespace core

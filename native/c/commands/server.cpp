@@ -16,13 +16,17 @@
 #include <iostream>
 #include <map>
 #include <mutex>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <thread>
 #include <unistd.h>
 #include "core.hpp"
+#include <vector>
 #include "server.hpp"
+#include "../zut.hpp"
+#include "../ifaed.h"
 #include "../zjson.hpp"
 #include "../zusf.hpp"
 #include "../server/rpc_server.hpp"
@@ -201,6 +205,7 @@ static int handle_server(plugin::InvocationContext &context)
   opts.verbose = context.get<bool>("verbose", opts.verbose);
   opts.request_timeout = context.get<long long>("request-timeout", opts.request_timeout);
   opts.exec_dir = ZServer::get_instance().get_exec_dir();
+  std::string client_name = context.get<std::string>("client-name", "ZRS VSCE");
 
   const auto *num_workers_env = getenv("ZOWEX_NUM_WORKERS");
   if (num_workers_env != nullptr)
@@ -240,16 +245,57 @@ static int handle_server(plugin::InvocationContext &context)
     return 1;
   }
 
+  if (!client_name.empty())
+  {
+    std::transform(client_name.begin(), client_name.end(), client_name.begin(), ::toupper);
+  }
+
+  auto is_valid_client_name = [](const std::string &client_name) -> bool
+  {
+    static const std::set<std::string> valid_clients = {
+        "ZRS VSCE",
+        "ZRS CLI",
+        "ZRS MCP"};
+    return valid_clients.find(client_name) != valid_clients.end();
+  };
+
+  if (!client_name.empty() && !is_valid_client_name(client_name))
+  {
+    static const std::set<std::string> valid_clients = {
+        "ZRS VSCE",
+        "ZRS CLI",
+        "ZRS MCP"};
+
+    std::cerr << "Error: Invalid client name '" << client_name << "', must be one of: ";
+    bool first = true;
+    for (const auto &valid_name : valid_clients)
+    {
+      if (!first)
+        std::cerr << " | ";
+      std::cerr << valid_name;
+      first = false;
+    }
+    std::cerr << std::endl;
+    return 1;
+  }
+
+  std::vector<IFAED_TOKEN> tokens;
+  const auto exec_dir = ZServer::get_instance().get_exec_dir();
+  zut_register_service(tokens, client_name, core::get_version(), server::get_overrides_dir(exec_dir));
+
   try
   {
     ZServer::get_instance().run(opts);
   }
   catch (const std::exception &e)
   {
+    zut_deregister_service(tokens);
     std::cerr << "Fatal error: " << e.what() << std::endl;
     LOG_FATAL("Fatal error: %s", e.what());
     return 1;
   }
+
+  zut_deregister_service(tokens);
 
   return 0;
 }
@@ -272,6 +318,10 @@ void register_commands(Command &root_command)
                               "request timeout in seconds before a worker is restarted",
                               ArgType_Single, false,
                               ArgValue(60LL));
+  server_cmd->add_keyword_arg("client-name",
+                              make_aliases("-c", "--client-name"),
+                              "name of the client",
+                              ArgType_Single, false);
   server_cmd->set_handler(handle_server);
   root_command.add_command(server_cmd);
 }

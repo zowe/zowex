@@ -56,21 +56,6 @@ static std::string get_plugins_dir(const std::string &exec_dir)
   return plugins_path;
 }
 
-static std::string get_overrides_dir(const std::string &exec_dir)
-{
-  std::string overrides_path = std::string(getenv("ZOWEX_OVERRIDES_DIR"));
-  if (overrides_path.empty())
-  {
-    return exec_dir + "/overrides";
-  }
-  else if (overrides_path.back() == '/')
-  {
-    overrides_path.pop_back(); // Remove trailing slash if present
-  }
-
-  return overrides_path;
-}
-
 int main(int argc, char *argv[])
 {
   const auto exec_dir = get_executable_dir(argv[0]);
@@ -96,11 +81,36 @@ int main(int argc, char *argv[])
 
     pm.register_commands(root_cmd);
 
-    // TODO(Kelosky): support other features, MCP, ZRS, CLI, etc.
     std::vector<IFAED_TOKEN> tokens;
-    zut_register_service(tokens, "ZOWEX CLI", core::get_version(), get_overrides_dir(exec_dir));
+    auto arg_parser = core::get_argument_parser();
+
+    // for all commands, register the CLI service if it is not already registered and if it's not a server command
+    arg_parser->add_pre_command_hook([&exec_dir](const parser::Command &command, bool is_help_request) -> bool
+                                     {
+                                       if (command.get_name() == "server" && !is_help_request)
+                                       {
+                                         // server command is handled within the server command handler (except for help requests)
+                                       }
+                                       else
+                                       {
+                                         std::vector<IFAED_TOKEN> tokens;
+                                         zut_register_service(tokens, "CLI", core::get_version(), server::get_overrides_dir(exec_dir));
+                                       }
+                                       return true; });
+
+    arg_parser->add_post_command_hook([&tokens](const parser::Command &command, bool is_help_request, int exit_code) -> bool
+                                      {
+                                        if (command.get_name() == "server" && !is_help_request)
+                                        {
+                                          // server command is handled within the server command handler (except for help requests)
+                                        }
+                                        else
+                                        {
+                                          zut_deregister_service(tokens);
+                                        }
+                                        return true; });
+
     auto rc = core::execute_command(argc, argv);
-    zut_deregister_service(tokens);
     return rc;
   }
   catch (const std::exception &e)
