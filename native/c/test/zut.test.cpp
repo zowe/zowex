@@ -36,19 +36,21 @@ void zut_tests()
 
                             // should return success for first registration
                             int rc = zut_register_service(tokens, "ZOWEX TEST", "1.0.0");
-                            expect(rc).ToBe(0);
+                            Expect(rc).ToBe(0);
+                            Expect(tokens.size()).ToBe(1);
 
-                            // should return warning for duplicate registration
+                            // should ignore warning for duplicate registration
                             rc = zut_register_service(tokens, "ZOWEX TEST", "1.0.0");
-                            expect(rc).ToBe(RTNCD_WARNING);
+                            Expect(rc).ToBe(0);
+                            Expect(tokens.size()).ToBe(1);
 
                             // should return success for deregistration
                             rc = zut_deregister_service(tokens);
-                            expect(rc).ToBe(0);
+                            Expect(rc).ToBe(0);
 
-                            // should return failure for deregistration of already deregistered service
+                            // should ignore error for deregistration of already deregistered service
                             rc = zut_deregister_service(tokens);
-                            expect(rc).ToBe(RTNCD_FAILURE); });
+                            Expect(rc).ToBe(0); });
                       });
 
              it("should run shell program", []() -> void
