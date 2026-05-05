@@ -15,9 +15,15 @@ OUT_DIR=build-out
 
 all: $(OUT_DIR) run
 
-run: $(OUT_DIR)/testrcvy
+testrcvy: $(OUT_DIR) $(OUT_DIR)/testrcvy
 	@echo 'Running ./$(OUT_DIR)/testrcvy'
 	export _BPXK_JOBLOG=STDERR && ./$(OUT_DIR)/testrcvy
+
+test: $(OUT_DIR) $(OUT_DIR)/rcvy
+	@echo 'Running ./$(OUT_DIR)/rcvy'
+	export _BPXK_JOBLOG=STDERR && ./$(OUT_DIR)/rcvy
+
+run: test testrcvy 
 
 $(OUT_DIR):
 	@echo 'Creating $(OUT_DIR)'
@@ -33,6 +39,19 @@ $(OUT_DIR)/testrcvy.o: $(OUT_DIR)/testrcvy.s
 
 $(OUT_DIR)/testrcvy: $(OUT_DIR)/testrcvy.o
 	@echo 'Building testrcvy'
+	$(BIND) $(BIND_FLAGS_64) -V -eMAIN -o $@ $^ > $*.bind.lst
+
+
+$(OUT_DIR)/rcvy.s: rcvy.c
+	@echo 'Building $(OUT_DIR)/rcvy.s'
+	$(CC) $(MTL_FLAGS64) -qlist=$*.mtl.lst $(MTL_HEADERS) -o $@ $^
+
+$(OUT_DIR)/rcvy.o: $(OUT_DIR)/rcvy.s
+	@echo 'Building $(OUT_DIR)/rcvy.o'
+	$(ASM) $(ASM_FLAGS) -a=$*.s.lst $(MACLIBS) -o $@ $^
+
+$(OUT_DIR)/rcvy: $(OUT_DIR)/rcvy.o
+	@echo 'Building rcvy'
 	$(BIND) $(BIND_FLAGS_64) -V -eMAIN -o $@ $^ > $*.bind.lst
 
 clean:

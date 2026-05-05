@@ -269,7 +269,7 @@ int ZJBMMOD(ZJB *zjb, int type, int flags)
 
   ssobp = &ssob;
   ssobp = (SSOB * PTR32)((unsigned int)ssobp | 0x80000000);
-  rc = iefssreq(&ssobp); // TODO(Kelosky): recovery
+  rc = iefssreq(&ssobp);
 
   if (0 != rc || 0 != ssob.ssobretn)
   {
@@ -311,20 +311,19 @@ int ZJBMVIEW(ZJB *zjb, ZJB_JOB_INFO **PTR64 job_info, int *entries)
   STAT stat = {0};
   init_stat(&stat);
 
-  if (zjb->jobid[0] != 0x00)
+  if (0x00 != zjb->jobid[0])
   {
     stat.statsel1 = stat.statsel1 | statsjbi; // real lookup
     memcpy(stat.statjbil, zjb->jobid, sizeof(stat.statjbil));
     memcpy(stat.statjbih, zjb->jobid, sizeof(stat.statjbih));
   }
-  else
+  else if (zjb->correlator != "" && 0 != strncmp(zjb->correlator, "                                                                ", sizeof(zjb->correlator)))
   {
     char correlator31[64] = {0};
     memcpy(correlator31, zjb->correlator, sizeof(zjb->correlator));
     stat.statsel5 = statscor;
     stat.statjcrp = &correlator31[0];
   }
-
   stat.stattype = statters;
 
   return ZJBMTCOM(zjb, &stat, job_info, entries);
@@ -342,7 +341,7 @@ int ZJBMLIST(ZJB *zjb, ZJB_JOB_INFO **PTR64 job_info, int *entries)
   stat.stattype = statters;
   memcpy(stat.statownr, zjb->owner_name, sizeof((stat.statownr)));
 
-  if (0 == strcmp(zjb->prefix_name, "        "))
+  if (0 == strncmp(zjb->prefix_name, "        ", sizeof(zjb->prefix_name)))
   {
     // do nothing
   }
@@ -352,7 +351,7 @@ int ZJBMLIST(ZJB *zjb, ZJB_JOB_INFO **PTR64 job_info, int *entries)
     memcpy(stat.statjobn, zjb->prefix_name, sizeof((stat.statjobn)));
   }
 
-  if (0 == strcmp(zjb->status_name, "ACTIVE  "))
+  if (0 == strncmp(zjb->status_name, "ACTIVE  ", sizeof(zjb->status_name)))
   {
     stat.statphaz = stat___onmain;
     stat.statsel3 |= statsphz;
@@ -361,7 +360,7 @@ int ZJBMLIST(ZJB *zjb, ZJB_JOB_INFO **PTR64 job_info, int *entries)
   return ZJBMTCOM(zjb, &stat, job_info, entries);
 }
 
-int ZJBMGJQ(ZJB *zjb, SSOB *ssobp, STAT *statp, STATJQ *PTR32 *PTR32 statjqp)
+int ZJBMGJQ(ZJB *zjb, SSOB *ssobp, STAT *statp, STATJQ * PTR32 * PTR32 statjqp)
 {
   int rc = 0;
 
@@ -369,7 +368,7 @@ int ZJBMGJQ(ZJB *zjb, SSOB *ssobp, STAT *statp, STATJQ *PTR32 *PTR32 statjqp)
 
   ssobp2 = ssobp;
   ssobp2 = (SSOB * PTR32)((unsigned int)ssobp2 | 0x80000000);
-  rc = iefssreq(&ssobp2); // TODO(Kelosky): recovery
+  rc = iefssreq(&ssobp2);
 
   if (0 != rc || 0 != ssobp->ssobretn)
   {
@@ -423,7 +422,7 @@ int ZJBMTCOM(ZJB *zjb, STAT *PTR64 stat, ZJB_JOB_INFO **PTR64 job_info, int *ent
 
   ssobp = &ssob;
   ssobp = (SSOB * PTR32)((unsigned int)ssobp | 0x80000000);
-  rc = iefssreq(&ssobp); // TODO(Kelosky): recovery
+  rc = iefssreq(&ssobp);
 
   if (0 != rc || 0 != ssob.ssobretn)
   {
@@ -496,7 +495,7 @@ int ZJBMTCOM(ZJB *zjb, STAT *PTR64 stat, ZJB_JOB_INFO **PTR64 job_info, int *ent
   zjb->buffer_size_needed = total_size;
 
   stat->stattype = statmem; // free storage
-  rc = iefssreq(&ssobp);    // TODO(Kelosky): recovery
+  rc = iefssreq(&ssobp);
 
   return RTNCD_SUCCESS;
 }
@@ -581,14 +580,14 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
     }
 
     stat.stattype = statmem; // free storage
-    rc = iefssreq(&ssobp);   // TODO(Kelosky): recovery
+    rc = iefssreq(&ssobp);
     return RTNCD_FAILURE;
   }
 
   stat.stattrsa = statjqp;
   stat.stattype = statoutv;
 
-  rc = iefssreq(&ssobp); // TODO(Kelosky): recovery
+  rc = iefssreq(&ssobp);
 
   if (0 != rc || 0 != ssob.ssobretn)
   {
@@ -627,7 +626,7 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
     }
     zjb->diag.detail_rc = ZJB_RTNCD_JOB_NOT_FOUND;
     stat.stattype = statmem; // free storage
-    rc = iefssreq(&ssobp);   // TODO(Kelosky): recovery
+    rc = iefssreq(&ssobp);
     return RTNCD_FAILURE;
   }
 
@@ -647,7 +646,7 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
       if (loop_control >= zjb->dds_max)
       {
         stat.stattype = statmem; // free storage
-        rc = iefssreq(&ssobp);   // TODO(Kelosky): recovery
+        rc = iefssreq(&ssobp);
         zjb->diag.detail_rc = ZJB_RSNCD_MAX_JOBS_REACHED;
         ZDIAG_SET_MSG(&zjb->diag, "max DDs reached '%d', results truncated", zjb->dds_max);
         return RTNCD_WARNING;
@@ -681,7 +680,7 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
   zjb->buffer_size_needed = total_size;
 
   stat.stattype = statmem; // free storage
-  rc = iefssreq(&ssobp);   // TODO(Kelosky): recovery
+  rc = iefssreq(&ssobp);
 
   return RTNCD_SUCCESS;
 }
@@ -731,11 +730,11 @@ int ZJBMLPRC(ZJB *zjb, char *buffer, int *buffer_size, int *entries)
 
   ssobp = &ssob;
   ssobp = (SSOB * PTR32)((unsigned int)ssobp | 0x80000000);
-  rc = iefssreq(&ssobp); // TODO(Kelosky): recovery
+  rc = iefssreq(&ssobp);
 
   if (0 != rc || 0 != ssob.ssobretn)
   {
-    strcpy(zjb->diag.service_name, "IEFSSREQ"); // TODO(Kelosky): recovery
+    strcpy(zjb->diag.service_name, "IEFSSREQ");
     zjb->diag.service_rc = ssob.ssobretn;
     zjb->diag.service_rsn = ssjp.ssjpretn;
     ZDIAG_SET_MSG(&zjb->diag, "IEFSSREQ rc was: '%d' SSOBRETN was: '%d', SSJPRETN was: '%d'", rc, ssob.ssobretn, ssjp.ssjpretn);
@@ -775,7 +774,7 @@ int ZJBMLPRC(ZJB *zjb, char *buffer, int *buffer_size, int *entries)
   }
 
   ssjp.ssjpfreq = ssjpprrs; // free storage
-  rc = iefssreq(&ssobp);    // TODO(Kelosky): recovery
+  rc = iefssreq(&ssobp);
 
   return rc;
 }

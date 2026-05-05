@@ -16,6 +16,7 @@
 #include "../zusf.hpp"
 #include "../zut.hpp"
 #include <regex.h>
+#include <string>
 
 using namespace ast;
 using namespace parser;
@@ -733,7 +734,15 @@ int job_submit_common(InvocationContext &context, const std::string &jcl, std::s
   }
 
   ZJob job{};
-  rc = zjb_view(&zjb, std::string(zjb.correlator, sizeof(zjb.correlator)), job);
+
+  if (0 != strncmp(zjb.correlator, "                                                                ", sizeof(zjb.correlator)))
+  {
+    rc = zjb_view(&zjb, std::string(zjb.correlator, sizeof(zjb.correlator)), job);
+  }
+  else
+  {
+    rc = zjb_view(&zjb, jobid, job);
+  }
   if (0 != rc)
   {
     context.error_stream() << "Error: could not get job status for: '" << jobid << "' rc: '" << rc << "'" << std::endl;

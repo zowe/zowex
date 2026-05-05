@@ -16,6 +16,8 @@
 #include "zssitype.h"
 #include "iefjsqry.h"
 #include "zmetal.h"
+#include "zrecovery.h"
+#include "zdbg.h"
 
 #if defined(__IBM_METAL__)
 
@@ -117,7 +119,7 @@ IEFSSI_QUERY_MODEL(iefssi_query_model); // make this copy in static storage
 
 typedef struct jqry___header JQRY_HEADER;
 
-static int iefssi_query(JQRY_HEADER *PTR32 *PTR32 area, int *PTR32 rsn, const char *filter)
+static int iefssi_query(JQRY_HEADER * PTR32 * PTR32 area, int *PTR32 rsn, const char *filter)
 {
   int rc = 0;
   char filter_truncated[4] = {};
@@ -129,11 +131,24 @@ static int iefssi_query(JQRY_HEADER *PTR32 *PTR32 area, int *PTR32 rsn, const ch
 }
 
 // https://www.ibm.com/docs/en/zos/3.1.0?topic=subsystem-making-request-iefssreq-macro
-static int iefssreq(SSOB *PTR32 *PTR32 ssob)
+#pragma prolog(iefssreq, " ZWEPROLG NEWDSA=(YES,128) ")
+#pragma epilog(iefssreq, " ZWEEPILG ")
+static int iefssreq(SSOB * PTR32 * PTR32 ssob)
 {
   int rc = 0;
-  IEFSSREQ(ssob, rc);
-  return rc;
+  ZRCVY_ENV zenv = {0};
+
+  if (0 == enable_recovery(&zenv))
+  {
+    IEFSSREQ(ssob, rc);
+    disable_recovery(&zenv);
+    return rc;
+  }
+  else
+  {
+    disable_recovery(&zenv);
+    return RTNCD_FAILURE;
+  }
 }
 
 #endif

@@ -31,11 +31,12 @@
 #include "zdyn.h"
 #include "ihapsa.h"
 #include "cvt.h"
-#include "zdbg.h"
+#include <algorithm>
 
 typedef struct iazbtokp IAZBTOKP;
 
 void zjb_build_job_response(ZJB_JOB_INFO *PTR64, int, std::vector<ZJob> &);
+int zjb_get_jobid_from_syslog(ZJB *zjb, std::string &jobid);
 
 #define BTOKLEN (293 - 254) // 293 is the full length, minus the max optional buffer area for logs (less 254)
 
@@ -527,35 +528,49 @@ int zjb_submit(ZJB *zjb, const std::string &contents, std::string &jobid)
 
   jobid = std::string(cjobid);
 
-  if (jobid == "")
+  bool dynfree_needed = true;
+  if (jobid == "" || jobid == "        ")
   {
     rc = dynfree(&ip);
-    strcpy(zjb->diag.service_name, "intrdr");
-    ZDIAG_SET_MSG(&zjb->diag, "job submission failed");
-    zjb->diag.detail_rc = ZJB_RTNCD_SUBMIT_ERROR;
-    return RTNCD_FAILURE;
+    dynfree_needed = false;
+
+    if (0 != zjb_get_jobid_from_syslog(zjb, jobid))
+    {
+      strcpy(zjb->diag.service_name, "intrdr");
+      ZDIAG_SET_MSG(&zjb->diag, "job submission failed");
+      zjb->diag.detail_rc = ZJB_RTNCD_SUBMIT_ERROR;
+      return RTNCD_FAILURE;
+    }
   }
 
-  char ccorrelator[64 + 1] = {0};
+  memcpy(zjb->jobid, jobid.c_str(), sizeof(zjb->jobid));
+
+  char ccorrelator[64 + 1]{};
   int correlator_size = sizeof(ccorrelator);
   rc = ZJBSYMB(zjb, "SYS_CORR_LASTJOB", ccorrelator, &correlator_size);
 
   if (0 != rc)
   {
-    dynfree(&ip);
+    if (dynfree_needed)
+    {
+      dynfree(&ip);
+    }
     return rc;
   }
 
   memcpy(zjb->correlator, ccorrelator, sizeof(zjb->correlator));
 
-  rc = dynfree(&ip);
-  if (0 != rc)
+  if (dynfree_needed)
   {
-    strcpy(zjb->diag.service_name, "dynfree");
-    zjb->diag.service_rc = rc;
-    ZDIAG_SET_MSG(&zjb->diag, "dynfree failed with %d", rc);
-    zjb->diag.detail_rc = ZJB_RTNCD_SERVICE_FAILURE;
-    return RTNCD_FAILURE;
+    rc = dynfree(&ip);
+    if (0 != rc)
+    {
+      strcpy(zjb->diag.service_name, "dynfree");
+      zjb->diag.service_rc = rc;
+      ZDIAG_SET_MSG(&zjb->diag, "dynfree failed with %d", rc);
+      zjb->diag.detail_rc = ZJB_RTNCD_SERVICE_FAILURE;
+      return RTNCD_FAILURE;
+    }
   }
 
   return RTNCD_SUCCESS;
@@ -859,4 +874,86 @@ void zjb_build_job_response(ZJB_JOB_INFO *PTR64 job_info, int entries, std::vect
 
     jobs.push_back(zjob);
   }
+}
+
+int zjb_get_jobid_from_syslog(ZJB *zjb, std::string &jobid)
+{
+  time_t now = time(nullptr) - 1; // Look 1 second back to be safe
+  struct tm tm_now_storage;
+  struct tm *tm_now = localtime_r(&now, &tm_now_storage);
+  char buf_time[32];
+  strftime(buf_time, sizeof(buf_time), "%H:%M:%S.00", tm_now);
+  std::string time_value = buf_time;
+
+  char buf_date[32];
+  strftime(buf_date, sizeof(buf_date), "%Y-%m-%d", tm_now);
+  std::string date_value = buf_date;
+
+  std::string found_jobid = "        ";
+  ZJB zjb_syslog = {0};
+  zjb_syslog.encoding_opts.data_type = eDataTypeText;
+  std::string syslog_content;
+  int rc = zjb_read_syslog(&zjb_syslog, syslog_content, date_value, time_value, 500);
+
+  if (0 == rc)
+  {
+    std::string IEFC_MESSAGE = "IEFC452I";
+    size_t pos = syslog_content.rfind(IEFC_MESSAGE); // Get the most recent one
+
+    if (std::string::npos != pos)
+    {
+      size_t line_start = syslog_content.rfind('\n', pos);
+      if (std::string::npos == line_start)
+      {
+        line_start = 0;
+      }
+      else
+      {
+        line_start++;
+      }
+
+      std::string line = syslog_content.substr(line_start, syslog_content.find('\n', pos) - line_start);
+      std::string line_reverse = line;
+      std::reverse(line_reverse.begin(), line_reverse.end());
+      // original line: (example)
+      // M 4040000 ABCD     26096 10:50:52.57 JOB08758 00000094  IEFC452I TESTJOB1 - JOB NOT RUN - JCL ERROR 855
+      // reversed line: (example)
+      //                            558 RORRE LCJ - NUR TON BOJ - 1BOJTSET I254CFEI  49000000 85780BOJ 75.25:05:01 69062     DCBA 0000404 M
+
+      size_t original_iefc_pos = line.find(IEFC_MESSAGE);
+      if (std::string::npos != original_iefc_pos)
+      {
+        // Index in reversed string where the text *before* IEFC452I begins
+        size_t rev_start_pos = line.length() - original_iefc_pos;
+
+        // Find the first non-space character (this is the start of the word "49000000" in reverse)
+        size_t word1_start = line_reverse.find_first_not_of(" ", rev_start_pos);
+        if (std::string::npos != word1_start)
+        {
+          // Find the space after word1
+          size_t word1_end = line_reverse.find_first_of(" ", word1_start);
+          if (std::string::npos != word1_end)
+          {
+            // Find the start of word2 (which should be "JOB08758" in reverse, i.e., "85780BOJ")
+            size_t word2_start = line_reverse.find_first_not_of(" ", word1_end);
+            if (std::string::npos != word2_start)
+            {
+              // Find the space after word2
+              size_t word2_end = line_reverse.find_first_of(" ", word2_start);
+              if (std::string::npos == word2_end)
+              {
+                word2_end = line_reverse.length();
+              }
+
+              found_jobid = line_reverse.substr(word2_start, word2_end - word2_start);
+              std::reverse(found_jobid.begin(), found_jobid.end());
+            }
+          }
+        }
+      }
+    }
+    jobid = found_jobid;
+  }
+
+  return rc;
 }
