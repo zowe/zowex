@@ -79,8 +79,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        // Continue the filter chain. If authentication was not set, Spring Security
-        // will block the request before it reaches the controller.
-        filterChain.doFilter(request, response);
+        try {
+            // Continue the filter chain. If authentication was not set, Spring Security
+            // will block the request before it reaches the controller.
+            filterChain.doFilter(request, response);
+        } finally {
+            // This block is guaranteed to run after the controller returns and the response is written,
+            // right before the thread is returned to the thread pool.
+            // 
+            // Example: ThreadLocalContext.clear(); or any other thread-local cleanup.
+            // SecurityContextHolder.clearContext() is usually handled by Spring Security's 
+            // SecurityContextPersistenceFilter, but you can do your own custom thread cleanup here.
+        }
     }
 }
