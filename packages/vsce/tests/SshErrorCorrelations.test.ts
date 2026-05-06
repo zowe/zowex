@@ -17,7 +17,7 @@ import {
     ZoweVsCodeExtension,
 } from "@zowe/zowe-explorer-api";
 import { afterEach, beforeEach, describe, expect, it, type MockedFunction, vi } from "vitest";
-import { SshErrors } from "zowex-sdk";
+import { SshErrors } from "@zowe/zowex-for-zowe-sdk";
 import { registerSshErrorCorrelations } from "../src/SshErrorCorrelations";
 
 // Mock Zowe Explorer API (shared structure with SshErrorHandler.test.ts)
