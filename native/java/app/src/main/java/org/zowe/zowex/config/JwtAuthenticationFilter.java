@@ -46,26 +46,35 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     tokenResult.getUserId(),
                     jwt,
                     java.util.Collections.emptyList());
+
             SecurityContextHolder.getContext().setAuthentication(authentication);
         } catch (ZaasClientException e) {
             System.out.println("Error: " + e.getMessage());
             // Validation failed. Clear the context to be safe.
             SecurityContextHolder.clearContext();
             // Get the return code safely
-            int statusCode = e.getErrorCode() != null ? e.getErrorCode().getReturnCode() : HttpServletResponse.SC_UNAUTHORIZED;
+            int statusCode = e.getErrorCode() != null ? e.getErrorCode().getReturnCode()
+                    : HttpServletResponse.SC_UNAUTHORIZED;
             String returnCodeStr = e.getErrorCode() != null ? String.valueOf(statusCode) : "UNKNOWN";
 
-            // Set the response status according to the returnCode
+            // If the status code is a 4xx client error, map it to 401 Unauthorized
+            if (statusCode >= 400 && statusCode < 500) {
+                statusCode = HttpServletResponse.SC_UNAUTHORIZED;
+            }
+
+            // Set the response status according to the mapped returnCode
             response.setStatus(statusCode);
             response.setContentType("application/json");
-            
+
             // Safely escape the message (basic escaping for JSON)
-            String errorMessage = e.getMessage() != null ? e.getMessage().replace("\"", "\\\"") : "Authentication failed";
-            
+            String errorMessage = e.getMessage() != null ? e.getMessage().replace("\"", "\\\"")
+                    : "Authentication failed";
+
             // Write the exception message and return code to the response body
-            response.getWriter().write(String.format("{\"error\": \"%s\", \"returnCode\": \"%s\"}", errorMessage, returnCodeStr));
+            response.getWriter()
+                    .write(String.format("{\"error\": \"%s\", \"returnCode\": \"%s\"}", errorMessage, returnCodeStr));
             response.getWriter().flush();
-            
+
             // Return immediately so the request doesn't continue down the filter chain
             return;
         }
