@@ -13,9 +13,11 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final BasicAuthenticationFilter basicAuthenticationFilter;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter, BasicAuthenticationFilter basicAuthenticationFilter) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.basicAuthenticationFilter = basicAuthenticationFilter;
     }
 
     private static final String[] OPENAPI_WHITELIST = {
@@ -33,8 +35,9 @@ public class SecurityConfig {
                 .requestMatchers(OPENAPI_WHITELIST).permitAll()
                 .anyRequest().authenticated()
             )
-            // Add our custom JWT filter before the standard authentication filter
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+            // Add our custom filters before the standard authentication filter
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(basicAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
             
         return http.build();
     }
