@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
+#include <functional>
 #include <iomanip>
 #include <iostream>
 #include <map>
@@ -81,13 +82,16 @@ inline std::vector<std::string> make_aliases(const char *a1 = 0,
 }
 
 class Command;
-typedef std::shared_ptr<Command> command_ptr;
-typedef std::enable_shared_from_this<Command> enable_shared_command;
+using command_ptr = std::shared_ptr<Command>;
+using enable_shared_command = std::enable_shared_from_this<Command>;
 
 class ArgumentParser;
 class ParseResult;
 
-typedef plugin::Argument ArgValue;
+using ArgValue = plugin::Argument;
+
+// Return value signals whether the hook succeeded
+using PreCommandHook = std::function<bool(const Command &command, bool is_help_request)>;
 
 enum ArgType
 {
@@ -319,11 +323,11 @@ struct CmdExample
 class Command : public enable_shared_command
 {
 public:
-  typedef int (*CommandHandler)(plugin::InvocationContext &context);
+  using CommandHandler = int (*)(plugin::InvocationContext &context);
 
   Command(std::string name, std::string help)
       : m_name(name), m_help(help), m_handler(nullptr),
-        m_allow_dynamic_keywords(false), m_allow_passthrough(false)
+        m_allow_dynamic_keywords(false), m_allow_passthrough(false), m_privileged(false)
   {
     ensure_help_argument();
   }
@@ -332,6 +336,39 @@ public:
   ~Command()
   {
     m_commands.clear();
+  }
+
+  // mark command as privileged (and propagate to children)
+  Command &set_privileged(bool privileged = true)
+  {
+    m_privileged = privileged;
+    for (auto &pair : m_commands)
+    {
+      if (pair.second)
+      {
+        pair.second->set_privileged(privileged);
+      }
+    }
+    return *this;
+  }
+
+  bool is_privileged() const
+  {
+    return m_privileged;
+  }
+
+  // propagate pre_hooks recursively
+  Command &set_pre_hooks(std::shared_ptr<std::vector<PreCommandHook>> hooks)
+  {
+    m_pre_hooks = hooks;
+    for (auto &pair : m_commands)
+    {
+      if (pair.second)
+      {
+        pair.second->set_pre_hooks(hooks);
+      }
+    }
+    return *this;
   }
 
   // add an argument
@@ -452,6 +489,17 @@ public:
       return *this;
 
     sub->ensure_help_argument();
+
+    // Only propagate privileges if the parent is privileged
+    if (m_privileged)
+    {
+      sub->set_privileged(true);
+    }
+
+    if (m_pre_hooks)
+    {
+      sub->set_pre_hooks(m_pre_hooks);
+    }
 
     std::string sub_name = sub->get_name();
     // check for conflicts with existing names and aliases
@@ -791,7 +839,27 @@ public:
 private:
   bool m_allow_dynamic_keywords;
   bool m_allow_passthrough;
+  bool m_privileged;
   std::string m_passthrough_description;
+  std::shared_ptr<std::vector<PreCommandHook>> m_pre_hooks;
+
+  // helper to execute pre-command hooks
+  bool execute_pre_hooks(bool is_help_request, const char *context_msg) const
+  {
+    if (m_pre_hooks)
+    {
+      for (size_t i = 0; i < m_pre_hooks->size(); ++i)
+      {
+        const auto &hook = (*m_pre_hooks)[i];
+        if (!hook(*this, is_help_request))
+        {
+          ZLOG_TRACE("Pre-command hook aborted execution for %s '%s'", context_msg, m_name.c_str());
+          return false;
+        }
+      }
+    }
+    return true;
+  }
 
   // helper to check if the token at the given index is a flag/option token
   bool is_flag_token(const std::vector<lexer::Token> &tokens,
@@ -1464,6 +1532,14 @@ Command::parse(const std::vector<lexer::Token> &tokens,
       if (matched_arg->is_help_flag)
       {
         ZLOG_TRACE("Help flag detected, showing help and exiting");
+
+        // Execute pre-command hooks before the help runs
+        if (!execute_pre_hooks(true, "help command"))
+        {
+          result.exit_code = 1;
+          return result;
+        }
+
         generate_help(std::cout, command_path_prefix);
         result.status = ParseResult::ParserStatus_HelpRequested;
         result.exit_code = 0; // help request is a successful exit
@@ -1889,6 +1965,13 @@ Command::parse(const std::vector<lexer::Token> &tokens,
   {
     ZLOG_TRACE("Executing handler for command '%s'", m_name.c_str());
 
+    // Execute pre-command hooks before the handler
+    if (!execute_pre_hooks(false, "command"))
+    {
+      result.exit_code = 1;
+      return result;
+    }
+
     plugin::ArgumentMap invocation_args;
     for (const auto &kv : result.m_values)
     {
@@ -1911,6 +1994,14 @@ Command::parse(const std::vector<lexer::Token> &tokens,
       result.status == ParseResult::ParserStatus_Success)
   {
     ZLOG_TRACE("Command group with no handler, showing help");
+
+    // Execute pre-command hooks before the help runs
+    if (!execute_pre_hooks(true, "help command group"))
+    {
+      result.exit_code = 1;
+      return result;
+    }
+
     generate_help(std::cout, command_path_prefix);
     result.status = ParseResult::ParserStatus_HelpRequested;
     result.exit_code = 0;
@@ -1927,8 +2018,10 @@ public:
   ArgumentParser() = default;
   explicit ArgumentParser(std::string prog_name, std::string description = "")
       : m_program_name(prog_name), m_program_desc(description),
-        m_root_cmd(command_ptr(new Command(prog_name, description)))
+        m_root_cmd(command_ptr(new Command(prog_name, description))),
+        m_pre_hooks(std::make_shared<std::vector<PreCommandHook>>())
   {
+    m_root_cmd->set_pre_hooks(m_pre_hooks);
   }
 
   ~ArgumentParser() = default;
@@ -1961,6 +2054,27 @@ public:
   const std::string &get_program_name() const
   {
     return m_program_name;
+  }
+
+  /**
+   * @brief Register a pre-command hook to be called before any command handler executes.
+   *
+   * Hooks receive the full command path (e.g. "zowex console issue") and run
+   * in registration order. They cannot prevent handler execution.
+   *
+   * @param hook Callback invoked with the command path before the handler runs
+   */
+  void add_pre_command_hook(PreCommandHook hook)
+  {
+    if (m_pre_hooks == nullptr)
+    {
+      m_pre_hooks = std::make_shared<std::vector<PreCommandHook>>();
+    }
+    m_pre_hooks->push_back(std::move(hook));
+    if (m_root_cmd)
+    {
+      m_root_cmd->set_pre_hooks(m_pre_hooks);
+    }
   }
 
   /**
@@ -2227,6 +2341,7 @@ private:
   std::string m_program_name;
   std::string m_program_desc;
   command_ptr m_root_cmd;
+  std::shared_ptr<std::vector<PreCommandHook>> m_pre_hooks;
 }; // class ArgumentParser
 
 /**

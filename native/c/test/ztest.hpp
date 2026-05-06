@@ -40,7 +40,6 @@
 #include <functional>
 
 // TODO(Kelosky): handle test not run
-// TODO(Kelosky): handle running individual test and/or suite
 
 #define Expect(x) expect((x), EXPECT_CONTEXT{__LINE__, __FILE__, "", false})
 #define ExpectWithContext(x, context) expect((x), EXPECT_CONTEXT{__LINE__, __FILE__, std::string(context), true})
@@ -588,6 +587,45 @@ public:
     return hooks;
   }
 
+  // Check if pattern matches the full test name (Jest-like behavior)
+  bool matches_filter(const std::string &test_description, const std::string &pattern)
+  {
+    if (pattern.empty())
+    {
+      return true;
+    }
+
+    // Build full test name: "suite1 suite2 suite3 test_description"
+    std::string full_name = "";
+    for (const auto &idx : suite_stack)
+    {
+      if (idx >= 0 && idx < static_cast<int>(suites.size()))
+      {
+        if (!full_name.empty())
+        {
+          full_name += " ";
+        }
+        full_name += suites[idx].description;
+      }
+    }
+    if (!full_name.empty())
+    {
+      full_name += " ";
+    }
+    full_name += test_description;
+
+    try
+    {
+      std::regex regex_pattern(pattern);
+      return std::regex_search(full_name, regex_pattern);
+    }
+    catch (const std::regex_error &e)
+    {
+      // If regex is invalid, fall back to exact string match
+      return full_name.find(pattern) != std::string::npos;
+    }
+  }
+
   template <typename Callable,
             typename = typename std::enable_if<
                 std::is_same<void, decltype(std::declval<Callable>()())>::value>::type>
@@ -601,24 +639,10 @@ public:
 
     int current_nesting = get_nesting();
 
-    if (get_matcher() != "")
+    // Check if test matches filter (Jest-like: matches either test name or suite path)
+    if (!matches_filter(description, get_matcher()))
     {
-      try
-      {
-        std::regex pattern(get_matcher());
-        if (!std::regex_search(description, pattern))
-        {
-          return;
-        }
-      }
-      catch (const std::regex_error &e)
-      {
-        // If regex is invalid, fall back to exact string match
-        if (get_matcher() != description)
-        {
-          return;
-        }
-      }
+      return;
     }
 
     int suite_idx = get_suite_index();

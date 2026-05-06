@@ -162,7 +162,6 @@ void register_uss_commands(CommandDispatcher &dispatcher)
   dispatcher.register_command("deleteFile",
                               create_uss_builder(uss::handle_uss_delete)
                                   .validate<DeleteFileRequest, DeleteFileResponse>());
-  // {"id": 1, "jsonrpc": "2.0", "method": "moveFile", "params": {"source": "source-path", "target": "target-path", "force": false}}
   dispatcher.register_command("moveFile",
                               create_uss_builder(uss::handle_uss_move)
                                   .validate<MoveFileRequest, MoveFileResponse>()

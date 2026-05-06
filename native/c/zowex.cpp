@@ -40,9 +40,25 @@ static std::string get_executable_dir(const char *argv0)
   return ".";
 }
 
+static std::string get_plugins_dir(const std::string &exec_dir)
+{
+  std::string plugins_path = std::string(getenv("ZOWEX_PLUGINS_DIR"));
+  if (plugins_path.empty())
+  {
+    return exec_dir + "/plugins";
+  }
+  else if (plugins_path.back() == '/')
+  {
+    plugins_path.pop_back(); // Remove trailing slash if present
+  }
+
+  return plugins_path;
+}
+
 int main(int argc, char *argv[])
 {
-  ZServer::get_instance().set_exec_dir(get_executable_dir(argv[0]));
+  const auto exec_dir = get_executable_dir(argv[0]);
+  ZServer::get_instance().set_exec_dir(exec_dir);
 
   try
   {
@@ -51,7 +67,7 @@ int main(int argc, char *argv[])
 
     plugin::PluginManager pm;
     core::set_plugin_manager(&pm);
-    pm.load_plugins();
+    pm.load_plugins(get_plugins_dir(exec_dir));
 
     console::register_commands(root_cmd);
     ds::register_commands(root_cmd);

@@ -407,6 +407,14 @@ int ZUTSSIQ(ZDIAG *diag, JQRY_HEADER **area, const char *filter)
   return rc;
 }
 
+#pragma prolog(ZUTNOAUT, " ZWEPROLG NEWDSA=(YES,1) ")
+#pragma epilog(ZUTNOAUT, " ZWEEPILG ")
+int ZUTNOAUT()
+{
+  auth_off();
+  return 0;
+}
+
 #pragma prolog(ZUTMSREL, " ZWEPROLG NEWDSA=(YES,4) ")
 #pragma epilog(ZUTMSREL, " ZWEEPILG ")
 int ZUTMSREL(int *size, void *data)

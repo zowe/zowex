@@ -47,7 +47,7 @@ public:
   void add_alias(CommandHandle command, const char *alias)
   {
     CommandRecord *record = to_record(command);
-    if (!record || !alias)
+    if (record == nullptr || alias == nullptr)
       return;
 
     record->get().add_alias(alias);
@@ -63,7 +63,7 @@ public:
                        const DefaultValue *default_value)
   {
     CommandRecord *record = to_record(command);
-    if (!record || !name)
+    if (record == nullptr || name == nullptr)
       return;
 
     std::vector<std::string> alias_vector;
@@ -88,7 +88,7 @@ public:
                           const DefaultValue *default_value)
   {
     CommandRecord *record = to_record(command);
-    if (!record || !name)
+    if (record == nullptr || name == nullptr)
       return;
 
     parser::ArgValue default_arg = convert_default(default_value);
@@ -102,7 +102,7 @@ public:
   void set_handler(CommandHandle command, CommandHandler handler)
   {
     CommandRecord *record = to_record(command);
-    if (!record)
+    if (record == nullptr)
       return;
 
     record->get().set_handler(handler);
@@ -112,7 +112,7 @@ public:
   {
     CommandRecord *parent_record = to_record(parent);
     CommandRecord *child_record = to_record(child);
-    if (!parent_record || !child_record)
+    if (parent_record == nullptr || child_record == nullptr)
       return;
 
     if (parent_record->is_root())
@@ -124,6 +124,20 @@ public:
       parent_record->get()
           .add_command(child_record->get_command_ptr());
     }
+  }
+
+  void add_to_server(CommandHandle command)
+  {
+    CommandRecord *record = to_record(command);
+    if (record == nullptr)
+      return;
+
+    m_server_commands.insert(record->get_command_ptr());
+  }
+
+  const std::set<parser::command_ptr> &get_server_commands() const
+  {
+    return m_server_commands;
   }
 
 private:
@@ -166,7 +180,7 @@ private:
 
   parser::ArgValue convert_default(const DefaultValue *value)
   {
-    if (!value || value->kind == DefaultValue::ValueKind_None)
+    if (value == nullptr || value->kind == DefaultValue::ValueKind_None)
     {
       return parser::ArgValue();
     }
@@ -205,20 +219,22 @@ private:
   parser::Command &m_root;
   CommandRecord m_root_record;
   std::vector<std::unique_ptr<CommandRecord>> m_records;
+  std::set<parser::command_ptr> m_server_commands;
 };
 
-void PluginManager::load_plugins()
+void PluginManager::load_plugins(const std::string &plugins_path)
 {
-  auto *plugins_dir = opendir("./plugins");
+  m_plugins_path = plugins_path;
+  auto *plugins_dir = opendir(m_plugins_path.c_str());
   if (plugins_dir != nullptr)
   {
     struct dirent *entry;
     void (*register_plugin)(plugin::PluginManager &);
     while ((entry = readdir(plugins_dir)) != nullptr)
     {
-      std::string plugin_path = std::string("./plugins/") + entry->d_name;
+      std::string plugin_path = m_plugins_path + "/" + entry->d_name;
       void *plugin = dlopen(plugin_path.c_str(), RTLD_LAZY);
-      if (!plugin)
+      if (plugin == nullptr)
       {
         ZLOG_ERROR("Failed to open handle to plugin located at: %s", plugin_path.c_str());
         continue;
@@ -259,6 +275,8 @@ void PluginManager::load_plugins()
 
 void PluginManager::unload_plugins()
 {
+  m_command_providers.clear();
+  m_server_commands.clear();
   for (auto it = m_plugins.begin(); it != m_plugins.end(); ++it)
   {
     if (it->handle)
@@ -303,6 +321,11 @@ void PluginManager::register_commands(parser::Command &rootCommand)
       continue;
 
     provider->register_commands(context);
+  }
+
+  for (const auto &command : context.get_server_commands())
+  {
+    m_server_commands.insert(command);
   }
 }
 } // namespace plugin

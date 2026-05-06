@@ -630,7 +630,7 @@ void zds_tests()
                              Expect(zds_create_dsn(&zds, src, ps_attr, response)).ToBe(0);
 
                              std::string data = "test data";
-                             ZDSWriteOpts wopts{&zds, .dsname = src};
+                             ZDSWriteOpts wopts{.zds = &zds, .dsname = src};
                              Expect(zds_write(wopts, data)).ToBe(0);
 
                              int rc = zds_copy_dsn(&zds, src, tgt, &opts);
@@ -651,11 +651,11 @@ void zds_tests()
 
                              std::string d1 = "DATA1", d2 = "DATA2", data = "OLD DATA";
 
-                             zds_write(ZDSWriteOpts{&zds, .dsname = src + "(M1)"}, d1);
-                             zds_write(ZDSWriteOpts{&zds, .dsname = src + "(M2)"}, d2);
+                             zds_write(ZDSWriteOpts{.zds = &zds, .dsname = src + "(M1)"}, d1);
+                             zds_write(ZDSWriteOpts{.zds = &zds, .dsname = src + "(M2)"}, d2);
 
                              zds_create_dsn(&zds, tgt, pds_attr, response);
-                             zds_write(ZDSWriteOpts{&zds, .dsname = tgt + "(tgt)"}, data);
+                             zds_write(ZDSWriteOpts{.zds = &zds, .dsname = tgt + "(tgt)"}, data);
 
                              opts.replace = true;
                              int rc = zds_copy_dsn(&zds, src, tgt, &opts);
@@ -676,7 +676,7 @@ void zds_tests()
                              zds_create_dsn(&zds, tgt_pds, pds_attr, response);
 
                              std::string data = "test data";
-                             ZDSWriteOpts wopts{&zds, .dsname = src_pds + "(M1)"};
+                             ZDSWriteOpts wopts{.zds = &zds, .dsname = src_pds + "(M1)"};
                              int rc = zds_write(wopts, data);
                              ExpectWithContext(rc, zds.diag.e_msg).ToBe(0);
 
@@ -698,16 +698,16 @@ void zds_tests()
 
                              zds_create_dsn(&zds, src, pds_attr, response);
                              std::string n = "NEW", o = "OLD";
-                             zds_write(ZDSWriteOpts{&zds, .dsname = src + "(M1)"}, n);
+                             zds_write(ZDSWriteOpts{.zds = &zds, .dsname = src + "(M1)"}, n);
 
                              zds_create_dsn(&zds, tgt, pds_attr, response);
-                             zds_write(ZDSWriteOpts{&zds, .dsname = tgt + "(tgt)"}, o);
+                             zds_write(ZDSWriteOpts{.zds = &zds, .dsname = tgt + "(tgt)"}, o);
 
                              int rc = zds_copy_dsn(&zds, src, tgt, &opts);
                              ExpectWithContext(rc, zds.diag.e_msg).ToBe(0);
 
                              std::string out;
-                             ZDSReadOpts ropts{&zds, .dsname = tgt + "(tgt)"};
+                             ZDSReadOpts ropts{.zds = &zds, .dsname = tgt + "(tgt)"};
                              int read_rc = zds_read(ropts, out);
                              Expect(read_rc).Not().ToBe(0);
                            });
@@ -726,36 +726,36 @@ void zds_tests()
                              zds_create_dsn(&zds, tgt, pds_attr, response);
 
                              std::string data = "test data";
-                             zds_write(ZDSWriteOpts{&zds, .dsname = src + "(MEM#1)"}, data);
+                             zds_write(ZDSWriteOpts{.zds = &zds, .dsname = src + "(MEM#1)"}, data);
 
                              int rc = zds_copy_dsn(&zds, src + "(MEM#1)", tgt + "(MEM#1)", &opts);
                              ExpectWithContext(rc, zds.diag.e_msg).ToBe(0);
                            });
 
                         it("should fail if target member exists and replace flag is not used",
-                          [&]() -> void
-                          {
-                            ZDS zds = {};
-                            ZDSCopyOptions opts{};
-                            std::string src = get_random_ds(3);
-                            std::string tgt = get_random_ds(3);
-                            created_dsns.push_back(src);
-                            created_dsns.push_back(tgt);
+                           [&]() -> void
+                           {
+                             ZDS zds = {};
+                             ZDSCopyOptions opts{};
+                             std::string src = get_random_ds(3);
+                             std::string tgt = get_random_ds(3);
+                             created_dsns.push_back(src);
+                             created_dsns.push_back(tgt);
 
-                            zds_create_dsn(&zds, src, pds_attr, response);
+                             zds_create_dsn(&zds, src, pds_attr, response);
 
-                            zds_create_dsn(&zds, tgt, pds_attr, response);
+                             zds_create_dsn(&zds, tgt, pds_attr, response);
 
-                            std::string d1 = "DATA1", d2 = "DATA2";
+                             std::string d1 = "DATA1", d2 = "DATA2";
 
-                            zds_write(ZDSWriteOpts{&zds, .dsname = src + "(M1)"}, d1);
+                             zds_write(ZDSWriteOpts{.zds = &zds, .dsname = src + "(M1)"}, d1);
 
-                            zds_write(ZDSWriteOpts{&zds, .dsname = tgt + "(tgt)"}, d2);
+                             zds_write(ZDSWriteOpts{.zds = &zds, .dsname = tgt + "(tgt)"}, d2);
 
-                            int rc = zds_copy_dsn(&zds, src, tgt, &opts);
-                            ExpectWithContext(rc, zds.diag.e_msg).ToBe(RTNCD_FAILURE);
-                            Expect(std::string(zds.diag.e_msg)).ToContain("--replace");
-                          });
+                             int rc = zds_copy_dsn(&zds, src, tgt, &opts);
+                             ExpectWithContext(rc, zds.diag.e_msg).ToBe(RTNCD_FAILURE);
+                             Expect(std::string(zds.diag.e_msg)).ToContain("--replace");
+                           });
 
                         it("should fail if source data set does not exist",
                            [&]() -> void
@@ -790,6 +790,65 @@ void zds_tests()
 
                              Expect(rc).ToBe(RTNCD_FAILURE);
                              Expect(std::string(zds.diag.e_msg)).ToContain("Source member 'DNE' not found");
+                           });
+                      });
+
+             describe("delete data sets",
+                      [&]() -> void
+                      {
+                        it("should fail if data set does not exist",
+                           []() -> void
+                           {
+                             ZDS zds = {0};
+                             std::string dsname = get_random_ds(3);
+                             int rc = zds_delete_dsn(&zds, dsname);
+                             Expect(rc).ToBe(RTNCD_FAILURE);
+                             Expect(std::string(zds.diag.e_msg)).ToContain("Failed to allocate data set '" + dsname + "' for deletion (errno=46)");
+                           });
+
+                        it("should fail if member does not exist",
+                           [&]() -> void
+                           {
+                             ZDS zds = {0};
+                             DS_ATTRIBUTES attr{};
+
+                             attr.dsorg = "PO";
+                             attr.recfm = "FB";
+                             attr.lrecl = 80;
+                             attr.blksize = 6160;
+                             attr.alcunit = "TRACKS";
+                             attr.primary = 1;
+                             attr.secondary = 1;
+                             attr.dirblk = 10;
+                             std::string dsname = get_random_ds(3);
+                             created_dsns.push_back(dsname);
+
+                             create_pds(&zds, dsname);
+                             int rc = zds_delete_dsn(&zds, dsname + "(NOEXIST)");
+                             Expect(rc).ToBe(RTNCD_FAILURE);
+                             Expect(std::string(zds.diag.e_msg)).ToContain("Failed to allocate data set '" + dsname + "(NOEXIST)' for deletion (errno=91)");
+                           });
+
+                        it("should delete data set successfully when valid",
+                           [&]() -> void
+                           {
+                             ZDS zds = {0};
+                             DS_ATTRIBUTES attr{};
+
+                             attr.dsorg = "PS";
+                             attr.recfm = "FB";
+                             attr.lrecl = 80;
+                             attr.blksize = 0;
+                             attr.alcunit = "TRACKS";
+                             attr.primary = 1;
+                             attr.secondary = 1;
+                             attr.dirblk = 0;
+                             std::string dsname = get_random_ds(3);
+                             created_dsns.push_back(dsname);
+
+                             create_seq(&zds, dsname);
+                             int rc = zds_delete_dsn(&zds, dsname);
+                             ExpectWithContext(rc, zds.diag.e_msg).ToBe(0);
                            });
                       });
 

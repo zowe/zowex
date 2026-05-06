@@ -484,7 +484,7 @@ void zowex_ds_tests()
                              int rc = execute_command_with_output(command, response);
                              ExpectWithContext(rc, response).Not().ToBe(0);
                              Expect(response).ToContain("Error: could not create data set member");
-                             Expect(response).ToContain("Not found in catalog");
+                             Expect(response).ToContain("Not found in any catalog");
                            });
                         it("should create a member in a PDS",
                            [&]() -> void
@@ -666,6 +666,20 @@ void zowex_ds_tests()
                              int rc = execute_command_with_output(command, response);
                              ExpectWithContext(rc, response).ToBe(0);
                              Expect(response).ToContain("Data set '" + ds + "' deleted");
+                           });
+                        it("should delete a member of a partitioned data set",
+                           [&]() -> void
+                           {
+                             std::string ds = _ds.back();
+                             _create_ds(ds, "--dsorg PO --dirblk 2");
+
+                             std::string response;
+                             execute_command_with_output(zowex_command + " data-set create-member '" + ds + "(TESTMEM)'", response);
+
+                             std::string command = zowex_command + " data-set delete '" + ds + "(TESTMEM)'";
+                             int rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain("Data set '" + ds + "(TESTMEM)' deleted");
                            });
 
                         it("should fail to delete a non-existent data set",
