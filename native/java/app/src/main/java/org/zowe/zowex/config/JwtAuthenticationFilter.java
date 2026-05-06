@@ -49,19 +49,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             SecurityContextHolder.getContext().setAuthentication(authentication);
         } catch (ZaasClientException e) {
             System.out.println("Error: " + e.getMessage());
-            
             // Validation failed. Clear the context to be safe.
             SecurityContextHolder.clearContext();
-            
-            // Set the response status to 401 Unauthorized
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            // Get the return code safely
+            int statusCode = e.getErrorCode() != null ? e.getErrorCode().getReturnCode() : HttpServletResponse.SC_UNAUTHORIZED;
+            String returnCodeStr = e.getErrorCode() != null ? String.valueOf(statusCode) : "UNKNOWN";
+
+            // Set the response status according to the returnCode
+            response.setStatus(statusCode);
             response.setContentType("application/json");
             
             // Safely escape the message (basic escaping for JSON)
             String errorMessage = e.getMessage() != null ? e.getMessage().replace("\"", "\\\"") : "Authentication failed";
             
-            // Write the exception message to the response body
-            response.getWriter().write("{\"error\": \"" + errorMessage + "\"}");
+            // Write the exception message and return code to the response body
+            response.getWriter().write(String.format("{\"error\": \"%s\", \"returnCode\": \"%s\"}", errorMessage, returnCodeStr));
             response.getWriter().flush();
             
             // Return immediately so the request doesn't continue down the filter chain
