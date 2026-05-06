@@ -172,7 +172,7 @@ void zds_tests()
                       cleanup_opts);
 
              describe("list",
-                      []() -> void
+                      [&]() -> void
                       {
                         it("should list data sets with a given DSN",
                            []() -> void
@@ -218,6 +218,36 @@ void zds_tests()
                              Expect(found != nullptr).ToBe(true);
                              Expect(zut_rtrim(found->name)).ToBe(dsn);
                              Expect(found->volser.length()).ToBeGreaterThan(0);
+                             Expect(found->volser.front()).Not().ToBe('*');
+                             Expect(found->volsers.size()).ToBeGreaterThan(0);
+                             Expect(found->volsers[0].front()).Not().ToBe('*');
+                           });
+
+                        it("should list data sets with a given DSN and calculate used space correctly",
+                           [&]() -> void
+                           {
+                             int rc = 0;
+                             ZDS zds = {0};
+                             DS_ATTRIBUTES attr{};
+                             attr.dsorg = "PO";
+                             attr.recfm = "FB";
+                             attr.lrecl = 80;
+                             attr.blksize = 6160;
+                             attr.alcunit = "CYL";
+                             attr.primary = 1;
+                             attr.dirblk = 5;
+                             std::string dsname = get_random_ds(3);
+                             created_dsns.push_back(dsname);
+                             create_dsn_with_attrs(&zds, dsname, attr, "PDS");
+                             std::vector<ZDSEntry> entries;
+
+                             rc = zds_list_data_sets(&zds, dsname, entries, true);
+                             ExpectWithContext(rc, zds.diag.e_msg).ToBe(0);
+                             Expect(entries.size()).ToBe(1);
+                             Expect(zut_rtrim(entries[0].name)).ToBe(dsname);
+                             Expect(entries[0].allocx).ToBe(1);
+                             Expect(entries[0].usedx).ToBe(1);
+                             Expect(entries[0].usedp > 0 && entries[0].usedp < 50).ToBe(true);
                            });
 
                         it("should find dsn (SYS1.MACLIB) based on a pattern: (SYS1.*)",
@@ -810,19 +840,8 @@ void zds_tests()
                            [&]() -> void
                            {
                              ZDS zds = {0};
-                             DS_ATTRIBUTES attr{};
-
-                             attr.dsorg = "PO";
-                             attr.recfm = "FB";
-                             attr.lrecl = 80;
-                             attr.blksize = 6160;
-                             attr.alcunit = "TRACKS";
-                             attr.primary = 1;
-                             attr.secondary = 1;
-                             attr.dirblk = 10;
                              std::string dsname = get_random_ds(3);
                              created_dsns.push_back(dsname);
-
                              create_pds(&zds, dsname);
                              int rc = zds_delete_dsn(&zds, dsname + "(NOEXIST)");
                              Expect(rc).ToBe(RTNCD_FAILURE);
