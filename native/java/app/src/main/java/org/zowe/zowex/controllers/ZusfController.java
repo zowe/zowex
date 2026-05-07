@@ -1,13 +1,26 @@
 package org.zowe.zowex.controllers;
 
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.zowe.zowex.ffm.ZusfBindings;
+import org.zowe.zowex.zos.security.platform.PlatformAccessControl;
+import org.zowe.zowex.zos.security.service.PlatformSecurityService;
+import org.zowe.zowex.zos.security.thread.PlatformThreadLevelSecurity;
 
 import java.util.Map;
 
+import static org.zowe.zowex.zos.security.platform.SafConstants.BPX_SERVER;
+import static org.zowe.zowex.zos.security.platform.SafConstants.CLASS_FACILITY;
+
 @RestController
 @RequestMapping("/zosmf/restfiles/fs")
+@RequiredArgsConstructor
 public class ZusfController {
+
+    private final PlatformSecurityService platformSecurityService;
+    private final PlatformThreadLevelSecurity platformThreadLevelSecurity;
 
     @GetMapping
     public String listUssDir(@RequestParam("path") String path,
@@ -23,7 +36,7 @@ public class ZusfController {
     @GetMapping("/**") // wildcard for paths
     public String readUssFile(@RequestParam("path") String path,
                               @RequestParam(value = "encoding", required = false) String encoding) throws Exception {
-        return ZusfBindings.readUssFile(path, encoding != null ? encoding : "");
+        return platformThreadLevelSecurity.wrapCallableInEnvironmentForAuthenticatedUser(() -> ZusfBindings.readUssFile(path, encoding != null ? encoding : "")).call();
     }
 
     @PutMapping("/**")
