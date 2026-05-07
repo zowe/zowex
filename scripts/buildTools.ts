@@ -23,6 +23,7 @@ interface IConfig {
     sshProfile: string | IProfile;
     deployDir: string;
     preBuildCmd?: string;
+    testEnv?: Record<string, string>;
 }
 
 type SftpError = Error & { code?: number };
@@ -45,6 +46,7 @@ function localeCompare(a: string, b: string): number {
 const localDeployDir = "./../native";
 const args = process.argv.slice(2);
 let preBuildCmd: string | undefined;
+let configTestEnv: Record<string, string> = {};
 let deployDirs: {
     root: string;
     cDir: string;
@@ -1296,7 +1298,16 @@ async function make(connection: Client, inDir?: string) {
 }
 
 async function test(connection: Client) {
-    const cTestCmd = `cd ${deployDirs.cTestDir} && ./build-out/ztest_runner ${args[1] ?? ""}`;
+    const localZnpEnv = Object.fromEntries(
+        Object.entries(process.env)
+            .filter(([key]) => key.startsWith("ZNP_"))
+            .map(([key, val]) => [key, val as string]),
+    );
+    const mergedEnv = { ...configTestEnv, ...localZnpEnv };
+    const envPrefix = Object.entries(mergedEnv)
+        .map(([key, val]) => `${key}=${val}`)
+        .join(" ");
+    const cTestCmd = `cd ${deployDirs.cTestDir} && ${envPrefix ? `${envPrefix} ` : ""}./build-out/ztest_runner ${args[1] ?? ""}`;
     await runCommandInShell(connection, `${cTestCmd}\n`, {
         streamOutput: true,
         stepName: "Running tests",
@@ -1527,6 +1538,7 @@ async function buildSshClient(sshProfile: IProfile): Promise<Client> {
 async function main() {
     const config = await loadConfig();
     preBuildCmd = config.preBuildCmd;
+    configTestEnv = config.testEnv ?? {};
     deployDirs = {
         root: config.deployDir,
         cDir: `${config.deployDir}/c`,
