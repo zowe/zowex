@@ -472,11 +472,10 @@ For a complete working example that includes all layers (C++ native, SDK, CLI, a
 - **C++ server** (`native/c/server/`) - Command registration with the dispatcher
 - **SDK** (`packages/sdk/`) - TypeScript types and client methods
 - **CLI** (`packages/cli/`) - CLI command definition and handler
-- **VS Code Extension** (`packages/vsce/`) - VS Code integration with CommandApi
 
 ## Next Steps
 
 - Add the command to the CLI package (`packages/cli/`)
-- Add the command to the VS Code extension (`packages/vsce/`)
+- Add the command to the VS Code extension
 - Write unit tests for your command
 - Update documentation and examples
