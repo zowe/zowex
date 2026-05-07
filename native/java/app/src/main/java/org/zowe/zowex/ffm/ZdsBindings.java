@@ -14,6 +14,15 @@ import org.zowe.zowex.ffm.generated.ZdsCApi;
 
 public class ZdsBindings {
 
+    static {
+        // Force loading of the native library before any FFM calls are made
+        try {
+            Class.forName("org.zowe.zowex.ffm.NativeLoader");
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public static class ZDSEntry {
         public String name;
         public String dsorg;

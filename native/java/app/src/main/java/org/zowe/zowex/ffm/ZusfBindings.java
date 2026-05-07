@@ -9,6 +9,15 @@ import org.zowe.zowex.ffm.generated.ZUSFListOptions_C;
 
 public class ZusfBindings {
 
+    static {
+        // Force loading of the native library before any FFM calls are made
+        try {
+            Class.forName("org.zowe.zowex.ffm.NativeLoader");
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public static String listUssDir(String path, boolean allFiles, boolean longFormat, int maxDepth) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment pathSeg = FfmUtils.allocateString(arena, path);
