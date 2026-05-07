@@ -1,83 +1,18 @@
 package org.zowe.zowex.ffm;
 
 import java.lang.foreign.*;
-import java.lang.invoke.MethodHandle;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.zowe.zowex.ffm.generated.DS_ATTRIBUTES_C;
+import org.zowe.zowex.ffm.generated.ZDSBasicResponse_C;
+import org.zowe.zowex.ffm.generated.ZDSEntry_C;
+import org.zowe.zowex.ffm.generated.ZDSListResponse_C;
+import org.zowe.zowex.ffm.generated.ZDSMemListResponse_C;
+import org.zowe.zowex.ffm.generated.ZDSStringResponse_C;
+import org.zowe.zowex.ffm.generated.ZdsCApi;
+
 public class ZdsBindings {
-
-    private static final MethodHandle zds_c_list_data_sets;
-    private static final MethodHandle zds_c_read_data_set;
-    private static final MethodHandle zds_c_write_data_set;
-    private static final MethodHandle zds_c_delete_data_set;
-    private static final MethodHandle zds_c_create_data_set;
-    private static final MethodHandle zds_c_create_member;
-    private static final MethodHandle zds_c_list_members;
-    private static final MethodHandle zds_c_free_list_response;
-    private static final MethodHandle zds_c_free_string_response;
-    private static final MethodHandle zds_c_free_basic_response;
-    private static final MethodHandle zds_c_free_mem_list_response;
-
-    static {
-        Linker linker = NativeLoader.LINKER;
-        SymbolLookup lookup = NativeLoader.getLookup();
-
-        zds_c_list_data_sets = linker.downcallHandle(
-            lookup.find("zds_c_list_data_sets").orElseThrow(),
-            FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS)
-        );
-
-        zds_c_read_data_set = linker.downcallHandle(
-            lookup.find("zds_c_read_data_set").orElseThrow(),
-            FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS)
-        );
-
-        zds_c_write_data_set = linker.downcallHandle(
-            lookup.find("zds_c_write_data_set").orElseThrow(),
-            FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS)
-        );
-
-        zds_c_delete_data_set = linker.downcallHandle(
-            lookup.find("zds_c_delete_data_set").orElseThrow(),
-            FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS)
-        );
-
-        zds_c_create_data_set = linker.downcallHandle(
-            lookup.find("zds_c_create_data_set").orElseThrow(),
-            FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS)
-        );
-
-        zds_c_create_member = linker.downcallHandle(
-            lookup.find("zds_c_create_member").orElseThrow(),
-            FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS)
-        );
-
-        zds_c_list_members = linker.downcallHandle(
-            lookup.find("zds_c_list_members").orElseThrow(),
-            FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS)
-        );
-
-        zds_c_free_list_response = linker.downcallHandle(
-            lookup.find("zds_c_free_list_response").orElseThrow(),
-            FunctionDescriptor.ofVoid(ValueLayout.ADDRESS)
-        );
-
-        zds_c_free_string_response = linker.downcallHandle(
-            lookup.find("zds_c_free_string_response").orElseThrow(),
-            FunctionDescriptor.ofVoid(ValueLayout.ADDRESS)
-        );
-
-        zds_c_free_basic_response = linker.downcallHandle(
-            lookup.find("zds_c_free_basic_response").orElseThrow(),
-            FunctionDescriptor.ofVoid(ValueLayout.ADDRESS)
-        );
-
-        zds_c_free_mem_list_response = linker.downcallHandle(
-            lookup.find("zds_c_free_mem_list_response").orElseThrow(),
-            FunctionDescriptor.ofVoid(ValueLayout.ADDRESS)
-        );
-    }
 
     public static class ZDSEntry {
         public String name;
@@ -89,39 +24,44 @@ public class ZdsBindings {
 
     public static List<ZDSEntry> listDataSets(String dsn) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
-            MemorySegment dsnSeg = FfmUtils.allocateString(arena, dsn);
-            MemorySegment responsePtr = (MemorySegment) zds_c_list_data_sets.invokeExact(dsnSeg);
+          
+            var dsnSeg = FfmUtils.allocateString(arena, dsn);
+            
+            var responsePtr = ZdsCApi.zds_c_list_data_sets(dsnSeg);
+            // MemorySegment responsePtr = (MemorySegment) zds_c_list_data_sets.invokeExact(dsnSeg);
             
             if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
             
-            responsePtr = responsePtr.reinterpret(24);
+            responsePtr = ZDSListResponse_C.reinterpret(responsePtr, arena, null);
 
-            MemorySegment errorMsgSeg = responsePtr.get(ValueLayout.ADDRESS, 16);
+            MemorySegment errorMsgSeg = ZDSListResponse_C.error_message(responsePtr);
             String errorMsg = FfmUtils.readString(errorMsgSeg);
             if (errorMsg != null) {
-                zds_c_free_list_response.invokeExact(responsePtr);
+                ZdsCApi.zds_c_free_list_response(responsePtr);
                 throw new RuntimeException(errorMsg);
             }
 
-            MemorySegment entriesPtr = responsePtr.get(ValueLayout.ADDRESS, 0);
-            long count = responsePtr.get(ValueLayout.JAVA_LONG, 8);
+            MemorySegment entriesPtr = ZDSListResponse_C.entries(responsePtr);
+            long count = ZDSListResponse_C.count(responsePtr);
             
             List<ZDSEntry> results = new ArrayList<>();
             if (count > 0 && entriesPtr.address() != 0) {
                 // reinterpret entries array to read structs
-                MemorySegment entriesArray = entriesPtr.reinterpret(count * 40); // 40 bytes per ZDSEntry_C
+                MemorySegment entriesArray = ZDSEntry_C.reinterpret(entriesPtr, count,arena, null);
                 for (long i = 0; i < count; i++) {
-                    long offset = i * 40;
+                    MemorySegment entryStruct = ZDSEntry_C.asSlice(entriesArray, i);
+           
                     ZDSEntry entry = new ZDSEntry();
-                    entry.name = FfmUtils.readString(entriesArray.get(ValueLayout.ADDRESS, offset));
-                    entry.dsorg = FfmUtils.readString(entriesArray.get(ValueLayout.ADDRESS, offset + 8));
-                    entry.volser = FfmUtils.readString(entriesArray.get(ValueLayout.ADDRESS, offset + 16));
-                    entry.recfm = FfmUtils.readString(entriesArray.get(ValueLayout.ADDRESS, offset + 24));
-                    entry.migrated = entriesArray.get(ValueLayout.JAVA_BOOLEAN, offset + 32);
+                    entry.name = FfmUtils.readString(ZDSEntry_C.name(entryStruct));
+                    entry.dsorg = FfmUtils.readString(ZDSEntry_C.dsorg(entryStruct));
+                    entry.volser = FfmUtils.readString(ZDSEntry_C.volser(entryStruct));
+                    entry.recfm = FfmUtils.readString(ZDSEntry_C.recfm(entryStruct));
+                    entry.migrated = ZDSEntry_C.migrated(entryStruct);
                     results.add(entry);
                 }
             }
-            zds_c_free_list_response.invokeExact(responsePtr);
+            // Free memory
+            ZdsCApi.zds_c_free_list_response(responsePtr);
             return results;
         } catch (Throwable e) {
             if (e instanceof Exception) throw (Exception) e;
@@ -133,22 +73,23 @@ public class ZdsBindings {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment dsnSeg = FfmUtils.allocateString(arena, dsn);
             MemorySegment cpSeg = FfmUtils.allocateString(arena, codepage);
-            MemorySegment responsePtr = (MemorySegment) zds_c_read_data_set.invokeExact(dsnSeg, cpSeg);
+
+            MemorySegment responsePtr = ZdsCApi.zds_c_read_data_set(dsnSeg, cpSeg);
             
             if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
             
-            responsePtr = responsePtr.reinterpret(16);
+            responsePtr = ZDSStringResponse_C.reinterpret(responsePtr, arena, null);
 
-            MemorySegment errorMsgSeg = responsePtr.get(ValueLayout.ADDRESS, 8);
+            MemorySegment errorMsgSeg = ZDSStringResponse_C.error_message(responsePtr);
             String errorMsg = FfmUtils.readString(errorMsgSeg);
             if (errorMsg != null) {
-                zds_c_free_string_response.invokeExact(responsePtr);
+                ZdsCApi.zds_c_free_string_response(responsePtr);
                 throw new RuntimeException(errorMsg);
             }
 
-            MemorySegment dataSeg = responsePtr.get(ValueLayout.ADDRESS, 0);
+            MemorySegment dataSeg = ZDSStringResponse_C.data(responsePtr);
             String data = FfmUtils.readString(dataSeg);
-            zds_c_free_string_response.invokeExact(responsePtr);
+            ZdsCApi.zds_c_free_string_response(responsePtr);
             return data;
         } catch (Throwable e) {
             if (e instanceof Exception) throw (Exception) e;
@@ -163,22 +104,22 @@ public class ZdsBindings {
             MemorySegment cpSeg = FfmUtils.allocateString(arena, codepage);
             MemorySegment etagSeg = FfmUtils.allocateString(arena, etag);
 
-            MemorySegment responsePtr = (MemorySegment) zds_c_write_data_set.invokeExact(dsnSeg, dataSeg, cpSeg, etagSeg);
+            MemorySegment responsePtr = ZdsCApi.zds_c_write_data_set(dsnSeg, dataSeg, cpSeg, etagSeg);
             
             if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
             
-            responsePtr = responsePtr.reinterpret(16);
+            responsePtr = ZDSStringResponse_C.reinterpret(responsePtr, arena, null);
 
-            MemorySegment errorMsgSeg = responsePtr.get(ValueLayout.ADDRESS, 8);
+            MemorySegment errorMsgSeg = ZDSStringResponse_C.error_message(responsePtr);
             String errorMsg = FfmUtils.readString(errorMsgSeg);
             if (errorMsg != null) {
-                zds_c_free_string_response.invokeExact(responsePtr);
+                ZdsCApi.zds_c_free_string_response(responsePtr);
                 throw new RuntimeException(errorMsg);
             }
 
-            MemorySegment outEtagSeg = responsePtr.get(ValueLayout.ADDRESS, 0);
+            MemorySegment outEtagSeg = ZDSStringResponse_C.data(responsePtr);
             String outEtag = FfmUtils.readString(outEtagSeg);
-            zds_c_free_string_response.invokeExact(responsePtr);
+            ZdsCApi.zds_c_free_string_response(responsePtr);
             return outEtag;
         } catch (Throwable e) {
             if (e instanceof Exception) throw (Exception) e;
@@ -210,13 +151,13 @@ public class ZdsBindings {
         public String vol;
     }
 
-    private static void handleBasicResponse(MemorySegment responsePtr) throws Exception {
+    private static void handleBasicResponse(MemorySegment responsePtr, Arena arena) throws Exception {
         if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
-        responsePtr = responsePtr.reinterpret(8);
-        MemorySegment errorMsgSeg = responsePtr.get(ValueLayout.ADDRESS, 0);
+        responsePtr = ZDSBasicResponse_C.reinterpret(responsePtr, arena, null);
+        MemorySegment errorMsgSeg = ZDSBasicResponse_C.error_message(responsePtr);
         String errorMsg = FfmUtils.readString(errorMsgSeg);
         try {
-            zds_c_free_basic_response.invokeExact(responsePtr);
+            ZdsCApi.zds_c_free_basic_response(responsePtr);
         } catch (Throwable e) {
             if (e instanceof Exception) throw (Exception) e;
             throw new RuntimeException(e);
@@ -232,50 +173,28 @@ public class ZdsBindings {
             MemorySegment attrsSeg = MemorySegment.NULL;
             
             if (attrs != null) {
-                // Struct layout:
-                // 0: alcunit (ptr)
-                // 8: blksize (int)
-                // 12: dirblk (int)
-                // 16: dsorg (ptr)
-                // 24: primary (int)
-                // 28: padding (4)
-                // 32: recfm (ptr)
-                // 40: lrecl (int)
-                // 44: padding (4)
-                // 48: dataclass (ptr)
-                // 56: unit (ptr)
-                // 64: dsntype (ptr)
-                // 72: mgntclass (ptr)
-                // 80: dsname (ptr)
-                // 88: avgblk (int)
-                // 92: secondary (int)
-                // 96: size (int)
-                // 100: padding (4)
-                // 104: storclass (ptr)
-                // 112: vol (ptr)
-                // Total size: 120 bytes
-                attrsSeg = arena.allocate(120);
-                attrsSeg.set(ValueLayout.ADDRESS, 0, FfmUtils.allocateString(arena, attrs.alcunit));
-                attrsSeg.set(ValueLayout.JAVA_INT, 8, attrs.blksize);
-                attrsSeg.set(ValueLayout.JAVA_INT, 12, attrs.dirblk);
-                attrsSeg.set(ValueLayout.ADDRESS, 16, FfmUtils.allocateString(arena, attrs.dsorg));
-                attrsSeg.set(ValueLayout.JAVA_INT, 24, attrs.primary);
-                attrsSeg.set(ValueLayout.ADDRESS, 32, FfmUtils.allocateString(arena, attrs.recfm));
-                attrsSeg.set(ValueLayout.JAVA_INT, 40, attrs.lrecl);
-                attrsSeg.set(ValueLayout.ADDRESS, 48, FfmUtils.allocateString(arena, attrs.dataclass));
-                attrsSeg.set(ValueLayout.ADDRESS, 56, FfmUtils.allocateString(arena, attrs.unit));
-                attrsSeg.set(ValueLayout.ADDRESS, 64, FfmUtils.allocateString(arena, attrs.dsntype));
-                attrsSeg.set(ValueLayout.ADDRESS, 72, FfmUtils.allocateString(arena, attrs.mgntclass));
-                attrsSeg.set(ValueLayout.ADDRESS, 80, FfmUtils.allocateString(arena, attrs.dsname));
-                attrsSeg.set(ValueLayout.JAVA_INT, 88, attrs.avgblk);
-                attrsSeg.set(ValueLayout.JAVA_INT, 92, attrs.secondary);
-                attrsSeg.set(ValueLayout.JAVA_INT, 96, attrs.size);
-                attrsSeg.set(ValueLayout.ADDRESS, 104, FfmUtils.allocateString(arena, attrs.storclass));
-                attrsSeg.set(ValueLayout.ADDRESS, 112, FfmUtils.allocateString(arena, attrs.vol));
+                attrsSeg = DS_ATTRIBUTES_C.allocate(arena);
+                DS_ATTRIBUTES_C.alcunit(attrsSeg, FfmUtils.allocateString(arena, attrs.alcunit));
+                DS_ATTRIBUTES_C.blksize(attrsSeg, attrs.blksize);
+                DS_ATTRIBUTES_C.dirblk(attrsSeg, attrs.dirblk);
+                DS_ATTRIBUTES_C.dsorg(attrsSeg, FfmUtils.allocateString(arena, attrs.dsorg));
+                DS_ATTRIBUTES_C.primary(attrsSeg, attrs.primary);
+                DS_ATTRIBUTES_C.recfm(attrsSeg, FfmUtils.allocateString(arena, attrs.recfm));
+                DS_ATTRIBUTES_C.lrecl(attrsSeg, attrs.lrecl);
+                DS_ATTRIBUTES_C.dataclass(attrsSeg, FfmUtils.allocateString(arena, attrs.dataclass));
+                DS_ATTRIBUTES_C.unit(attrsSeg, FfmUtils.allocateString(arena, attrs.unit));
+                DS_ATTRIBUTES_C.dsntype(attrsSeg, FfmUtils.allocateString(arena, attrs.dsntype));
+                DS_ATTRIBUTES_C.mgntclass(attrsSeg, FfmUtils.allocateString(arena, attrs.mgntclass));
+                DS_ATTRIBUTES_C.dsname(attrsSeg, FfmUtils.allocateString(arena, attrs.dsname));
+                DS_ATTRIBUTES_C.avgblk(attrsSeg, attrs.avgblk);
+                DS_ATTRIBUTES_C.secondary(attrsSeg, attrs.secondary);
+                DS_ATTRIBUTES_C.size(attrsSeg, attrs.size);
+                DS_ATTRIBUTES_C.storclass(attrsSeg, FfmUtils.allocateString(arena, attrs.storclass));
+                DS_ATTRIBUTES_C.vol(attrsSeg, FfmUtils.allocateString(arena, attrs.vol));
             }
 
-            MemorySegment responsePtr = (MemorySegment) zds_c_create_data_set.invokeExact(dsnSeg, attrsSeg);
-            handleBasicResponse(responsePtr);
+            MemorySegment responsePtr = ZdsCApi.zds_c_create_data_set(dsnSeg, attrsSeg);
+            handleBasicResponse(responsePtr, arena);
         } catch (Throwable e) {
             if (e instanceof Exception) throw (Exception) e;
             throw new RuntimeException(e);
@@ -285,8 +204,8 @@ public class ZdsBindings {
     public static void createMember(String dsn) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment dsnSeg = FfmUtils.allocateString(arena, dsn);
-            MemorySegment responsePtr = (MemorySegment) zds_c_create_member.invokeExact(dsnSeg);
-            handleBasicResponse(responsePtr);
+            MemorySegment responsePtr = ZdsCApi.zds_c_create_member(dsnSeg);
+            handleBasicResponse(responsePtr, arena);
         } catch (Throwable e) {
             if (e instanceof Exception) throw (Exception) e;
             throw new RuntimeException(e);
@@ -296,32 +215,33 @@ public class ZdsBindings {
     public static List<ZDSMem> listMembers(String dsn) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment dsnSeg = FfmUtils.allocateString(arena, dsn);
-            MemorySegment responsePtr = (MemorySegment) zds_c_list_members.invokeExact(dsnSeg);
+            MemorySegment responsePtr = ZdsCApi.zds_c_list_members(dsnSeg);
             
             if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
             
-            responsePtr = responsePtr.reinterpret(24);
+            responsePtr = ZDSMemListResponse_C.reinterpret(responsePtr, arena, null);
 
-            MemorySegment errorMsgSeg = responsePtr.get(ValueLayout.ADDRESS, 16);
+            MemorySegment errorMsgSeg = ZDSMemListResponse_C.error_message(responsePtr);
             String errorMsg = FfmUtils.readString(errorMsgSeg);
             if (errorMsg != null) {
-                zds_c_free_mem_list_response.invokeExact(responsePtr);
+                ZdsCApi.zds_c_free_mem_list_response(responsePtr);
                 throw new RuntimeException(errorMsg);
             }
 
-            MemorySegment membersPtr = responsePtr.get(ValueLayout.ADDRESS, 0);
-            long count = responsePtr.get(ValueLayout.JAVA_LONG, 8);
+            MemorySegment membersPtr = ZDSMemListResponse_C.members(responsePtr);
+            long count = ZDSMemListResponse_C.count(responsePtr);
             
             List<ZDSMem> results = new ArrayList<>();
             if (count > 0 && membersPtr.address() != 0) {
-                MemorySegment membersArray = membersPtr.reinterpret(count * 8); // 8 bytes per ZDSMem_C (just a pointer)
+                MemorySegment membersArray = org.zowe.zowex.ffm.generated.ZDSMem_C.reinterpret(membersPtr, count, arena, null);
                 for (long i = 0; i < count; i++) {
+                    MemorySegment memStruct = org.zowe.zowex.ffm.generated.ZDSMem_C.asSlice(membersArray, i);
                     ZDSMem mem = new ZDSMem();
-                    mem.name = FfmUtils.readString(membersArray.get(ValueLayout.ADDRESS, i * 8));
+                    mem.name = FfmUtils.readString(org.zowe.zowex.ffm.generated.ZDSMem_C.name(memStruct));
                     results.add(mem);
                 }
             }
-            zds_c_free_mem_list_response.invokeExact(responsePtr);
+            ZdsCApi.zds_c_free_mem_list_response(responsePtr);
             return results;
         } catch (Throwable e) {
             if (e instanceof Exception) throw (Exception) e;
@@ -332,19 +252,8 @@ public class ZdsBindings {
     public static void deleteDataSet(String dsn) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment dsnSeg = FfmUtils.allocateString(arena, dsn);
-            MemorySegment responsePtr = (MemorySegment) zds_c_delete_data_set.invokeExact(dsnSeg);
-            
-            if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
-            
-            responsePtr = responsePtr.reinterpret(8);
-
-            MemorySegment errorMsgSeg = responsePtr.get(ValueLayout.ADDRESS, 0);
-            String errorMsg = FfmUtils.readString(errorMsgSeg);
-            zds_c_free_basic_response.invokeExact(responsePtr);
-            
-            if (errorMsg != null) {
-                throw new RuntimeException(errorMsg);
-            }
+            MemorySegment responsePtr = ZdsCApi.zds_c_delete_data_set(dsnSeg);
+            handleBasicResponse(responsePtr, arena);
         } catch (Throwable e) {
             if (e instanceof Exception) throw (Exception) e;
             throw new RuntimeException(e);
