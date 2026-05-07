@@ -27,6 +27,8 @@
 #include "zowex.test.hpp"
 #include "zowex.ds.test.hpp"
 #include "../zusf.hpp"
+#include "../zjb.hpp"
+#include <chrono>
 
 using namespace ztst;
 
@@ -891,6 +893,178 @@ void zowex_ds_tests()
                              Expect(response).ToContain("N");
                            });
                       });
+             describe("GDG",
+                      [&]() -> void
+                      {
+                        const std::string user = get_user();
+                        const std::string base = get_random_ds(2, user);
+                        const std::string gdg_base_dsn = base + ".GDG";
+                        const std::string gdg_gen1_dsn = gdg_base_dsn + ".G0001V00";
+                        const std::string gdg_gen2_dsn = gdg_base_dsn + ".G0002V00";
+
+                        auto submit_and_wait = [](const std::string &jcl, int max_polls = 600, bool check_rc = false)
+                        {
+                          ZJB zjb = {0};
+                          std::string jobid;
+                          int rc = zjb_submit(&zjb, jcl, jobid);
+                          if (rc != 0)
+                            throw std::runtime_error("Failed to submit JCL: " + std::string(zjb.diag.e_msg));
+                          TestLog("Submitted job " + jobid + " (" + std::to_string(jcl.size()) + " bytes)");
+                          std::string correlator(zjb.correlator, sizeof(zjb.correlator));
+                          ZJob final_job = {};
+                          for (int i = 0; i < max_polls; ++i)
+                          {
+                            ZJB zjb_v = {0};
+                            final_job = {};
+                            int vrc = zjb_view(&zjb_v, correlator, final_job);
+                            if (vrc != 0)
+                              throw std::runtime_error("Failed to view job: " + std::string(zjb_v.diag.e_msg));
+                            if (!final_job.retcode.empty())
+                              break;
+                            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                          }
+                          TestLog("Job " + jobid + " retcode='" + final_job.retcode + "'");
+                          if (check_rc && final_job.retcode.find("CC 0000") == std::string::npos)
+                            throw std::runtime_error("Job failed with retcode='" + final_job.retcode + "'");
+                        };
+
+                        TEST_OPTIONS gdg_opts = {false, 60};
+
+                        beforeAll([&]() -> void
+                                  {
+                                    // Clean up any leftover data sets from previous test runs
+                                    std::string cleanup_jcl;
+                                    cleanup_jcl += "//GDGCLN$ JOB IZUACCT\n";
+                                    cleanup_jcl += "//STEP1    EXEC PGM=IDCAMS\n";
+                                    cleanup_jcl += "//SYSPRINT DD SYSOUT=*\n";
+                                    cleanup_jcl += "//SYSIN    DD *\n";
+                                    cleanup_jcl += "  DELETE " + gdg_gen2_dsn + " NONVSAM PURGE\n";
+                                    cleanup_jcl += "  DELETE " + gdg_gen1_dsn + " NONVSAM PURGE\n";
+                                    cleanup_jcl += "  DELETE " + gdg_base_dsn + " GDG PURGE\n";
+                                    cleanup_jcl += "  SET MAXCC = 0\n";
+                                    cleanup_jcl += "/*\n";
+                                    submit_and_wait(cleanup_jcl, 200);
+
+                                    // Define the GDG base via IDCAMS
+                                    std::string setup_jcl;
+                                    setup_jcl += "//GDGSET$ JOB IZUACCT\n";
+                                    setup_jcl += "//STEP1    EXEC PGM=IDCAMS\n";
+                                    setup_jcl += "//SYSPRINT DD SYSOUT=*\n";
+                                    setup_jcl += "//SYSIN    DD *\n";
+                                    setup_jcl += "  DEFINE GDG ( -\n";
+                                    setup_jcl += "    NAME(" + gdg_base_dsn + ") -\n";
+                                    setup_jcl += "    LIMIT(5) -\n";
+                                    setup_jcl += "    NOEMPTY -\n";
+                                    setup_jcl += "    NOSCRATCH )\n";
+                                    setup_jcl += "/*\n";
+                                    submit_and_wait(setup_jcl, 200, true);
+
+                                    // Create generation 1 via IEBGENER
+                                    std::string gen1_jcl;
+                                    gen1_jcl += "//GDGGEN1 JOB IZUACCT\n";
+                                    gen1_jcl += "//STEP1    EXEC PGM=IEBGENER\n";
+                                    gen1_jcl += "//SYSPRINT DD SYSOUT=*\n";
+                                    gen1_jcl += "//SYSIN    DD DUMMY\n";
+                                    gen1_jcl += "//SYSUT1   DD *\n";
+                                    gen1_jcl += "GENERATION ONE CONTENT\n";
+                                    gen1_jcl += "/*\n";
+                                    gen1_jcl += "//SYSUT2   DD DSN=" + gdg_base_dsn + "(+1),DISP=(NEW,CATLG),\n";
+                                    gen1_jcl += "//            UNIT=SYSALLDA,SPACE=(TRK,(1,1)),\n";
+                                    gen1_jcl += "//            RECFM=FB,LRECL=80,BLKSIZE=800\n";
+                                    submit_and_wait(gen1_jcl, 600, true);
+
+                                    // Create generation 2 via IEBGENER
+                                    std::string gen2_jcl;
+                                    gen2_jcl += "//GDGGEN2 JOB IZUACCT\n";
+                                    gen2_jcl += "//STEP1    EXEC PGM=IEBGENER\n";
+                                    gen2_jcl += "//SYSPRINT DD SYSOUT=*\n";
+                                    gen2_jcl += "//SYSIN    DD DUMMY\n";
+                                    gen2_jcl += "//SYSUT1   DD *\n";
+                                    gen2_jcl += "GENERATION TWO CONTENT\n";
+                                    gen2_jcl += "/*\n";
+                                    gen2_jcl += "//SYSUT2   DD DSN=" + gdg_base_dsn + "(+1),DISP=(NEW,CATLG),\n";
+                                    gen2_jcl += "//            UNIT=SYSALLDA,SPACE=(TRK,(1,1)),\n";
+                                    gen2_jcl += "//            RECFM=FB,LRECL=80,BLKSIZE=800\n";
+                                    submit_and_wait(gen2_jcl, 600, true); },
+                                  gdg_opts);
+
+                        afterAll([&]() -> void
+                                 {
+                                   std::string del_jcl;
+                                   del_jcl += "//GDGDEL$ JOB IZUACCT\n";
+                                   del_jcl += "//STEP1    EXEC PGM=IDCAMS\n";
+                                   del_jcl += "//SYSPRINT DD SYSOUT=*\n";
+                                   del_jcl += "//SYSIN    DD *\n";
+                                   del_jcl += "  DELETE " + gdg_gen2_dsn + " NONVSAM PURGE\n";
+                                   del_jcl += "  DELETE " + gdg_gen1_dsn + " NONVSAM PURGE\n";
+                                   del_jcl += "  DELETE " + gdg_base_dsn + " GDG PURGE\n";
+                                   del_jcl += "  SET MAXCC = 0\n";
+                                   del_jcl += "/*\n";
+                                   submit_and_wait(del_jcl, 200); },
+                                 gdg_opts);
+
+                        it("should list the GDG base in the catalog",
+                           [&]() -> void
+                           {
+                             std::string response;
+                             const std::string command = zowex_command + " data-set list " + gdg_base_dsn + " --no-warn";
+                             const int rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain(gdg_base_dsn);
+                           },
+                           gdg_opts);
+
+                        it("should report ?????? volser for GDG base when listing with attributes",
+                           [&]() -> void
+                           {
+                             std::string response;
+                             const std::string command = zowex_command + " data-set list " + gdg_base_dsn + " -a --rfc";
+                             const int rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain("??????");
+                           },
+                           gdg_opts);
+
+                        it("should list GDG generations using a wildcard pattern",
+                           [&]() -> void
+                           {
+                             std::string response;
+                             const std::string command = zowex_command + " data-set list '" + gdg_base_dsn + ".*' --no-warn";
+                             const int rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain(gdg_gen1_dsn);
+                             Expect(response).ToContain(gdg_gen2_dsn);
+                           },
+                           gdg_opts);
+
+                        it("should view the content of a GDG generation by absolute name",
+                           [&]() -> void
+                           {
+                             std::string response;
+                             const std::string command = zowex_command + " data-set view " + gdg_gen1_dsn;
+                             const int rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain("GENERATION ONE CONTENT");
+                           },
+                           gdg_opts);
+
+                        it("should view the most recent GDG generation via relative reference",
+                           [&]() -> void
+                           {
+                             std::string response;
+                             const std::string command = zowex_command + " data-set view '" + gdg_base_dsn + "(0)'";
+                             const int rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain("GENERATION TWO CONTENT");
+                           },
+                           gdg_opts);
+
+                        // TODO: https://github.com/zowe/zowex/issues/666
+                        xit("should delete a specific GDG generation", []() -> void {});
+                        xit("should delete a GDG base when it has no active generations", []() -> void {});
+                        xit("should delete a GDG base and all its generations", []() -> void {});
+                        xit("should error when deleting a GDG base with active generations without the PURGE option", []() -> void {});
+                      });
              // TODO: https://github.com/zowe/zowex/issues/380
              xdescribe("restore",
                        [&]() -> void
@@ -926,6 +1100,128 @@ void zowex_ds_tests()
                          // TODO: What do?
                          xit("should fail to restore if not authorized", [&]() -> void {});
                        });
+             // CA Disk archival tests. Enable with: export ZNP_CADISK=1
+             // CA Disk is one of several possible archival methods on z/OS (others include DFSMShsm).
+             // The archival workflow uses two JCL jobs:
+             //   JCL 1 - submits the archive request for a specific data set.
+             //   JCL 2 - asks the CA Disk scheduler to start processing immediately.
+             describe("archived (CA Disk)",
+                      [&]() -> void
+                      {
+                        const bool cadisk_available = (std::getenv("ZNP_CADISK") != nullptr);
+
+                        if (!cadisk_available)
+                        {
+                          xit("should archive a data set via the two-step CA Disk JCL process (set ZNP_CADISK=1 to enable)", []() -> void {});
+                          xit("should restore a CA Disk-archived data set", []() -> void {});
+                          xit("should fail to restore a non-existent archived data set", []() -> void {});
+                          return;
+                        }
+
+                        TEST_OPTIONS cadisk_opts = {false, 120};
+                        std::string archive_ds;
+
+                        auto submit_and_wait = [](const std::string &jcl, int max_polls = 600, bool check_rc = false)
+                        {
+                          ZJB zjb = {0};
+                          std::string jobid;
+                          int rc = zjb_submit(&zjb, jcl, jobid);
+                          if (rc != 0)
+                            throw std::runtime_error("Failed to submit JCL: " + std::string(zjb.diag.e_msg));
+                          TestLog("Submitted job " + jobid + " (" + std::to_string(jcl.size()) + " bytes)");
+                          std::string correlator(zjb.correlator, sizeof(zjb.correlator));
+                          ZJob final_job = {};
+                          for (int i = 0; i < max_polls; ++i)
+                          {
+                            ZJB zjb_v = {0};
+                            final_job = {};
+                            int vrc = zjb_view(&zjb_v, correlator, final_job);
+                            if (vrc != 0)
+                              throw std::runtime_error("Failed to view job: " + std::string(zjb_v.diag.e_msg));
+                            if (!final_job.retcode.empty())
+                              break;
+                            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                          }
+                          TestLog("Job " + jobid + " retcode='" + final_job.retcode + "'");
+                          if (check_rc && final_job.retcode.find("CC 0000") == std::string::npos)
+                            throw std::runtime_error("Job failed with retcode='" + final_job.retcode + "'");
+                        };
+
+                        beforeAll([&]() -> void
+                                  {
+                                    archive_ds = get_random_ds();
+                                    _ds.push_back(archive_ds);
+                                    _create_ds(archive_ds, "--dsorg PS");
+
+                                    // Write recognizable content so we can verify it survives archival/restore
+                                    std::string response;
+                                    const std::string command = "echo 'cadisk archival test content' | " + zowex_command + " data-set write " + archive_ds;
+                                    const int rc = execute_command_with_output(command, response);
+                                    ExpectWithContext(rc, response).ToBe(0); },
+                                  cadisk_opts);
+
+                        it("should archive a data set via the two-step CA Disk JCL process",
+                           [&]() -> void
+                           {
+                             // JCL 1: Request CA Disk archival of the data set
+                             std::string arc_jcl;
+                             arc_jcl += "//CADARC$  JOB IZUACCT\n";
+                             arc_jcl += "//STEP1    EXEC PGM=CADAMSUP\n";
+                             arc_jcl += "//SYSPRINT DD SYSOUT=*\n";
+                             arc_jcl += "//SYSIN    DD *\n";
+                             arc_jcl += "  ARCHIVE DATASET(" + archive_ds + ")\n";
+                             arc_jcl += "/*\n";
+                             submit_and_wait(arc_jcl, 600, true);
+
+                             // JCL 2: Ask the CA Disk scheduler to process the request immediately
+                             std::string sched_jcl;
+                             sched_jcl += "//CADSCH$  JOB IZUACCT\n";
+                             sched_jcl += "//STEP1    EXEC PGM=CADAMSUP\n";
+                             sched_jcl += "//SYSPRINT DD SYSOUT=*\n";
+                             sched_jcl += "//SYSIN    DD *\n";
+                             sched_jcl += "  START IMMEDIATE\n";
+                             sched_jcl += "/*\n";
+                             submit_and_wait(sched_jcl, 600, true);
+
+                             // Verify the data set is now archived (CA Disk uses ARCIVE as the volser)
+                             std::string response;
+                             const std::string command = zowex_command + " data-set list " + archive_ds + " -a --rfc";
+                             const int rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain("ARCIVE");
+                           },
+                           cadisk_opts);
+
+                        it("should restore a CA Disk-archived data set",
+                           [&]() -> void
+                           {
+                             std::string response;
+                             const std::string command = zowex_command + " data-set restore " + archive_ds;
+                             const int rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain("Data set '" + archive_ds + "' restored");
+
+                             // Verify the data set is accessible and content is intact after restore
+                             const std::string view_command = zowex_command + " data-set view " + archive_ds;
+                             std::string view_response;
+                             const int view_rc = execute_command_with_output(view_command, view_response);
+                             ExpectWithContext(view_rc, view_response).ToBe(0);
+                             Expect(view_response).ToContain("cadisk archival test content");
+                           },
+                           cadisk_opts);
+
+                        it("should fail to restore a non-existent archived data set",
+                           [&]() -> void
+                           {
+                             const std::string ghost_ds = archive_ds + ".GHOST";
+                             std::string response;
+                             const std::string command = zowex_command + " data-set restore " + ghost_ds;
+                             const int rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).Not().ToBe(0);
+                             Expect(response).ToContain("Error: could not restore data set: '" + ghost_ds + "'");
+                           },
+                           cadisk_opts);
+                      });
              describe("view",
                       [&]() -> void
                       {
@@ -995,6 +1291,25 @@ void zowex_ds_tests()
                              rc = execute_command_with_output(command, response);
                              ExpectWithContext(rc, response).ToBe(0);
                              Expect(response).ToContain("test!");
+                           });
+                        it("should view multibyte-encoded content correctly",
+                           [&]() -> void
+                           {
+                             std::string ds = _ds.back();
+                             _create_ds(ds, "--dsorg PS");
+                             std::string response;
+                             // Write Japanese こんにちは encoded as DBCS EBCDIC (IBM-939)
+                             std::string command = "echo '\xe3\x81\x93\xe3\x82\x93\xe3\x81\xab\xe3\x81\xa1\xe3\x81\xaf' | " +
+                                                   zowex_command + " data-set write " + ds + " --encoding IBM-939";
+                             int rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain("Wrote data to '" + ds + "'");
+
+                             // View raw bytes to verify the stored DBCS EBCDIC encoding
+                             command = zowex_command + " data-set view " + ds + " --rfb";
+                             rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain("0e 44 8a 44 bd 44 97 44 92 44 9d 0f");
                            });
                         it("should fail to view a non-existent data set",
                            [&]() -> void
@@ -1627,6 +1942,61 @@ void zowex_ds_tests()
                         xit("should fail if the data set is deleted before the write operation is completed", []() -> void {});
                         // TODO: What do?
                         xit("should fail to write to a data set if not authorized", []() -> void {});
+
+                        describe("concurrent writes",
+                                 [&]() -> void
+                                 {
+                                   TEST_OPTIONS concurrent_opts = {false, 60};
+
+                                   it("should handle concurrent writes to different PDSE members",
+                                      [&]() -> void
+                                      {
+                                        const std::string ds = get_random_ds();
+                                        _ds.push_back(ds);
+                                        _create_ds(ds, "--dsorg PO --dirblk 5 --dsntype LIBRARY");
+
+                                        const int thread_count = 4;
+                                        std::vector<std::thread> threads;
+                                        std::vector<int> results(thread_count, -1);
+
+                                        for (int i = 0; i < thread_count; ++i)
+                                        {
+                                          threads.emplace_back([&, i]()
+                                                               {
+                                                                 std::string response;
+                                                                 const std::string member = "MEM" + std::to_string(i);
+                                                                 const std::string command = "echo 'thread " + std::to_string(i) + " data' | " +
+                                                                                             zowex_command + " data-set write '" + ds + "(" + member + ")'";
+                                                                 results[i] = execute_command_with_output(command, response); });
+                                        }
+
+                                        for (auto &t : threads)
+                                          t.join();
+
+                                        for (int i = 0; i < thread_count; ++i)
+                                        {
+                                          ExpectWithContext(results[i], "Thread " + std::to_string(i) + " write failed").ToBe(0);
+
+                                          std::string response;
+                                          const std::string member = "MEM" + std::to_string(i);
+                                          const std::string command = zowex_command + " data-set view '" + ds + "(" + member + ")'";
+                                          const int rc = execute_command_with_output(command, response);
+                                          ExpectWithContext(rc, response).ToBe(0);
+                                          Expect(response).ToContain("thread " + std::to_string(i) + " data");
+                                        }
+                                      },
+                                      concurrent_opts);
+
+                                   // The following tests require a controlled environment and manual verification.
+                                   // Key areas to investigate:
+                                   //   - Logger thread safety: concurrent calls to zlogger from multiple threads
+                                   //     may interleave or corrupt log output. Verify output integrity.
+                                   //   - Mutual tenancy: z/OS ENQ/RESERVE must prevent simultaneous exclusive
+                                   //     writes from different users or processes to the same data set.
+                                   //     Verify that the second writer receives a proper error or waits.
+                                   xit("should handle concurrent writes to the same PDS member gracefully (run by Dan)", []() -> void {});
+                                   xit("should release ENQ resources when a thread crashes during a write operation", []() -> void {});
+                                 });
                       });
            });
 }

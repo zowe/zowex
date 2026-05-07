@@ -1233,6 +1233,169 @@ void zds_tests()
                              Expect(found->volser).ToBe(std::string(ZDS_VOLSER_PATH));
                            });
                       });
+             describe("list GDG",
+                      [&]() -> void
+                      {
+                        const std::string user = get_user();
+                        const std::string base = get_random_ds(2, user);
+                        const std::string gdg_base_dsn = base + ".GDG";
+                        const std::string gdg_gen1_dsn = gdg_base_dsn + ".G0001V00";
+
+                        auto submit_and_wait = [](const std::string &jcl, int max_polls = 600, bool check_rc = false)
+                        {
+                          ZJB zjb = {0};
+                          std::string jobid;
+                          int rc = zjb_submit(&zjb, jcl, jobid);
+                          if (rc != 0)
+                            throw std::runtime_error("Failed to submit JCL: " + std::string(zjb.diag.e_msg));
+                          TestLog("Submitted job " + jobid + " (" + std::to_string(jcl.size()) + " bytes)");
+                          std::string correlator(zjb.correlator, sizeof(zjb.correlator));
+                          ZJob final_job = {};
+                          for (int i = 0; i < max_polls; ++i)
+                          {
+                            ZJB zjb_v = {0};
+                            final_job = {};
+                            int vrc = zjb_view(&zjb_v, correlator, final_job);
+                            if (vrc != 0)
+                              throw std::runtime_error("Failed to view job: " + std::string(zjb_v.diag.e_msg));
+                            if (!final_job.retcode.empty())
+                              break;
+                            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                          }
+                          TestLog("Job " + jobid + " retcode='" + final_job.retcode + "'");
+                          if (check_rc && final_job.retcode.find("CC 0000") == std::string::npos)
+                            throw std::runtime_error("Job failed with retcode='" + final_job.retcode + "'");
+                        };
+
+                        TEST_OPTIONS gdg_opts = {false, 60};
+
+                        beforeAll([&]() -> void
+                                  {
+                                    // Clean up any leftover data sets from previous test runs
+                                    std::string cleanup_jcl;
+                                    cleanup_jcl += "//GDGCLN$ JOB IZUACCT\n";
+                                    cleanup_jcl += "//STEP1    EXEC PGM=IDCAMS\n";
+                                    cleanup_jcl += "//SYSPRINT DD SYSOUT=*\n";
+                                    cleanup_jcl += "//SYSIN    DD *\n";
+                                    cleanup_jcl += "  DELETE " + gdg_gen1_dsn + " NONVSAM PURGE\n";
+                                    cleanup_jcl += "  DELETE " + gdg_base_dsn + " GDG PURGE\n";
+                                    cleanup_jcl += "  SET MAXCC = 0\n";
+                                    cleanup_jcl += "/*\n";
+                                    submit_and_wait(cleanup_jcl, 200);
+
+                                    // Define the GDG base via IDCAMS
+                                    std::string setup_jcl;
+                                    setup_jcl += "//GDGSET$ JOB IZUACCT\n";
+                                    setup_jcl += "//STEP1    EXEC PGM=IDCAMS\n";
+                                    setup_jcl += "//SYSPRINT DD SYSOUT=*\n";
+                                    setup_jcl += "//SYSIN    DD *\n";
+                                    setup_jcl += "  DEFINE GDG ( -\n";
+                                    setup_jcl += "    NAME(" + gdg_base_dsn + ") -\n";
+                                    setup_jcl += "    LIMIT(5) -\n";
+                                    setup_jcl += "    NOEMPTY -\n";
+                                    setup_jcl += "    NOSCRATCH )\n";
+                                    setup_jcl += "/*\n";
+                                    submit_and_wait(setup_jcl, 200, true);
+
+                                    // Create one generation via IEBGENER
+                                    std::string gen_jcl;
+                                    gen_jcl += "//GDGGEN$ JOB IZUACCT\n";
+                                    gen_jcl += "//STEP1    EXEC PGM=IEBGENER\n";
+                                    gen_jcl += "//SYSPRINT DD SYSOUT=*\n";
+                                    gen_jcl += "//SYSIN    DD DUMMY\n";
+                                    gen_jcl += "//SYSUT1   DD *\n";
+                                    gen_jcl += "GDG GENERATION ONE\n";
+                                    gen_jcl += "/*\n";
+                                    gen_jcl += "//SYSUT2   DD DSN=" + gdg_base_dsn + "(+1),DISP=(NEW,CATLG),\n";
+                                    gen_jcl += "//            UNIT=SYSALLDA,SPACE=(TRK,(1,1)),\n";
+                                    gen_jcl += "//            RECFM=FB,LRECL=80,BLKSIZE=800\n";
+                                    submit_and_wait(gen_jcl, 600, true); },
+                                  gdg_opts);
+
+                        afterAll([&]() -> void
+                                 {
+                                   std::string del_jcl;
+                                   del_jcl += "//GDGDEL$ JOB IZUACCT\n";
+                                   del_jcl += "//STEP1    EXEC PGM=IDCAMS\n";
+                                   del_jcl += "//SYSPRINT DD SYSOUT=*\n";
+                                   del_jcl += "//SYSIN    DD *\n";
+                                   del_jcl += "  DELETE " + gdg_gen1_dsn + " NONVSAM PURGE\n";
+                                   del_jcl += "  DELETE " + gdg_base_dsn + " GDG PURGE\n";
+                                   del_jcl += "  SET MAXCC = 0\n";
+                                   del_jcl += "/*\n";
+                                   submit_and_wait(del_jcl, 200); },
+                                 gdg_opts);
+
+                        it("should report ZDS_VOLSER_GDG (??????) for a GDG base",
+                           [&]() -> void
+                           {
+                             ZDS zds = {0};
+                             std::vector<ZDSEntry> entries;
+                             const int rc = zds_list_data_sets(&zds, gdg_base_dsn, entries, true);
+                             ExpectWithContext(rc, zds.diag.e_msg).ToBe(0);
+
+                             ZDSEntry *found = nullptr;
+                             for (auto &e : entries)
+                             {
+                               std::string trimmed = e.name;
+                               zut_rtrim(trimmed);
+                               if (trimmed == gdg_base_dsn)
+                               {
+                                 found = &e;
+                                 break;
+                               }
+                             }
+                             Expect(found != nullptr).ToBe(true);
+                             Expect(found->volser).ToBe(std::string(ZDS_VOLSER_GDG));
+                           },
+                           gdg_opts);
+
+                        it("should find GDG generations using a wildcard pattern",
+                           [&]() -> void
+                           {
+                             ZDS zds = {0};
+                             std::vector<ZDSEntry> entries;
+                             const std::string pattern = gdg_base_dsn + ".*";
+                             const int rc = zds_list_data_sets(&zds, pattern, entries);
+                             ExpectWithContext(rc, zds.diag.e_msg).ToBe(0);
+
+                             bool found_gen1 = false;
+                             for (const auto &e : entries)
+                             {
+                               std::string trimmed = e.name;
+                               zut_rtrim(trimmed);
+                               if (trimmed == gdg_gen1_dsn)
+                                 found_gen1 = true;
+                             }
+                             Expect(found_gen1).ToBe(true);
+                           },
+                           gdg_opts);
+
+                        it("should read content from a GDG generation by absolute name",
+                           [&]() -> void
+                           {
+                             ZDS read_zds{};
+                             ZDSReadOpts read_opts{.zds = &read_zds, .dsname = gdg_gen1_dsn};
+                             std::string content;
+                             const int rc = zds_read(read_opts, content);
+                             ExpectWithContext(rc, read_zds.diag.e_msg).ToBe(0);
+                             Expect(content.find("GDG GENERATION ONE") != std::string::npos).ToBe(true);
+                           },
+                           gdg_opts);
+
+                        it("should read content from the most recent GDG generation via relative reference",
+                           [&]() -> void
+                           {
+                             const std::string relative_ref = gdg_base_dsn + "(0)";
+                             ZDS read_zds{};
+                             ZDSReadOpts read_opts{.zds = &read_zds, .dsname = relative_ref};
+                             std::string content;
+                             const int rc = zds_read(read_opts, content);
+                             ExpectWithContext(rc, read_zds.diag.e_msg).ToBe(0);
+                             Expect(content.find("GDG GENERATION ONE") != std::string::npos).ToBe(true);
+                           },
+                           gdg_opts);
+                      });
              describe("read",
                       [&]() -> void
                       {
