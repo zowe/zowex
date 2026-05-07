@@ -1,6 +1,6 @@
 ---
 name: frontend-code-quality
-description: Improve TypeScript code quality in CLI, SDK, and VS Code extension packages. Apply DRY, YAGNI, SRP principles to reduce duplication and complexity. Use when refactoring, deduplicating, simplifying, or improving code in packages/cli/, packages/sdk/, or packages/vsce/.
+description: Improve TypeScript code quality in CLI, SDK, and VS Code extension packages. Apply DRY, YAGNI, SRP principles to reduce duplication and complexity. Use when refactoring, deduplicating, simplifying, or improving code in packages/cli/ or packages/sdk/.
 ---
 
 # Frontend Code Quality
@@ -11,8 +11,8 @@ Identify and fix code quality issues in the client-side TypeScript codebase (`pa
 
 **Client Components:** Node.js LTS, TypeScript.
 **Packages:**
+
 - `packages/cli`: Zowe CLI plug-in (`@zowe/imperative` handlers)
-- `packages/vsce`: Zowe Explorer extender (`@zowe/zowe-explorer-api` implementations)
 - `packages/sdk`: Node.js SDK (`ZSshClient` and RPC typings)
 
 ## Quality Checklist
@@ -104,7 +104,6 @@ Signs a function does too much:
 
 - **SDK (`packages/sdk`)**: Strictly handles RPC JSON-RPC formulation, `stdin`/`stdout` streaming, and SSH connection lifecycle.
 - **CLI Handlers (`packages/cli`)**: Gathers CLI `IHandlerParameters`, passes them to SDK, and formats the output `params.response.format.output`.
-- **VS Code Extension (`packages/vsce`)**: Adapts Zowe SDK outputs to `IZosFilesResponse` structures for Zowe Explorer.
 
 ---
 
@@ -154,7 +153,7 @@ if (attributes.uid || attributes.owner) {
 
 When improving code quality:
 
-1. **Identify scope**: Single file or related files (e.g. `cli`, `vsce`, `sdk`)
+1. **Identify scope**: Single file or related files (e.g. `cli`, `sdk`)
 2. **Search for patterns**: Use grep to find similar code blocks
 3. **Categorize issues** by type (DRY, YAGNI, SRP, complexity)
 4. **Propose changes** with rationale
@@ -177,20 +176,20 @@ npm run test
 Find potential duplicates:
 
 ```bash
-rg -n "pattern" packages/cli/ packages/sdk/ packages/vsce/
+rg -n "pattern" packages/cli/ packages/sdk/
 ```
 
 Analyze function length and complexity:
-*Note: Use structural code search tools or read the target files directly to evaluate function lengths and branches. Avoid brittle brace-matching regex.*
+_Note: Use structural code search tools or read the target files directly to evaluate function lengths and branches. Avoid brittle brace-matching regex._
 
 ---
 
 ## Anti-Patterns to Flag
 
-| Pattern            | Issue                | Fix                              |
-| ------------------ | -------------------- | -------------------------------- |
-| Manual Promise     | Hard to debug/trace  | Use async/await when possible    |
-| Inconsistent Err   | Different CLI output | Use `SshBaseHandler` for errors  |
-| Deep nesting       | Hard to follow       | Early returns, extract functions |
-| > 5 parameters     | Hard to maintain     | Use options/config object        |
-| Copy-paste auth    | Maintenance burden   | Extract shared fallback logic    |
+| Pattern          | Issue                | Fix                              |
+| ---------------- | -------------------- | -------------------------------- |
+| Manual Promise   | Hard to debug/trace  | Use async/await when possible    |
+| Inconsistent Err | Different CLI output | Use `SshBaseHandler` for errors  |
+| Deep nesting     | Hard to follow       | Early returns, extract functions |
+| > 5 parameters   | Hard to maintain     | Use options/config object        |
+| Copy-paste auth  | Maintenance burden   | Extract shared fallback logic    |
