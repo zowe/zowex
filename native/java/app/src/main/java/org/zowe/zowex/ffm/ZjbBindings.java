@@ -1,89 +1,19 @@
 package org.zowe.zowex.ffm;
 
 import java.lang.foreign.*;
-import java.lang.invoke.MethodHandle;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.zowe.zowex.ffm.generated.ZjbCApi;
+import org.zowe.zowex.ffm.generated.ZJBBasicResponse_C;
+import org.zowe.zowex.ffm.generated.ZJBStringResponse_C;
+import org.zowe.zowex.ffm.generated.ZJobListResponse_C;
+import org.zowe.zowex.ffm.generated.ZJobResponse_C;
+import org.zowe.zowex.ffm.generated.ZJobDDListResponse_C;
+import org.zowe.zowex.ffm.generated.ZJob_C;
+import org.zowe.zowex.ffm.generated.ZJobDD_C;
+
 public class ZjbBindings {
-
-    private static final MethodHandle zjb_c_list_jobs_by_owner;
-    private static final MethodHandle zjb_c_get_job_status;
-    private static final MethodHandle zjb_c_submit_job;
-    private static final MethodHandle zjb_c_list_spool_files;
-    private static final MethodHandle zjb_c_read_spool_file;
-    private static final MethodHandle zjb_c_get_job_jcl;
-    private static final MethodHandle zjb_c_delete_job;
-    private static final MethodHandle zjb_c_free_job_list_response;
-    private static final MethodHandle zjb_c_free_job_response;
-    private static final MethodHandle zjb_c_free_string_response;
-    private static final MethodHandle zjb_c_free_job_dd_list_response;
-    private static final MethodHandle zjb_c_free_basic_response;
-
-    static {
-        Linker linker = NativeLoader.LINKER;
-        SymbolLookup lookup = NativeLoader.getLookup();
-
-        zjb_c_list_jobs_by_owner = linker.downcallHandle(
-            lookup.find("zjb_c_list_jobs_by_owner").orElseThrow(),
-            FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS)
-        );
-
-        zjb_c_get_job_status = linker.downcallHandle(
-            lookup.find("zjb_c_get_job_status").orElseThrow(),
-            FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS)
-        );
-
-        zjb_c_submit_job = linker.downcallHandle(
-            lookup.find("zjb_c_submit_job").orElseThrow(),
-            FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS)
-        );
-
-        zjb_c_list_spool_files = linker.downcallHandle(
-            lookup.find("zjb_c_list_spool_files").orElseThrow(),
-            FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS)
-        );
-
-        zjb_c_read_spool_file = linker.downcallHandle(
-            lookup.find("zjb_c_read_spool_file").orElseThrow(),
-            FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT)
-        );
-
-        zjb_c_get_job_jcl = linker.downcallHandle(
-            lookup.find("zjb_c_get_job_jcl").orElseThrow(),
-            FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS)
-        );
-
-        zjb_c_delete_job = linker.downcallHandle(
-            lookup.find("zjb_c_delete_job").orElseThrow(),
-            FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS)
-        );
-
-        zjb_c_free_job_list_response = linker.downcallHandle(
-            lookup.find("zjb_c_free_job_list_response").orElseThrow(),
-            FunctionDescriptor.ofVoid(ValueLayout.ADDRESS)
-        );
-
-        zjb_c_free_job_response = linker.downcallHandle(
-            lookup.find("zjb_c_free_job_response").orElseThrow(),
-            FunctionDescriptor.ofVoid(ValueLayout.ADDRESS)
-        );
-
-        zjb_c_free_string_response = linker.downcallHandle(
-            lookup.find("zjb_c_free_string_response").orElseThrow(),
-            FunctionDescriptor.ofVoid(ValueLayout.ADDRESS)
-        );
-
-        zjb_c_free_job_dd_list_response = linker.downcallHandle(
-            lookup.find("zjb_c_free_job_dd_list_response").orElseThrow(),
-            FunctionDescriptor.ofVoid(ValueLayout.ADDRESS)
-        );
-
-        zjb_c_free_basic_response = linker.downcallHandle(
-            lookup.find("zjb_c_free_basic_response").orElseThrow(),
-            FunctionDescriptor.ofVoid(ValueLayout.ADDRESS)
-        );
-    }
 
     public static class ZJob {
         public String jobname;
@@ -95,48 +25,45 @@ public class ZjbBindings {
         public String correlator;
     }
 
-    private static ZJob readZJobStruct(MemorySegment segment, long offset) {
-        ZJob job = new ZJob();
-        job.jobname = FfmUtils.readString(segment.get(ValueLayout.ADDRESS, offset));
-        job.jobid = FfmUtils.readString(segment.get(ValueLayout.ADDRESS, offset + 8));
-        job.owner = FfmUtils.readString(segment.get(ValueLayout.ADDRESS, offset + 16));
-        job.status = FfmUtils.readString(segment.get(ValueLayout.ADDRESS, offset + 24));
-        job.fullStatus = FfmUtils.readString(segment.get(ValueLayout.ADDRESS, offset + 32));
-        job.retcode = FfmUtils.readString(segment.get(ValueLayout.ADDRESS, offset + 40));
-        job.correlator = FfmUtils.readString(segment.get(ValueLayout.ADDRESS, offset + 48));
-        return job;
-    }
-
     public static List<ZJob> listJobsByOwner(String ownerName, String prefix, String status) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment ownerSeg = FfmUtils.allocateString(arena, ownerName);
             MemorySegment prefixSeg = FfmUtils.allocateString(arena, prefix);
             MemorySegment statusSeg = FfmUtils.allocateString(arena, status);
 
-            MemorySegment responsePtr = (MemorySegment) zjb_c_list_jobs_by_owner.invokeExact(ownerSeg, prefixSeg, statusSeg);
+            MemorySegment responsePtr = ZjbCApi.zjb_c_list_jobs_by_owner(ownerSeg, prefixSeg, statusSeg);
             
             if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
             
-            responsePtr = responsePtr.reinterpret(24);
+            responsePtr = ZJobListResponse_C.reinterpret(responsePtr, arena, null);
 
-            MemorySegment errorMsgSeg = responsePtr.get(ValueLayout.ADDRESS, 16);
+            MemorySegment errorMsgSeg = ZJobListResponse_C.error_message(responsePtr);
             String errorMsg = FfmUtils.readString(errorMsgSeg);
             if (errorMsg != null) {
-                zjb_c_free_job_list_response.invokeExact(responsePtr);
+                ZjbCApi.zjb_c_free_job_list_response(responsePtr);
                 throw new RuntimeException(errorMsg);
             }
 
-            MemorySegment jobsPtr = responsePtr.get(ValueLayout.ADDRESS, 0);
-            long count = responsePtr.get(ValueLayout.JAVA_LONG, 8);
+            MemorySegment jobsPtr = ZJobListResponse_C.jobs(responsePtr);
+            long count = ZJobListResponse_C.count(responsePtr);
             
             List<ZJob> results = new ArrayList<>();
             if (count > 0 && jobsPtr.address() != 0) {
-                MemorySegment jobsArray = jobsPtr.reinterpret(count * 56); // 7 pointers * 8 bytes = 56 bytes
+                MemorySegment jobsArray = ZJob_C.reinterpret(jobsPtr, count, arena, null);
                 for (long i = 0; i < count; i++) {
-                    results.add(readZJobStruct(jobsArray, i * 56));
+                    MemorySegment jobStruct = ZJob_C.asSlice(jobsArray, i);
+                    ZJob job = new ZJob();
+                    job.jobname = FfmUtils.readString(ZJob_C.jobname(jobStruct));
+                    job.jobid = FfmUtils.readString(ZJob_C.jobid(jobStruct));
+                    job.owner = FfmUtils.readString(ZJob_C.owner(jobStruct));
+                    job.status = FfmUtils.readString(ZJob_C.status(jobStruct));
+                    job.fullStatus = FfmUtils.readString(ZJob_C.full_status(jobStruct));
+                    job.retcode = FfmUtils.readString(ZJob_C.retcode(jobStruct));
+                    job.correlator = FfmUtils.readString(ZJob_C.correlator(jobStruct));
+                    results.add(job);
                 }
             }
-            zjb_c_free_job_list_response.invokeExact(responsePtr);
+            ZjbCApi.zjb_c_free_job_list_response(responsePtr);
             return results;
         } catch (Throwable e) {
             if (e instanceof Exception) throw (Exception) e;
@@ -147,25 +74,33 @@ public class ZjbBindings {
     public static ZJob getJobStatus(String jobid) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment jobidSeg = FfmUtils.allocateString(arena, jobid);
-            MemorySegment responsePtr = (MemorySegment) zjb_c_get_job_status.invokeExact(jobidSeg);
+            MemorySegment responsePtr = ZjbCApi.zjb_c_get_job_status(jobidSeg);
             
             if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
             
-            responsePtr = responsePtr.reinterpret(16);
+            responsePtr = ZJobResponse_C.reinterpret(responsePtr, arena, null);
 
-            MemorySegment errorMsgSeg = responsePtr.get(ValueLayout.ADDRESS, 8);
+            MemorySegment errorMsgSeg = ZJobResponse_C.error_message(responsePtr);
             String errorMsg = FfmUtils.readString(errorMsgSeg);
             if (errorMsg != null) {
-                zjb_c_free_job_response.invokeExact(responsePtr);
+                ZjbCApi.zjb_c_free_job_response(responsePtr);
                 throw new RuntimeException(errorMsg);
             }
 
-            MemorySegment jobPtr = responsePtr.get(ValueLayout.ADDRESS, 0);
+            MemorySegment jobPtr = ZJobResponse_C.job(responsePtr);
             ZJob job = null;
             if (jobPtr.address() != 0) {
-                job = readZJobStruct(jobPtr.reinterpret(56), 0);
+                MemorySegment jobStruct = ZJob_C.reinterpret(jobPtr, arena, null);
+                job = new ZJob();
+                job.jobname = FfmUtils.readString(ZJob_C.jobname(jobStruct));
+                job.jobid = FfmUtils.readString(ZJob_C.jobid(jobStruct));
+                job.owner = FfmUtils.readString(ZJob_C.owner(jobStruct));
+                job.status = FfmUtils.readString(ZJob_C.status(jobStruct));
+                job.fullStatus = FfmUtils.readString(ZJob_C.full_status(jobStruct));
+                job.retcode = FfmUtils.readString(ZJob_C.retcode(jobStruct));
+                job.correlator = FfmUtils.readString(ZJob_C.correlator(jobStruct));
             }
-            zjb_c_free_job_response.invokeExact(responsePtr);
+            ZjbCApi.zjb_c_free_job_response(responsePtr);
             return job;
         } catch (Throwable e) {
             if (e instanceof Exception) throw (Exception) e;
@@ -182,13 +117,13 @@ public class ZjbBindings {
         public int key;
     }
 
-    private static void handleBasicResponse(MemorySegment responsePtr) throws Exception {
+    private static void handleBasicResponse(MemorySegment responsePtr, Arena arena) throws Exception {
         if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
-        responsePtr = responsePtr.reinterpret(8);
-        MemorySegment errorMsgSeg = responsePtr.get(ValueLayout.ADDRESS, 0);
+        responsePtr = ZJBBasicResponse_C.reinterpret(responsePtr, arena, null);
+        MemorySegment errorMsgSeg = ZJBBasicResponse_C.error_message(responsePtr);
         String errorMsg = FfmUtils.readString(errorMsgSeg);
         try {
-            zjb_c_free_basic_response.invokeExact(responsePtr);
+            ZjbCApi.zjb_c_free_basic_response(responsePtr);
         } catch (Throwable e) {
             if (e instanceof Exception) throw (Exception) e;
             throw new RuntimeException(e);
@@ -201,38 +136,38 @@ public class ZjbBindings {
     public static List<ZJobDD> listSpoolFiles(String jobid) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment jobidSeg = FfmUtils.allocateString(arena, jobid);
-            MemorySegment responsePtr = (MemorySegment) zjb_c_list_spool_files.invokeExact(jobidSeg);
+            MemorySegment responsePtr = ZjbCApi.zjb_c_list_spool_files(jobidSeg);
             
             if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
             
-            responsePtr = responsePtr.reinterpret(24);
+            responsePtr = ZJobDDListResponse_C.reinterpret(responsePtr, arena, null);
 
-            MemorySegment errorMsgSeg = responsePtr.get(ValueLayout.ADDRESS, 16);
+            MemorySegment errorMsgSeg = ZJobDDListResponse_C.error_message(responsePtr);
             String errorMsg = FfmUtils.readString(errorMsgSeg);
             if (errorMsg != null) {
-                zjb_c_free_job_dd_list_response.invokeExact(responsePtr);
+                ZjbCApi.zjb_c_free_job_dd_list_response(responsePtr);
                 throw new RuntimeException(errorMsg);
             }
 
-            MemorySegment ddsPtr = responsePtr.get(ValueLayout.ADDRESS, 0);
-            long count = responsePtr.get(ValueLayout.JAVA_LONG, 8);
+            MemorySegment ddsPtr = ZJobDDListResponse_C.dds(responsePtr);
+            long count = ZJobDDListResponse_C.count(responsePtr);
             
             List<ZJobDD> results = new ArrayList<>();
             if (count > 0 && ddsPtr.address() != 0) {
-                MemorySegment ddsArray = ddsPtr.reinterpret(count * 48); // 5 pointers + 1 int + padding = 48 bytes
+                MemorySegment ddsArray = ZJobDD_C.reinterpret(ddsPtr, count, arena, null);
                 for (long i = 0; i < count; i++) {
-                    long offset = i * 48;
+                    MemorySegment ddStruct = ZJobDD_C.asSlice(ddsArray, i);
                     ZJobDD dd = new ZJobDD();
-                    dd.jobid = FfmUtils.readString(ddsArray.get(ValueLayout.ADDRESS, offset));
-                    dd.ddn = FfmUtils.readString(ddsArray.get(ValueLayout.ADDRESS, offset + 8));
-                    dd.dsn = FfmUtils.readString(ddsArray.get(ValueLayout.ADDRESS, offset + 16));
-                    dd.stepname = FfmUtils.readString(ddsArray.get(ValueLayout.ADDRESS, offset + 24));
-                    dd.procstep = FfmUtils.readString(ddsArray.get(ValueLayout.ADDRESS, offset + 32));
-                    dd.key = ddsArray.get(ValueLayout.JAVA_INT, offset + 40);
+                    dd.jobid = FfmUtils.readString(ZJobDD_C.jobid(ddStruct));
+                    dd.ddn = FfmUtils.readString(ZJobDD_C.ddn(ddStruct));
+                    dd.dsn = FfmUtils.readString(ZJobDD_C.dsn(ddStruct));
+                    dd.stepname = FfmUtils.readString(ZJobDD_C.stepname(ddStruct));
+                    dd.procstep = FfmUtils.readString(ZJobDD_C.procstep(ddStruct));
+                    dd.key = ZJobDD_C.key(ddStruct);
                     results.add(dd);
                 }
             }
-            zjb_c_free_job_dd_list_response.invokeExact(responsePtr);
+            ZjbCApi.zjb_c_free_job_dd_list_response(responsePtr);
             return results;
         } catch (Throwable e) {
             if (e instanceof Exception) throw (Exception) e;
@@ -243,22 +178,22 @@ public class ZjbBindings {
     public static String readSpoolFile(String jobid, int key) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment jobidSeg = FfmUtils.allocateString(arena, jobid);
-            MemorySegment responsePtr = (MemorySegment) zjb_c_read_spool_file.invokeExact(jobidSeg, key);
+            MemorySegment responsePtr = ZjbCApi.zjb_c_read_spool_file(jobidSeg, key);
             
             if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
             
-            responsePtr = responsePtr.reinterpret(16);
+            responsePtr = ZJBStringResponse_C.reinterpret(responsePtr, arena, null);
 
-            MemorySegment errorMsgSeg = responsePtr.get(ValueLayout.ADDRESS, 8);
+            MemorySegment errorMsgSeg = ZJBStringResponse_C.error_message(responsePtr);
             String errorMsg = FfmUtils.readString(errorMsgSeg);
             if (errorMsg != null) {
-                zjb_c_free_string_response.invokeExact(responsePtr);
+                ZjbCApi.zjb_c_free_string_response(responsePtr);
                 throw new RuntimeException(errorMsg);
             }
 
-            MemorySegment dataSeg = responsePtr.get(ValueLayout.ADDRESS, 0);
+            MemorySegment dataSeg = ZJBStringResponse_C.data(responsePtr);
             String data = FfmUtils.readString(dataSeg);
-            zjb_c_free_string_response.invokeExact(responsePtr);
+            ZjbCApi.zjb_c_free_string_response(responsePtr);
             return data;
         } catch (Throwable e) {
             if (e instanceof Exception) throw (Exception) e;
@@ -269,22 +204,22 @@ public class ZjbBindings {
     public static String getJobJcl(String jobid) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment jobidSeg = FfmUtils.allocateString(arena, jobid);
-            MemorySegment responsePtr = (MemorySegment) zjb_c_get_job_jcl.invokeExact(jobidSeg);
+            MemorySegment responsePtr = ZjbCApi.zjb_c_get_job_jcl(jobidSeg);
             
             if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
             
-            responsePtr = responsePtr.reinterpret(16);
+            responsePtr = ZJBStringResponse_C.reinterpret(responsePtr, arena, null);
 
-            MemorySegment errorMsgSeg = responsePtr.get(ValueLayout.ADDRESS, 8);
+            MemorySegment errorMsgSeg = ZJBStringResponse_C.error_message(responsePtr);
             String errorMsg = FfmUtils.readString(errorMsgSeg);
             if (errorMsg != null) {
-                zjb_c_free_string_response.invokeExact(responsePtr);
+                ZjbCApi.zjb_c_free_string_response(responsePtr);
                 throw new RuntimeException(errorMsg);
             }
 
-            MemorySegment dataSeg = responsePtr.get(ValueLayout.ADDRESS, 0);
+            MemorySegment dataSeg = ZJBStringResponse_C.data(responsePtr);
             String data = FfmUtils.readString(dataSeg);
-            zjb_c_free_string_response.invokeExact(responsePtr);
+            ZjbCApi.zjb_c_free_string_response(responsePtr);
             return data;
         } catch (Throwable e) {
             if (e instanceof Exception) throw (Exception) e;
@@ -295,8 +230,8 @@ public class ZjbBindings {
     public static void deleteJob(String jobid) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment jobidSeg = FfmUtils.allocateString(arena, jobid);
-            MemorySegment responsePtr = (MemorySegment) zjb_c_delete_job.invokeExact(jobidSeg);
-            handleBasicResponse(responsePtr);
+            MemorySegment responsePtr = ZjbCApi.zjb_c_delete_job(jobidSeg);
+            handleBasicResponse(responsePtr, arena);
         } catch (Throwable e) {
             if (e instanceof Exception) throw (Exception) e;
             throw new RuntimeException(e);
@@ -306,22 +241,22 @@ public class ZjbBindings {
     public static String submitJob(String jclContent) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment jclSeg = FfmUtils.allocateString(arena, jclContent);
-            MemorySegment responsePtr = (MemorySegment) zjb_c_submit_job.invokeExact(jclSeg);
+            MemorySegment responsePtr = ZjbCApi.zjb_c_submit_job(jclSeg);
             
             if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
             
-            responsePtr = responsePtr.reinterpret(16);
+            responsePtr = ZJBStringResponse_C.reinterpret(responsePtr, arena, null);
 
-            MemorySegment errorMsgSeg = responsePtr.get(ValueLayout.ADDRESS, 8);
+            MemorySegment errorMsgSeg = ZJBStringResponse_C.error_message(responsePtr);
             String errorMsg = FfmUtils.readString(errorMsgSeg);
             if (errorMsg != null) {
-                zjb_c_free_string_response.invokeExact(responsePtr);
+                ZjbCApi.zjb_c_free_string_response(responsePtr);
                 throw new RuntimeException(errorMsg);
             }
 
-            MemorySegment jobidSeg = responsePtr.get(ValueLayout.ADDRESS, 0);
+            MemorySegment jobidSeg = ZJBStringResponse_C.data(responsePtr);
             String jobid = FfmUtils.readString(jobidSeg);
-            zjb_c_free_string_response.invokeExact(responsePtr);
+            ZjbCApi.zjb_c_free_string_response(responsePtr);
             return jobid;
         } catch (Throwable e) {
             if (e instanceof Exception) throw (Exception) e;

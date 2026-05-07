@@ -1,115 +1,39 @@
 package org.zowe.zowex.ffm;
 
 import java.lang.foreign.*;
-import java.lang.invoke.MethodHandle;
+
+import org.zowe.zowex.ffm.generated.ZusfCApi;
+import org.zowe.zowex.ffm.generated.ZUSFBasicResponse_C;
+import org.zowe.zowex.ffm.generated.ZUSFStringResponse_C;
+import org.zowe.zowex.ffm.generated.ZUSFListOptions_C;
 
 public class ZusfBindings {
-
-    private static final MethodHandle zusf_c_list_uss_dir;
-    private static final MethodHandle zusf_c_read_uss_file;
-    private static final MethodHandle zusf_c_write_uss_file;
-    private static final MethodHandle zusf_c_create_uss_file;
-    private static final MethodHandle zusf_c_create_uss_dir;
-    private static final MethodHandle zusf_c_move_uss_file_or_dir;
-    private static final MethodHandle zusf_c_chmod_uss_item;
-    private static final MethodHandle zusf_c_delete_uss_item;
-    private static final MethodHandle zusf_c_chown_uss_item;
-    private static final MethodHandle zusf_c_chtag_uss_item;
-    private static final MethodHandle zusf_c_free_string_response;
-    private static final MethodHandle zusf_c_free_basic_response;
-
-    static {
-        Linker linker = NativeLoader.LINKER;
-        SymbolLookup lookup = NativeLoader.getLookup();
-
-        zusf_c_list_uss_dir = linker.downcallHandle(
-            lookup.find("zusf_c_list_uss_dir").orElseThrow(),
-            FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS)
-        );
-
-        zusf_c_read_uss_file = linker.downcallHandle(
-            lookup.find("zusf_c_read_uss_file").orElseThrow(),
-            FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS)
-        );
-
-        zusf_c_write_uss_file = linker.downcallHandle(
-            lookup.find("zusf_c_write_uss_file").orElseThrow(),
-            FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS)
-        );
-
-        zusf_c_create_uss_file = linker.downcallHandle(
-            lookup.find("zusf_c_create_uss_file").orElseThrow(),
-            FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS)
-        );
-
-        zusf_c_create_uss_dir = linker.downcallHandle(
-            lookup.find("zusf_c_create_uss_dir").orElseThrow(),
-            FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS)
-        );
-
-        zusf_c_move_uss_file_or_dir = linker.downcallHandle(
-            lookup.find("zusf_c_move_uss_file_or_dir").orElseThrow(),
-            FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS)
-        );
-
-        zusf_c_chmod_uss_item = linker.downcallHandle(
-            lookup.find("zusf_c_chmod_uss_item").orElseThrow(),
-            FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_BOOLEAN)
-        );
-
-        zusf_c_delete_uss_item = linker.downcallHandle(
-            lookup.find("zusf_c_delete_uss_item").orElseThrow(),
-            FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_BOOLEAN)
-        );
-
-        zusf_c_chown_uss_item = linker.downcallHandle(
-            lookup.find("zusf_c_chown_uss_item").orElseThrow(),
-            FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_BOOLEAN)
-        );
-
-        zusf_c_chtag_uss_item = linker.downcallHandle(
-            lookup.find("zusf_c_chtag_uss_item").orElseThrow(),
-            FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_BOOLEAN)
-        );
-
-        zusf_c_free_string_response = linker.downcallHandle(
-            lookup.find("zusf_c_free_string_response").orElseThrow(),
-            FunctionDescriptor.ofVoid(ValueLayout.ADDRESS)
-        );
-
-        zusf_c_free_basic_response = linker.downcallHandle(
-            lookup.find("zusf_c_free_basic_response").orElseThrow(),
-            FunctionDescriptor.ofVoid(ValueLayout.ADDRESS)
-        );
-    }
 
     public static String listUssDir(String path, boolean allFiles, boolean longFormat, int maxDepth) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment pathSeg = FfmUtils.allocateString(arena, path);
             
-            // Allocate ZUSFListOptions_C: bool(1) + bool(1) + int(4) -> 8 bytes total aligned?
-            // Actually struct is bool, bool, padding(2), int(4) -> 8 bytes.
-            MemorySegment optionsSeg = arena.allocate(8);
-            optionsSeg.set(ValueLayout.JAVA_BOOLEAN, 0, allFiles);
-            optionsSeg.set(ValueLayout.JAVA_BOOLEAN, 1, longFormat);
-            optionsSeg.set(ValueLayout.JAVA_INT, 4, maxDepth);
+            MemorySegment optionsSeg = ZUSFListOptions_C.allocate(arena);
+            ZUSFListOptions_C.all_files(optionsSeg, allFiles);
+            ZUSFListOptions_C.long_format(optionsSeg, longFormat);
+            ZUSFListOptions_C.max_depth(optionsSeg, maxDepth);
 
-            MemorySegment responsePtr = (MemorySegment) zusf_c_list_uss_dir.invokeExact(pathSeg, optionsSeg);
+            MemorySegment responsePtr = ZusfCApi.zusf_c_list_uss_dir(pathSeg, optionsSeg);
             
             if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
             
-            responsePtr = responsePtr.reinterpret(16);
+            responsePtr = ZUSFStringResponse_C.reinterpret(responsePtr, arena, null);
 
-            MemorySegment errorMsgSeg = responsePtr.get(ValueLayout.ADDRESS, 8);
+            MemorySegment errorMsgSeg = ZUSFStringResponse_C.error_message(responsePtr);
             String errorMsg = FfmUtils.readString(errorMsgSeg);
             if (errorMsg != null) {
-                zusf_c_free_string_response.invokeExact(responsePtr);
+                ZusfCApi.zusf_c_free_string_response(responsePtr);
                 throw new RuntimeException(errorMsg);
             }
 
-            MemorySegment dataSeg = responsePtr.get(ValueLayout.ADDRESS, 0);
+            MemorySegment dataSeg = ZUSFStringResponse_C.data(responsePtr);
             String data = FfmUtils.readString(dataSeg);
-            zusf_c_free_string_response.invokeExact(responsePtr);
+            ZusfCApi.zusf_c_free_string_response(responsePtr);
             return data;
         } catch (Throwable e) {
             if (e instanceof Exception) throw (Exception) e;
@@ -121,22 +45,22 @@ public class ZusfBindings {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment fileSeg = FfmUtils.allocateString(arena, file);
             MemorySegment cpSeg = FfmUtils.allocateString(arena, codepage);
-            MemorySegment responsePtr = (MemorySegment) zusf_c_read_uss_file.invokeExact(fileSeg, cpSeg);
+            MemorySegment responsePtr = ZusfCApi.zusf_c_read_uss_file(fileSeg, cpSeg);
             
             if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
             
-            responsePtr = responsePtr.reinterpret(16);
+            responsePtr = ZUSFStringResponse_C.reinterpret(responsePtr, arena, null);
 
-            MemorySegment errorMsgSeg = responsePtr.get(ValueLayout.ADDRESS, 8);
+            MemorySegment errorMsgSeg = ZUSFStringResponse_C.error_message(responsePtr);
             String errorMsg = FfmUtils.readString(errorMsgSeg);
             if (errorMsg != null) {
-                zusf_c_free_string_response.invokeExact(responsePtr);
+                ZusfCApi.zusf_c_free_string_response(responsePtr);
                 throw new RuntimeException(errorMsg);
             }
 
-            MemorySegment dataSeg = responsePtr.get(ValueLayout.ADDRESS, 0);
+            MemorySegment dataSeg = ZUSFStringResponse_C.data(responsePtr);
             String data = FfmUtils.readString(dataSeg);
-            zusf_c_free_string_response.invokeExact(responsePtr);
+            ZusfCApi.zusf_c_free_string_response(responsePtr);
             return data;
         } catch (Throwable e) {
             if (e instanceof Exception) throw (Exception) e;
@@ -151,22 +75,22 @@ public class ZusfBindings {
             MemorySegment cpSeg = FfmUtils.allocateString(arena, codepage);
             MemorySegment etagSeg = FfmUtils.allocateString(arena, etag);
 
-            MemorySegment responsePtr = (MemorySegment) zusf_c_write_uss_file.invokeExact(fileSeg, dataSeg, cpSeg, etagSeg);
+            MemorySegment responsePtr = ZusfCApi.zusf_c_write_uss_file(fileSeg, dataSeg, cpSeg, etagSeg);
             
             if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
             
-            responsePtr = responsePtr.reinterpret(16);
+            responsePtr = ZUSFStringResponse_C.reinterpret(responsePtr, arena, null);
 
-            MemorySegment errorMsgSeg = responsePtr.get(ValueLayout.ADDRESS, 8);
+            MemorySegment errorMsgSeg = ZUSFStringResponse_C.error_message(responsePtr);
             String errorMsg = FfmUtils.readString(errorMsgSeg);
             if (errorMsg != null) {
-                zusf_c_free_string_response.invokeExact(responsePtr);
+                ZusfCApi.zusf_c_free_string_response(responsePtr);
                 throw new RuntimeException(errorMsg);
             }
 
-            MemorySegment outDataSeg = responsePtr.get(ValueLayout.ADDRESS, 0);
+            MemorySegment outDataSeg = ZUSFStringResponse_C.data(responsePtr);
             String outEtag = FfmUtils.readString(outDataSeg);
-            zusf_c_free_string_response.invokeExact(responsePtr);
+            ZusfCApi.zusf_c_free_string_response(responsePtr);
             return outEtag;
         } catch (Throwable e) {
             if (e instanceof Exception) throw (Exception) e;
@@ -174,13 +98,13 @@ public class ZusfBindings {
         }
     }
 
-    private static void handleBasicResponse(MemorySegment responsePtr) throws Exception {
+    private static void handleBasicResponse(MemorySegment responsePtr, Arena arena) throws Exception {
         if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
-        responsePtr = responsePtr.reinterpret(8);
-        MemorySegment errorMsgSeg = responsePtr.get(ValueLayout.ADDRESS, 0);
+        responsePtr = ZUSFBasicResponse_C.reinterpret(responsePtr, arena, null);
+        MemorySegment errorMsgSeg = ZUSFBasicResponse_C.error_message(responsePtr);
         String errorMsg = FfmUtils.readString(errorMsgSeg);
         try {
-            zusf_c_free_basic_response.invokeExact(responsePtr);
+            ZusfCApi.zusf_c_free_basic_response(responsePtr);
         } catch (Throwable e) {
             if (e instanceof Exception) throw (Exception) e;
             throw new RuntimeException(e);
@@ -194,8 +118,8 @@ public class ZusfBindings {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment fileSeg = FfmUtils.allocateString(arena, file);
             MemorySegment modeSeg = FfmUtils.allocateString(arena, mode);
-            MemorySegment responsePtr = (MemorySegment) zusf_c_create_uss_file.invokeExact(fileSeg, modeSeg);
-            handleBasicResponse(responsePtr);
+            MemorySegment responsePtr = ZusfCApi.zusf_c_create_uss_file(fileSeg, modeSeg);
+            handleBasicResponse(responsePtr, arena);
         } catch (Throwable e) {
             if (e instanceof Exception) throw (Exception) e;
             throw new RuntimeException(e);
@@ -206,8 +130,8 @@ public class ZusfBindings {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment fileSeg = FfmUtils.allocateString(arena, file);
             MemorySegment modeSeg = FfmUtils.allocateString(arena, mode);
-            MemorySegment responsePtr = (MemorySegment) zusf_c_create_uss_dir.invokeExact(fileSeg, modeSeg);
-            handleBasicResponse(responsePtr);
+            MemorySegment responsePtr = ZusfCApi.zusf_c_create_uss_dir(fileSeg, modeSeg);
+            handleBasicResponse(responsePtr, arena);
         } catch (Throwable e) {
             if (e instanceof Exception) throw (Exception) e;
             throw new RuntimeException(e);
@@ -218,8 +142,8 @@ public class ZusfBindings {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment srcSeg = FfmUtils.allocateString(arena, source);
             MemorySegment destSeg = FfmUtils.allocateString(arena, destination);
-            MemorySegment responsePtr = (MemorySegment) zusf_c_move_uss_file_or_dir.invokeExact(srcSeg, destSeg);
-            handleBasicResponse(responsePtr);
+            MemorySegment responsePtr = ZusfCApi.zusf_c_move_uss_file_or_dir(srcSeg, destSeg);
+            handleBasicResponse(responsePtr, arena);
         } catch (Throwable e) {
             if (e instanceof Exception) throw (Exception) e;
             throw new RuntimeException(e);
@@ -230,8 +154,8 @@ public class ZusfBindings {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment fileSeg = FfmUtils.allocateString(arena, file);
             MemorySegment modeSeg = FfmUtils.allocateString(arena, mode);
-            MemorySegment responsePtr = (MemorySegment) zusf_c_chmod_uss_item.invokeExact(fileSeg, modeSeg, recursive);
-            handleBasicResponse(responsePtr);
+            MemorySegment responsePtr = ZusfCApi.zusf_c_chmod_uss_item(fileSeg, modeSeg, recursive);
+            handleBasicResponse(responsePtr, arena);
         } catch (Throwable e) {
             if (e instanceof Exception) throw (Exception) e;
             throw new RuntimeException(e);
@@ -241,8 +165,8 @@ public class ZusfBindings {
     public static void deleteUssItem(String file, boolean recursive) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment fileSeg = FfmUtils.allocateString(arena, file);
-            MemorySegment responsePtr = (MemorySegment) zusf_c_delete_uss_item.invokeExact(fileSeg, recursive);
-            handleBasicResponse(responsePtr);
+            MemorySegment responsePtr = ZusfCApi.zusf_c_delete_uss_item(fileSeg, recursive);
+            handleBasicResponse(responsePtr, arena);
         } catch (Throwable e) {
             if (e instanceof Exception) throw (Exception) e;
             throw new RuntimeException(e);
@@ -253,8 +177,8 @@ public class ZusfBindings {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment fileSeg = FfmUtils.allocateString(arena, file);
             MemorySegment ownerSeg = FfmUtils.allocateString(arena, owner);
-            MemorySegment responsePtr = (MemorySegment) zusf_c_chown_uss_item.invokeExact(fileSeg, ownerSeg, recursive);
-            handleBasicResponse(responsePtr);
+            MemorySegment responsePtr = ZusfCApi.zusf_c_chown_uss_item(fileSeg, ownerSeg, recursive);
+            handleBasicResponse(responsePtr, arena);
         } catch (Throwable e) {
             if (e instanceof Exception) throw (Exception) e;
             throw new RuntimeException(e);
@@ -265,8 +189,8 @@ public class ZusfBindings {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment fileSeg = FfmUtils.allocateString(arena, file);
             MemorySegment tagSeg = FfmUtils.allocateString(arena, tag);
-            MemorySegment responsePtr = (MemorySegment) zusf_c_chtag_uss_item.invokeExact(fileSeg, tagSeg, recursive);
-            handleBasicResponse(responsePtr);
+            MemorySegment responsePtr = ZusfCApi.zusf_c_chtag_uss_item(fileSeg, tagSeg, recursive);
+            handleBasicResponse(responsePtr, arena);
         } catch (Throwable e) {
             if (e instanceof Exception) throw (Exception) e;
             throw new RuntimeException(e);
