@@ -1089,8 +1089,25 @@ int zusf_move_uss_file_or_dir(ZUSF *zusf, const std::string &source, const std::
  *
  * @return formatted std::string for the file entry
  */
-std::string zusf_format_file_entry(ZUSF *zusf, const struct stat &file_stats, const std::string &file_path, const std::string &display_name, ListOptions options, bool use_csv_format)
+std::string zusf_format_file_entry(ZUSF *zusf, const struct stat &file_stats, const std::string &file_path, const std::string &display_name, ListOptions options, bool use_csv_format, std::vector<ZusfListEntry> *entries)
 {
+  if (entries)
+  {
+    ZusfListEntry entry;
+    entry.name = display_name;
+    if (options.long_format)
+    {
+      entry.mode = zusf_build_mode_string(file_stats.st_mode);
+      entry.links = file_stats.st_nlink;
+      entry.user = zusf_get_owner_from_uid(file_stats.st_uid);
+      entry.group = zusf_get_group_from_gid(file_stats.st_gid);
+      entry.size = file_stats.st_size;
+      entry.filetag = zusf_get_ccsid_display_name(file_stats.st_tag.ft_ccsid);
+      entry.mtime = zusf_format_ls_time(file_stats.st_mtime, true);
+    }
+    entries->push_back(entry);
+  }
+
   if (!options.long_format)
   {
     return display_name + "\n";
@@ -1217,7 +1234,7 @@ static int zusf_collect_directory_entries_recursive(ZUSF *zusf, const std::strin
  *
  * @return RTNCD_SUCCESS on success, RTNCD_FAILURE on failure
  */
-int zusf_list_uss_file_path(ZUSF *zusf, const std::string &file, std::string &response, ListOptions options, bool use_csv_format)
+int zusf_list_uss_file_path(ZUSF *zusf, const std::string &file, std::string &response, ListOptions options, bool use_csv_format, std::vector<ZusfListEntry> *entries)
 {
   if (!zusf_is_valid_path(file))
   {
@@ -1236,7 +1253,7 @@ int zusf_list_uss_file_path(ZUSF *zusf, const std::string &file, std::string &re
   if (S_ISREG(file_stats.st_mode))
   {
     const auto file_name = file.substr(file.find_last_of("/") + 1);
-    response = zusf_format_file_entry(zusf, file_stats, file, file_name, options, use_csv_format);
+    response = zusf_format_file_entry(zusf, file_stats, file, file_name, options, use_csv_format, entries);
     return RTNCD_SUCCESS;
   }
 
@@ -1252,7 +1269,7 @@ int zusf_list_uss_file_path(ZUSF *zusf, const std::string &file, std::string &re
   if (options.max_depth == 0)
   {
     const auto dir_name = file.substr(file.find_last_of("/") + 1);
-    response = zusf_format_file_entry(zusf, file_stats, file, dir_name, options, use_csv_format);
+    response = zusf_format_file_entry(zusf, file_stats, file, dir_name, options, use_csv_format, entries);
     return RTNCD_SUCCESS;
   }
 
@@ -1260,7 +1277,7 @@ int zusf_list_uss_file_path(ZUSF *zusf, const std::string &file, std::string &re
   if (options.all_files)
   {
     // Add "." entry
-    response += zusf_format_file_entry(zusf, file_stats, file, ".", options, use_csv_format);
+    response += zusf_format_file_entry(zusf, file_stats, file, ".", options, use_csv_format, entries);
 
     // Add ".." entry if we can stat the parent directory
     std::string parent_path = file.substr(0, file.find_last_of("/"));
@@ -1271,7 +1288,7 @@ int zusf_list_uss_file_path(ZUSF *zusf, const std::string &file, std::string &re
     struct stat parent_stats;
     if (stat(parent_path.c_str(), &parent_stats) == 0)
     {
-      response += zusf_format_file_entry(zusf, parent_stats, parent_path, "..", options, use_csv_format);
+      response += zusf_format_file_entry(zusf, parent_stats, parent_path, "..", options, use_csv_format, entries);
     }
   }
 
@@ -1295,7 +1312,7 @@ int zusf_list_uss_file_path(ZUSF *zusf, const std::string &file, std::string &re
       return RTNCD_FAILURE;
     }
 
-    response += zusf_format_file_entry(zusf, child_stats, child_path, name, options, use_csv_format);
+    response += zusf_format_file_entry(zusf, child_stats, child_path, name, options, use_csv_format, entries);
   }
 
   return RTNCD_SUCCESS;
