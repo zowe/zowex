@@ -991,6 +991,20 @@ void zowex_uss_tests()
                              Expect(response).ToContain("drwxrwxrwx,");
                              Expect(response).ToContain(",subDir1");
                            });
+                        it("should properly handle file names with commas with --response-format-csv",
+                           [&]() -> void
+                           {
+                             std::string commaFile = ussTestDir + "/subDir1/comma,file,test.txt";
+                             execute_command_with_output(zowex_command + " uss create-file " + commaFile, response);
+
+                             std::string listDepthCommand = zowex_command + " uss ls " + ussTestDir + "/subDir1 -l --rfc";
+                             rc = execute_command_with_output(listDepthCommand, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain("comma,file,test.txt");
+
+                             // cleanup
+                             execute_command_with_output(zowex_command + " uss delete " + commaFile, response);
+                           });
                         it("should preserve symlink file type in long listing",
                            [&]() -> void
                            {
