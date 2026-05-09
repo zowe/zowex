@@ -110,16 +110,13 @@ void zowex_system_tests()
                 []()
                 {
                   int rc = 0;
-                  string response;
+                  string stdout_output, stderr_output;
                   int max_lines = 3;
 
-                  // set old date and time to orient to beginning of syslog
-                  rc = execute_command_with_output(zowex_command + " system view-syslog --date 1990-01-01 --time 00:00:00.00 --max-lines " + to_string(max_lines), response);
-                  ExpectWithContext(rc, response).ToBe(0);
-                  // split response into lines in an array
-                  std::cout << "response: " << response << std::endl;
-                  vector<string> lines = parse_rfc_response(response, "\n");
-                  Expect(lines.size() - 1).ToBe(max_lines); // -1 to exclude final `/n`
+                  rc = execute_command(zowex_command + " system view-syslog --date 1990-01-01 --time 00:00:00 --max-lines " + to_string(max_lines), stdout_output, stderr_output);
+                  ExpectWithContext(rc, stderr_output).ToBe(0);
+                  vector<string> lines = parse_rfc_response(stdout_output, "\n");
+                  Expect(lines.size() - 1).ToBe(max_lines);
                 });
 
              it("should fail with invalid max-lines",
@@ -145,7 +142,7 @@ void zowex_system_tests()
                 {
                   int rc = 0;
                   string response;
-                  rc = execute_command_with_output(zowex_command + " system view-syslog --time 25:00:00.00", response);
+                  rc = execute_command_with_output(zowex_command + " system view-syslog --time 25:00:00", response);
                   ExpectWithContext(rc, response).Not().ToBe(0);
                   Expect(response).ToContain("Error: invalid time");
                 });
@@ -157,6 +154,190 @@ void zowex_system_tests()
                   rc = execute_command_with_output(zowex_command + " system view-syslog --date 2026-13-01", response);
                   ExpectWithContext(rc, response).Not().ToBe(0);
                   Expect(response).ToContain("Error: invalid date");
+                });
+
+             it("should view syslog with --seconds-ago",
+                []()
+                {
+                  int rc = 0;
+                  string response;
+                  rc = execute_command_with_output(zowex_command + " system view-syslog --seconds-ago 300", response);
+                  ExpectWithContext(rc, response).ToBe(0);
+                  Expect(response.length()).ToBeGreaterThan(0);
+                });
+
+             it("should fail when --seconds-ago used with --date",
+                []()
+                {
+                  int rc = 0;
+                  string response;
+                  rc = execute_command_with_output(zowex_command + " system view-syslog --seconds-ago 300 --date 2026-03-23", response);
+                  ExpectWithContext(rc, response).Not().ToBe(0);
+                  Expect(response).ToContain("mutually exclusive");
+                });
+
+             it("should fail when --seconds-ago used with --time",
+                []()
+                {
+                  int rc = 0;
+                  string response;
+                  rc = execute_command_with_output(zowex_command + " system view-syslog --seconds-ago 300 --time 10:00:00", response);
+                  ExpectWithContext(rc, response).Not().ToBe(0);
+                  Expect(response).ToContain("mutually exclusive");
+                });
+
+             it("should fail with invalid --seconds-ago value",
+                []()
+                {
+                  int rc = 0;
+                  string response;
+                  rc = execute_command_with_output(zowex_command + " system view-syslog --seconds-ago 0", response);
+                  ExpectWithContext(rc, response).Not().ToBe(0);
+                  rc = execute_command_with_output(zowex_command + " system view-syslog --seconds-ago 86401", response);
+                  ExpectWithContext(rc, response).Not().ToBe(0);
+                });
+
+             it("should use default behavior (last 30 seconds) with no arguments",
+                []()
+                {
+                  int rc = 0;
+                  string response;
+                  rc = execute_command_with_output(zowex_command + " system view-syslog", response);
+                  ExpectWithContext(rc, response).ToBe(0);
+                });
+
+             it("should include endDate and endTime in metadata",
+                []()
+                {
+                  int rc = 0;
+                  string stdout_output, stderr_output;
+                  rc = execute_command(zowex_command + " system view-syslog --seconds-ago 300", stdout_output, stderr_output);
+                  ExpectWithContext(rc, stderr_output).ToBe(0);
+                  Expect(stderr_output).ToContain("End:");
+                  Expect(stderr_output).ToContain("Start:");
+                  Expect(stderr_output).ToContain("Lines:");
+                  Expect(stderr_output).ToContain("Has more:");
+                });
+
+             it("should have endDate in yyyy-mm-dd format",
+                []()
+                {
+                  int rc = 0;
+                  string stdout_output, stderr_output;
+                  rc = execute_command(zowex_command + " system view-syslog --seconds-ago 300", stdout_output, stderr_output);
+                  ExpectWithContext(rc, stderr_output).ToBe(0);
+
+                  auto pos = stderr_output.find("End: ");
+                  Expect(pos).Not().ToBe(string::npos);
+                  string after_end = stderr_output.substr(pos + 5);
+                  // yyyy-mm-dd = 10 chars
+                  string end_date = after_end.substr(0, 10);
+                  Expect(end_date.length()).ToBe(10);
+                  Expect(end_date[4]).ToBe('-');
+                  Expect(end_date[7]).ToBe('-');
+                });
+
+             it("should have endTime in hh:mm:ss format",
+                []()
+                {
+                  int rc = 0;
+                  string stdout_output, stderr_output;
+                  rc = execute_command(zowex_command + " system view-syslog --seconds-ago 300", stdout_output, stderr_output);
+                  ExpectWithContext(rc, stderr_output).ToBe(0);
+
+                  auto pos = stderr_output.find("End: ");
+                  Expect(pos).Not().ToBe(string::npos);
+                  string after_end = stderr_output.substr(pos + 5);
+                  // skip date (10 chars) + space (1 char) = 11
+                  string end_time = after_end.substr(11, 8);
+                  Expect(end_time[2]).ToBe(':');
+                  Expect(end_time[5]).ToBe(':');
+                });
+
+             it("should have end timestamp >= start timestamp",
+                []()
+                {
+                  int rc = 0;
+                  string stdout_output, stderr_output;
+                  rc = execute_command(zowex_command + " system view-syslog --date 1990-01-01 --time 00:00:00 --max-lines 5", stdout_output, stderr_output);
+                  ExpectWithContext(rc, stderr_output).ToBe(0);
+
+                  auto start_pos = stderr_output.find("Start: ");
+                  auto end_pos = stderr_output.find("End: ");
+                  Expect(start_pos).Not().ToBe(string::npos);
+                  Expect(end_pos).Not().ToBe(string::npos);
+
+                  string start_str = stderr_output.substr(start_pos + 7, 21);
+                  string end_str = stderr_output.substr(end_pos + 5, 21);
+                  Expect(end_str >= start_str).ToBe(true);
+                });
+
+             it("should have different end timestamps for different ranges",
+                []()
+                {
+                  int rc = 0;
+                  string stdout1, stderr1, stdout2, stderr2;
+
+                  rc = execute_command(zowex_command + " system view-syslog --date 1990-01-01 --time 00:00:00 --max-lines 3", stdout1, stderr1);
+                  ExpectWithContext(rc, stderr1).ToBe(0);
+
+                  rc = execute_command(zowex_command + " system view-syslog --date 1990-01-01 --time 00:00:00 --max-lines 10", stdout2, stderr2);
+                  ExpectWithContext(rc, stderr2).ToBe(0);
+
+                  auto end_pos1 = stderr1.find("End: ");
+                  auto end_pos2 = stderr2.find("End: ");
+                  Expect(end_pos1).Not().ToBe(string::npos);
+                  Expect(end_pos2).Not().ToBe(string::npos);
+
+                  string end1 = stderr1.substr(end_pos1 + 5, 21);
+                  string end2 = stderr2.substr(end_pos2 + 5, 21);
+                  Expect(end2 >= end1).ToBe(true);
+                });
+
+             it("should include endDate/endTime with --seconds-ago",
+                []()
+                {
+                  int rc = 0;
+                  string stdout_output, stderr_output;
+                  rc = execute_command(zowex_command + " system view-syslog --seconds-ago 60", stdout_output, stderr_output);
+                  ExpectWithContext(rc, stderr_output).ToBe(0);
+                  Expect(stderr_output).ToContain("End:");
+                });
+
+             it("should include endDate/endTime with explicit --date/--time",
+                []()
+                {
+                  int rc = 0;
+                  string stdout_output, stderr_output;
+                  rc = execute_command(zowex_command + " system view-syslog --date 1990-01-01 --time 00:00:00 --max-lines 3", stdout_output, stderr_output);
+                  ExpectWithContext(rc, stderr_output).ToBe(0);
+                  Expect(stderr_output).ToContain("End:");
+                });
+
+             it("should allow pagination using endDate/endTime from previous call",
+                []()
+                {
+                  int rc = 0;
+                  string stdout1, stderr1;
+
+                  rc = execute_command(zowex_command + " system view-syslog --date 1990-01-01 --time 00:00:00 --max-lines 3", stdout1, stderr1);
+                  ExpectWithContext(rc, stderr1).ToBe(0);
+
+                  auto end_pos = stderr1.find("End: ");
+                  Expect(end_pos).Not().ToBe(string::npos);
+                  string end_date = stderr1.substr(end_pos + 5, 10);
+                  string end_time = stderr1.substr(end_pos + 16, 11);
+
+                  string stdout2, stderr2;
+                  rc = execute_command(zowex_command + " system view-syslog --date " + end_date + " --time " + end_time + " --max-lines 3", stdout2, stderr2);
+                  ExpectWithContext(rc, stderr2).ToBe(0);
+                  Expect(stdout2.length()).ToBeGreaterThan(0);
+
+                  auto end_pos2 = stderr2.find("End: ");
+                  Expect(end_pos2).Not().ToBe(string::npos);
+                  string end2 = stderr2.substr(end_pos2 + 5, 21);
+                  string end1 = stderr1.substr(end_pos + 5, 21);
+                  Expect(end2 >= end1).ToBe(true);
                 });
            });
 }
