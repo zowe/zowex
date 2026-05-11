@@ -4,6 +4,7 @@ import java.lang.foreign.*;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.springframework.stereotype.Service;
 import org.zowe.zowex.ffm.generated.DS_ATTRIBUTES_C;
 import org.zowe.zowex.ffm.generated.ZDSBasicResponse_C;
 import org.zowe.zowex.ffm.generated.ZDSEntry_C;
@@ -12,6 +13,7 @@ import org.zowe.zowex.ffm.generated.ZDSMemListResponse_C;
 import org.zowe.zowex.ffm.generated.ZDSStringResponse_C;
 import org.zowe.zowex.ffm.generated.ZdsCApi;
 
+@Service
 public class ZdsBindings {
 
     static {
@@ -31,7 +33,7 @@ public class ZdsBindings {
         public boolean migrated;
     }
 
-    public static List<ZDSEntry> listDataSets(String dsn) throws Exception {
+    public List<ZDSEntry> listDataSets(String dsn) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
           
             var dsnSeg = FfmUtils.allocateString(arena, dsn);
@@ -78,7 +80,7 @@ public class ZdsBindings {
         }
     }
 
-    public static String readDataSet(String dsn, String codepage) throws Exception {
+    public String readDataSet(String dsn, String codepage) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment dsnSeg = FfmUtils.allocateString(arena, dsn);
             MemorySegment cpSeg = FfmUtils.allocateString(arena, codepage);
@@ -106,7 +108,7 @@ public class ZdsBindings {
         }
     }
 
-    public static String writeDataSet(String dsn, String data, String codepage, String etag) throws Exception {
+    public String writeDataSet(String dsn, String data, String codepage, String etag) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment dsnSeg = FfmUtils.allocateString(arena, dsn);
             MemorySegment dataSeg = FfmUtils.allocateString(arena, data);
@@ -160,7 +162,7 @@ public class ZdsBindings {
         public String vol;
     }
 
-    private static void handleBasicResponse(MemorySegment responsePtr, Arena arena) throws Exception {
+    private void handleBasicResponse(MemorySegment responsePtr, Arena arena) throws Exception {
         if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
         responsePtr = ZDSBasicResponse_C.reinterpret(responsePtr, arena, null);
         MemorySegment errorMsgSeg = ZDSBasicResponse_C.error_message(responsePtr);
@@ -176,7 +178,7 @@ public class ZdsBindings {
         }
     }
 
-    public static void createDataSet(String dsn, DSAttributes attrs) throws Exception {
+    public void createDataSet(String dsn, DSAttributes attrs) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment dsnSeg = FfmUtils.allocateString(arena, dsn);
             MemorySegment attrsSeg = MemorySegment.NULL;
@@ -210,7 +212,7 @@ public class ZdsBindings {
         }
     }
 
-    public static void createMember(String dsn) throws Exception {
+    public void createMember(String dsn) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment dsnSeg = FfmUtils.allocateString(arena, dsn);
             MemorySegment responsePtr = ZdsCApi.zds_c_create_member(dsnSeg);
@@ -221,7 +223,7 @@ public class ZdsBindings {
         }
     }
 
-    public static List<ZDSMem> listMembers(String dsn) throws Exception {
+    public List<ZDSMem> listMembers(String dsn) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment dsnSeg = FfmUtils.allocateString(arena, dsn);
             MemorySegment responsePtr = ZdsCApi.zds_c_list_members(dsnSeg);
@@ -258,7 +260,7 @@ public class ZdsBindings {
         }
     }
 
-    public static void deleteDataSet(String dsn) throws Exception {
+    public void deleteDataSet(String dsn) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment dsnSeg = FfmUtils.allocateString(arena, dsn);
             MemorySegment responsePtr = ZdsCApi.zds_c_delete_data_set(dsnSeg);

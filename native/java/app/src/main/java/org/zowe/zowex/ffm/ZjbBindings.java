@@ -1,5 +1,7 @@
 package org.zowe.zowex.ffm;
 
+import org.springframework.stereotype.Service;
+
 import java.lang.foreign.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -13,6 +15,7 @@ import org.zowe.zowex.ffm.generated.ZJobDDListResponse_C;
 import org.zowe.zowex.ffm.generated.ZJob_C;
 import org.zowe.zowex.ffm.generated.ZJobDD_C;
 
+@Service
 public class ZjbBindings {
 
     static {
@@ -41,9 +44,9 @@ public class ZjbBindings {
             MemorySegment statusSeg = FfmUtils.allocateString(arena, status);
 
             MemorySegment responsePtr = ZjbCApi.zjb_c_list_jobs_by_owner(ownerSeg, prefixSeg, statusSeg);
-            
+
             if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
-            
+
             responsePtr = ZJobListResponse_C.reinterpret(responsePtr, arena, null);
 
             MemorySegment errorMsgSeg = ZJobListResponse_C.error_message(responsePtr);
@@ -55,7 +58,7 @@ public class ZjbBindings {
 
             MemorySegment jobsPtr = ZJobListResponse_C.jobs(responsePtr);
             long count = ZJobListResponse_C.count(responsePtr);
-            
+
             List<ZJob> results = new ArrayList<>();
             if (count > 0 && jobsPtr.address() != 0) {
                 MemorySegment jobsArray = ZJob_C.reinterpret(jobsPtr, count, arena, null);
@@ -80,13 +83,13 @@ public class ZjbBindings {
         }
     }
 
-    public static ZJob getJobStatus(String jobid) throws Exception {
+    public ZJob getJobStatus(String jobid) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment jobidSeg = FfmUtils.allocateString(arena, jobid);
             MemorySegment responsePtr = ZjbCApi.zjb_c_get_job_status(jobidSeg);
-            
+
             if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
-            
+
             responsePtr = ZJobResponse_C.reinterpret(responsePtr, arena, null);
 
             MemorySegment errorMsgSeg = ZJobResponse_C.error_message(responsePtr);
@@ -126,7 +129,7 @@ public class ZjbBindings {
         public int key;
     }
 
-    private static void handleBasicResponse(MemorySegment responsePtr, Arena arena) throws Exception {
+    private void handleBasicResponse(MemorySegment responsePtr) throws Exception {
         if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
         responsePtr = ZJBBasicResponse_C.reinterpret(responsePtr, arena, null);
         MemorySegment errorMsgSeg = ZJBBasicResponse_C.error_message(responsePtr);
@@ -142,13 +145,13 @@ public class ZjbBindings {
         }
     }
 
-    public static List<ZJobDD> listSpoolFiles(String jobid) throws Exception {
+    public List<ZJobDD> listSpoolFiles(String jobid) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment jobidSeg = FfmUtils.allocateString(arena, jobid);
             MemorySegment responsePtr = ZjbCApi.zjb_c_list_spool_files(jobidSeg);
-            
+
             if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
-            
+
             responsePtr = ZJobDDListResponse_C.reinterpret(responsePtr, arena, null);
 
             MemorySegment errorMsgSeg = ZJobDDListResponse_C.error_message(responsePtr);
@@ -160,7 +163,7 @@ public class ZjbBindings {
 
             MemorySegment ddsPtr = ZJobDDListResponse_C.dds(responsePtr);
             long count = ZJobDDListResponse_C.count(responsePtr);
-            
+
             List<ZJobDD> results = new ArrayList<>();
             if (count > 0 && ddsPtr.address() != 0) {
                 MemorySegment ddsArray = ZJobDD_C.reinterpret(ddsPtr, count, arena, null);
@@ -184,13 +187,13 @@ public class ZjbBindings {
         }
     }
 
-    public static String readSpoolFile(String jobid, int key) throws Exception {
+    public String readSpoolFile(String jobid, int key) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment jobidSeg = FfmUtils.allocateString(arena, jobid);
             MemorySegment responsePtr = ZjbCApi.zjb_c_read_spool_file(jobidSeg, key);
-            
+
             if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
-            
+
             responsePtr = ZJBStringResponse_C.reinterpret(responsePtr, arena, null);
 
             MemorySegment errorMsgSeg = ZJBStringResponse_C.error_message(responsePtr);
@@ -210,13 +213,13 @@ public class ZjbBindings {
         }
     }
 
-    public static String getJobJcl(String jobid) throws Exception {
+    public String getJobJcl(String jobid) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment jobidSeg = FfmUtils.allocateString(arena, jobid);
             MemorySegment responsePtr = ZjbCApi.zjb_c_get_job_jcl(jobidSeg);
-            
+
             if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
-            
+
             responsePtr = ZJBStringResponse_C.reinterpret(responsePtr, arena, null);
 
             MemorySegment errorMsgSeg = ZJBStringResponse_C.error_message(responsePtr);
@@ -236,7 +239,7 @@ public class ZjbBindings {
         }
     }
 
-    public static void deleteJob(String jobid) throws Exception {
+    public void deleteJob(String jobid) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment jobidSeg = FfmUtils.allocateString(arena, jobid);
             MemorySegment responsePtr = ZjbCApi.zjb_c_delete_job(jobidSeg);
@@ -247,13 +250,13 @@ public class ZjbBindings {
         }
     }
 
-    public static String submitJob(String jclContent) throws Exception {
+    public String submitJob(String jclContent) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment jclSeg = FfmUtils.allocateString(arena, jclContent);
             MemorySegment responsePtr = ZjbCApi.zjb_c_submit_job(jclSeg);
-            
+
             if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
-            
+
             responsePtr = ZJBStringResponse_C.reinterpret(responsePtr, arena, null);
 
             MemorySegment errorMsgSeg = ZJBStringResponse_C.error_message(responsePtr);

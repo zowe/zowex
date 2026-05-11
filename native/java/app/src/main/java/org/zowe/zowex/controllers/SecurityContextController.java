@@ -31,6 +31,10 @@ import java.util.Map;
 import static org.zowe.zowex.zos.security.platform.SafConstants.BPX_SERVER;
 import static org.zowe.zowex.zos.security.platform.SafConstants.CLASS_FACILITY;
 
+/**
+ * The controller is meant only for thread level security troubleshooting.
+ */
+
 @Tag(name = "Security")
 @RestController
 @RequestMapping("/api/v1/securityTest")
