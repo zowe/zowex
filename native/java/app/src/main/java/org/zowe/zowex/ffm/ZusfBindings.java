@@ -1,8 +1,11 @@
 package org.zowe.zowex.ffm;
 
+import org.springframework.stereotype.Service;
+
 import java.lang.foreign.*;
 import java.lang.invoke.MethodHandle;
 
+@Service
 public class ZusfBindings {
 
     private static final MethodHandle zusf_c_list_uss_dir;
@@ -83,7 +86,7 @@ public class ZusfBindings {
         );
     }
 
-    public static String listUssDir(String path, boolean allFiles, boolean longFormat, int maxDepth) throws Exception {
+    public String listUssDir(String path, boolean allFiles, boolean longFormat, int maxDepth) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment pathSeg = FfmUtils.allocateString(arena, path);
             
@@ -117,7 +120,7 @@ public class ZusfBindings {
         }
     }
 
-    public static String readUssFile(String file, String codepage) throws Exception {
+    public String readUssFile(String file, String codepage) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment fileSeg = FfmUtils.allocateString(arena, file);
             MemorySegment cpSeg = FfmUtils.allocateString(arena, codepage);
@@ -144,7 +147,7 @@ public class ZusfBindings {
         }
     }
 
-    public static String writeUssFile(String file, String data, String codepage, String etag) throws Exception {
+    public String writeUssFile(String file, String data, String codepage, String etag) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment fileSeg = FfmUtils.allocateString(arena, file);
             MemorySegment dataSeg = FfmUtils.allocateString(arena, data);
@@ -174,7 +177,7 @@ public class ZusfBindings {
         }
     }
 
-    private static void handleBasicResponse(MemorySegment responsePtr) throws Exception {
+    private void handleBasicResponse(MemorySegment responsePtr) throws Exception {
         if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
         responsePtr = responsePtr.reinterpret(8);
         MemorySegment errorMsgSeg = responsePtr.get(ValueLayout.ADDRESS, 0);
@@ -190,7 +193,7 @@ public class ZusfBindings {
         }
     }
 
-    public static void createUssFile(String file, String mode) throws Exception {
+    public void createUssFile(String file, String mode) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment fileSeg = FfmUtils.allocateString(arena, file);
             MemorySegment modeSeg = FfmUtils.allocateString(arena, mode);
@@ -202,7 +205,7 @@ public class ZusfBindings {
         }
     }
 
-    public static void createUssDir(String file, String mode) throws Exception {
+    public void createUssDir(String file, String mode) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment fileSeg = FfmUtils.allocateString(arena, file);
             MemorySegment modeSeg = FfmUtils.allocateString(arena, mode);
@@ -214,7 +217,7 @@ public class ZusfBindings {
         }
     }
 
-    public static void moveUssFileOrDir(String source, String destination) throws Exception {
+    public void moveUssFileOrDir(String source, String destination) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment srcSeg = FfmUtils.allocateString(arena, source);
             MemorySegment destSeg = FfmUtils.allocateString(arena, destination);
@@ -226,7 +229,7 @@ public class ZusfBindings {
         }
     }
 
-    public static void chmodUssItem(String file, String mode, boolean recursive) throws Exception {
+    public void chmodUssItem(String file, String mode, boolean recursive) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment fileSeg = FfmUtils.allocateString(arena, file);
             MemorySegment modeSeg = FfmUtils.allocateString(arena, mode);
@@ -238,7 +241,7 @@ public class ZusfBindings {
         }
     }
 
-    public static void deleteUssItem(String file, boolean recursive) throws Exception {
+    public void deleteUssItem(String file, boolean recursive) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment fileSeg = FfmUtils.allocateString(arena, file);
             MemorySegment responsePtr = (MemorySegment) zusf_c_delete_uss_item.invokeExact(fileSeg, recursive);
@@ -249,7 +252,7 @@ public class ZusfBindings {
         }
     }
 
-    public static void chownUssItem(String file, String owner, boolean recursive) throws Exception {
+    public void chownUssItem(String file, String owner, boolean recursive) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment fileSeg = FfmUtils.allocateString(arena, file);
             MemorySegment ownerSeg = FfmUtils.allocateString(arena, owner);
@@ -261,7 +264,7 @@ public class ZusfBindings {
         }
     }
 
-    public static void chtagUssItem(String file, String tag, boolean recursive) throws Exception {
+    public void chtagUssItem(String file, String tag, boolean recursive) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment fileSeg = FfmUtils.allocateString(arena, file);
             MemorySegment tagSeg = FfmUtils.allocateString(arena, tag);

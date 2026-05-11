@@ -1,10 +1,13 @@
 package org.zowe.zowex.ffm;
 
+import org.springframework.stereotype.Service;
+
 import java.lang.foreign.*;
 import java.lang.invoke.MethodHandle;
 import java.util.ArrayList;
 import java.util.List;
 
+@Service
 public class ZjbBindings {
 
     private static final MethodHandle zjb_c_list_jobs_by_owner;
@@ -107,7 +110,7 @@ public class ZjbBindings {
         return job;
     }
 
-    public static List<ZJob> listJobsByOwner(String ownerName, String prefix, String status) throws Exception {
+    public List<ZJob> listJobsByOwner(String ownerName, String prefix, String status) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment ownerSeg = FfmUtils.allocateString(arena, ownerName);
             MemorySegment prefixSeg = FfmUtils.allocateString(arena, prefix);
@@ -144,7 +147,7 @@ public class ZjbBindings {
         }
     }
 
-    public static ZJob getJobStatus(String jobid) throws Exception {
+    public ZJob getJobStatus(String jobid) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment jobidSeg = FfmUtils.allocateString(arena, jobid);
             MemorySegment responsePtr = (MemorySegment) zjb_c_get_job_status.invokeExact(jobidSeg);
@@ -182,7 +185,7 @@ public class ZjbBindings {
         public int key;
     }
 
-    private static void handleBasicResponse(MemorySegment responsePtr) throws Exception {
+    private void handleBasicResponse(MemorySegment responsePtr) throws Exception {
         if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
         responsePtr = responsePtr.reinterpret(8);
         MemorySegment errorMsgSeg = responsePtr.get(ValueLayout.ADDRESS, 0);
@@ -198,7 +201,7 @@ public class ZjbBindings {
         }
     }
 
-    public static List<ZJobDD> listSpoolFiles(String jobid) throws Exception {
+    public List<ZJobDD> listSpoolFiles(String jobid) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment jobidSeg = FfmUtils.allocateString(arena, jobid);
             MemorySegment responsePtr = (MemorySegment) zjb_c_list_spool_files.invokeExact(jobidSeg);
@@ -240,7 +243,7 @@ public class ZjbBindings {
         }
     }
 
-    public static String readSpoolFile(String jobid, int key) throws Exception {
+    public String readSpoolFile(String jobid, int key) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment jobidSeg = FfmUtils.allocateString(arena, jobid);
             MemorySegment responsePtr = (MemorySegment) zjb_c_read_spool_file.invokeExact(jobidSeg, key);
@@ -266,7 +269,7 @@ public class ZjbBindings {
         }
     }
 
-    public static String getJobJcl(String jobid) throws Exception {
+    public String getJobJcl(String jobid) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment jobidSeg = FfmUtils.allocateString(arena, jobid);
             MemorySegment responsePtr = (MemorySegment) zjb_c_get_job_jcl.invokeExact(jobidSeg);
@@ -292,7 +295,7 @@ public class ZjbBindings {
         }
     }
 
-    public static void deleteJob(String jobid) throws Exception {
+    public void deleteJob(String jobid) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment jobidSeg = FfmUtils.allocateString(arena, jobid);
             MemorySegment responsePtr = (MemorySegment) zjb_c_delete_job.invokeExact(jobidSeg);
@@ -303,7 +306,7 @@ public class ZjbBindings {
         }
     }
 
-    public static String submitJob(String jclContent) throws Exception {
+    public String submitJob(String jclContent) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment jclSeg = FfmUtils.allocateString(arena, jclContent);
             MemorySegment responsePtr = (MemorySegment) zjb_c_submit_job.invokeExact(jclSeg);
