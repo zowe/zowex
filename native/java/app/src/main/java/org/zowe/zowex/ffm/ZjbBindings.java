@@ -129,7 +129,7 @@ public class ZjbBindings {
         public int key;
     }
 
-    private void handleBasicResponse(MemorySegment responsePtr) throws Exception {
+    private void handleBasicResponse(MemorySegment responsePtr, Arena arena) throws Exception {
         if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
         responsePtr = ZJBBasicResponse_C.reinterpret(responsePtr, arena, null);
         MemorySegment errorMsgSeg = ZJBBasicResponse_C.error_message(responsePtr);
