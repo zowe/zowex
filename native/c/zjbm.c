@@ -24,6 +24,7 @@
 #include "ihapsa.h"
 #include "cvt.h"
 #include "iefjesct.h"
+#include "zdbg.h"
 
 // TODO(Kelosky):
 // https://www.ibm.com/docs/en/zos/3.1.0?topic=79-putget-requests
@@ -522,6 +523,7 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
   STATJQTR *PTR32 statjqtrp = NULL;
 
   STATVO *PTR32 statvop = NULL;
+  STATSE *PTR32 statsep = NULL;
   STATSVHD *PTR32 statsvhdp = NULL;
   STATSEVB *PTR32 statsevbp = NULL;
 
@@ -551,6 +553,8 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
     stat.statjcrp = &correlator31[0];
   }
 
+  //rc = ZJBMTCOM(zjb, &stat, &job_info, entries);
+  // return rc;
   // NOTE(Kelosky): we first locate the STATJQ via jobid or job correlator because verbose data which containts SYSOUT info
   // cannot be obtained directly from the jobid or job correlator as documented by the JES SSI API.
   rc = ZJBMGJQ(zjb, &ssob, &stat, &statjqp);
@@ -560,7 +564,11 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
     return rc;
   }
   stat.statsel1 = 0;
+  stat.statsel2 = 0;
+  stat.statsel3 = 0;
+  stat.statsel4 = 0;
   stat.statsel5 = 0;
+  stat.statsel6 = 0;
 
   ssobp = &ssob;
   ssobp = (SSOB * PTR32)((unsigned int)ssobp | 0x80000000);
@@ -605,11 +613,18 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
   }
 
   statjqp = (STATJQ * PTR32) stat.statjobf;
-  statvop = (STATVO * PTR32) statjqp->stjqsvrb;
+  // statvop = (STATVO * PTR32) statjqp->stjqsvrb;
+  statvop = NULL;
 
   if (NULL == statjqp)
   {
     statjqp = stat.stattrsa;
+  }
+
+  if(NULL == statvop) {
+    // statvop = statjqp->stjqse;
+    // statsep = statjqp->stjqse;
+    zut_print_debug("problem?");
   }
 
   if (NULL == statjqp)
@@ -641,7 +656,7 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
     statjqhdp = (STATJQHD * PTR32)((unsigned char *PTR32)statjqp + statjqp->stjqohdr);
     statjqtrp = (STATJQTR * PTR32)((unsigned char *PTR32)statjqhdp + sizeof(STATJQHD));
 
-    while (statvop)
+    while (statvop || statsep)
     {
 
       if (loop_control >= zjb->dds_max)
@@ -658,8 +673,14 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
       if (total_size <= zjb->buffer_size)
       {
         *entries = *entries + 1;
+        // replace with statse if statvop is null
+        if(statvop == NULL) {
+          statsvhdp = (STATSVHD * PTR32)((unsigned char *PTR32)statsep + statsep->stseohdr);
+        }
+        else {
+          statsvhdp = (STATSVHD * PTR32)((unsigned char *PTR32)statvop + statvop->stvoohdr);
+        }
 
-        statsvhdp = (STATSVHD * PTR32)((unsigned char *PTR32)statvop + statvop->stvoohdr);
         statsevbp = (STATSEVB * PTR32)((unsigned char *PTR32)statsvhdp + sizeof(STATSVHD));
 
         memcpy(statsetrsp, statsevbp, sizeof(STATSEVB));
@@ -670,13 +691,52 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
         zjb->diag.detail_rc = ZJB_RTNCD_INSUFFICIENT_BUFFER;
       }
 
-      statvop = (STATVO * PTR32) statvop->stvojnxt;
+      char msg[100] = {0};
+      sprintf(msg, "----------DEBUG: DD=%s DSN=%s", statsevbp->stvsddnd, statsevbp->stvsdsn);
+      zut_print_debug(msg);
+
+      sprintf(msg, "----------DEBUG: FLG1=X'%02X' FLG2=X'%02X' LINES=%d",
+              statsevbp->stvsflg1,
+              statsevbp->stvsflg2,
+              statsevbp->stvslnct);
+      zut_print_debug(msg);
+
+      //replace with statse if statvop is null
+
+      if(statvop == NULL) {
+        statsep = (STATSE *PTR32) statsep->stsejnxt;
+      }
+      else {
+        statvop = (STATVO * PTR32) statvop->stvojnxt;
+
+      }
+      // statvop = (STATVO * PTR32) statvop->stvojnxt;
 
       loop_control++;
     }
 
     statjqp = (STATJQ * PTR32) statjqp->stjqnext;
   }
+
+  char msg[100] = {0};
+  sprintf(msg, "----- stat.statscla: '%d' ------", stat.statscla);
+  zut_print_debug(msg);
+  sprintf(msg, "----- stat.statsdes: '%d' ------", stat.statsdes);
+  zut_print_debug(msg);
+  sprintf(msg, "----- stat.stattype: '%d' ------", stat.stattype);
+  zut_print_debug(msg);
+  sprintf(msg, "----- stat.statnrse: '%d' ------", stat.statnrse);
+  zut_print_debug(msg);
+  sprintf(msg, "----- stat.statvero: '%d' ------", stat.statvero);
+  zut_print_debug(msg);
+  sprintf(msg, "----- stat.statofg1: '%d' ------", stat.statofg1);
+  zut_print_debug(msg);
+  sprintf(msg, "statvol: %s %s %s %s", stat.statvol[0], stat.statvol[1], stat.statvol[2], stat.statvol[3]);
+  zut_print_debug(msg);
+  sprintf(msg, "----- jobid: '%s' ------", zjb->jobid);
+  zut_print_debug(msg);
+  sprintf(msg, "----- correlator: '%s' ------", zjb->correlator);
+  zut_print_debug(msg);
 
   zjb->buffer_size_needed = total_size;
 
