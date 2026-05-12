@@ -209,8 +209,8 @@ static int zds_get_type_info(const std::string &dsn, ZDSTypeInfo &info)
 static int zds_write_sequential_streamed(ZDS *zds, const std::string &dsn, const std::string &pipe, size_t *content_len, const DscbAttributes &attrs);
 static int zds_write_member_bpam_streamed(ZDS *zds, const std::string &dsn, const std::string &pipe, size_t *content_len);
 
-static bool zds_alloc_rtdd(ZDIAG &diag, const std::string &cmd, const std::string &label,
-                           std::vector<std::string> &dds, std::string &ddname)
+static int zds_alloc_rtdd(ZDIAG &diag, const std::string &cmd, const std::string &label,
+                          std::vector<std::string> &dds, std::string &ddname)
 {
   unsigned int code = 0;
   std::string resp;
@@ -220,7 +220,7 @@ static bool zds_alloc_rtdd(ZDIAG &diag, const std::string &cmd, const std::strin
     return false;
   }
   dds.emplace_back("dd(" + ddname + ")");
-  return true;
+  return RTNCD_SUCCESS;
 }
 
 static int copy_sequential(ZDS *zds, const std::string &dsn1, const std::string &dsn2, ZDSCopyOptions *options)
@@ -245,21 +245,21 @@ static int copy_sequential(ZDS *zds, const std::string &dsn1, const std::string 
 
   std::string sysut1_ddname, sysut2_ddname, sysin_ddname, sysprint_ddname;
 
-  if (0 != zds_alloc_rtdd(zds->diag, "alloc da('" + dsn1 + "') shr", "source '" + dsn1 + "'", dds, sysut1_ddname))
+  if (RTNCD_SUCCESS != zds_alloc_rtdd(zds->diag, "alloc da('" + dsn1 + "') shr", "source '" + dsn1 + "'", dds, sysut1_ddname))
   {
     return RTNCD_FAILURE;
   }
-  if (0 != zds_alloc_rtdd(zds->diag, "alloc da('" + dsn2 + "') shr", "target '" + dsn2 + "'", dds, sysut2_ddname))
-  {
-    zut_free_dynalloc_dds(zds->diag, dds);
-    return RTNCD_FAILURE;
-  }
-  if (0 != zds_alloc_rtdd(zds->diag, "alloc lrecl(121) recfm(f,b,a) new delete space(1,1) tracks", "SYSPRINT", dds, sysprint_ddname))
+  if (RTNCD_SUCCESS != zds_alloc_rtdd(zds->diag, "alloc da('" + dsn2 + "') shr", "target '" + dsn2 + "'", dds, sysut2_ddname))
   {
     zut_free_dynalloc_dds(zds->diag, dds);
     return RTNCD_FAILURE;
   }
-  if (0 != zds_alloc_rtdd(zds->diag, "alloc dummy", "SYSIN", dds, sysin_ddname))
+  if (RTNCD_SUCCESS != zds_alloc_rtdd(zds->diag, "alloc lrecl(121) recfm(f,b,a) new delete space(1,1) tracks", "SYSPRINT", dds, sysprint_ddname))
+  {
+    zut_free_dynalloc_dds(zds->diag, dds);
+    return RTNCD_FAILURE;
+  }
+  if (RTNCD_SUCCESS != zds_alloc_rtdd(zds->diag, "alloc dummy", "SYSIN", dds, sysin_ddname))
   {
     zut_free_dynalloc_dds(zds->diag, dds);
     return RTNCD_FAILURE;
@@ -356,21 +356,21 @@ static int copy_partitioned(ZDS *zds, const ZDSTypeInfo &sourceInfo, const ZDSTy
   std::vector<std::string> dds;
   std::string src_ddname, tgt_ddname, sysin_ddname, sysprint_ddname;
 
-  if (0 != zds_alloc_rtdd(zds->diag, "alloc da('" + sourceInfo.base_dsn + "') shr", "source '" + sourceInfo.base_dsn + "'", dds, src_ddname))
+  if (RTNCD_SUCCESS != zds_alloc_rtdd(zds->diag, "alloc da('" + sourceInfo.base_dsn + "') shr", "source '" + sourceInfo.base_dsn + "'", dds, src_ddname))
   {
     return RTNCD_FAILURE;
   }
-  if (0 != zds_alloc_rtdd(zds->diag, "alloc da('" + targetInfo.base_dsn + "') shr", "target '" + targetInfo.base_dsn + "'", dds, tgt_ddname))
-  {
-    zut_free_dynalloc_dds(zds->diag, dds);
-    return RTNCD_FAILURE;
-  }
-  if (0 != zds_alloc_rtdd(zds->diag, "alloc lrecl(80) recfm(f,b)", "SYSIN", dds, sysin_ddname))
+  if (RTNCD_SUCCESS != zds_alloc_rtdd(zds->diag, "alloc da('" + targetInfo.base_dsn + "') shr", "target '" + targetInfo.base_dsn + "'", dds, tgt_ddname))
   {
     zut_free_dynalloc_dds(zds->diag, dds);
     return RTNCD_FAILURE;
   }
-  if (0 != zds_alloc_rtdd(zds->diag, "alloc lrecl(121) recfm(f,b,a)", "SYSPRINT", dds, sysprint_ddname))
+  if (RTNCD_SUCCESS != zds_alloc_rtdd(zds->diag, "alloc lrecl(80) recfm(f,b)", "SYSIN", dds, sysin_ddname))
+  {
+    zut_free_dynalloc_dds(zds->diag, dds);
+    return RTNCD_FAILURE;
+  }
+  if (RTNCD_SUCCESS != zds_alloc_rtdd(zds->diag, "alloc lrecl(121) recfm(f,b,a)", "SYSPRINT", dds, sysprint_ddname))
   {
     zut_free_dynalloc_dds(zds->diag, dds);
     return RTNCD_FAILURE;
