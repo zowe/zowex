@@ -116,7 +116,7 @@ static int wto(WTO_BUF *buf)
 #define zwto_debug(...)                                 \
   {                                                     \
     WTO_BUF buf = {0};                                  \
-    buf.len = sprintf(buf.msg, "%s", "ZWEX0001I ");     \
+    buf.len = sprintf(buf.msg, "%.*s", MAX_WTO_TEXT - 1, "ZWEX0001I ");     \
     buf.len += sprintf(buf.msg + buf.len, __VA_ARGS__); \
     wto(&buf);                                          \
   }
