@@ -209,6 +209,20 @@ static int zds_get_type_info(const std::string &dsn, ZDSTypeInfo &info)
 static int zds_write_sequential_streamed(ZDS *zds, const std::string &dsn, const std::string &pipe, size_t *content_len, const DscbAttributes &attrs);
 static int zds_write_member_bpam_streamed(ZDS *zds, const std::string &dsn, const std::string &pipe, size_t *content_len);
 
+static bool zds_alloc_rtdd(ZDIAG &diag, const std::string &cmd, const std::string &label,
+                           std::vector<std::string> &dds, std::string &ddname)
+{
+  unsigned int code = 0;
+  std::string resp;
+  if (zut_bpxwdyn_rtdd(cmd, &code, resp, ddname) != RTNCD_SUCCESS)
+  {
+    ZDIAG_SET_MSG(&diag, "Failed to allocate DD for %s: %s", label.c_str(), resp.c_str());
+    return false;
+  }
+  dds.emplace_back("dd(" + ddname + ")");
+  return true;
+}
+
 static int copy_sequential(ZDS *zds, const std::string &dsn1, const std::string &dsn2, ZDSCopyOptions *options)
 {
   int rc = 0;
@@ -229,24 +243,46 @@ static int copy_sequential(ZDS *zds, const std::string &dsn1, const std::string 
     return RTNCD_FAILURE;
   }
 
-  dds.push_back("alloc dd(SYSUT1) da('" + dsn1 + "') shr");
-  dds.push_back("alloc dd(SYSUT2) da('" + dsn2 + "') shr");
-  dds.push_back("alloc dd(SYSPRINT) new delete space(1,1) tracks recfm(f,b,a) lrecl(121) reuse");
-  dds.push_back("alloc dd(SYSIN) dummy reuse");
+  std::string sysut1_ddname, sysut2_ddname, sysin_ddname, sysprint_ddname;
 
-  rc = zut_loop_dynalloc(zds->diag, dds);
-  if (rc != RTNCD_SUCCESS)
+  if (0 != zds_alloc_rtdd(zds->diag, "alloc da('" + dsn1 + "') shr", "source '" + dsn1 + "'", dds, sysut1_ddname))
+  {
+    return RTNCD_FAILURE;
+  }
+  if (0 != zds_alloc_rtdd(zds->diag, "alloc da('" + dsn2 + "') shr", "target '" + dsn2 + "'", dds, sysut2_ddname))
+  {
+    zut_free_dynalloc_dds(zds->diag, dds);
+    return RTNCD_FAILURE;
+  }
+  if (0 != zds_alloc_rtdd(zds->diag, "alloc lrecl(121) recfm(f,b,a) new delete space(1,1) tracks", "SYSPRINT", dds, sysprint_ddname))
+  {
+    zut_free_dynalloc_dds(zds->diag, dds);
+    return RTNCD_FAILURE;
+  }
+  if (0 != zds_alloc_rtdd(zds->diag, "alloc dummy", "SYSIN", dds, sysin_ddname))
   {
     zut_free_dynalloc_dds(zds->diag, dds);
     return RTNCD_FAILURE;
   }
 
-  rc = zut_run("IEBGENER");
+  IEBCOPY_ALT_DDS alt_dds{};
+  zut_build_iebcopy_dds_options(&alt_dds, {
+                                              .sysin_ddname = sysin_ddname,
+                                              .sysprint_ddname = sysprint_ddname,
+                                              .src_ddname = sysut1_ddname,
+                                              .tgt_ddname = sysut2_ddname,
+                                          });
 
-  if (rc != 0)
+  PROGRAM_OPTION opt = {sizeof(IEBCOPY_ALT_DDS), 6, &alt_dds};
+  PROGRAM_OPTION_LIST opt_list{};
+  zut_build_program_option_list(&opt_list, {&opt}, zds->diag);
+
+  rc = zut_run_with_options(zds->diag, "IEBGENER", "", &opt_list);
+
+  if (rc != RTNCD_SUCCESS)
   {
     std::string output;
-    ZDSReadOpts ropts{.zds = zds, .ddname = "SYSPRINT"};
+    ZDSReadOpts ropts{.zds = zds, .ddname = sysprint_ddname};
     zds_read(ropts, output);
 
     char truncated_detail[128];
@@ -256,15 +292,12 @@ static int copy_sequential(ZDS *zds, const std::string &dsn1, const std::string 
     ZDIAG_SET_MSG(&zds->diag,
                   "IEBGENER failed with RC=%d. SYSPRINT: %s",
                   rc, truncated_detail);
-    rc = RTNCD_FAILURE;
-  }
-  else
-  {
-    rc = RTNCD_SUCCESS;
+    zut_free_dynalloc_dds(zds->diag, dds);
+    return RTNCD_FAILURE;
   }
 
   zut_free_dynalloc_dds(zds->diag, dds);
-  return rc;
+  return RTNCD_SUCCESS;
 }
 
 static int copy_partitioned(ZDS *zds, const ZDSTypeInfo &sourceInfo, const ZDSTypeInfo &targetInfo, ZDSCopyOptions *options)
@@ -320,38 +353,24 @@ static int copy_partitioned(ZDS *zds, const ZDSTypeInfo &sourceInfo, const ZDSTy
   }
 
   int rc = 0;
-  unsigned int code = 0;
-  std::string resp;
   std::vector<std::string> dds;
   std::string src_ddname, tgt_ddname, sysin_ddname, sysprint_ddname;
 
-  auto alloc_dd = [&](const std::string &cmd, const std::string &label, std::string &ddname) -> bool
-  {
-    if (zut_bpxwdyn_rtdd(cmd, &code, resp, ddname) != RTNCD_SUCCESS)
-    {
-      ZDIAG_SET_MSG(&zds->diag,
-                    "Failed to allocate DD for %s: %s", label.c_str(), resp.c_str());
-      return false;
-    }
-    dds.emplace_back("dd(" + ddname + ")");
-    return true;
-  };
-
-  if (!alloc_dd("alloc da('" + sourceInfo.base_dsn + "') shr", "source '" + sourceInfo.base_dsn + "'", src_ddname))
+  if (0 != zds_alloc_rtdd(zds->diag, "alloc da('" + sourceInfo.base_dsn + "') shr", "source '" + sourceInfo.base_dsn + "'", dds, src_ddname))
   {
     return RTNCD_FAILURE;
   }
-  if (!alloc_dd("alloc da('" + targetInfo.base_dsn + "') shr", "target '" + targetInfo.base_dsn + "'", tgt_ddname))
+  if (0 != zds_alloc_rtdd(zds->diag, "alloc da('" + targetInfo.base_dsn + "') shr", "target '" + targetInfo.base_dsn + "'", dds, tgt_ddname))
   {
     zut_free_dynalloc_dds(zds->diag, dds);
     return RTNCD_FAILURE;
   }
-  if (!alloc_dd("alloc lrecl(80) recfm(f,b)", "SYSIN", sysin_ddname))
+  if (0 != zds_alloc_rtdd(zds->diag, "alloc lrecl(80) recfm(f,b)", "SYSIN", dds, sysin_ddname))
   {
     zut_free_dynalloc_dds(zds->diag, dds);
     return RTNCD_FAILURE;
   }
-  if (!alloc_dd("alloc lrecl(121) recfm(f,b,a)", "SYSPRINT", sysprint_ddname))
+  if (0 != zds_alloc_rtdd(zds->diag, "alloc lrecl(121) recfm(f,b,a)", "SYSPRINT", dds, sysprint_ddname))
   {
     zut_free_dynalloc_dds(zds->diag, dds);
     return RTNCD_FAILURE;
