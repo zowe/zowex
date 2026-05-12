@@ -331,7 +331,7 @@ export class SshMvsApi extends SshCommonApi implements MainframeInteraction.IMvs
             );
         }
 
-        const sourceDs = listResponse.items[0];
+        const sourceDs: Dataset = listResponse.items[0];
 
         const attributes: DatasetAttributes = {
             dsname: dataSetName,
@@ -345,6 +345,10 @@ export class SshMvsApi extends SshCommonApi implements MainframeInteraction.IMvs
             primary: sourceDs.alloc || 1,
             secondary: 1,
         };
+
+        if (["PDS", "PDSE", "LIBRARY"].includes(sourceDs.dsntype ?? "")) {
+            attributes.dirblk = 25;
+        }
 
         try {
             const response = await (await this.client).ds.createDataset({

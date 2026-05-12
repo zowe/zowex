@@ -16,6 +16,7 @@
 #include <ostream>
 #include <iconv.h>
 #include <vector>
+#include <optional>
 #include <string>
 #include "ztype.h"
 
@@ -31,6 +32,35 @@ struct ZConvData
   char *output_buffer;    /**< Pointer to output buffer. */
   char *output_iter;      /**< Pointer to current position in output buffer. */
 };
+
+struct IEBCOPY_DD_OPTIONS
+{
+  const std::string &sysin_ddname;
+  const std::string &sysprint_ddname;
+  const std::string &src_ddname;
+  const std::string &tgt_ddname;
+  std::optional<std::string> sysut3;
+  std::optional<std::string> sysut4;
+};
+
+/**
+ * @brief Build a PROGRAM_OPTION_LIST from a vector of PROGRAM_OPTION pointers.
+ *        This function populates the option_list structure with the provided options,
+ *        setting the count and option array appropriately.
+ * @param opt_list Pointer to PROGRAM_OPTION_LIST structure to populate
+ * @param options Vector of PROGRAM_OPTION pointers to include in the list
+ */
+
+int zut_build_program_option_list(PROGRAM_OPTION_LIST *opt_list, const std::vector<PROGRAM_OPTION *> &options, ZDIAG &diag);
+/**
+ * @brief Build IEBCOPY_ALT_DDS structure from IEBCOPY_DD_OPTIONS.
+ *        This function populates the alt_dds structure with DD names and options
+ *        from the provided IEBCOPY_DD_OPTIONS structure.
+ * @param alt_dds Pointer to IEBCOPY_ALT_DDS structure to populate
+ * @param options Reference to IEBCOPY_DD_OPTIONS containing the DD configuration
+ */
+
+void zut_build_iebcopy_dds_options(IEBCOPY_ALT_DDS *alt_dds, const IEBCOPY_DD_OPTIONS &options);
 
 /**
  * @brief Strips the last character from input if it's a newline.
@@ -81,14 +111,34 @@ int zut_search(const std::string &input);
  * @param parms The parameters string to execute
  * @return Return code (0 for success, non-zero for error)
  */
-int zut_run(ZDIAG &diag, const std::string &input, const std::string &parms);
+int zut_run(const std::string &program);
 
 /**
  * @brief Run a specified command or operation
+ * @param diag Reference to diagnostic information structure
  * @param input The command string to execute
+ * @param parms The parameters string to execute
  * @return Return code (0 for success, non-zero for error)
  */
-int zut_run(const std::string &input);
+int zut_run(ZDIAG &diag, const std::string &input, const std::string &parms);
+
+/**
+ * @brief Run a z/OS load module with optional parameter options (e.g. alternate DD lists).
+ *        The caller is responsible for freeing opt_list after this call returns.
+ * @param diag Reference to diagnostic information structure
+ * @param input The load module name
+ * @param parms Parameter string passed as the first positional argument
+ * @param opt_list Optional program option list (nullptr for none)
+ * @return Return code (0 for success, non-zero for error)
+ */
+int zut_run_with_options(ZDIAG &diag, const std::string &input, const std::string &parms, PROGRAM_OPTION_LIST *opt_list);
+
+/**
+ * @brief Set a DD name in char array with padded spaces, or binary zeros for null. For use as PROGRAM_OPTION content.
+ * @param arr The 8-byte character array to set
+ * @param ddname The DD name to set
+ */
+void zut_set_dd_with_padding(char arr[8], const char *ddname);
 
 /**
  * @brief Substitute a symbol in a string
