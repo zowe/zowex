@@ -13,6 +13,7 @@
 #include <string>
 #include <cstring>
 #include <vector>
+#include <cctype>
 #include <iomanip>
 #include <cstdio>
 #include <unistd.h>
@@ -42,7 +43,7 @@ void zjb_build_job_response(ZJB_JOB_INFO *PTR64, int, std::vector<ZJob> &);
 // NOTE(Kelosky): see struct __S99struc via 'showinc' compiler option in <stdio.h>
 // NOTE(Kelosky): In the future, to allocate the logical SYSLOG concatenation for a system specify the following data set name (in DALDSNAM).
 // https://www.ibm.com/docs/en/zos/3.1.0?topic=allocation-specifying-data-set-name-daldsnam
-int zjb_read_jobs_output_by_key(ZJB *zjb, const std::string &jobid, int key, std::string &response)
+int zjb_read_job_content_by_key(ZJB *zjb, const std::string &jobid, int key, std::string &response)
 {
   int rc = 0;
   std::string job_dsn;
@@ -71,6 +72,7 @@ int zjb_get_job_dsn_by_key(ZJB *zjb, const std::string &jobid, int key, std::str
     if (key == dd.key)
     {
       job_dsn = dd.dsn;
+      memcpy(zjb->token, dd.token, sizeof(dd.token));
       rc = 0;
       break;
     }
@@ -84,6 +86,68 @@ int zjb_get_job_dsn_by_key(ZJB *zjb, const std::string &jobid, int key, std::str
   }
 
   return RTNCD_SUCCESS;
+}
+
+static int zjb_parse_dsn_for_key(const std::string &dsn_str, std::string &jobid, int &key)
+{
+  // dsn format: userid.jobname.jobid.Ddskey[.dsname]
+  // https://www.ibm.com/docs/en/zos/3.1.0?topic=allocation-specifying-data-set-name-daldsnam
+
+  std::vector<std::string> parts;
+  std::stringstream ss(dsn_str);
+  std::string part;
+
+  // split on '.' delimiter
+  while (std::getline(ss, part, '.'))
+  {
+    parts.push_back(part);
+  }
+
+  // ensure at least userid.jobname.jobid.Ddskey
+  if (parts.size() < 4)
+  {
+    return ZJB_RTNCD_PARSE_ERROR_SIZE;
+  }
+
+  // get jobid
+  jobid = parts[2];
+
+  // get key
+  const std::string &ddskey = parts[3];
+
+  // validate key starts with 'D' and has digits after
+  if (ddskey.empty() || ddskey[0] != 'D')
+  {
+    return ZJB_RTNCD_PARSE_ERROR_MALFORMED;
+  }
+
+  // get key after 'D' (skip first character)
+  std::string key_str = ddskey.substr(1);
+
+  // validate 7 chars max
+  if (key_str.empty() || key_str.length() > 7)
+  {
+    return ZJB_RTNCD_PARSE_ERROR_NUMBER_LEN;
+  }
+
+  for (char c : key_str)
+  {
+    if (!std::isdigit(c))
+    {
+      return ZJB_RTNCD_PARSE_ERROR_NUMBER_CHAR;
+    }
+  }
+
+  try
+  {
+    key = std::stoi(key_str);
+  }
+  catch (const std::exception &)
+  {
+    return ZJB_RTNCD_PARSE_ERROR_NUMBER_CONVERSION;
+  }
+
+  return 0;
 }
 
 int zjb_read_job_jcl(ZJB *zjb, const std::string &jobid, std::string &response)
@@ -131,8 +195,15 @@ static int zjb_read_job_dynamic_allocation(ZJB *zjb, std::string jobdsn, std::st
 
   unsigned char *p = nullptr;
 
+  unsigned char token[80] = {0};
+  bool use_stvsctkn = false;
+  if (0 != memcmp(zjb->token, token, sizeof(token)))
+  {
+    use_stvsctkn = true;
+  }
+
   // calculate total size needed, obtain, & clear
-  int total_size_needed = sizeof(IAZBTOKP) + (sizeof(S99TUNIT_X) * NUM_TEXT_UNITS) + (sizeof(S99TUPL) * NUM_TEXT_UNITS) + sizeof(__S99parms) + sizeof(__S99rbx_t);
+  int total_size_needed = sizeof(IAZBTOKP) + (sizeof(S99TUNIT_X) * NUM_TEXT_UNITS) + (sizeof(S99TUPL) * NUM_TEXT_UNITS) + sizeof(__S99parms) + sizeof(__S99rbx_t) + sizeof(token);
   unsigned char *parms = (unsigned char *)__malloc31(total_size_needed);
   if (parms == nullptr)
   {
@@ -147,6 +218,12 @@ static int zjb_read_job_dynamic_allocation(ZJB *zjb, std::string jobdsn, std::st
   S99TUPL *PTR32 s99tupl = (S99TUPL * PTR32)(parms + sizeof(IAZBTOKP) + (sizeof(S99TUNIT_X) * NUM_TEXT_UNITS));
   __S99parms *PTR32 s99parms = (__S99parms * PTR32)(parms + sizeof(IAZBTOKP) + (sizeof(S99TUNIT_X) * NUM_TEXT_UNITS) + (sizeof(S99TUPL) * NUM_TEXT_UNITS));
   __S99rbx_t *PTR32 s99parmsx = (__S99rbx_t * PTR32)(parms + sizeof(IAZBTOKP) + (sizeof(S99TUNIT_X) * NUM_TEXT_UNITS) + (sizeof(S99TUPL) * NUM_TEXT_UNITS) + sizeof(__S99parms));
+  unsigned char *PTR32 token31 = (unsigned char *PTR32)(parms + sizeof(IAZBTOKP) + (sizeof(S99TUNIT_X) * NUM_TEXT_UNITS) + (sizeof(S99TUPL) * NUM_TEXT_UNITS) + sizeof(__S99parms) + sizeof(__S99rbx_t));
+
+  if (use_stvsctkn)
+  {
+    memcpy(token31, zjb->token, sizeof(zjb->token));
+  }
 
   // https://www.ibm.com/docs/en/zos/3.1.0?topic=allocation-building-browse-token-dalbrtkn
   short int len = sizeof(iazbtokp->btokid);
@@ -154,9 +231,23 @@ static int zjb_read_job_dynamic_allocation(ZJB *zjb, std::string jobdsn, std::st
   memcpy(iazbtokp->btokid, "BTOK", sizeof(iazbtokp->btokid));
   len = sizeof(iazbtokp->btokver);
   memcpy(iazbtokp->btokpl2, &len, sizeof(len));
-  iazbtokp->btoktype = btokbrws; // alternative type: btokstkn
+
+  if (use_stvsctkn)
+  {
+    iazbtokp->btoktype = btokstkn; // alternative type: btokstkn
+  }
+  else
+  {
+    iazbtokp->btoktype = btokbrws; // alternative type: btokstkn
+  }
   iazbtokp->btokvers = btokvrnm;
   len = sizeof(iazbtokp->btokiotp);
+
+  if (use_stvsctkn)
+  {
+    memcpy(&iazbtokp->btokiotp[0], &token31, 4);
+  }
+
   memcpy(iazbtokp->btokpl3, &len, sizeof(len));
   len = sizeof(iazbtokp->btokjkey);
   memcpy(iazbtokp->btokpl4, &len, sizeof(len));
@@ -261,6 +352,8 @@ static int zjb_read_job_dynamic_allocation(ZJB *zjb, std::string jobdsn, std::st
     zjb->diag.service_rc = rc;
     ZDIAG_SET_MSG(&zjb->diag, "Could not allocate job spool file '%s', rc: '%d' s99error: '%d' s99info: '%d'", jobdsn.c_str(), rc, s99parms->__S99ERROR, s99parms->__S99INFO);
     zjb->diag.detail_rc = ZJB_RTNCD_SERVICE_FAILURE;
+    zjb->diag.service_rsn = s99parms->__S99ERROR;
+    zjb->diag.service_rsn_secondary = s99parms->__S99INFO;
     free(parms);
     return RTNCD_FAILURE;
   }
@@ -366,6 +459,50 @@ int zjb_read_job_content_by_dsn(ZJB *zjb, const std::string &dsn, std::string &r
   int rc = 0;
   std::string ddname;
   ZDS zds = {};
+
+  std::string parsed_jobid;
+  int parsed_key;
+
+  // parse dsn for jobid and key
+  int parse_rc = zjb_parse_dsn_for_key(dsn, parsed_jobid, parsed_key);
+  if (0 != parse_rc)
+  {
+    strcpy(zjb->diag.service_name, "zjb_parse_dsn_for_key");
+    zjb->diag.service_rc = parse_rc;
+    ZDIAG_SET_MSG(&zjb->diag, "Spool read parse failed with error code %d", parse_rc);
+    return RTNCD_FAILURE;
+  }
+
+  // list all dsns on jobid
+  std::vector<ZJobDD> job_dds;
+  rc = zjb_list_dds(zjb, parsed_jobid, job_dds);
+  if (0 != rc)
+  {
+    return rc;
+  }
+
+  // verify the dsn is on the jobid
+  bool found = false;
+  for (const auto &dd : job_dds)
+  {
+    std::string dd_dsn_trimmed = dd.dsn;
+    std::string dsn_trimmed = dsn;
+    if (zut_trim(dd_dsn_trimmed) == zut_trim(dsn_trimmed))
+    {
+      ddname = dd.dsn;
+      memcpy(zjb->token, dd.token, sizeof(dd.token));
+      found = true;
+      break;
+    }
+  }
+
+  if (!found)
+  {
+    strcpy(zjb->diag.service_name, "zjb_list_dds");
+    zjb->diag.service_rc = ZJB_RTNCD_JOB_DSN_NOT_FOUND;
+    ZDIAG_SET_MSG(&zjb->diag, "Spool read DSN not found in job '%s'", parsed_jobid.c_str());
+    return RTNCD_FAILURE;
+  }
 
   rc = zjb_read_job_dynamic_allocation(zjb, dsn, ddname);
   if (0 != rc)
@@ -634,6 +771,7 @@ int zjb_list_dds(ZJB *zjb, const std::string &jobid, std::vector<ZJobDD> &jobDDs
     ZJobDD zjobdd{};
 
     zjobdd.ddn = ddn;
+    memcpy(zjobdd.token, sysoutInfoNext[i].stvsctkn, sizeof(sysoutInfoNext[i].stvsctkn));
     zjobdd.stepname = stepname;
     zjobdd.procstep = procstep;
     zjobdd.dsn = dsn;
