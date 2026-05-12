@@ -94,7 +94,7 @@ extern "C"
   int ZUTEDSCT();
   int ZUTSYMBP(SYMBOL_DATA *);
   int ZUTSRCH(const char *);
-  int ZUTRUN(ZDIAG *, const char *, const char *);
+  int ZUTRUN(ZDIAG *, const char *, const char *, PROGRAM_OPTION_LIST *);
   void ZUTDBGMG(const char *);
   unsigned char ZUTMGKEY();
   int ZUTMLPLB(ZDIAG *, int *, PARMLIB_DSNS *);

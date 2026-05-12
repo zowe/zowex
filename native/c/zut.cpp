@@ -11,6 +11,7 @@
 
 #ifndef _XOPEN_SOURCE
 #define _XOPEN_SOURCE
+#include "ztype.h"
 #endif
 
 #define _OPEN_SYS_EXT
@@ -369,15 +370,79 @@ int zut_search(const std::string &parms)
   return ZUTSRCH(parms.c_str());
 }
 
+int zut_build_program_option_list(PROGRAM_OPTION_LIST *opt_list, const std::vector<PROGRAM_OPTION *> &options, ZDIAG &diag)
+{
+
+  if (options.size() > 4)
+  {
+    ZDIAG_SET_MSG(&diag, "ZUTRUN called with more than 4 program options. Only up to 4 are supported.");
+    return RTNCD_FAILURE;
+  }
+
+  opt_list->count = options.size();
+
+  for (size_t i = 0; i < options.size(); i++)
+  {
+    // data pointer must remain valid for the duration of the ZUTRUN call;
+    // ZUTRUN copies it to 31-bit memory before invoking the load module
+    opt_list->options[i] = options[i];
+  }
+  return RTNCD_SUCCESS;
+}
+
+int zut_run_with_options(ZDIAG &diag, const std::string &program, const std::string &parms, PROGRAM_OPTION_LIST *options)
+{
+  return ZUTRUN(&diag, program.c_str(), parms.c_str(), options);
+}
+
 int zut_run(ZDIAG &diag, const std::string &program, const std::string &parms)
 {
-  return ZUTRUN(&diag, program.c_str(), parms.c_str());
+  return zut_run_with_options(diag, program, parms, nullptr);
 }
 
 int zut_run(const std::string &program)
 {
   ZDIAG diag{};
-  return ZUTRUN(&diag, program.c_str(), nullptr);
+  return zut_run_with_options(diag, program, "", nullptr);
+}
+
+void zut_build_iebcopy_dds_options(IEBCOPY_ALT_DDS *alt_dds, const IEBCOPY_DD_OPTIONS &options)
+{
+  // represents length of the DD list in IEBCOPY_ALT_DDS
+  constexpr uint16_t IEBCOPY_DD_LEN_SYSUT2 = 72;
+  constexpr uint16_t IEBCOPY_DD_LEN_SYSUT3 = 80;
+  constexpr uint16_t IEBCOPY_DD_LEN_SYSUT4 = 88;
+
+  uint16_t len = IEBCOPY_DD_LEN_SYSUT2;
+  zut_set_dd_with_padding(alt_dds->sysin, options.sysin_ddname.c_str());
+  zut_set_dd_with_padding(alt_dds->sysprint, options.sysprint_ddname.c_str());
+  zut_set_dd_with_padding(alt_dds->sysut1, options.src_ddname.c_str());
+  zut_set_dd_with_padding(alt_dds->sysut2, options.tgt_ddname.c_str());
+  if (options.sysut3.has_value())
+  {
+    zut_set_dd_with_padding(alt_dds->sysut3, options.sysut3.value().c_str());
+    len = IEBCOPY_DD_LEN_SYSUT3;
+  }
+  if (options.sysut4.has_value())
+  {
+    zut_set_dd_with_padding(alt_dds->sysut4, options.sysut4.value().c_str());
+    len = IEBCOPY_DD_LEN_SYSUT4;
+  }
+  alt_dds->TotalLength = len;
+}
+
+void zut_set_dd_with_padding(char arr[8], const char *ddname)
+{
+  if (ddname && ddname[0] != '\0')
+  {
+    memset(arr, ' ', 8); // Pad with spaces for standard DD format
+    unsigned long int len = strlen(ddname);
+    memcpy(arr, ddname, len > 8 ? 8 : len);
+  }
+  else
+  {
+    memset(arr, 0, 8); // Binary zeros
+  }
 }
 
 unsigned char zut_get_key()

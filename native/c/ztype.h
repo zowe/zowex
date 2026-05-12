@@ -84,7 +84,51 @@ typedef struct
 
 } ZDIAG;
 
+// see https://www.ibm.com/docs/en/SSLTBW_3.1.0/pdf/idau100_v3r1.pdf "ddname List"
+typedef struct
+{
+
+  /* DWORD alignment */
+  char _unused0[6];
+  /* 2 byte length: measures from start of dd section to end */
+  uint16_t TotalLength;
+
+  /* --- DD LIST --- */
+  /* Rows 1-4 explicitly show binary zeros */
+  char _unused1[8];
+  char _unused2[8];
+  char _unused3[8];
+  char _unused4[8];
+
+  /* Explicit DDNAME override labels */
+  char sysin[8];
+  char sysprint[8];
+
+  /* Row explicitly showing binary zeros */
+  char _unused5[8];
+
+  /* SYSUT datasets */
+  char sysut1[8];
+  char sysut2[8];
+  char sysut3[8];
+  char sysut4[8];
+
+} IEBCOPY_ALT_DDS;
+
 ZNP_PACK_OFF
+typedef struct
+{
+  unsigned int size;
+  // bytes offset from start of data where param ptr should be set
+  unsigned short chain_ptr_offset;
+  void *data;
+} PROGRAM_OPTION;
+
+typedef struct
+{
+  unsigned int count;
+  PROGRAM_OPTION *options[4];
+} PROGRAM_OPTION_LIST;
 
 enum DataType
 {

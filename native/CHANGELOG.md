@@ -6,6 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- `c`: Fixed an issue where the `zowex ds copy` command would fail to allocate DDs when copying PDS members in parallel. [#994](https://github.com/zowe/zowex/issues/994)
 - `c`: Optimized USS file list operations by replacing CSV formatting and parsing with structured data transfer via the `ZusfListEntry` struct. This improves performance for `zowex uss list` and provides type-safe, programmatic access to file attributes for SDK consumers. [#990](https://github.com/zowe/zowex/pull/990)
 - `c`: Fixed parsing of file names containing commas in USS list API responses, which caused data misalignment for SDK consumers. [#989](https://github.com/zowe/zowex/issues/989)
 - `c`: Fixed an issue where the `zoweax` authorized CLI binary could run the `server` command or `plugin` command group as privileged. Now, `zoweax` disables privileges before commands are executed. Commands in the `console` group continue to run as privileged. [#958](https://github.com/zowe/zowex/issues/958)

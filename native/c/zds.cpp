@@ -1,4 +1,3 @@
-
 /**
  * This program and the accompanying materials are made available under the terms of the
  * Eclipse Public License v2.0 which accompanies this distribution, and is available at
@@ -210,6 +209,20 @@ static int zds_get_type_info(const std::string &dsn, ZDSTypeInfo &info)
 static int zds_write_sequential_streamed(ZDS *zds, const std::string &dsn, const std::string &pipe, size_t *content_len, const DscbAttributes &attrs);
 static int zds_write_member_bpam_streamed(ZDS *zds, const std::string &dsn, const std::string &pipe, size_t *content_len);
 
+static bool zds_alloc_rtdd(ZDIAG &diag, const std::string &cmd, const std::string &label,
+                           std::vector<std::string> &dds, std::string &ddname)
+{
+  unsigned int code = 0;
+  std::string resp;
+  if (zut_bpxwdyn_rtdd(cmd, &code, resp, ddname) != RTNCD_SUCCESS)
+  {
+    ZDIAG_SET_MSG(&diag, "Failed to allocate DD for %s: %s", label.c_str(), resp.c_str());
+    return false;
+  }
+  dds.emplace_back("dd(" + ddname + ")");
+  return true;
+}
+
 static int copy_sequential(ZDS *zds, const std::string &dsn1, const std::string &dsn2, ZDSCopyOptions *options)
 {
   int rc = 0;
@@ -217,60 +230,74 @@ static int copy_sequential(ZDS *zds, const std::string &dsn1, const std::string 
 
   if (options->overwrite)
   {
-    zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
-                                   "Cannot use --overwrite when a sequential data set is specified. Use --replace (-r) to replace the contents of target data set '%s'.",
-                                   dsn2.c_str());
+    ZDIAG_SET_MSG(&zds->diag,
+                  "Cannot use --overwrite when a sequential data set is specified. Use --replace (-r) to replace the contents of target data set '%s'.",
+                  dsn2.c_str());
     return RTNCD_FAILURE;
   }
 
   if (options->target_exists && !options->replace)
   {
-    zds->diag.e_msg_len = snprintf(zds->diag.e_msg, (int)(sizeof(zds->diag.e_msg) - 1),
-                                   "Target data set '%s' already exists. Use --replace (-r) flag to replace the target's contents", dsn2.c_str());
+    ZDIAG_SET_MSG(&zds->diag,
+                  "Target data set '%s' already exists. Use --replace (-r) flag to replace the target's contents", dsn2.c_str());
     return RTNCD_FAILURE;
   }
 
-  dds.push_back("alloc dd(SYSUT1) da('" + dsn1 + "') shr");
-  dds.push_back("alloc dd(SYSUT2) da('" + dsn2 + "') shr");
-  dds.push_back("alloc dd(SYSPRINT) new delete space(1,1) tracks recfm(f,b,a) lrecl(121) reuse");
-  dds.push_back("alloc dd(SYSIN) dummy reuse");
+  std::string sysut1_ddname, sysut2_ddname, sysin_ddname, sysprint_ddname;
 
-  rc = zut_loop_dynalloc(zds->diag, dds);
-  if (rc != RTNCD_SUCCESS)
+  if (0 != zds_alloc_rtdd(zds->diag, "alloc da('" + dsn1 + "') shr", "source '" + dsn1 + "'", dds, sysut1_ddname))
+  {
+    return RTNCD_FAILURE;
+  }
+  if (0 != zds_alloc_rtdd(zds->diag, "alloc da('" + dsn2 + "') shr", "target '" + dsn2 + "'", dds, sysut2_ddname))
+  {
+    zut_free_dynalloc_dds(zds->diag, dds);
+    return RTNCD_FAILURE;
+  }
+  if (0 != zds_alloc_rtdd(zds->diag, "alloc lrecl(121) recfm(f,b,a) new delete space(1,1) tracks", "SYSPRINT", dds, sysprint_ddname))
+  {
+    zut_free_dynalloc_dds(zds->diag, dds);
+    return RTNCD_FAILURE;
+  }
+  if (0 != zds_alloc_rtdd(zds->diag, "alloc dummy", "SYSIN", dds, sysin_ddname))
   {
     zut_free_dynalloc_dds(zds->diag, dds);
     return RTNCD_FAILURE;
   }
 
-  rc = zut_run("IEBGENER");
+  IEBCOPY_ALT_DDS alt_dds{};
+  zut_build_iebcopy_dds_options(&alt_dds, {
+                                              .sysin_ddname = sysin_ddname,
+                                              .sysprint_ddname = sysprint_ddname,
+                                              .src_ddname = sysut1_ddname,
+                                              .tgt_ddname = sysut2_ddname,
+                                          });
 
-  if (rc != 0)
+  PROGRAM_OPTION opt = {sizeof(IEBCOPY_ALT_DDS), 6, &alt_dds};
+  PROGRAM_OPTION_LIST opt_list{};
+  zut_build_program_option_list(&opt_list, {&opt}, zds->diag);
+
+  rc = zut_run_with_options(zds->diag, "IEBGENER", "", &opt_list);
+
+  if (rc != RTNCD_SUCCESS)
   {
     std::string output;
-    ZDSReadOpts ropts{.zds = zds, .ddname = "SYSPRINT"};
+    ZDSReadOpts ropts{.zds = zds, .ddname = sysprint_ddname};
     zds_read(ropts, output);
 
     char truncated_detail[128];
     strncpy(truncated_detail, output.c_str(), sizeof(truncated_detail) - 1);
     truncated_detail[sizeof(truncated_detail) - 1] = '\0';
 
-    zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
-                                   "IEBGENER failed with RC=%d. SYSPRINT: %s",
-                                   rc, truncated_detail);
-
-    if (zds->diag.e_msg_len >= sizeof(zds->diag.e_msg))
-    {
-      zds->diag.e_msg_len = sizeof(zds->diag.e_msg) - 1;
-    }
-    rc = RTNCD_FAILURE;
-  }
-  else
-  {
-    rc = RTNCD_SUCCESS;
+    ZDIAG_SET_MSG(&zds->diag,
+                  "IEBGENER failed with RC=%d. SYSPRINT: %s",
+                  rc, truncated_detail);
+    zut_free_dynalloc_dds(zds->diag, dds);
+    return RTNCD_FAILURE;
   }
 
   zut_free_dynalloc_dds(zds->diag, dds);
-  return rc;
+  return RTNCD_SUCCESS;
 }
 
 static int copy_partitioned(ZDS *zds, const ZDSTypeInfo &sourceInfo, const ZDSTypeInfo &targetInfo, ZDSCopyOptions *options)
@@ -280,9 +307,9 @@ static int copy_partitioned(ZDS *zds, const ZDSTypeInfo &sourceInfo, const ZDSTy
 
   if (options->overwrite && !targetIsPds)
   {
-    zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
-                                   "Cannot use --overwrite when a target member is specified. Use --replace (-r) to replace the contents of member '%s'.",
-                                   targetInfo.member_name.c_str());
+    ZDIAG_SET_MSG(&zds->diag,
+                  "Cannot use --overwrite when a target member is specified. Use --replace (-r) to replace the contents of member '%s'.",
+                  targetInfo.member_name.c_str());
     return RTNCD_FAILURE;
   }
 
@@ -312,30 +339,42 @@ static int copy_partitioned(ZDS *zds, const ZDSTypeInfo &sourceInfo, const ZDSTy
     int rc = zut_bpxwdyn("ALLOC DA('" + targetInfo.base_dsn + "') LIKE('" + sourceInfo.base_dsn + "') NEW CATALOG", &code, create_resp);
     if (rc != RTNCD_SUCCESS)
     {
-      zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
-                                     "Overwrite failed. Could not recreate '%s' using LIKE. Details: %s", targetInfo.base_dsn.c_str(), create_resp.c_str());
+      ZDIAG_SET_MSG(&zds->diag,
+                    "Overwrite failed. Could not recreate '%s' using LIKE. Details: %s", targetInfo.base_dsn.c_str(), create_resp.c_str());
       return RTNCD_FAILURE;
     }
     rc = zut_bpxwdyn("FREE DA('" + targetInfo.base_dsn + "')", &code, resp);
     if (rc != RTNCD_SUCCESS)
     {
-      zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
-                                     "Overwrite failed. Details: %s", create_resp.c_str());
+      ZDIAG_SET_MSG(&zds->diag,
+                    "Overwrite failed. Details: %s", create_resp.c_str());
       return RTNCD_FAILURE;
     }
   }
 
   int rc = 0;
-  std::vector<std::string> dds{};
+  std::vector<std::string> dds;
+  std::string src_ddname, tgt_ddname, sysin_ddname, sysprint_ddname;
 
-  dds.push_back("alloc dd(SYSUT1) da('" + sourceInfo.base_dsn + "') shr");
-  dds.push_back("alloc dd(SYSUT2) da('" + targetInfo.base_dsn + "') shr");
-  dds.push_back("alloc dd(sysin) lrecl(80) recfm(f,b)");
-  dds.push_back("alloc dd(sysprint) lrecl(121) recfm(f,b,a)");
-
-  rc = zut_loop_dynalloc(zds->diag, dds);
-  if (rc != RTNCD_SUCCESS)
+  if (0 != zds_alloc_rtdd(zds->diag, "alloc da('" + sourceInfo.base_dsn + "') shr", "source '" + sourceInfo.base_dsn + "'", dds, src_ddname))
+  {
     return RTNCD_FAILURE;
+  }
+  if (0 != zds_alloc_rtdd(zds->diag, "alloc da('" + targetInfo.base_dsn + "') shr", "target '" + targetInfo.base_dsn + "'", dds, tgt_ddname))
+  {
+    zut_free_dynalloc_dds(zds->diag, dds);
+    return RTNCD_FAILURE;
+  }
+  if (0 != zds_alloc_rtdd(zds->diag, "alloc lrecl(80) recfm(f,b)", "SYSIN", dds, sysin_ddname))
+  {
+    zut_free_dynalloc_dds(zds->diag, dds);
+    return RTNCD_FAILURE;
+  }
+  if (0 != zds_alloc_rtdd(zds->diag, "alloc lrecl(121) recfm(f,b,a)", "SYSPRINT", dds, sysprint_ddname))
+  {
+    zut_free_dynalloc_dds(zds->diag, dds);
+    return RTNCD_FAILURE;
+  }
 
   std::string control_stmt;
   std::string replace_flag = options->replace ? ",R" : "";
@@ -346,25 +385,24 @@ static int copy_partitioned(ZDS *zds, const ZDSTypeInfo &sourceInfo, const ZDSTy
     {
       options->member_created = true;
     }
-    control_stmt = "  COPY OUTDD=SYSUT2,INDD=SYSUT1\n";
+    control_stmt = "  COPY OUTDD=" + tgt_ddname + ",INDD=" + src_ddname + "\n";
     control_stmt += "  SELECT MEMBER=((" + sourceInfo.member_name + "," + targetInfo.member_name + replace_flag + "))";
   }
   else
   {
     if (options->replace)
     {
-      control_stmt = "  COPY OUTDD=SYSUT2,INDD=((SYSUT1,R))";
+      control_stmt = "  COPY OUTDD=" + tgt_ddname + ",INDD=((" + src_ddname + ",R))";
     }
     else
     {
-      control_stmt = "  COPY OUTDD=SYSUT2,INDD=SYSUT1";
+      control_stmt = "  COPY OUTDD=" + tgt_ddname + ",INDD=" + src_ddname;
     }
   }
 
   ZDSWriteOpts wopts{};
   wopts.zds = zds;
-  wopts.ddname = "sysin";
-
+  wopts.ddname = sysin_ddname;
   rc = zds_write(wopts, control_stmt);
   if (rc != 0)
   {
@@ -372,26 +410,33 @@ static int copy_partitioned(ZDS *zds, const ZDSTypeInfo &sourceInfo, const ZDSTy
     return RTNCD_FAILURE;
   }
 
-  rc = zut_run("IEBCOPY");
+  IEBCOPY_ALT_DDS alt_dds{};
+  zut_build_iebcopy_dds_options(&alt_dds, {
+                                              .sysin_ddname = sysin_ddname,
+                                              .sysprint_ddname = sysprint_ddname,
+                                              .src_ddname = src_ddname,
+                                              .tgt_ddname = tgt_ddname,
+                                          });
+
+  PROGRAM_OPTION opt = {sizeof(IEBCOPY_ALT_DDS), 6, &alt_dds};
+  PROGRAM_OPTION_LIST opt_list{};
+  zut_build_program_option_list(&opt_list, {&opt}, zds->diag);
+
+  rc = zut_run_with_options(zds->diag, "IEBCOPY", "", &opt_list);
 
   if (rc != RTNCD_SUCCESS)
   {
     std::string output;
-    ZDSReadOpts ropts{.zds = zds, .ddname = "SYSPRINT"};
+    ZDSReadOpts ropts{.zds = zds, .ddname = sysprint_ddname};
     zds_read(ropts, output);
     {
       char truncated_detail[128];
       strncpy(truncated_detail, output.c_str(), sizeof(truncated_detail) - 1);
       truncated_detail[sizeof(truncated_detail) - 1] = '\0';
 
-      zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
-                                     "IEBCOPY failed with RC=%d. SYSPRINT: %s",
-                                     rc, truncated_detail);
-
-      if (zds->diag.e_msg_len >= sizeof(zds->diag.e_msg))
-      {
-        zds->diag.e_msg_len = sizeof(zds->diag.e_msg) - 1;
-      }
+      ZDIAG_SET_MSG(&zds->diag,
+                    "IEBCOPY failed with RC=%d. Reason=%d. SYSPRINT: %s",
+                    rc, zds->diag.detail_rc, truncated_detail);
     }
     zut_free_dynalloc_dds(zds->diag, dds);
     return RTNCD_FAILURE;
@@ -406,18 +451,18 @@ static int validate_attributes(ZDS *zds, const ZDSTypeInfo &src, const ZDSTypeIn
   // fail if mistaching recfm
   if (src.entry.recfm != tgt.entry.recfm)
   {
-    zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
-                                   "Expected target RECFM to match source (%s), but the destination RECFM is %s",
-                                   src.entry.recfm.c_str(), tgt.entry.recfm.c_str());
+    ZDIAG_SET_MSG(&zds->diag,
+                  "Expected target RECFM to match source (%s), but the destination RECFM is %s",
+                  src.entry.recfm.c_str(), tgt.entry.recfm.c_str());
     return RTNCD_FAILURE;
   }
 
   // fail if mismatching lrecl
   if (src.entry.lrecl != tgt.entry.lrecl)
   {
-    zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
-                                   "Expected target LRECL to match source (%d), but the destination LRECL is %d",
-                                   src.entry.lrecl, tgt.entry.lrecl);
+    ZDIAG_SET_MSG(&zds->diag,
+                  "Expected target LRECL to match source (%d), but the destination LRECL is %d",
+                  src.entry.lrecl, tgt.entry.lrecl);
     return RTNCD_FAILURE;
   }
 
@@ -427,9 +472,9 @@ static int validate_attributes(ZDS *zds, const ZDSTypeInfo &src, const ZDSTypeIn
     // fail if mismatching blcsize
     if (src.entry.blksize != tgt.entry.blksize)
     {
-      zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
-                                     "Expected target block size to match source (%d), but the destination block size is %d",
-                                     src.entry.blksize, tgt.entry.blksize);
+      ZDIAG_SET_MSG(&zds->diag,
+                    "Expected target block size to match source (%d), but the destination block size is %d",
+                    src.entry.blksize, tgt.entry.blksize);
       return RTNCD_FAILURE;
     }
   }
@@ -2412,16 +2457,16 @@ int zds_list_members(ZDS *zds, std::string dsn, std::vector<ZDSMem> &members, co
       if (abend_code == 0x913)
       {
         // Insufficient permissions for this data set
-        zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg), "Insufficient permissions for opening data set '%s' (S913 abend)", dsn.c_str());
+        ZDIAG_SET_MSG(&zds->diag, "Insufficient permissions for opening data set '%s' (S913 abend)", dsn.c_str());
       }
       else
       {
-        zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg), "Could not list members for '%s': %s (errno %d) abend code S%03X", dsn.c_str(), strerror(errno), errno, save_amrc.__code.__abend.__syscode);
+        ZDIAG_SET_MSG(&zds->diag, "Could not list members for '%s': %s (errno %d) abend code S%03X", dsn.c_str(), strerror(errno), errno, save_amrc.__code.__abend.__syscode);
       }
     }
     else
     {
-      zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg), "Could not list members for '%s': %s (errno %d)", dsn.c_str(), strerror(errno), errno);
+      ZDIAG_SET_MSG(&zds->diag, "Could not list members for '%s': %s (errno %d)", dsn.c_str(), strerror(errno), errno);
     }
     return RTNCD_FAILURE;
   }
@@ -2474,7 +2519,7 @@ int zds_list_members(ZDS *zds, std::string dsn, std::vector<ZDSMem> &members, co
 
           if (total_entries > zds->max_entries)
           {
-            zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg), "Reached maximum returned members requested %d", zds->max_entries);
+            ZDIAG_SET_MSG(&zds->diag, "Reached maximum returned members requested %d", zds->max_entries);
             zds->diag.detail_rc = ZDS_RSNCD_MAXED_ENTRIES_REACHED;
             fclose(fp);
             return RTNCD_WARNING;

@@ -6,6 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- Added `zssh copy data-set` command to copy data sets and members with optional `--replace` and `--overwrite` flags. Supports PDS-to-PDS, member-to-member, and sequential-to-sequential copies.
 - Added the `zssh system view-syslog` command to the CLI.
 
 ## `0.6.0`
@@ -85,3 +86,4 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## [Unreleased]
 
 - Initial release
+
