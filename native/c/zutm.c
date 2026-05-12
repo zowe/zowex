@@ -301,7 +301,7 @@ int ZUTRUN(ZDIAG *diag, const char *program, const char *parms, PROGRAM_OPTION_L
       return RTNCD_FAILURE;
     }
     memcpy(option_data[i], p->data, p->size);
-    pchain.params[i + 1] = (unsigned int)(uintptr_t)option_data[i] + p->ptr_offset;
+    pchain.params[i + 1] = (unsigned int)(uintptr_t)option_data[i] + p->chain_ptr_offset;
   }
 
   void *p = load_module(name_truncated);

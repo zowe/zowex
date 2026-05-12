@@ -21,7 +21,47 @@ export const CopyDatasetOrMemberDefinition: ICommandDefinition = {
     examples: [
         {
             description: "Copy a data set or member",
-            options: "'ibmuser.test.cntl",
+            options: "'ibmuser.test.cntl' 'ibmuser.backup.cntl'",
+        },
+        {
+            description: "Copy a data    set with replace option",
+            options: "'ibmuser.test.cntl' 'ibmuser.backup.cntl' --replace",
+        },
+        {
+            description: "Copy a data set with overwrite option",
+            options: "'ibmuser.test.cntl' 'ibmuser.backup.cntl' --overwrite",
+        },
+        {
+            description: "Copy a member with both replace and overwrite options",
+            options: "'ibmuser.test.cntl(member1)' 'ibmuser.backup.cntl(member1)' --replace --overwrite",
+        },
+    ],
+    positionals: [
+        {
+            name: "fromDataset",
+            description: "The data set or member to copy from",
+            type: "string",
+            required: true,
+        },
+        {
+            name: "toDataset",
+            description: "The data set or member to copy to",
+            type: "string",
+            required: true,
+        },
+    ],
+    options: [
+        {
+            name: "replace",
+            description: "Replace the target dataset or member if it already exists",
+            type: "boolean",
+            required: false,
+        },
+        {
+            name: "overwrite",
+            description: "Overwrite the target dataset or member if it already exists",
+            type: "boolean",
+            required: false,
         },
     ],
 };

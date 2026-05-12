@@ -119,7 +119,8 @@ ZNP_PACK_OFF
 typedef struct
 {
   unsigned int size;
-  unsigned short ptr_offset;
+  // bytes offset from start of data where param ptr should be set
+  unsigned short chain_ptr_offset;
   void *data;
 } PROGRAM_OPTION;
 
