@@ -257,6 +257,18 @@ ZJSON_SCHEMA(SubmitUssResponse,
     FIELD_REQUIRED(jobName, STRING)
 );
 
+struct ViewSyslogResponse {};
+ZJSON_SCHEMA(ViewSyslogResponse,
+    FIELD_REQUIRED(success, BOOL),
+    FIELD_OPTIONAL(data, STRING),
+    FIELD_OPTIONAL(startDate, STRING),
+    FIELD_OPTIONAL(startTime, STRING),
+    FIELD_OPTIONAL(endDate, STRING),
+    FIELD_OPTIONAL(endTime, STRING),
+    FIELD_OPTIONAL(returnedLines, NUMBER),
+    FIELD_OPTIONAL(hasMore, BOOL)
+);
+
 struct ToolSearchResponse {};
 ZJSON_SCHEMA(ToolSearchResponse,
     FIELD_REQUIRED(success, BOOL),
