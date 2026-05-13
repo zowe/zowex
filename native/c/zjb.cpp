@@ -32,11 +32,14 @@
 #include "ihapsa.h"
 #include "cvt.h"
 #include <algorithm>
+#include <string_view>
 
 typedef struct iazbtokp IAZBTOKP;
 
 void zjb_build_job_response(ZJB_JOB_INFO *PTR64, int, std::vector<ZJob> &);
 int zjb_get_jobid_from_syslog(ZJB *zjb, std::string &jobid);
+bool str_is_all_spaces(std::string_view str);
+int zjb_get_jobid_from_list_jobs(ZJB *zjb, std::string &jobid);
 
 #define BTOKLEN (293 - 254) // 293 is the full length, minus the max optional buffer area for logs (less 254)
 
@@ -529,12 +532,12 @@ int zjb_submit(ZJB *zjb, const std::string &contents, std::string &jobid)
   jobid = std::string(cjobid);
 
   bool dynfree_needed = true;
-  if (jobid == "" || jobid == "        ")
+  if (jobid.empty() || str_is_all_spaces(jobid))
   {
     rc = dynfree(&ip);
     dynfree_needed = false;
 
-    if (0 != zjb_get_jobid_from_syslog(zjb, jobid))
+    if (0 != zjb_get_jobid_from_list_jobs(zjb, jobid))
     {
       strcpy(zjb->diag.service_name, "intrdr");
       ZDIAG_SET_MSG(&zjb->diag, "job submission failed");
@@ -956,4 +959,30 @@ int zjb_get_jobid_from_syslog(ZJB *zjb, std::string &jobid)
   }
 
   return rc;
+}
+
+bool str_is_all_spaces(std::string_view str)
+{
+  // using string_view to avoid copying the string (in case we are called with a literal string e.g. " " or "      ")
+  return str.find_first_not_of(' ') == std::string_view::npos;
+}
+
+int zjb_get_jobid_from_list_jobs(ZJB *zjb, std::string &jobid)
+{
+  // TODO(zFernand0): This function does not return the very last job that was just submitted
+  int rc = 0;
+  std::vector<ZJob> jobs;
+  rc = zjb_list_by_owner(zjb, "", jobs);
+  if (0 == rc)
+  {
+    for (const auto &job : jobs)
+    {
+      if ("JCL ERROR" == job.retcode)
+      {
+        jobid = job.jobid;
+        return RTNCD_SUCCESS;
+      }
+    }
+  }
+  return ZJB_RTNCD_JOB_NOT_FOUND;
 }

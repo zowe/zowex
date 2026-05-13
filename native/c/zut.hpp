@@ -296,6 +296,30 @@ std::string &zut_ltrim(std::string &s, const char *t = " ");
 std::string &zut_trim(std::string &s, const char *t = " ");
 
 /**
+ * @brief Trim whitespace from the left end of a string
+ * @param s String to trim
+ * @param t Characters to trim (default is space)
+ * @return Reference to the trimmed string
+ */
+char *zut_ltrim(char *s, const char *t = " ");
+
+/**
+ * @brief Trim whitespace from the right end of a string
+ * @param s String to trim
+ * @param t Characters to trim (default is space)
+ * @return Reference to the trimmed string
+ */
+char *zut_rtrim(char *s, const char *t = " ");
+
+/**
+ * @brief Trim whitespace from both ends of a string
+ * @param s String to trim
+ * @param t Characters to trim (default is space)
+ * @return Reference to the trimmed string
+ */
+char *zut_trim(char *s, const char *t = " ");
+
+/**
  * @brief Function to dynamically allocate output debug DD
  *
  * @return int rc Return code (0 for success, non-zero for error)

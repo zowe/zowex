@@ -735,7 +735,7 @@ int job_submit_common(InvocationContext &context, const std::string &jcl, std::s
 
   ZJob job{};
 
-  if (0 != strncmp(zjb.correlator, "                                                                ", sizeof(zjb.correlator)))
+  if (jobid != std::string(zut_trim(zjb.correlator)))
   {
     rc = zjb_view(&zjb, std::string(zjb.correlator, sizeof(zjb.correlator)), job);
   }

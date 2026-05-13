@@ -931,6 +931,27 @@ std::string &zut_trim(std::string &s, const char *t)
   return zut_ltrim(zut_rtrim(s, t), t);
 }
 
+char *zut_rtrim(char *s, const char *t)
+{
+  size_t len = strlen(s);
+  while (len > 0 && strchr(t, s[len - 1]) != nullptr)
+  {
+    s[len - 1] = '\0';
+    len--;
+  }
+  return s;
+}
+
+char *zut_ltrim(char *s, const char *t)
+{
+  return s + strspn(s, t);
+}
+
+char *zut_trim(char *s, const char *t)
+{
+  return zut_ltrim(zut_rtrim(s, t), t);
+}
+
 std::string zut_format_as_csv(std::vector<std::string> &fields)
 {
   std::string formatted;
