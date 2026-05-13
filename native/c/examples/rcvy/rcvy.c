@@ -17,6 +17,7 @@
 #include "zecb.h"
 #include "zssi.h"
 #include "zssitype.h"
+#include <stdint.h>
 
 #pragma prolog(ABEXIT, " ZWEPROLG NEWDSA=(YES,128) ")
 #pragma epilog(ABEXIT, " ZWEEPILG ")
@@ -58,7 +59,7 @@ static void init_ssob(SSOB *PTR32 ssob, SSIB *PTR32 ssib, void *PTR32 function_d
   memcpy(ssob->ssobid, "SSOB", sizeof(ssob->ssobid));
   ssob->ssoblen = sizeof(SSOB);
   ssob->ssobssib = ssib;
-  ssob->ssobindv = (int)function_dependent_area;
+  ssob->ssobindv = (int)(uintptr_t)function_dependent_area;
   ssob->ssobfunc = function;
 }
 
@@ -163,7 +164,7 @@ static int test_iefssreq_with_recovery(void)
 
   // Prepare pointer for IEFSSREQ macro
   ssobp = &ssob;
-  ssobp = (SSOB * PTR32)((unsigned int)ssobp | 0x80000000);
+  ssobp = (SSOB * PTR32)((uintptr_t)ssobp | (uintptr_t)0x80000000u);
 
   zwto_debug("@TEST Calling our own recovery-enabled IEFSSREQ wrapper...");
 
@@ -253,7 +254,7 @@ static int test_iefssreq_with_wild_free(void)
 
   // Prepare pointer for IEFSSREQ macro
   ssobp = &ssob;
-  ssobp = (SSOB * PTR32)((unsigned int)ssobp | 0x80000000);
+  ssobp = (SSOB * PTR32)((uintptr_t)ssobp | (uintptr_t)0x80000000u);
 
   zwto_debug("@TEST Calling iefssreq() to free wild pointer 0xDEADBEEF...");
 

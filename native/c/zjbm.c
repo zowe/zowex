@@ -588,13 +588,6 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
   stat.stattype = statoutv;
 
   rc = iefssreq(&ssobp);
-  char msg_[1024] = {0};
-  sprintf(msg_, "IEFSSREQ rc was: '%d' SSOBRETN was: '%d', STATREAS was: '%d', STATREA2 was: '%d'", rc, ssob.ssobretn, stat.statreas, stat.statrea2);
-  zut_print_debug(msg_);
-  // print unsigned char statvol[4][6]; /* IS.List of SPOOL volume serial       */
-  sprintf(msg_, "statvol: %s %s %s %s", stat.statvol[0], stat.statvol[1], stat.statvol[2], stat.statvol[3]);
-  zut_print_debug(msg_);
-  // pr
 
   if (0 != rc || 0 != ssob.ssobretn)
   {

@@ -566,6 +566,7 @@ int zjb_submit(ZJB *zjb, const std::string &contents, std::string &jobid)
     rc = dynfree(&ip);
     dynfree_needed = false;
 
+    // if (0 != zjb_get_jobid_from_syslog(zjb, jobid))
     if (0 != zjb_get_jobid_from_list_jobs(zjb, jobid))
     {
       strcpy(zjb->diag.service_name, "intrdr");
@@ -924,17 +925,22 @@ int zjb_get_jobid_from_syslog(ZJB *zjb, std::string &jobid)
   std::string found_jobid = "        ";
   ZJB zjb_syslog = {0};
   zjb_syslog.encoding_opts.data_type = eDataTypeText;
-  std::string syslog_content;
-  int rc = zjb_read_syslog(&zjb_syslog, syslog_content, date_value, time_value, 500);
+  ZJBSyslogResponse response{};
+  ZJBSyslogOptions opts;
+  opts.date = date_value;
+  opts.time = time_value;
+  opts.max_lines = 100;
+
+  int rc = zjb_read_syslog(&zjb_syslog, opts, response);
 
   if (0 == rc)
   {
     std::string IEFC_MESSAGE = "IEFC452I";
-    size_t pos = syslog_content.rfind(IEFC_MESSAGE); // Get the most recent one
+    size_t pos = response.data.rfind(IEFC_MESSAGE); // Get the most recent one
 
     if (std::string::npos != pos)
     {
-      size_t line_start = syslog_content.rfind('\n', pos);
+      size_t line_start = response.data.rfind('\n', pos);
       if (std::string::npos == line_start)
       {
         line_start = 0;
@@ -944,7 +950,7 @@ int zjb_get_jobid_from_syslog(ZJB *zjb, std::string &jobid)
         line_start++;
       }
 
-      std::string line = syslog_content.substr(line_start, syslog_content.find('\n', pos) - line_start);
+      std::string line = response.data.substr(line_start, response.data.find('\n', pos) - line_start);
       std::string line_reverse = line;
       std::reverse(line_reverse.begin(), line_reverse.end());
       // original line: (example)
