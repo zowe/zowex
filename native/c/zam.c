@@ -328,6 +328,8 @@ int open_input_vsam(ZDIAG *PTR32 diag, IO_CTRL *PTR32 *PTR32 ioc, const char *PT
 #define PREV_OCCURRENCE 0xFF02
 #define OFF_CURRENT_RECORD 0xFF03
 #define ABSOLUTE_RECORD 0xFF04
+
+// TODO(Kelosky): this should have accepted a etod_t instead of a TIME_STRUCT
 int point_input_vsam(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc, TIME_STRUCT *time_struct)
 {
   int rc = 0;
@@ -370,10 +372,9 @@ int read_input_vsam(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
 {
   int rc = 0;
 
-  DSINF dsinf = {0};
-  memcpy(dsinf.dsineye, "DSIN", sizeof(dsinf.dsineye));
+  memcpy(ioc->dsinf.dsineye, "DSIN", sizeof(ioc->dsinf.dsineye));
   IFGRPL *rplp = &ioc->rpl;
-  rplp->rplermsa = &dsinf;
+  rplp->rplermsa = &ioc->dsinf;
   rplp->rplemlen = dsinsiz1;
 
   GET(rplp, rc);

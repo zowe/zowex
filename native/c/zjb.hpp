@@ -144,14 +144,31 @@ int zjb_get_job_dsn_by_key(ZJB *zjb, const std::string &, int, std::string &);
  *
  * @param zjb job returned attributes and error information
  * @param job_dsn job data set name to read
- * @param timestamp timestamp to read, e.g. 10:41:00.15
+ * @param timestamp timestamp to read, e.g. 10:41:00
  * @param date date to read, e.g. 2026-03-13
  * @param response return job content
  * @return int 0 for success; non zero otherwise
  */
 int zjb_read_job_content_by_dsn(ZJB *zjb, const std::string &job_dsn, std::string &response);
 
-int zjb_read_syslog(ZJB *zjb, std::string &response, std::string &date, std::string &timestamp, int max_lines);
+struct ZJBSyslogOptions
+{
+  // Inputs
+  std::string date;
+  std::string time;
+  int max_lines = 0;
+};
+
+struct ZJBSyslogResponse
+{
+  std::string data;
+  bool has_more;
+  std::string end_date;
+  std::string end_time;
+  int returned_lines;
+};
+
+int zjb_read_syslog(ZJB *zjb, ZJBSyslogOptions &opts, ZJBSyslogResponse &response);
 
 /**
  * @brief Wait for a job to reach a specific status

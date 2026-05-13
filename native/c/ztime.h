@@ -94,6 +94,42 @@ STCKCONV_MODEL(stckconv_model);
 #endif
 
 #if defined(__IBM_METAL__)
+#define STCKECONV(output, etod, plist, rc, format)            \
+  __asm(                                                      \
+      "*                                                  \n" \
+      " LGHI  2,0       Clear                             \n" \
+      " TAM   ,         AMODE64??                         \n" \
+      " JM    *+4+4+2   No, skip switching                \n" \
+      " OILH  2,X'8000' Set AMODE31 flag                  \n" \
+      " SAM31 ,         Set AMODE31                       \n" \
+      "*                                                  \n" \
+      " SYSSTATE PUSH       Save SYSSTATE                 \n" \
+      " SYSSTATE AMODE64=NO                               \n" \
+      "*                                                  \n" \
+      " STCKCONV STCKEVAL=%2,"                                \
+      "CONVVAL=%0,"                                           \
+      "TIMETYPE=BIN,"                                         \
+      "DATETYPE=" #format ","                                 \
+      "MF=(E,%3)                                          \n" \
+      "*                                                  \n" \
+      " ST    15,%1     Save RC                           \n" \
+      "*                                                  \n" \
+      " TMLH  2,X'8000' Did we switch AMODE??             \n" \
+      " JNO   *+4+2     No, skip restore                  \n" \
+      " SAM64 ,         Set AMODE64                       \n" \
+      "*                                                  \n" \
+      " SYSSTATE POP    Restore SYSSTATE                  \n" \
+      "*                                                    " \
+      : "=m"(output),                                         \
+        "=m"(rc)                                              \
+      : "m"(etod),                                            \
+        "m"(plist)                                            \
+      : "r0", "r1", "r2", "r14", "r15");
+#else
+#define STCKECONV(output, etod, plist, rc, format)
+#endif
+
+#if defined(__IBM_METAL__)
 #define CONVTOD_MODEL(convtodm)       \
   __asm(                              \
       "*                          \n" \
@@ -210,10 +246,18 @@ typedef struct
 
 typedef struct
 {
+  unsigned char year[2];
+  unsigned char month;
+  unsigned char day;
+} DATE_YYYYMMDD;
+
+typedef struct
+{
   unsigned char time[8];
   union
   {
     DATE_MMDDYYYY mmddyyyy;
+    DATE_YYYYMMDD yyyymmdd;
   } date;
   unsigned char unused[4];
 } TIME_STRUCT;
@@ -230,6 +274,20 @@ static int stckconv(unsigned long long *tod, TIME_STRUCT *time_struct)
   return rc;
 }
 
+typedef unsigned char etod_t[16];
+
+static int stckeconv(etod_t *etod, TIME_STRUCT *time_struct)
+{
+  int rc = 0;
+
+  STCKCONV_MODEL(dsa_stckconv_model);
+  dsa_stckconv_model = stckconv_model;
+
+  STCKECONV(*time_struct, *etod[0], dsa_stckconv_model, rc, YYYYMMDD);
+
+  return rc;
+}
+
 static int convtod(TIME_STRUCT *time_struct, unsigned long long *tod)
 {
   int rc = 0;
@@ -241,8 +299,6 @@ static int convtod(TIME_STRUCT *time_struct, unsigned long long *tod)
 
   return rc;
 }
-
-typedef unsigned char etod_t[16];
 
 static int convetod(TIME_STRUCT *time_struct, etod_t *etod)
 {
