@@ -6,9 +6,10 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- **Breaking:** `c`: Renamed C function `zjb_read_jobs_output_by_key` in zjb.hpp to `zjb_read_job_content_by_key` to be consistent with `zjb_read_job_content_by_dsn.
+- `c`: Fixes issue where `zowex` failed to allocate `sysout` DDs that were dynamically allocated under z/OS UNIX. [#840](https://github.com/zowe/zowex/issues/840)
 - `c`: Optimized USS file list operations by replacing CSV formatting and parsing with structured data transfer via the `ZusfListEntry` struct. This improves performance for `zowex uss list` and provides type-safe, programmatic access to file attributes for SDK consumers. [#990](https://github.com/zowe/zowex/pull/990)
 - `c`: Fixed parsing of file names containing commas in USS list API responses, which caused data misalignment for SDK consumers. [#989](https://github.com/zowe/zowex/issues/989)
-- `c`: Fixes issue where `zowex` failed to allocate `sysout` DDs that were dynamically allocated under z/OS UNIX. [#840](https://github.com/zowe/zowex/issues/840)
 - `c`: Fixed an issue where the `zoweax` authorized CLI binary could run the `server` command or `plugin` command group as privileged. Now, `zoweax` disables privileges before commands are executed. Commands in the `console` group continue to run as privileged. [#958](https://github.com/zowe/zowex/issues/958)
 - `c`: Added support for pre-command hooks in the command-line parser utility. [#958](https://github.com/zowe/zowex/issues/958)
 - `c`: Fixes issue where ZWEPROLG could return to caller in an incorrect AMODE. [#951](https://github.com/zowe/zowex/issues/951)
