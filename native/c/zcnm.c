@@ -62,7 +62,6 @@ int ZCNACT(ZCN *zcn)
 int ZCNPUT(ZCN *zcn, const char *command)
 {
   int rc = 0;
-
   rc = test_auth();
   if (0 != rc)
   {
@@ -72,16 +71,27 @@ int ZCNPUT(ZCN *zcn, const char *command)
     return RTNCD_FAILURE;
   }
 
-  ZCN zcn31 = {0};
-  memcpy(&zcn31, zcn, sizeof(ZCN));
-  rc = zcnm1put(&zcn31, command);
-  memcpy(zcn, &zcn31, sizeof(ZCN));
+  ZRCVY_ENV zenv = {0};
 
-  if (0 != rc)
+  if (0 == enable_recovery(&zenv))
   {
-    ZDIAG_SET_MSG(&zcn->diag, "Error writting data to console, service: %.16s, rc: %d, service_rc: %d, service_rsn: %d", zcn->diag.service_name, rc, zcn->diag.service_rc, zcn->diag.service_rsn);
-    return RTNCD_FAILURE;
+    ZCN zcn31 = {0};
+    memcpy(&zcn31, zcn, sizeof(ZCN));
+    rc = zcnm1put(&zcn31, command);
+    memcpy(zcn, &zcn31, sizeof(ZCN));
+    if (0 != rc)
+    {
+      ZDIAG_SET_MSG(&zcn->diag, "Error writting data to console, service: %.16s, rc: %d, service_rc: %d, service_rsn: %d", zcn->diag.service_name, rc, zcn->diag.service_rc, zcn->diag.service_rsn);
+      rc = RTNCD_FAILURE;
+    }
   }
+  else
+  {
+    zcn->diag.e_msg_len = sprintf(zcn->diag.e_msg, "Unexpected abend occurred during command execution");
+    rc = RTNCD_FAILURE;
+  }
+
+  disable_recovery(&zenv);
 
   return rc;
 }
@@ -112,10 +122,6 @@ int ZCNGET(ZCN *zcn, char *response)
 {
   int rc = 0;
 
-  ZRCVY_ENV zenv = {0};
-  zenv.abexit = ZCNMABEX;
-  zenv.abexit_data = (void *PTR64)zcn->ecb;
-
   rc = test_auth();
   if (0 != rc)
   {
@@ -125,26 +131,45 @@ int ZCNGET(ZCN *zcn, char *response)
     return RTNCD_FAILURE;
   }
 
-  if (zcn->ecb)
+  ZRCVY_ENV zenv = {0};
+  zenv.abexit = ZCNMABEX;
+  zenv.abexit_data = (void *PTR64)zcn->ecb;
+
+  if (0 == enable_recovery(&zenv))
   {
-    int timeout = zcn->timeout * 100; // convert to seconds
-    timer(timeout, ZCNTIMER, (ECB * PTR32) zcn->ecb);
-    ecb_wait((ECB * PTR32) zcn->ecb);
-    cancel_timers();
+    if (zcn->ecb)
+    {
+      int timeout = zcn->timeout * 100; // convert to seconds
+      timer(timeout, ZCNTIMER, (ECB * PTR32) zcn->ecb);
+      ecb_wait((ECB * PTR32) zcn->ecb);
+      cancel_timers();
+    }
+
+    ZCN zcn31 = {0};
+    memcpy(&zcn31, zcn, sizeof(ZCN));
+    rc = zcnm1get(&zcn31, response);
+    memcpy(zcn, &zcn31, sizeof(ZCN));
+
+    if (0 != rc)
+    {
+      ZDIAG_SET_MSG(&zcn->diag, "Error getting data from console, service: %.16s, rc: %d, service_rc: %d, service_rsn: %d", zcn->diag.service_name, rc, zcn->diag.service_rc, zcn->diag.service_rsn);
+      rc = RTNCD_FAILURE;
+    }
+  }
+  else
+  {
+    // Abend occurred - ensure timers are cancelled if they were started
+    if (zcn->ecb)
+    {
+      cancel_timers();
+    }
+    zcn->diag.e_msg_len = sprintf(zcn->diag.e_msg, "Unexpected abend occurred during console read");
+    rc = RTNCD_FAILURE;
   }
 
-  ZCN zcn31 = {0};
-  memcpy(&zcn31, zcn, sizeof(ZCN));
-  rc = zcnm1get(&zcn31, response);
-  memcpy(zcn, &zcn31, sizeof(ZCN));
+  disable_recovery(&zenv);
 
-  if (0 != rc)
-  {
-    ZDIAG_SET_MSG(&zcn->diag, "Error getting data from console, service: %.16s, rc: %d, service_rc: %d, service_rsn: %d", zcn->diag.service_name, rc, zcn->diag.service_rc, zcn->diag.service_rsn);
-    return RTNCD_FAILURE;
-  }
-
-  return RTNCD_SUCCESS;
+  return rc;
 }
 
 #pragma prolog(ZCNDACT, " ZWEPROLG NEWDSA=(YES,128) ")
@@ -152,7 +177,6 @@ int ZCNGET(ZCN *zcn, char *response)
 int ZCNDACT(ZCN *zcn)
 {
   int rc = 0;
-
   rc = test_auth();
   if (0 != rc)
   {
@@ -162,16 +186,27 @@ int ZCNDACT(ZCN *zcn)
     return RTNCD_FAILURE;
   }
 
-  ZCN zcn31 = {0};
-  memcpy(&zcn31, zcn, sizeof(ZCN));
-  rc = zcnm1dea(&zcn31);
-  memcpy(zcn, &zcn31, sizeof(ZCN));
+  ZRCVY_ENV zenv = {0};
 
-  if (0 != rc)
+  if (0 == enable_recovery(&zenv))
   {
-    ZDIAG_SET_MSG(&zcn->diag, "Error deactivating console, service: %.16s, rc: %d, service_rc: %d, service_rsn: %d", zcn->diag.service_name, rc, zcn->diag.service_rc, zcn->diag.service_rsn);
-    return RTNCD_FAILURE;
+    ZCN zcn31 = {0};
+    memcpy(&zcn31, zcn, sizeof(ZCN));
+    rc = zcnm1dea(&zcn31);
+    memcpy(zcn, &zcn31, sizeof(ZCN));
+    if (0 != rc)
+    {
+      ZDIAG_SET_MSG(&zcn->diag, "Error deactivating console, service: %.16s, rc: %d, service_rc: %d, service_rsn: %d", zcn->diag.service_name, rc, zcn->diag.service_rc, zcn->diag.service_rsn);
+      rc = RTNCD_FAILURE;
+    }
+  }
+  else
+  {
+    zcn->diag.e_msg_len = sprintf(zcn->diag.e_msg, "Unexpected abend occurred during deactivation");
+    rc = RTNCD_FAILURE;
   }
 
-  return RTNCD_SUCCESS;
+  disable_recovery(&zenv);
+
+  return rc;
 }
