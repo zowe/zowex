@@ -103,21 +103,21 @@
 #endif
 
 #if defined(__IBM_METAL__)
-#define CSVAPF(answer, answer_len, rc, rsn, plist)                    \
-  __asm(                                                              \
-      "*                                                  \n"         \
-      " LLGT  2,%0                                                \n" \
-      "*                                                  \n"         \
-      " CSVAPF REQUEST=LIST,"                                         \
-      "ANSAREA=(2),"                                                  \
-      "ANSLEN=(%3),"                                                  \
-      "MF=(E,%4)                                          \n"         \
-      "*                                                  \n"         \
-      " ST 15,%1                                          \n"         \
-      " ST 0,%2                                           \n"         \
-      "*                                                    "         \
-      : "=m"(answer), "=m"(rc), "=m"(rsn)                             \
-      : "r"(answer_len), "m"(plist)                                   \
+#define CSVAPF(answer, answer_len, rc, rsn, plist)            \
+  __asm(                                                      \
+      "*                                                  \n" \
+      " LLGT  2,%0                                        \n" \
+      "*                                                  \n" \
+      " CSVAPF REQUEST=LIST,"                                 \
+      "ANSAREA=(2),"                                          \
+      "ANSLEN=(%3),"                                          \
+      "MF=(E,%4)                                          \n" \
+      "*                                                  \n" \
+      " ST 15,%1                                          \n" \
+      " ST 0,%2                                           \n" \
+      "*                                                    " \
+      : "=m"(answer), "=m"(rc), "=m"(rsn)                     \
+      : "r"(answer_len), "m"(plist)                           \
       : "r0", "r1", "r2", "r14", "r15");
 #else
 #define CSVAPF(answer, answer_len, rc, rsn, plist)
