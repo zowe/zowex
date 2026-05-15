@@ -574,7 +574,7 @@ bool zds_member_exists(const std::string &dsn, const std::string &member_before)
 
 bool zds_is_valid_member_name(const std::string &name)
 {
-  if (name.length() > 8)
+  if (name.length() > 8 || name.empty())
     return false;
 
   char first = name[0];
@@ -3331,7 +3331,7 @@ int zds_list_data_sets(ZDS *zds, std::string dsn, std::vector<ZDSEntry> &dataset
   // init blanks in query and set input DSN name
   memset(selection_criteria->csifiltk, ' ', sizeof(selection_criteria->csifiltk));
   std::transform(dsn.begin(), dsn.end(), dsn.begin(), ::toupper); // upper case
-  memcpy(selection_criteria->csifiltk, dsn.c_str(), dsn.size());
+  memcpy(selection_criteria->csifiltk, dsn.c_str(), std::min(dsn.size(), MAX_DS_LENGTH));
   memset(&selection_criteria->csicldi, 'Y', sizeof(selection_criteria->csicldi));
   memset(&selection_criteria->csiresum, ' ', sizeof(selection_criteria->csiresum));
   memset(&selection_criteria->csicatnm, ' ', sizeof(selection_criteria->csicatnm));
