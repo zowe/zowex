@@ -273,7 +273,7 @@ static int ZRCVYARR(SDWA sdwa)
   if (sdwa.sdwaxpad) {
     struct sdwaptrs *ptrs = (struct sdwaptrs *)sdwa.sdwaxpad;
     if (ptrs->sdwasrvp) {
-      struct sdwarc1 *rc1 = (struct sdwarc1 *)ptrs->sdwasrvp;
+      const struct sdwarc1 *rc1 = (const struct sdwarc1 *)ptrs->sdwasrvp;
       // Use the DSECT macro directly, which expands to sdwaserv.sdwarc1p.sdwart12._sdwaocrc
       zenv->abend_rsn = rc1->sdwaocrc;
     } else {
