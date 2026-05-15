@@ -414,8 +414,16 @@ int handle_uss_chmod(InvocationContext &context)
   long long mode = context.get<long long>("mode", 0);
   if (mode == 0 && !context.get<std::string>("mode", "").empty())
   {
-    context.error_stream() << "Error: invalid mode provided.\nExamples of valid modes: 777, 0644" << std::endl;
-    return RTNCD_FAILURE;
+    std::string mode_str = context.get<std::string>("mode", "");
+    try
+    {
+      mode = std::stoll(mode_str);
+    }
+    catch (...)
+    {
+      context.error_stream() << "Error: invalid mode provided.\nExamples of valid modes: 777, 0644" << std::endl;
+      return RTNCD_FAILURE;
+    }
   }
 
   std::string file_path = context.get<std::string>("file-path", "");

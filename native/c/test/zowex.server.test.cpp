@@ -23,14 +23,7 @@
 
 using namespace ztst;
 
-struct ServerHandle
-{
-  pid_t pid;
-  FILE *output_stream;
-  FILE *input_stream;
-};
-
-std::string read_line_from_server(ServerHandle &handle, int timeout_ms = 5000)
+std::string read_line_from_server(ServerHandle &handle, int timeout_ms)
 {
   fd_set read_fds;
   struct timeval timeout;
@@ -69,7 +62,7 @@ void write_to_server(ServerHandle &handle, const std::string &input)
   }
 }
 
-ServerHandle start_server(const std::string &command, bool read_ready_message = false)
+ServerHandle start_server(const std::string &command, bool read_ready_message)
 {
   int output_pipe[2];
   int input_pipe[2];
@@ -136,8 +129,8 @@ void stop_server(ServerHandle &handle)
   waitpid(handle.pid, nullptr, 0);
 }
 
-const std::string zowex_dir = "./../build-out";
-const std::string zowex_server_command = zowex_dir + "/zowex server";
+extern const std::string zowex_dir = "./../build-out";
+extern const std::string zowex_server_command = zowex_dir + "/zowex server";
 
 void zowex_server_tests()
 {
