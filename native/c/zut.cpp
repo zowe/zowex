@@ -406,29 +406,58 @@ int zut_run(const std::string &program)
   return zut_run_with_options(diag, program, "", nullptr);
 }
 
-void zut_build_iebcopy_dds_options(IEBCOPY_ALT_DDS *alt_dds, const IEBCOPY_DD_OPTIONS &options)
+static void zut_build_dfsmsdfp_dds_options(DFSMSdfp_DD_LIST &dd_list, const DFSMSdfp_ALT_DDS &alt_dds)
 {
   // represents length of the DD list in IEBCOPY_ALT_DDS
-  constexpr uint16_t IEBCOPY_DD_LEN_SYSUT2 = 72;
-  constexpr uint16_t IEBCOPY_DD_LEN_SYSUT3 = 80;
-  constexpr uint16_t IEBCOPY_DD_LEN_SYSUT4 = 88;
+  constexpr uint16_t DD_LEN_SYSUT2 = 72;
+  constexpr uint16_t DD_LEN_SYSUT3 = 80;
+  constexpr uint16_t DD_LEN_SYSUT4 = 88;
 
-  uint16_t len = IEBCOPY_DD_LEN_SYSUT2;
-  zut_set_dd_with_padding(alt_dds->sysin, options.sysin_ddname.c_str());
-  zut_set_dd_with_padding(alt_dds->sysprint, options.sysprint_ddname.c_str());
-  zut_set_dd_with_padding(alt_dds->sysut1, options.src_ddname.c_str());
-  zut_set_dd_with_padding(alt_dds->sysut2, options.tgt_ddname.c_str());
-  if (options.sysut3.has_value())
+  uint16_t len = DD_LEN_SYSUT2;
+  zut_set_dd_with_padding(dd_list.sysin, alt_dds.sysin.c_str());
+  zut_set_dd_with_padding(dd_list.sysprint, alt_dds.sysprint.c_str());
+  zut_set_dd_with_padding(dd_list.sysut1, alt_dds.sysut1.c_str());
+  zut_set_dd_with_padding(dd_list.sysut2, alt_dds.sysut2.c_str());
+  if (alt_dds.sysut3.has_value())
   {
-    zut_set_dd_with_padding(alt_dds->sysut3, options.sysut3.value().c_str());
-    len = IEBCOPY_DD_LEN_SYSUT3;
+    zut_set_dd_with_padding(dd_list.sysut3, alt_dds.sysut3.value().c_str());
+    len = DD_LEN_SYSUT3;
   }
-  if (options.sysut4.has_value())
+  if (alt_dds.sysut4.has_value())
   {
-    zut_set_dd_with_padding(alt_dds->sysut4, options.sysut4.value().c_str());
-    len = IEBCOPY_DD_LEN_SYSUT4;
+    zut_set_dd_with_padding(dd_list.sysut4, alt_dds.sysut4.value().c_str());
+    len = DD_LEN_SYSUT4;
   }
-  alt_dds->TotalLength = len;
+  dd_list.TotalLength = len;
+}
+
+static int zut_dfsmsdfp(ZDIAG &diag, ZUTMSDFP_UTILITY utility, const std::string &opts, const DFSMSdfp_ALT_DDS *alt_dds)
+{
+  DFSMSdfp_OPT_LIST opt_list = {0};
+  DFSMSdfp_DD_LIST dd_list = {0};
+  DFSMSdfp_PAGE_LIST page_list = {0};
+
+  if (!opts.empty())
+  {
+    opt_list.len = snprintf(opt_list.str, sizeof(opt_list.str) - 1, "%s", opts.c_str());
+  }
+
+  if (alt_dds)
+  {
+    zut_build_dfsmsdfp_dds_options(dd_list, *alt_dds);
+  }
+
+  return ZUTMSDFP(&diag, &utility, &opt_list, &dd_list, &page_list);
+}
+
+int zut_iebcopy(ZDIAG &diag, const std::string &opts, const DFSMSdfp_ALT_DDS *alt_dd_list)
+{
+  return zut_dfsmsdfp(diag, ZUTMSDFP_IEBCOPY, opts, alt_dd_list);
+}
+
+int zut_iebgener(ZDIAG &diag, const std::string &opts, const DFSMSdfp_ALT_DDS *alt_dd_list)
+{
+  return zut_dfsmsdfp(diag, ZUTMSDFP_IEBGENER, opts, alt_dd_list);
 }
 
 void zut_set_dd_with_padding(char arr[8], const char *ddname)

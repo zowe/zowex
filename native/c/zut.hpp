@@ -19,6 +19,7 @@
 #include <optional>
 #include <string>
 #include "ztype.h"
+#include "zutm.h"
 
 /**
  * @struct ZConvData
@@ -33,15 +34,33 @@ struct ZConvData
   char *output_iter;      /**< Pointer to current position in output buffer. */
 };
 
-struct IEBCOPY_DD_OPTIONS
+struct DFSMSdfp_ALT_DDS
 {
-  const std::string &sysin_ddname;
-  const std::string &sysprint_ddname;
-  const std::string &src_ddname;
-  const std::string &tgt_ddname;
+  const std::string &sysin;
+  const std::string &sysprint;
+  const std::string &sysut1;
+  const std::string &sysut2;
   std::optional<std::string> sysut3;
   std::optional<std::string> sysut4;
 };
+
+/**
+ * @brief Run IEBCOPY utility
+ * @param diag Reference to diagnostic information structure
+ * @param opts Options string
+ * @param options Pointer to DFSMSdfp_ALT_DDS structure
+ * @return Return code (0 for success, non-zero for error)
+ */
+int zut_iebcopy(ZDIAG &diag, const std::string &opts, const DFSMSdfp_ALT_DDS *options);
+
+/**
+ * @brief Run IEBGENER utility
+ * @param diag Reference to diagnostic information structure
+ * @param opts Options string
+ * @param options Pointer to DFSMSdfp_ALT_DDS structure
+ * @return Return code (0 for success, non-zero for error)
+ */
+int zut_iebgener(ZDIAG &diag, const std::string &opts, const DFSMSdfp_ALT_DDS *options);
 
 /**
  * @brief Build a PROGRAM_OPTION_LIST from a vector of PROGRAM_OPTION pointers.
@@ -52,15 +71,6 @@ struct IEBCOPY_DD_OPTIONS
  */
 
 int zut_build_program_option_list(PROGRAM_OPTION_LIST *opt_list, const std::vector<PROGRAM_OPTION *> &options, ZDIAG &diag);
-/**
- * @brief Build IEBCOPY_ALT_DDS structure from IEBCOPY_DD_OPTIONS.
- *        This function populates the alt_dds structure with DD names and options
- *        from the provided IEBCOPY_DD_OPTIONS structure.
- * @param alt_dds Pointer to IEBCOPY_ALT_DDS structure to populate
- * @param options Reference to IEBCOPY_DD_OPTIONS containing the DD configuration
- */
-
-void zut_build_iebcopy_dds_options(IEBCOPY_ALT_DDS *alt_dds, const IEBCOPY_DD_OPTIONS &options);
 
 /**
  * @brief Strips the last character from input if it's a newline.

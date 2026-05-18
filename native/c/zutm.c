@@ -25,6 +25,72 @@
 
 #define ZUT_BPXWDYN_SERVICE_FAILURE -2
 
+typedef int (*DFSMSPGM)(
+    DFSMSdfp_OPT_LIST *PTR32,
+    DFSMSdfp_DD_LIST *PTR32,
+    DFSMSdfp_PAGE_LIST *PTR32) ATTRIBUTE(amode31);
+
+static const char *const zut_dfsmsdfp_names[] = {
+    [ZUTMSDFP_IEBCOPY] = "IEBCOPY",
+    [ZUTMSDFP_IEBGENER] = "IEBGENER",
+};
+
+#pragma prolog(ZUTMSDFP, " ZWEPROLG NEWDSA=(YES,128) ")
+#pragma epilog(ZUTMSDFP, " ZWEEPILG ")
+int ZUTMSDFP(ZDIAG *diag, ZUTMSDFP_UTILITY *utility, DFSMSdfp_OPT_LIST *opts, DFSMSdfp_DD_LIST *ddlist, DFSMSdfp_PAGE_LIST *pagelist)
+{
+  int rc = 0;
+
+  if ((size_t)*utility >= sizeof(zut_dfsmsdfp_names) / sizeof(zut_dfsmsdfp_names[0]))
+  {
+    ZDIAG_SET_MSG(diag, "Unknown DFSMSdfp utility index %d", (int)*utility);
+    diag->detail_rc = ZUT_RTNCD_LOAD_FAILURE;
+    return RTNCD_FAILURE;
+  }
+
+  const char *utility_name = zut_dfsmsdfp_names[*utility];
+
+  DFSMSPGM dyn_dfsms = (DFSMSPGM)load_module31(utility_name);
+
+  if (!dyn_dfsms)
+  {
+    ZDIAG_SET_MSG(diag, "Load failure for program '%.8s', not found", utility_name);
+    diag->detail_rc = ZUT_RTNCD_LOAD_FAILURE;
+    return RTNCD_FAILURE;
+  }
+
+  // below the bar
+  DFSMSdfp_OPT_LIST btb_opts = {0};
+  DFSMSdfp_DD_LIST btb_dd_list = {0};
+  DFSMSdfp_PAGE_LIST btb_page_list = {0};
+
+  if (opts)
+  {
+    memcpy(&btb_opts, opts, sizeof(DFSMSdfp_OPT_LIST));
+  }
+  if (ddlist)
+  {
+    memcpy(&btb_dd_list, ddlist, sizeof(DFSMSdfp_DD_LIST));
+  }
+  if (pagelist)
+  {
+    memcpy(&btb_page_list, pagelist, sizeof(DFSMSdfp_PAGE_LIST));
+  }
+
+  rc = dyn_dfsms(&btb_opts, (void *)&btb_dd_list.TotalLength, (void *)((uintptr_t)&btb_page_list | 0x80000000));
+
+  delete_module(utility_name);
+
+  if (0 != rc)
+  {
+    ZDIAG_SET_MSG(diag, "Execution failure for program '%.8s'", utility_name);
+    diag->detail_rc = ZUT_RTNCD_LOAD_FAILURE;
+    return RTNCD_FAILURE;
+  }
+
+  return RTNCD_SUCCESS;
+}
+
 // takes a conventional paramter list
 typedef int (*BPXWDYN)(
     BPXWDYN_PARM *PTR32,

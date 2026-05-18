@@ -231,7 +231,7 @@ static int copy_sequential(ZDS *zds, const std::string &dsn1, const std::string 
   if (options->overwrite)
   {
     ZDIAG_SET_MSG(&zds->diag,
-                  "Cannot use --overwrite when a sequential data set is specified. Use --replace (-r) to replace the contents of target data set '%s'.",
+                  "Cannot set 'overwrite' option when a sequential data set is specified. Use the 'replace' option instead to replace the contents of target data set '%s'.",
                   dsn2.c_str());
     return RTNCD_FAILURE;
   }
@@ -239,7 +239,7 @@ static int copy_sequential(ZDS *zds, const std::string &dsn1, const std::string 
   if (options->target_exists && !options->replace)
   {
     ZDIAG_SET_MSG(&zds->diag,
-                  "Target data set '%s' already exists. Use --replace (-r) flag to replace the target's contents", dsn2.c_str());
+                  "Target data set '%s' already exists. Use the 'replace' option to replace the target's contents", dsn2.c_str());
     return RTNCD_FAILURE;
   }
 
@@ -264,20 +264,14 @@ static int copy_sequential(ZDS *zds, const std::string &dsn1, const std::string 
     zut_free_dynalloc_dds(zds->diag, dds);
     return RTNCD_FAILURE;
   }
+  DFSMSdfp_ALT_DDS alt_dds{
+      .sysin = sysin_ddname,
+      .sysprint = sysprint_ddname,
+      .sysut1 = sysut1_ddname,
+      .sysut2 = sysut2_ddname,
+  };
 
-  IEBCOPY_ALT_DDS alt_dds{};
-  zut_build_iebcopy_dds_options(&alt_dds, {
-                                              .sysin_ddname = sysin_ddname,
-                                              .sysprint_ddname = sysprint_ddname,
-                                              .src_ddname = sysut1_ddname,
-                                              .tgt_ddname = sysut2_ddname,
-                                          });
-
-  PROGRAM_OPTION opt = {sizeof(IEBCOPY_ALT_DDS), 6, &alt_dds};
-  PROGRAM_OPTION_LIST opt_list{};
-  zut_build_program_option_list(&opt_list, {&opt}, zds->diag);
-
-  rc = zut_run_with_options(zds->diag, "IEBGENER", "", &opt_list);
+  rc = zut_iebgener(zds->diag, "", &alt_dds);
 
   if (rc != RTNCD_SUCCESS)
   {
@@ -285,13 +279,16 @@ static int copy_sequential(ZDS *zds, const std::string &dsn1, const std::string 
     ZDSReadOpts ropts{.zds = zds, .ddname = sysprint_ddname};
     zds_read(ropts, output);
 
-    char truncated_detail[128];
-    strncpy(truncated_detail, output.c_str(), sizeof(truncated_detail) - 1);
-    truncated_detail[sizeof(truncated_detail) - 1] = '\0';
+    if (!output.empty() || zds->diag.e_msg_len == 0)
+    {
+      char truncated_detail[128];
+      strncpy(truncated_detail, output.c_str(), sizeof(truncated_detail) - 1);
+      truncated_detail[sizeof(truncated_detail) - 1] = '\0';
 
-    ZDIAG_SET_MSG(&zds->diag,
-                  "IEBGENER failed with RC=%d. SYSPRINT: %s",
-                  rc, truncated_detail);
+      ZDIAG_SET_MSG(&zds->diag,
+                    "IEBGENER failed with RC=%d. SYSPRINT: %s",
+                    rc, truncated_detail);
+    }
     zut_free_dynalloc_dds(zds->diag, dds);
     return RTNCD_FAILURE;
   }
@@ -308,7 +305,7 @@ static int copy_partitioned(ZDS *zds, const ZDSTypeInfo &sourceInfo, const ZDSTy
   if (options->overwrite && !targetIsPds)
   {
     ZDIAG_SET_MSG(&zds->diag,
-                  "Cannot use --overwrite when a target member is specified. Use --replace (-r) to replace the contents of member '%s'.",
+                  "Cannot set 'overwrite' option when a target member is specified. Use the 'replace' option to replace the contents of member '%s'.",
                   targetInfo.member_name.c_str());
     return RTNCD_FAILURE;
   }
@@ -318,12 +315,12 @@ static int copy_partitioned(ZDS *zds, const ZDSTypeInfo &sourceInfo, const ZDSTy
     if (targetIsPds)
     {
       ZDIAG_SET_MSG(&zds->diag,
-                    "Target data set '%s' exists. Use --replace (-r) flag to replace like-named members or --overwrite to replace the entire partitioned data set", targetInfo.base_dsn.c_str());
+                    "Target data set '%s' exists. Use the 'replace' option to replace like-named members or the 'overwrite' option to replace the entire partitioned data set", targetInfo.base_dsn.c_str());
     }
     else
     {
       ZDIAG_SET_MSG(&zds->diag,
-                    "Target member '%s' exists. Use --replace (-r) flag to replace the member's contents", targetInfo.member_name.c_str());
+                    "Target member '%s' exists. Use the 'replace' option to replace the member's contents", targetInfo.member_name.c_str());
     }
     return RTNCD_FAILURE;
   }
@@ -410,25 +407,20 @@ static int copy_partitioned(ZDS *zds, const ZDSTypeInfo &sourceInfo, const ZDSTy
     return RTNCD_FAILURE;
   }
 
-  IEBCOPY_ALT_DDS alt_dds{};
-  zut_build_iebcopy_dds_options(&alt_dds, {
-                                              .sysin_ddname = sysin_ddname,
-                                              .sysprint_ddname = sysprint_ddname,
-                                              .src_ddname = src_ddname,
-                                              .tgt_ddname = tgt_ddname,
-                                          });
-
-  PROGRAM_OPTION opt = {sizeof(IEBCOPY_ALT_DDS), 6, &alt_dds};
-  PROGRAM_OPTION_LIST opt_list{};
-  zut_build_program_option_list(&opt_list, {&opt}, zds->diag);
-
-  rc = zut_run_with_options(zds->diag, "IEBCOPY", "", &opt_list);
+  DFSMSdfp_ALT_DDS alt_dds{
+      .sysin = sysin_ddname,
+      .sysprint = sysprint_ddname,
+      .sysut1 = src_ddname,
+      .sysut2 = tgt_ddname,
+  };
+  rc = zut_iebcopy(zds->diag, "", &alt_dds);
 
   if (rc != RTNCD_SUCCESS)
   {
     std::string output;
     ZDSReadOpts ropts{.zds = zds, .ddname = sysprint_ddname};
     zds_read(ropts, output);
+    if (!output.empty() || zds->diag.e_msg_len == 0)
     {
       char truncated_detail[128];
       strncpy(truncated_detail, output.c_str(), sizeof(truncated_detail) - 1);
