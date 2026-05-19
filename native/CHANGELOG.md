@@ -6,6 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- `c`: Added system tests for data set operations covering GDG (Generation Data Group) listing and reading, multibyte encoding view, concurrent PDSE member writes, and conditional CA Disk archival/restore (enabled via `ZNP_CADISK=1`).
 - `c`: Fixed several vulnerabilities in C++ and Metal C code to improve stability. [#997](https://github.com/zowe/zowex/pull/997)
 - `c`: Optimized USS file list operations by replacing CSV formatting and parsing with structured data transfer via the `ZusfListEntry` struct. This improves performance for `zowex uss list` and provides type-safe, programmatic access to file attributes for SDK consumers. [#990](https://github.com/zowe/zowex/pull/990)
 - `c`: Fixed parsing of file names containing commas in USS list API responses, which caused data misalignment for SDK consumers. [#989](https://github.com/zowe/zowex/issues/989)
