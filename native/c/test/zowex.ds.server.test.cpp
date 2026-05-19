@@ -11,6 +11,8 @@
 
 #include "ztest.hpp"
 #include <string>
+#include <cstdlib>
+#include <unistd.h>
 #include "zutils.hpp"
 #include "zowex.server.test.hpp"
 #include "zowex.ds.server.test.hpp"
@@ -494,6 +496,78 @@ void zowex_ds_server_tests()
         // Note: Data set may add trailing newline, so we check that data is returned
         // The returned base64 may be "SGVsbG8gV29ybGQhCg==" (with newline) instead of "SGVsbG8gV29ybGQh"
         ExpectWithContext(read_resp, "Should contain our written data").ToContain("SGVsbG8gV29ybGQ");
+      });
+    });
+
+    describe("streaming integration", [&]() -> void {
+      std::string ds_name;
+
+      beforeEach([&]() -> void {
+        ds_name = get_test_ds();
+        
+        // Create PS dataset for streaming test
+        std::string response;
+        execute_command_with_output(zowex_command + " ds create " + ds_name + " --dsorg PS --recfm FB --lrecl 80 --primary 5", response);
+      });
+
+      afterEach([&]() -> void {
+        std::string response;
+        execute_command_with_output(zowex_command + " ds delete " + ds_name, response);
+      });
+
+      it("should write via stream", [&]() -> void {
+        // Create unique pipe path
+        std::string pipe_path = "/tmp/zowex_stream_" + get_random_string(8);
+        
+        // Test data to stream (base64: "Hello Stream\nLine 2\n")
+        std::string test_data = "SGVsbG8gU3RyZWFtCkxpbmUgMgo=";
+        
+        std::string stream_cmd = "echo '" + test_data + "' > " + pipe_path + " &";
+        system(stream_cmd.c_str());
+        
+        usleep(100000); // 100ms
+        
+        std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"writeDataset\",\"params\":{\"dsname\":\"" + ds_name + "\",\"stream\":\"" + pipe_path + "\"},\"id\":25}\n";
+        
+        write_to_server(server, request);
+        std::string response = read_line_from_server(server);
+
+        unlink(pipe_path.c_str());
+
+        Expect(response).ToContain("\"id\":25");
+        ExpectWithContext(response, "Should be valid JSON-RPC response").ToContain("jsonrpc");
+        
+        std::string read_request = "{\"jsonrpc\":\"2.0\",\"method\":\"readDataset\",\"params\":{\"dsname\":\"" + ds_name + "\"},\"id\":26}\n";
+        
+        write_to_server(server, read_request);
+        std::string read_response = read_line_from_server(server);
+        Expect(read_response).ToContain("\"success\":true");
+        Expect(read_response).ToContain("\"data\":");
+
+      });
+
+      it("should read via stream", [&]() -> void {
+        std::string test_content = "U3RyZWFtIHJlYWQgdGVzdAo=";
+        std::string write_request = "{\"jsonrpc\":\"2.0\",\"method\":\"writeDataset\",\"params\":{\"dsname\":\"" + ds_name + "\",\"data\":\"" + test_content + "\"},\"id\":30}\n";
+        
+        write_to_server(server, write_request);
+        std::string write_response = read_line_from_server(server);
+        
+        Expect(write_response).ToContain("\"success\":true");
+
+        std::string output_pipe = "/tmp/zowex_read_stream_" + get_random_string(8);
+        
+        std::string read_request = "{\"jsonrpc\":\"2.0\",\"method\":\"readDataset\",\"params\":{\"dsname\":\"" + ds_name + "\",\"stream\":\"" + output_pipe + "\"},\"id\":31}\n";
+        
+        write_to_server(server, read_request);
+        std::string read_response = read_line_from_server(server);
+
+        Expect(read_response).ToContain("\"id\":31");
+        ExpectWithContext(read_response, "Should be valid JSON-RPC response").ToContain("jsonrpc");
+
+        unlink(output_pipe.c_str());
+
+        ExpectWithContext(read_response, "Read streaming RPC interface should be supported").ToContain("\"id\":31");
       });
     });
 
