@@ -13,7 +13,11 @@
 #include <string>
 #include <cstdlib>
 #include <unistd.h>
+#include <thread>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include "zutils.hpp"
+#include "../zbase64.h"
 #include "zowex.server.test.hpp"
 #include "zowex.ds.server.test.hpp"
 
@@ -516,34 +520,65 @@ void zowex_ds_server_tests()
       });
 
       it("should write via stream", [&]() -> void {
-        // Create unique pipe path
-        std::string pipe_path = "/tmp/zowex_stream_" + get_random_string(8);
+        int stream_id = 100;
         
-        // Test data to stream (base64: "Hello Stream\nLine 2\n")
-        std::string test_data = "SGVsbG8gU3RyZWFtCkxpbmUgMgo=";
+        // Test data to stream - base64 encoded
+        const std::string payload = "Hello Stream\nLine 2\n";
+        const auto encoded = zbase64::encode(payload.c_str(), payload.size());
+        const std::string encoded_payload(encoded.begin(), encoded.end());
         
-        std::string stream_cmd = "echo '" + test_data + "' > " + pipe_path + " &";
-        system(stream_cmd.c_str());
+        std::string pipe_path;
+        std::thread writer;
         
-        usleep(100000); // 100ms
-        
-        std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"writeDataset\",\"params\":{\"dsname\":\"" + ds_name + "\",\"stream\":\"" + pipe_path + "\"},\"id\":25}\n";
+        // RPC request with stream ID - set encoding to binary for simplicity
+        std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"writeDataset\",\"params\":{\"dsname\":\"" + ds_name + "\",\"stream\":" + std::to_string(stream_id) + ",\"encoding\":\"binary\"},\"id\":25}\n";
         
         write_to_server(server, request);
+        
+        // Read the sendStream notification to get the actual pipe path
+        std::string notification = read_line_from_server(server);
+        
+        ExpectWithContext(notification, "Should be sendStream notification").ToContain("\"method\":\"sendStream\"");
+        ExpectWithContext(notification, "Should have correct stream ID").ToContain("\"id\":" + std::to_string(stream_id));
+        
+        // Extract pipe path from notification
+        size_t pipe_path_start = notification.find("\"pipePath\":\"") + 12;
+        size_t pipe_path_end = notification.find("\"", pipe_path_start);
+        pipe_path = notification.substr(pipe_path_start, pipe_path_end - pipe_path_start);
+        
+        // Start writer thread immediately
+        writer = std::thread([&]() -> void {
+          int fd = -1;
+          for (int attempt = 0; attempt < 100 && fd == -1; ++attempt) {
+            fd = open(pipe_path.c_str(), O_WRONLY | O_NONBLOCK);
+            if (fd == -1) {
+              usleep(10000);
+            }
+          }
+          if (fd != -1) {
+            write(fd, encoded_payload.data(), encoded_payload.size());
+            close(fd);
+          }
+        });
+        
+        // Read the actual RPC response
         std::string response = read_line_from_server(server);
-
-        unlink(pipe_path.c_str());
+        
+        if (writer.joinable()) {
+          writer.join();
+        }
 
         Expect(response).ToContain("\"id\":25");
-        ExpectWithContext(response, "Should be valid JSON-RPC response").ToContain("jsonrpc");
+        Expect(response).ToContain("\"success\":true");
         
+        // Verify the streamed data was written correctly
         std::string read_request = "{\"jsonrpc\":\"2.0\",\"method\":\"readDataset\",\"params\":{\"dsname\":\"" + ds_name + "\"},\"id\":26}\n";
         
         write_to_server(server, read_request);
         std::string read_response = read_line_from_server(server);
+        
         Expect(read_response).ToContain("\"success\":true");
-        Expect(read_response).ToContain("\"data\":");
-
+        ExpectWithContext(read_response, "Should contain streamed text").ToContain("SGVsbG8");
       });
 
       it("should read via stream", [&]() -> void {
@@ -555,17 +590,48 @@ void zowex_ds_server_tests()
         
         Expect(write_response).ToContain("\"success\":true");
 
-        std::string output_pipe = "/tmp/zowex_read_stream_" + get_random_string(8);
+        int stream_id = 200;
         
-        std::string read_request = "{\"jsonrpc\":\"2.0\",\"method\":\"readDataset\",\"params\":{\"dsname\":\"" + ds_name + "\",\"stream\":\"" + output_pipe + "\"},\"id\":31}\n";
+        std::string read_request = "{\"jsonrpc\":\"2.0\",\"method\":\"readDataset\",\"params\":{\"dsname\":\"" + ds_name + "\",\"stream\":" + std::to_string(stream_id) + "},\"id\":31}\n";
         
         write_to_server(server, read_request);
+        
+        // Read the receiveStream notification to get the actual pipe path
+        std::string notification = read_line_from_server(server);
+        Expect(notification).ToContain("\"method\":\"receiveStream\"");
+        ExpectWithContext(notification, "Should have correct stream ID").ToContain("\"id\":" + std::to_string(stream_id));
+        
+        // Extract pipe path from notification
+        size_t pipe_path_start = notification.find("\"pipePath\":\"") + 12;
+        size_t pipe_path_end = notification.find("\"", pipe_path_start);
+        std::string output_pipe = notification.substr(pipe_path_start, pipe_path_end - pipe_path_start);
+        
+        // Start reader thread immediately to prevent server from blocking
+        std::string file_content;
+        std::thread reader([&]() -> void {
+          // Open FIFO for reading - this will block until the server opens it for writing
+          int fd = open(output_pipe.c_str(), O_RDONLY);
+          if (fd != -1) {
+            char buffer[4096];
+            ssize_t bytes_read = read(fd, buffer, sizeof(buffer) - 1);
+            if (bytes_read > 0) {
+              buffer[bytes_read] = '\0';
+              file_content = std::string(buffer, bytes_read);
+            }
+            close(fd);
+          }
+        });
+        
         std::string read_response = read_line_from_server(server);
+        
+        // Wait for reader to complete
+        reader.join();
 
         Expect(read_response).ToContain("\"id\":31");
-        ExpectWithContext(read_response, "Should be valid JSON-RPC response").ToContain("jsonrpc");
 
-        unlink(output_pipe.c_str());
+        ExpectWithContext(file_content, "Streamed file should contain data").ToContain(test_content);
+
+        ExpectWithContext(read_response, "Should be valid JSON-RPC response").ToContain("jsonrpc");
 
         ExpectWithContext(read_response, "Read streaming RPC interface should be supported").ToContain("\"id\":31");
       });
