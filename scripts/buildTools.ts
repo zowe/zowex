@@ -1307,7 +1307,9 @@ async function test(connection: Client) {
     const envPrefix = Object.entries(mergedEnv)
         .map(([key, val]) => `${key}=${val}`)
         .join(" ");
-    const cTestCmd = `cd ${deployDirs.cTestDir} && ${envPrefix ? `${envPrefix} ` : ""}./build-out/ztest_runner ${args[1] ?? ""}`;
+    // Wrap multi-word pattern in single quotes to avoid shell expansion
+    const testPattern = args[1] ? `'${args[1].replaceAll("'", String.raw`'\''`)}'` : "";
+    const cTestCmd = `cd ${deployDirs.cTestDir} && ${envPrefix ? `${envPrefix} ` : ""}./build-out/ztest_runner ${testPattern}`;
     await runCommandInShell(connection, `${cTestCmd}\n`, {
         streamOutput: true,
         stepName: "Running tests",

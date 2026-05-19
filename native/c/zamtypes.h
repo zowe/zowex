@@ -217,6 +217,7 @@ typedef struct
   OPEN_PL opl;
   STOW_LIST stow_list;
   IFGRPL rpl;
+  DSINF dsinf;
 } IO_CTRL;
 
 #endif

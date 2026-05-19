@@ -5,20 +5,6 @@
   "tasks": [
     {
       "type": "npm",
-      "script": "watch",
-      "problemMatcher": "$ts-webpack-watch",
-      "isBackground": true,
-      "presentation": {
-        "reveal": "never"
-      },
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      },
-      "path": "./packages/vsce"
-    },
-    {
-      "type": "npm",
       "script": "z:watch",
       "problemMatcher": [
         {

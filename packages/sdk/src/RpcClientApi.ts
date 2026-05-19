@@ -10,7 +10,7 @@
  */
 
 import type { IRpcClient } from "./doc/client";
-import type { CommandRequest, CommandResponse, console, core, ds, jobs, tool, tso, uss } from "./doc/rpc";
+import type { CommandRequest, CommandResponse, console, core, ds, jobs, system, tool, tso, uss } from "./doc/rpc";
 import type { ProgressCallback } from "./doc/types";
 
 export abstract class RpcClientApi implements IRpcClient {
@@ -54,6 +54,10 @@ export abstract class RpcClientApi implements IRpcClient {
         submitJcl: this.rpc<jobs.SubmitJclRequest, jobs.SubmitJclResponse>("submitJcl"),
         submitJob: this.rpc<jobs.SubmitJobRequest, jobs.SubmitJobResponse>("submitJob"),
         submitUss: this.rpc<jobs.SubmitUssRequest, jobs.SubmitUssResponse>("submitUss"),
+    };
+
+    public system = {
+        viewSyslog: this.rpc<system.ViewSyslogRequest, system.ViewSyslogResponse>("viewSyslog"),
     };
 
     public tool = {

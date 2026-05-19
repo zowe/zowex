@@ -39,9 +39,6 @@
 #include <regex>
 #include <functional>
 
-// TODO(Kelosky): handle test not run
-// TODO(Kelosky): handle running individual test and/or suite
-
 #define Expect(x) expect((x), EXPECT_CONTEXT{__LINE__, __FILE__, "", false})
 #define ExpectWithContext(x, context) expect((x), EXPECT_CONTEXT{__LINE__, __FILE__, std::string(context), true})
 #define TestLog(message) Globals::get_instance().test_log(message)
@@ -197,6 +194,8 @@ struct TEST_SUITE
   bool skipped = false;
   bool hook_failed = false;
   std::string hook_error;
+  bool header_printed = false;
+  bool tests_executed = false;
 };
 
 struct EXPECT_CONTEXT
@@ -216,6 +215,8 @@ private:
   int current_nesting = 0;
   jmp_buf jump_buf = {0};
   std::string matcher = "";
+  std::regex compiled_regex;
+  bool regex_valid = false;
   std::vector<int> suite_stack;
   std::string znp_test_log = "";
   bool timeout_occurred = false;
@@ -382,6 +383,21 @@ public:
   void set_matcher(const std::string &m)
   {
     matcher = m;
+    regex_valid = false;
+
+    if (!m.empty())
+    {
+      try
+      {
+        compiled_regex = std::regex(m);
+        regex_valid = true;
+      }
+      catch (const std::regex_error &e)
+      {
+        // Invalid regex - will fall back to substring matching
+        regex_valid = false;
+      }
+    }
   }
   std::vector<TEST_SUITE> &get_suites()
   {
@@ -588,6 +604,61 @@ public:
     return hooks;
   }
 
+  // Check if pattern matches the full test name (Jest-like behavior)
+  bool matches_filter(const std::string &test_description, const std::string &pattern)
+  {
+    if (pattern.empty())
+    {
+      return true;
+    }
+
+    // Build full test name: "suite1 suite2 suite3 test_description"
+    std::string full_name = "";
+    for (const auto &idx : suite_stack)
+    {
+      if (idx >= 0 && idx < static_cast<int>(suites.size()))
+      {
+        if (!full_name.empty())
+        {
+          full_name += " ";
+        }
+        full_name += suites[idx].description;
+      }
+    }
+    if (!full_name.empty())
+    {
+      full_name += " ";
+    }
+    full_name += test_description;
+
+    if (regex_valid)
+    {
+      return std::regex_search(full_name, compiled_regex);
+    }
+    else
+    {
+      // If regex is invalid, fall back to substring matching
+      return full_name.find(pattern) != std::string::npos;
+    }
+  }
+
+  // Print suite headers for all unprinted suites in the current stack
+  void print_pending_suite_headers()
+  {
+    for (const auto &idx : suite_stack)
+    {
+      if (idx >= 0 && idx < static_cast<int>(suites.size()))
+      {
+        TEST_SUITE &suite = suites[idx];
+        if (!suite.header_printed)
+        {
+          std::cout << get_indent(suite.nesting_level) << suite.description << std::endl;
+          suite.header_printed = true;
+        }
+      }
+    }
+  }
+
   template <typename Callable,
             typename = typename std::enable_if<
                 std::is_same<void, decltype(std::declval<Callable>()())>::value>::type>
@@ -600,28 +671,21 @@ public:
     unsigned int timeout_seconds = opts.timeout_sec > 0 ? opts.timeout_sec : DEFAULT_TEST_TIMEOUT_SECONDS;
 
     int current_nesting = get_nesting();
+    int suite_idx = get_suite_index();
 
-    if (get_matcher() != "")
+    // Check if test matches filter (Jest-like: matches either test name or suite path)
+    if (!matches_filter(description, get_matcher()))
     {
-      try
+      tc.skipped = true;
+
+      if (suite_idx >= 0 && suite_idx < static_cast<int>(suites.size()))
       {
-        std::regex pattern(get_matcher());
-        if (!std::regex_search(description, pattern))
-        {
-          return;
-        }
+        suites[suite_idx].tests.push_back(tc);
       }
-      catch (const std::regex_error &e)
-      {
-        // If regex is invalid, fall back to exact string match
-        if (get_matcher() != description)
-        {
-          return;
-        }
-      }
+      return;
     }
 
-    int suite_idx = get_suite_index();
+    print_pending_suite_headers();
 
     // Check if the current suite already has a hook failure (skip remaining tests)
     if (suite_idx >= 0 && suite_idx < static_cast<int>(suites.size()) && suites[suite_idx].hook_failed)
@@ -643,6 +707,8 @@ public:
       }
 
       TEST_SUITE &suite = suites[idx];
+      suite.tests_executed = true;
+
       if (suite.hook_failed)
       {
         tc.success = false;
@@ -1081,7 +1147,7 @@ void describe(const std::string &description, Callable suite)
   int current_suite_idx = static_cast<int>(g.get_suites().size()) - 1;
   g.push_suite_index(current_suite_idx);
 
-  std::cout << get_indent(ts.nesting_level) << description << std::endl;
+  // Don't print header immediately - defer until first test runs
   g.increment_nesting();
 
   auto cleanup = [&]()
@@ -1106,7 +1172,9 @@ void describe(const std::string &description, Callable suite)
   {
     TEST_SUITE &current_suite = g.get_suites()[current_suite_idx];
     const std::vector<HOOK_WITH_OPTIONS> &after_all_hooks = current_suite.after_all_hooks;
-    if (!after_all_hooks.empty())
+
+    // Only run afterAll if tests were executed (not all skipped)
+    if (!after_all_hooks.empty() && current_suite.tests_executed)
     {
       std::string error_message;
       if (!g.execute_hooks(after_all_hooks, "afterAll", error_message))
@@ -1142,7 +1210,11 @@ void xit(const std::string &description, Callable)
     g.get_suites()[suite_idx].tests.push_back(tc);
   }
 
-  std::cout << get_indent(g.get_nesting()) << colors.skip << " SKIP " << description << std::endl;
+  if (g.matches_filter(description, g.get_matcher()))
+  {
+    g.print_pending_suite_headers();
+    std::cout << get_indent(g.get_nesting()) << colors.skip << " SKIP " << description << std::endl;
+  }
 }
 
 template <typename Callable,
@@ -1158,7 +1230,11 @@ void xdescribe(const std::string &description, Callable)
   suite.skipped = true;
   g.get_suites().push_back(suite);
 
-  std::cout << get_indent(g.get_nesting()) << colors.skip << " SKIP " << description << std::endl;
+  if (g.matches_filter(description, g.get_matcher()))
+  {
+    g.print_pending_suite_headers();
+    std::cout << get_indent(g.get_nesting()) << colors.skip << " SKIP " << description << std::endl;
+  }
 }
 
 template <typename Callable,
@@ -1445,12 +1521,16 @@ inline int report()
 
   for (const auto &suite : g.get_suites())
   {
-    suite_total++;
-
-    if (suite.skipped)
+    // Only count top-level suites to match Jest behavior
+    if (suite.nesting_level == 0)
     {
-      suite_skip++;
-      continue;
+      suite_total++;
+
+      if (suite.skipped || !suite.tests_executed)
+      {
+        // Mark entire suite as skipped if all child tests were skipped
+        suite_skip++;
+      }
     }
 
     bool suite_success = true;
@@ -1469,8 +1549,9 @@ inline int report()
       total_duration += std::chrono::duration_cast<std::chrono::microseconds>(test.end_time - test.start_time);
     }
 
-    if (!suite_success)
+    if (suite.nesting_level == 0 && !suite_success)
     {
+      // Mark entire suite as failed if any child test has failed
       suite_fail++;
     }
   }

@@ -16,6 +16,7 @@
 #include <iomanip>
 #include <cstdio>
 #include <unistd.h>
+#include <stdio.h>
 #include "iazbtokp.h"
 #include "iefzb4d0.h"
 #include "iefzb4d2.h"
@@ -299,11 +300,15 @@ static int zjb_free_job_dynamic_allocation(ZJB *zjb, std::string ddname)
   return rc;
 }
 
-int zjb_read_syslog(ZJB *zjb, std::string &response, std::string &date, std::string &timestamp, int max_lines)
+int zjb_read_syslog(ZJB *zjb, ZJBSyslogOptions &opts, ZJBSyslogResponse &response)
 {
   int rc = 0;
   std::string ddname;
   ZDS zds = {};
+  response.has_more = false;
+  response.end_date.clear();
+  response.end_time.clear();
+  response.returned_lines = 0;
 
   //
   // get system name
@@ -318,7 +323,7 @@ int zjb_read_syslog(ZJB *zjb, std::string &response, std::string &date, std::str
   // get input timestamp from format HH:MM:SS.CC to binary format (low bit represents 0.01 of a second) for CONVTOD
   //
   int hh = 0, mm = 0, ss = 0, cs = 0;
-  sscanf(timestamp.c_str(), "%d:%d:%d.%d", &hh, &mm, &ss, &cs);
+  sscanf(opts.time.c_str(), "%d:%d:%d.%d", &hh, &mm, &ss, &cs);
   uint32_t ts_binary = ((uint32_t)hh * 360000) + ((uint32_t)mm * 6000) + ((uint32_t)ss * 100) + (uint32_t)cs;
 
   //
@@ -332,13 +337,13 @@ int zjb_read_syslog(ZJB *zjb, std::string &response, std::string &date, std::str
   // prepare date for `pack`
   //
   std::string date_compact;
-  for (char c : date)
+  for (char c : opts.date)
   {
     if (c != '-')
       date_compact += c;
   }
   memcpy(&zds.ebcdic_date, date_compact.c_str(), sizeof(zds.ebcdic_date));
-  zds.max_lines = max_lines;
+  zds.max_lines = opts.max_lines;
 
   rc = zjb_read_job_dynamic_allocation(zjb, dsn, ddname);
   if (0 != rc)
@@ -349,8 +354,32 @@ int zjb_read_syslog(ZJB *zjb, std::string &response, std::string &date, std::str
   zds.encoding_opts.data_type = zjb->encoding_opts.data_type;
   memcpy((void *)&zds.encoding_opts.codepage, (const void *)&zjb->encoding_opts.codepage, sizeof(zjb->encoding_opts.codepage));
 
-  rc = zds_read_vsam(&zds, ddname, response);
+  rc = zds_read_vsam(&zds, ddname, response.data);
   memcpy(&zjb->diag, &zds.diag, sizeof(ZDIAG));
+  response.has_more = (zds.has_more != 0);
+  response.returned_lines = zds.returned_lines;
+
+  if (rc == 0 && !response.data.empty())
+  {
+    char ebcdic_date_formatted[8 + 1 + 1 + 1] = {}; // date + hypens + null
+    snprintf(&ebcdic_date_formatted[0], sizeof(ebcdic_date_formatted), "%.4s-%.2s-%.2s", zds.ebcdic_date, 4 + zds.ebcdic_date, 6 + zds.ebcdic_date);
+    response.end_date = std::string(ebcdic_date_formatted);
+
+    //
+    // Inverse of the ts_binary pack above: read the same 4 bytes, then undo local→UTC (uint32 wrap).
+    //
+    uint32_t utc_cs = 0;
+    memcpy(&utc_cs, &zds.ts_binary, sizeof(utc_cs));
+    uint32_t local_cs = utc_cs + (uint32_t)tz_offset_cs;
+    unsigned end_hh = local_cs / 360000U;
+    unsigned end_mm = (local_cs / 6000U) % 60U;
+    unsigned end_ss = (local_cs / 100U) % 60U;
+    // NOTE(Kelosky): centiseconds is not used for the end time because it cannot be used for input
+    // unsigned end_cs = local_cs % 100U;
+    char end_time_buf[16] = {};
+    snprintf(end_time_buf, sizeof(end_time_buf), "%02u:%02u:%02u", end_hh, end_mm, end_ss);
+    response.end_time = end_time_buf;
+  }
 
   int newrc = zjb_free_job_dynamic_allocation(zjb, ddname);
   if (0 != newrc && 0 == rc)

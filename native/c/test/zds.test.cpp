@@ -172,7 +172,7 @@ void zds_tests()
                       cleanup_opts);
 
              describe("list",
-                      []() -> void
+                      [&]() -> void
                       {
                         it("should list data sets with a given DSN",
                            []() -> void
@@ -218,6 +218,36 @@ void zds_tests()
                              Expect(found != nullptr).ToBe(true);
                              Expect(zut_rtrim(found->name)).ToBe(dsn);
                              Expect(found->volser.length()).ToBeGreaterThan(0);
+                             Expect(found->volser.front()).Not().ToBe('*');
+                             Expect(found->volsers.size()).ToBeGreaterThan(0);
+                             Expect(found->volsers[0].front()).Not().ToBe('*');
+                           });
+
+                        it("should list data sets with a given DSN and calculate used space correctly",
+                           [&]() -> void
+                           {
+                             int rc = 0;
+                             ZDS zds = {0};
+                             DS_ATTRIBUTES attr{};
+                             attr.dsorg = "PO";
+                             attr.recfm = "FB";
+                             attr.lrecl = 80;
+                             attr.blksize = 6160;
+                             attr.alcunit = "CYL";
+                             attr.primary = 1;
+                             attr.dirblk = 5;
+                             std::string dsname = get_random_ds(3);
+                             created_dsns.push_back(dsname);
+                             create_dsn_with_attrs(&zds, dsname, attr, "PDS");
+                             std::vector<ZDSEntry> entries;
+
+                             rc = zds_list_data_sets(&zds, dsname, entries, true);
+                             ExpectWithContext(rc, zds.diag.e_msg).ToBe(0);
+                             Expect(entries.size()).ToBe(1);
+                             Expect(zut_rtrim(entries[0].name)).ToBe(dsname);
+                             Expect(entries[0].allocx).ToBe(1);
+                             Expect(entries[0].usedx).ToBe(1);
+                             Expect(entries[0].usedp > 0 && entries[0].usedp < 50).ToBe(true);
                            });
 
                         it("should find dsn (SYS1.MACLIB) based on a pattern: (SYS1.*)",
@@ -733,29 +763,29 @@ void zds_tests()
                            });
 
                         it("should fail if target member exists and replace flag is not used",
-                          [&]() -> void
-                          {
-                            ZDS zds = {};
-                            ZDSCopyOptions opts{};
-                            std::string src = get_random_ds(3);
-                            std::string tgt = get_random_ds(3);
-                            created_dsns.push_back(src);
-                            created_dsns.push_back(tgt);
+                           [&]() -> void
+                           {
+                             ZDS zds = {};
+                             ZDSCopyOptions opts{};
+                             std::string src = get_random_ds(3);
+                             std::string tgt = get_random_ds(3);
+                             created_dsns.push_back(src);
+                             created_dsns.push_back(tgt);
 
-                            zds_create_dsn(&zds, src, pds_attr, response);
+                             zds_create_dsn(&zds, src, pds_attr, response);
 
-                            zds_create_dsn(&zds, tgt, pds_attr, response);
+                             zds_create_dsn(&zds, tgt, pds_attr, response);
 
-                            std::string d1 = "DATA1", d2 = "DATA2";
+                             std::string d1 = "DATA1", d2 = "DATA2";
 
-                            zds_write(ZDSWriteOpts{.zds = &zds, .dsname = src + "(M1)"}, d1);
+                             zds_write(ZDSWriteOpts{.zds = &zds, .dsname = src + "(M1)"}, d1);
 
-                            zds_write(ZDSWriteOpts{.zds = &zds, .dsname = tgt + "(tgt)"}, d2);
+                             zds_write(ZDSWriteOpts{.zds = &zds, .dsname = tgt + "(tgt)"}, d2);
 
-                            int rc = zds_copy_dsn(&zds, src, tgt, &opts);
-                            ExpectWithContext(rc, zds.diag.e_msg).ToBe(RTNCD_FAILURE);
-                            Expect(std::string(zds.diag.e_msg)).ToContain("--replace");
-                          });
+                             int rc = zds_copy_dsn(&zds, src, tgt, &opts);
+                             ExpectWithContext(rc, zds.diag.e_msg).ToBe(RTNCD_FAILURE);
+                             Expect(std::string(zds.diag.e_msg)).ToContain("--replace");
+                           });
 
                         it("should fail if source data set does not exist",
                            [&]() -> void
@@ -790,6 +820,54 @@ void zds_tests()
 
                              Expect(rc).ToBe(RTNCD_FAILURE);
                              Expect(std::string(zds.diag.e_msg)).ToContain("Source member 'DNE' not found");
+                           });
+                      });
+
+             describe("delete data sets",
+                      [&]() -> void
+                      {
+                        it("should fail if data set does not exist",
+                           []() -> void
+                           {
+                             ZDS zds = {0};
+                             std::string dsname = get_random_ds(3);
+                             int rc = zds_delete_dsn(&zds, dsname);
+                             Expect(rc).ToBe(RTNCD_FAILURE);
+                             Expect(std::string(zds.diag.e_msg)).ToContain("Failed to allocate data set '" + dsname + "' for deletion (errno=46)");
+                           });
+
+                        it("should fail if member does not exist",
+                           [&]() -> void
+                           {
+                             ZDS zds = {0};
+                             std::string dsname = get_random_ds(3);
+                             created_dsns.push_back(dsname);
+                             create_pds(&zds, dsname);
+                             int rc = zds_delete_dsn(&zds, dsname + "(NOEXIST)");
+                             Expect(rc).ToBe(RTNCD_FAILURE);
+                             Expect(std::string(zds.diag.e_msg)).ToContain("Failed to allocate data set '" + dsname + "(NOEXIST)' for deletion (errno=91)");
+                           });
+
+                        it("should delete data set successfully when valid",
+                           [&]() -> void
+                           {
+                             ZDS zds = {0};
+                             DS_ATTRIBUTES attr{};
+
+                             attr.dsorg = "PS";
+                             attr.recfm = "FB";
+                             attr.lrecl = 80;
+                             attr.blksize = 0;
+                             attr.alcunit = "TRACKS";
+                             attr.primary = 1;
+                             attr.secondary = 1;
+                             attr.dirblk = 0;
+                             std::string dsname = get_random_ds(3);
+                             created_dsns.push_back(dsname);
+
+                             create_seq(&zds, dsname);
+                             int rc = zds_delete_dsn(&zds, dsname);
+                             ExpectWithContext(rc, zds.diag.e_msg).ToBe(0);
                            });
                       });
 

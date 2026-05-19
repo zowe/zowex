@@ -59,11 +59,23 @@ struct ListOptions
   }
 };
 
+struct ZusfListEntry
+{
+  std::string name;
+  std::string mode;
+  int64_t links;
+  std::string user;
+  std::string group;
+  int64_t size;
+  std::string filetag;
+  std::string mtime;
+};
+
 int zusf_copy_file_or_dir(ZUSF *zusf, const std::string &source_fs, const std::string &dest_fs, const CopyOptions &options);
 int zusf_create_uss_file_or_dir(ZUSF *zusf, const std::string &file, mode_t mode, const CreateOptions &options);
 int zusf_move_uss_file_or_dir(ZUSF *zusf, const std::string &source, const std::string &target, bool force = true);
-std::string zusf_format_file_entry(ZUSF *zusf, const struct stat &file_stats, const std::string &file_path, const std::string &display_name, ListOptions options, bool use_csv_format);
-int zusf_list_uss_file_path(ZUSF *zusf, const std::string &file, std::string &response, ListOptions options = ListOptions{}, bool use_csv_format = false);
+std::string zusf_format_file_entry(ZUSF *zusf, const struct stat &file_stats, const std::string &file_path, const std::string &display_name, ListOptions options, bool use_csv_format, std::vector<ZusfListEntry> *entries = nullptr);
+int zusf_list_uss_file_path(ZUSF *zusf, const std::string &file, std::string &response, ListOptions options = ListOptions{}, bool use_csv_format = false, std::vector<ZusfListEntry> *entries = nullptr);
 int zusf_read_from_uss_file(ZUSF *zusf, const std::string &file, std::string &response);
 int zusf_read_from_uss_file_streamed(ZUSF *zusf, const std::string &file, const std::string &pipe, size_t *content_len);
 int zusf_write_to_uss_file(ZUSF *zusf, const std::string &file, std::string &data);

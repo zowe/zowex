@@ -196,6 +196,14 @@ ZJSON_SCHEMA(SubmitUssRequest,
     FIELD_REQUIRED(fspath, STRING)
 );
 
+struct ViewSyslogRequest {};
+ZJSON_SCHEMA(ViewSyslogRequest,
+    FIELD_OPTIONAL(date, STRING),
+    FIELD_OPTIONAL(time, STRING),
+    FIELD_OPTIONAL(secondsAgo, NUMBER),
+    FIELD_OPTIONAL(maxLines, NUMBER)
+);
+
 struct ToolSearchRequest {};
 ZJSON_SCHEMA(ToolSearchRequest,
     FIELD_REQUIRED(dsname, STRING),

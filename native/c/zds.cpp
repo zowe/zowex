@@ -574,7 +574,7 @@ bool zds_member_exists(const std::string &dsn, const std::string &member_before)
 
 bool zds_is_valid_member_name(const std::string &name)
 {
-  if (name.length() > 8)
+  if (name.length() > 8 || name.empty())
     return false;
 
   char first = name[0];
@@ -893,6 +893,7 @@ int zds_read_vsam(ZDS *zds, std::string ddname, std::string &response)
   }
 
   int lines_read = 0;
+  zds->has_more = 0;
   while (true)
   {
     rc = ZDSRIVSM(zds, ioc);
@@ -901,6 +902,11 @@ int zds_read_vsam(ZDS *zds, std::string ddname, std::string &response)
       response.append(ioc->buffer, ioc->ifgacb.acblrecl);
       response.append(1, '\n');
       lines_read++;
+      if (lines_read >= zds->max_lines)
+      {
+        zds->has_more = 1;
+        break;
+      }
     }
     else if (rc == RTNCD_WARNING)
     {
@@ -911,19 +917,11 @@ int zds_read_vsam(ZDS *zds, std::string ddname, std::string &response)
       ZDSCIVSM(zds, ioc);
       return rc;
     }
-    if (lines_read >= zds->max_lines)
-    {
-      break;
-    }
   }
 
-  rc = ZDSCIVSM(zds, ioc);
-  if (rc != RTNCD_SUCCESS)
-  {
-    return rc;
-  }
+  zds->returned_lines = lines_read;
 
-  return RTNCD_SUCCESS;
+  return ZDSCIVSM(zds, ioc);
 }
 
 /**
@@ -2188,20 +2186,26 @@ int zds_create_dsn_loadlib(ZDS *zds, const std::string &dsn, std::string &respon
   return zds_create_dsn(zds, dsn, attributes, response);
 }
 
-#define NUM_DELETE_TEXT_UNITS 2
 int zds_delete_dsn(ZDS *zds, std::string dsn)
 {
   int rc = 0;
-
-  dsn = "//'" + dsn + "'";
-
-  rc = remove(dsn.c_str());
+  std::string dsname = "//'" + dsn + "'";
+  rc = remove(dsname.c_str());
 
   if (0 != rc)
   {
+    const auto EOPEN = dsn.find("(") == std::string::npos ? 46 : 91;
     strcpy(zds->diag.service_name, "remove");
-    zds->diag.service_rc = rc;
-    ZDIAG_SET_MSG(&zds->diag, "Could not delete data set '%s', rc: '%d'", dsn.c_str(), rc);
+    zds->diag.service_rc = errno;
+    if (errno == EOPEN)
+    {
+      // Data set is open in another process so allocating with DISP=OLD failed
+      ZDIAG_SET_MSG(&zds->diag, "Failed to allocate data set '%s' for deletion (errno=%d). Check that it exists and is not in use by another process.", dsn.c_str(), errno);
+    }
+    else
+    {
+      ZDIAG_SET_MSG(&zds->diag, "Could not delete data set '%s', rc: '%d'", dsn.c_str(), errno);
+    }
     zds->diag.detail_rc = ZDS_RTNCD_SERVICE_FAILURE;
     return RTNCD_FAILURE;
   }
@@ -2779,6 +2783,9 @@ static inline uint32_t parse_cchh_cylinder(const char *cchh)
   return (cyl_high << 16) | cyl_low;
 }
 
+// Tracks per cylinder - constant for supported mainframe DASD types
+static constexpr int TRACKS_PER_CYLINDER = 15;
+
 // Get bytes per track for a given device type
 static inline int get_bytes_per_track(const uint16_t &devtype)
 {
@@ -2805,8 +2812,7 @@ static inline int calculate_extent_tracks(const char *extent, const uint16_t &de
   if (upper_cyl < lower_cyl)
     return 0;
 
-  const auto tracks_per_cyl = 15;
-  return ((upper_cyl - lower_cyl) * tracks_per_cyl) + (upper_head - lower_head) + 1;
+  return ((upper_cyl - lower_cyl) * TRACKS_PER_CYLINDER) + (upper_head - lower_head) + 1;
 }
 
 // Load space unit (spacu) from DSCB
@@ -3079,16 +3085,8 @@ void load_used_attrs_from_dscb(const DSCBFormat1 *dscb, ZDSEntry &entry)
     return;
   }
 
-  // Store used space temporarily in tracks/cylinders (will convert to percentage later)
-  if (use_cylinders)
-  {
-    const auto tracks_per_cyl = 15;
-    entry.usedp = (last_used_track + 1 + tracks_per_cyl - 1) / tracks_per_cyl; // Round up to cylinders
-  }
-  else
-  {
-    entry.usedp = last_used_track + 1; // Tracks (0-based, so +1)
-  }
+  // Store temporary used space indicator (actual percentage calculated later)
+  entry.usedp = last_used_track + 1; // Tracks (0-based, so +1)
 
   // Calculate how many extents contain data (count of used extents)
   if (entry.usedp > 0)
@@ -3124,8 +3122,9 @@ void load_used_attrs_from_dscb(const DSCBFormat1 *dscb, ZDSEntry &entry)
 
   if (entry.usedp > 0 && entry.alloc > 0)
   {
-    int used_value = entry.usedp;
-    long long alloc_value = entry.alloc;
+    // Always use tracks for percentage calculation to ensure accuracy
+    int used_value = last_used_track + 1; // Precise track count
+    long long alloc_value = use_cylinders ? entry.alloc * TRACKS_PER_CYLINDER : entry.alloc;
 
     // For BYTES space unit, convert to track-based calculation for percentage
     if (entry.spacu == "BYTES" && entry.blksize > 0)
@@ -3197,6 +3196,11 @@ void load_volsers_from_catalog(const unsigned char *&data, const int field_len, 
     if (0 == rc)
     {
       entry.volser = value;
+      for (auto &vol : entry.volsers)
+      {
+        if (vol == IPL_VOLUME)
+          vol = value;
+      }
     }
   }
 
@@ -3327,7 +3331,7 @@ int zds_list_data_sets(ZDS *zds, std::string dsn, std::vector<ZDSEntry> &dataset
   // init blanks in query and set input DSN name
   memset(selection_criteria->csifiltk, ' ', sizeof(selection_criteria->csifiltk));
   std::transform(dsn.begin(), dsn.end(), dsn.begin(), ::toupper); // upper case
-  memcpy(selection_criteria->csifiltk, dsn.c_str(), dsn.size());
+  memcpy(selection_criteria->csifiltk, dsn.c_str(), std::min(dsn.size(), MAX_DS_LENGTH));
   memset(&selection_criteria->csicldi, 'Y', sizeof(selection_criteria->csicldi));
   memset(&selection_criteria->csiresum, ' ', sizeof(selection_criteria->csiresum));
   memset(&selection_criteria->csicatnm, ' ', sizeof(selection_criteria->csicatnm));
