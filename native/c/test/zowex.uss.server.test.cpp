@@ -18,7 +18,7 @@
 using namespace ztst;
 
 // Create unique test directory to avoid conflicts between test runs
-static const std::string ussTestDir = "/tmp/zowex-uss-srv_" + get_random_string(10);
+static const std::string ussTestDir = "/tmp/zowex_uss_srv_" + get_random_string(10);
 
 void zowex_uss_server_tests()
 {
@@ -87,6 +87,17 @@ void zowex_uss_server_tests()
 
         Expect(response).ToContain("\"success\":true");
         Expect(response).ToContain("\"id\":2");
+
+        // Verify ownership was actually set by checking ls -l output
+        std::string ls_response;
+        execute_command_with_output("ls -l " + uss_path, ls_response);
+        
+        // ls -l shows the username, so we need to get it via id -un to compare
+        std::string username_resp;
+        execute_command_with_output("id -un", username_resp);
+        username_resp.erase(username_resp.find_last_not_of(" \t\r\n") + 1); // trim whitespace
+        
+        ExpectWithContext(ls_response, "File should be owned by the user").ToContain(username_resp);
       });
     });
 
@@ -124,6 +135,11 @@ void zowex_uss_server_tests()
         dest_path = get_random_uss(ussTestDir) + "_dest";
         std::string response;
         execute_command_with_output(zowex_command + " uss create-file " + src_path, response);
+
+        // Populate the source file with some sample content via RPC writeFile
+        std::string write_req = "{\"jsonrpc\":\"2.0\",\"method\":\"writeFile\",\"params\":{\"fspath\":\"" + src_path + "\",\"data\":\"SGVsbG8gY29weSE=\"},\"id\":40}\n";
+        write_to_server(server, write_req);
+        read_line_from_server(server); // consume response
       });
 
       it("should properly copy a file via RPC", [&]() -> void {
@@ -139,6 +155,15 @@ void zowex_uss_server_tests()
         std::string ls_response;
         int rc = execute_command_with_output("ls " + dest_path, ls_response);
         Expect(rc).ToBe(0);
+
+        // Verify the destination file contains the identical content via RPC readFile
+        std::string read_req = "{\"jsonrpc\":\"2.0\",\"method\":\"readFile\",\"params\":{\"fspath\":\"" + dest_path + "\"},\"id\":41}\n";
+        write_to_server(server, read_req);
+        std::string read_resp = read_line_from_server(server);
+
+        Expect(read_resp).ToContain("\"success\":true");
+        Expect(read_resp).ToContain("\"id\":41");
+        Expect(read_resp).ToContain("\"SGVsbG8gY29weSE=\""); // same base64 data
       });
     });
 
@@ -258,6 +283,11 @@ void zowex_uss_server_tests()
         dest_path = get_random_uss(ussTestDir) + "_mvdest";
         std::string response;
         execute_command_with_output(zowex_command + " uss create-file " + src_path, response);
+
+        // Populate the source file with some sample content via RPC writeFile
+        std::string write_req = "{\"jsonrpc\":\"2.0\",\"method\":\"writeFile\",\"params\":{\"fspath\":\"" + src_path + "\",\"data\":\"SGVsbG8gbW92ZSE=\"},\"id\":100}\n";
+        write_to_server(server, write_req);
+        read_line_from_server(server); // consume response
       });
 
       it("should properly move a file via RPC", [&]() -> void {
@@ -275,6 +305,15 @@ void zowex_uss_server_tests()
         Expect(rc1).Not().ToBe(0); // source file gone
         int rc2 = execute_command_with_output("ls " + dest_path, ls_response);
         Expect(rc2).ToBe(0); // destination file exists
+
+        // Verify the destination file contains the identical content via RPC readFile
+        std::string read_req = "{\"jsonrpc\":\"2.0\",\"method\":\"readFile\",\"params\":{\"fspath\":\"" + dest_path + "\"},\"id\":101}\n";
+        write_to_server(server, read_req);
+        std::string read_resp = read_line_from_server(server);
+
+        Expect(read_resp).ToContain("\"success\":true");
+        Expect(read_resp).ToContain("\"id\":101");
+        Expect(read_resp).ToContain("\"SGVsbG8gbW92ZSE=\""); // same base64 data
       });
     });
 
