@@ -492,45 +492,41 @@ int zjb_read_job_content_by_dsn(ZJB *zjb, const std::string &dsn, std::string &r
   std::string parsed_jobid;
   int parsed_key;
 
-  // parse dsn for jobid and key
+  // parse dsn for jobid and key - if found, attempt to get the token for the dsn
+  memset(zjb->token, 0, sizeof(zjb->token));
   int parse_rc = zjb_parse_dsn_for_key(dsn, parsed_jobid, parsed_key);
-  if (0 != parse_rc)
+  if (0 == parse_rc)
   {
-    strcpy(zjb->diag.service_name, "zjb_parse_dsn_for_key");
-    zjb->diag.service_rc = parse_rc;
-    ZDIAG_SET_MSG(&zjb->diag, "Spool read parse failed with error code %d", parse_rc);
-    return RTNCD_FAILURE;
-  }
-
-  // list all dsns on jobid
-  std::vector<ZJobDD> job_dds;
-  rc = zjb_list_dds(zjb, parsed_jobid, job_dds);
-  if (0 != rc)
-  {
-    return rc;
-  }
-
-  // verify the dsn is on the jobid
-  bool found = false;
-  for (const auto &dd : job_dds)
-  {
-    std::string dd_dsn_trimmed = dd.dsn;
-    std::string dsn_trimmed = dsn;
-    if (zut_trim(dd_dsn_trimmed) == zut_trim(dsn_trimmed))
+    // list all dsns on jobid
+    std::vector<ZJobDD> job_dds;
+    rc = zjb_list_dds(zjb, parsed_jobid, job_dds);
+    if (0 != rc)
     {
-      ddname = dd.dsn;
-      memcpy(zjb->token, dd.token, sizeof(dd.token));
-      found = true;
-      break;
+      return rc;
     }
-  }
 
-  if (!found)
-  {
-    strcpy(zjb->diag.service_name, "zjb_list_dds");
-    zjb->diag.service_rc = ZJB_RTNCD_JOB_DSN_NOT_FOUND;
-    ZDIAG_SET_MSG(&zjb->diag, "Spool read DSN not found in job '%s'", parsed_jobid.c_str());
-    return RTNCD_FAILURE;
+    // verify the dsn is on the jobid
+    bool found = false;
+    for (const auto &dd : job_dds)
+    {
+      std::string dd_dsn_trimmed = dd.dsn;
+      std::string dsn_trimmed = dsn;
+      if (zut_trim(dd_dsn_trimmed) == zut_trim(dsn_trimmed))
+      {
+        ddname = dd.dsn;
+        memcpy(zjb->token, dd.token, sizeof(dd.token));
+        found = true;
+        break;
+      }
+    }
+
+    if (!found)
+    {
+      strcpy(zjb->diag.service_name, "zjb_list_dds");
+      zjb->diag.service_rc = ZJB_RTNCD_JOB_DSN_NOT_FOUND;
+      ZDIAG_SET_MSG(&zjb->diag, "Spool read DSN not found in job '%s'", parsed_jobid.c_str());
+      return RTNCD_FAILURE;
+    }
   }
 
   rc = zjb_read_job_dynamic_allocation(zjb, dsn, ddname);
