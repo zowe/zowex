@@ -37,6 +37,18 @@ void zowex_system_tests()
                   ExpectWithContext(rc, response).ToBeGreaterThanOrEqualTo(0);
                 });
            });
+  describe("list-apf tests",
+           [&]() -> void
+           {
+             it("should list apf",
+                []()
+                {
+                  int rc = 0;
+                  string response;
+                  rc = execute_command_with_output(zowex_command + " system list-apf", response);
+                  ExpectWithContext(rc, response).ToBeGreaterThanOrEqualTo(0);
+                });
+           });
   describe("list-subsystems tests",
            [&]() -> void
            {

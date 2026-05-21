@@ -280,6 +280,25 @@ int handle_system_view_syslog(InvocationContext &context)
   return RTNCD_SUCCESS;
 }
 
+int handle_system_list_apf(InvocationContext &context)
+{
+  int rc = 0;
+  ZDIAG diag = {};
+  std::vector<std::pair<std::string, std::string>> apf;
+  rc = zut_list_apf(diag, apf);
+  if (0 != rc)
+  {
+    context.error_stream() << "Error: could not list apf, rc: '" << rc << "'" << endl;
+    context.error_stream() << "  Details: " << diag.e_msg << endl;
+    return RTNCD_FAILURE;
+  }
+  for (std::vector<std::pair<std::string, std::string>>::iterator it = apf.begin(); it != apf.end(); it++)
+  {
+    context.output_stream() << setw(44) << left << it->first << " " << setw(6) << right << it->second << endl;
+  }
+  return RTNCD_SUCCESS;
+}
+
 void register_commands(parser::Command &root_command)
 {
   auto system_cmd = command_ptr(new Command("system", "system operations"));
@@ -305,6 +324,11 @@ void register_commands(parser::Command &root_command)
   system_list_subsystems_cmd->set_handler(handle_system_list_subsystems);
   system_list_subsystems_cmd->add_keyword_arg("filter", make_aliases("--filter", "-f"), "filter subsystems", ArgType_Single, false);
   system_cmd->add_command(system_list_subsystems_cmd);
+
+  // List-apf subcommand
+  auto system_list_apf_cmd = command_ptr(new Command("list-apf", "list apf data sets"));
+  system_list_apf_cmd->set_handler(handle_system_list_apf);
+  system_cmd->add_command(system_list_apf_cmd);
 
   // View-syslog subcommand
   auto system_view_syslog_cmd = command_ptr(new Command("view-syslog", "view syslog"));

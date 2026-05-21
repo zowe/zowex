@@ -194,6 +194,10 @@ typedef struct
 
   int max_retries;
 
+  // abend information
+  unsigned int abend_rc;
+  unsigned int abend_rsn;
+
   // flags
   unsigned int recovery_entered : 1;
   unsigned int request_dump : 1;
@@ -258,6 +262,26 @@ static int ZRCVYARR(SDWA sdwa)
     return RTNCD_PERCOLATE; // TODO(Kelosky): handle no SDWA, call recovery routine if provided, handle counter, & use SETRP
   }
   zenv->recovery_entered = 1;
+
+  // capture abend information from SDWA using IBM standards
+  // Extract completion code from SDWAABCC (4 bytes)  
+  unsigned int temp_abend_code = 0;
+  memcpy(&temp_abend_code, &sdwa.sdwafiob.sdwaabcc, sizeof(unsigned int)); //4 bytes
+  zenv->abend_rc = temp_abend_code;
+  
+  // Extract reason code from SDWAOCRC using the DSECT definition
+  if (sdwa.sdwaxpad) {
+    struct sdwaptrs *ptrs = (struct sdwaptrs *)sdwa.sdwaxpad;
+    if (ptrs->sdwasrvp) {
+      const struct sdwarc1 *rc1 = (const struct sdwarc1 *)ptrs->sdwasrvp;
+      // Use the DSECT macro directly, which expands to sdwaserv.sdwarc1p.sdwart12._sdwaocrc
+      zenv->abend_rsn = rc1->sdwaocrc;
+    } else {
+      zenv->abend_rsn = 0;
+    }
+  } else {
+    zenv->abend_rsn = 0; 
+  }
 
   if (sdwa.sdwaerrd & sdwaclup) // clean up only
   {

@@ -18,6 +18,7 @@ using namespace plugin;
 int handle_system_display_symbol(InvocationContext &result);
 int handle_system_list_parmlib(InvocationContext &result);
 int handle_system_list_proclib(InvocationContext &result);
+int handle_system_list_apf(InvocationContext &result);
 int handle_system_view_syslog(InvocationContext &result);
 void register_commands(parser::Command &root_command);
 } // namespace sys
