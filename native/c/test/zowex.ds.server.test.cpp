@@ -503,7 +503,7 @@ void zowex_ds_server_tests()
       });
     });
 
-    describe("streaming integration", [&]() -> void {
+    describe("streaming", [&]() -> void {
       std::string ds_name;
 
       beforeEach([&]() -> void {
@@ -547,19 +547,7 @@ void zowex_ds_server_tests()
         pipe_path = notification.substr(pipe_path_start, pipe_path_end - pipe_path_start);
         
         // Start writer thread immediately
-        writer = std::thread([&]() -> void {
-          int fd = -1;
-          for (int attempt = 0; attempt < 100 && fd == -1; ++attempt) {
-            fd = open(pipe_path.c_str(), O_WRONLY | O_NONBLOCK);
-            if (fd == -1) {
-              usleep(10000);
-            }
-          }
-          if (fd != -1) {
-            write(fd, encoded_payload.data(), encoded_payload.size());
-            close(fd);
-          }
-        });
+        writer = start_pipe_writer_thread(pipe_path, encoded_payload);
         
         // Read the actual RPC response
         std::string response = read_line_from_server(server);
@@ -608,19 +596,7 @@ void zowex_ds_server_tests()
         
         // Start reader thread immediately to prevent server from blocking
         std::string file_content;
-        std::thread reader([&]() -> void {
-          // Open FIFO for reading - this will block until the server opens it for writing
-          int fd = open(output_pipe.c_str(), O_RDONLY);
-          if (fd != -1) {
-            char buffer[4096];
-            ssize_t bytes_read = read(fd, buffer, sizeof(buffer) - 1);
-            if (bytes_read > 0) {
-              buffer[bytes_read] = '\0';
-              file_content = std::string(buffer, bytes_read);
-            }
-            close(fd);
-          }
-        });
+        std::thread reader = start_pipe_reader_thread(output_pipe, &file_content);
         
         std::string read_response = read_line_from_server(server);
         
