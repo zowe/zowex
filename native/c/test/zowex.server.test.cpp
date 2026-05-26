@@ -129,8 +129,8 @@ void stop_server(ServerHandle &handle)
   waitpid(handle.pid, nullptr, 0);
 }
 
-extern const std::string zowex_dir = "./../build-out";
-extern const std::string zowex_server_command = zowex_dir + "/zowex server";
+const std::string zowex_dir = "./../build-out";
+const std::string zowex_server_command = zowex_dir + "/zowex server";
 
 void zowex_server_tests()
 {

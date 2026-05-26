@@ -13,6 +13,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "zdbg.h"
+#include "zwto.h"
 #include "iefzpmap.h"
 
 #if defined(__IBM_METAL__)
@@ -89,11 +91,51 @@
 #define IEFPRMLB_MODEL(iefprmlbm) void *iefprmlbm;
 #endif
 
+#if defined(__IBM_METAL__)
+#define CSVAPF_MODEL(csvapfm)                                 \
+  __asm(                                                      \
+      "*                                                  \n" \
+      " CSVAPF MF=(L,APF,0D)                              \n" \
+      "*                                                    " \
+      : "DS"(csvapfm));
+#else
+#define CSVAPF_MODEL(csvapfm) void *csvapfm;
+#endif
+
+#if defined(__IBM_METAL__)
+#define CSVAPF(answer, answer_len, rc, rsn, plist)            \
+  __asm(                                                      \
+      "*                                                  \n" \
+      " LLGT  2,%0                                        \n" \
+      "*                                                  \n" \
+      " CSVAPF REQUEST=LIST,"                                 \
+      "ANSAREA=(2),"                                          \
+      "ANSLEN=(%3),"                                          \
+      "MF=(E,%4)                                          \n" \
+      "*                                                  \n" \
+      " ST 15,%1                                          \n" \
+      " ST 0,%2                                           \n" \
+      "*                                                    " \
+      : "=m"(answer), "=m"(rc), "=m"(rsn)                     \
+      : "r"(answer_len), "m"(plist)                           \
+      : "r0", "r1", "r2", "r14", "r15");
+#else
+#define CSVAPF(answer, answer_len, rc, rsn, plist)
+#endif
+
 // https://www.ibm.com/docs/en/zos/3.1.0?topic=ixg-iazxjsab-obtain-information-about-currently-running-job
 int zutm1gur(char user[8])
 {
   int rc = 0;
   IAZXJSAB(user, rc);
+  return rc;
+}
+
+int zutm1apf(struct apfhdr *answer, int *answer_len, int *rsn)
+{
+  int rc = 0;
+  CSVAPF_MODEL(csvapfm);
+  CSVAPF(answer, answer_len, rc, *rsn, csvapfm);
   return rc;
 }
 

@@ -11,6 +11,10 @@
 
 #include "ztest.hpp"
 #include <string>
+#include <thread>
+#include <fcntl.h>
+#include <unistd.h>
+#include "../zbase64.h"
 #include "zutils.hpp"
 #include "zowex.server.test.hpp"
 #include "zowex.uss.server.test.hpp"
@@ -18,7 +22,7 @@
 using namespace ztst;
 
 // Create unique test directory to avoid conflicts between test runs
-static const std::string ussTestDir = "/tmp/zowex-uss-srv_" + get_random_string(10);
+static const std::string ussTestDir = "/tmp/zowex_uss_srv_" + get_random_string(10);
 
 void zowex_uss_server_tests()
 {
@@ -87,6 +91,17 @@ void zowex_uss_server_tests()
 
         Expect(response).ToContain("\"success\":true");
         Expect(response).ToContain("\"id\":2");
+
+        // Verify ownership was actually set by checking ls -l output
+        std::string ls_response;
+        execute_command_with_output("ls -l " + uss_path, ls_response);
+        
+        // ls -l shows the username, so we need to get it via id -un to compare
+        std::string username_resp;
+        execute_command_with_output("id -un", username_resp);
+        username_resp.erase(username_resp.find_last_not_of(" \t\r\n") + 1); // trim whitespace
+        
+        ExpectWithContext(ls_response, "File should be owned by the user").ToContain(username_resp);
       });
     });
 
@@ -124,6 +139,11 @@ void zowex_uss_server_tests()
         dest_path = get_random_uss(ussTestDir) + "_dest";
         std::string response;
         execute_command_with_output(zowex_command + " uss create-file " + src_path, response);
+
+        // Populate the source file with some sample content via RPC writeFile
+        std::string write_req = "{\"jsonrpc\":\"2.0\",\"method\":\"writeFile\",\"params\":{\"fspath\":\"" + src_path + "\",\"data\":\"SGVsbG8gY29weSE=\"},\"id\":40}\n";
+        write_to_server(server, write_req);
+        read_line_from_server(server); // consume response
       });
 
       it("should properly copy a file via RPC", [&]() -> void {
@@ -139,6 +159,15 @@ void zowex_uss_server_tests()
         std::string ls_response;
         int rc = execute_command_with_output("ls " + dest_path, ls_response);
         Expect(rc).ToBe(0);
+
+        // Verify the destination file contains the identical content via RPC readFile
+        std::string read_req = "{\"jsonrpc\":\"2.0\",\"method\":\"readFile\",\"params\":{\"fspath\":\"" + dest_path + "\"},\"id\":41}\n";
+        write_to_server(server, read_req);
+        std::string read_resp = read_line_from_server(server);
+
+        Expect(read_resp).ToContain("\"success\":true");
+        Expect(read_resp).ToContain("\"id\":41");
+        Expect(read_resp).ToContain("\"SGVsbG8gY29weSE=\""); // same base64 data
       });
     });
 
@@ -258,6 +287,11 @@ void zowex_uss_server_tests()
         dest_path = get_random_uss(ussTestDir) + "_mvdest";
         std::string response;
         execute_command_with_output(zowex_command + " uss create-file " + src_path, response);
+
+        // Populate the source file with some sample content via RPC writeFile
+        std::string write_req = "{\"jsonrpc\":\"2.0\",\"method\":\"writeFile\",\"params\":{\"fspath\":\"" + src_path + "\",\"data\":\"SGVsbG8gbW92ZSE=\"},\"id\":100}\n";
+        write_to_server(server, write_req);
+        read_line_from_server(server); // consume response
       });
 
       it("should properly move a file via RPC", [&]() -> void {
@@ -275,6 +309,15 @@ void zowex_uss_server_tests()
         Expect(rc1).Not().ToBe(0); // source file gone
         int rc2 = execute_command_with_output("ls " + dest_path, ls_response);
         Expect(rc2).ToBe(0); // destination file exists
+
+        // Verify the destination file contains the identical content via RPC readFile
+        std::string read_req = "{\"jsonrpc\":\"2.0\",\"method\":\"readFile\",\"params\":{\"fspath\":\"" + dest_path + "\"},\"id\":101}\n";
+        write_to_server(server, read_req);
+        std::string read_resp = read_line_from_server(server);
+
+        Expect(read_resp).ToContain("\"success\":true");
+        Expect(read_resp).ToContain("\"id\":101");
+        Expect(read_resp).ToContain("\"SGVsbG8gbW92ZSE=\""); // same base64 data
       });
     });
 
@@ -307,6 +350,117 @@ void zowex_uss_server_tests()
       });
     });
 
+    describe("streaming integration", [&]() -> void {
+      std::string file_path;
+
+      beforeEach([&]() -> void {
+        file_path = get_random_uss(ussTestDir) + "_stream_file";
+      });
+
+      it("should write via stream", [&]() -> void {
+        int stream_id = 300;
+
+        const std::string payload = "Hello USS Stream\nLine 2 of USS\n";
+        const auto encoded = zbase64::encode(payload.c_str(), payload.size());
+        const std::string encoded_payload(encoded.begin(), encoded.end());
+
+        std::string pipe_path;
+        std::thread writer;
+
+        std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"writeFile\",\"params\":{\"fspath\":\"" + file_path + "\",\"stream\":" + std::to_string(stream_id) + ",\"encoding\":\"binary\"},\"id\":45}\n";
+
+        write_to_server(server, request);
+
+        std::string notification = read_line_from_server(server);
+
+        ExpectWithContext(notification, "Should be sendStream notification").ToContain("\"method\":\"sendStream\"");
+        ExpectWithContext(notification, "Should have correct stream ID").ToContain("\"id\":" + std::to_string(stream_id));
+
+        size_t pipe_path_start = notification.find("\"pipePath\":\"") + 12;
+        size_t pipe_path_end = notification.find("\"", pipe_path_start);
+        pipe_path = notification.substr(pipe_path_start, pipe_path_end - pipe_path_start);
+
+        writer = std::thread([&]() -> void {
+          int fd = -1;
+          for (int attempt = 0; attempt < 100 && fd == -1; ++attempt) {
+            fd = open(pipe_path.c_str(), O_WRONLY | O_NONBLOCK);
+            if (fd == -1) {
+              usleep(10000);
+            }
+          }
+          if (fd != -1) {
+            write(fd, encoded_payload.data(), encoded_payload.size());
+            close(fd);
+          }
+        });
+
+        std::string response = read_line_from_server(server);
+
+        if (writer.joinable()) {
+          writer.join();
+        }
+
+        Expect(response).ToContain("\"id\":45");
+        Expect(response).ToContain("\"success\":true");
+
+        std::string read_request = "{\"jsonrpc\":\"2.0\",\"method\":\"readFile\",\"params\":{\"fspath\":\"" + file_path + "\"},\"id\":46}\n";
+
+        write_to_server(server, read_request);
+        std::string read_response = read_line_from_server(server);
+
+        Expect(read_response).ToContain("\"success\":true");
+        ExpectWithContext(read_response, "Should contain streamed text").ToContain("SGVsbG8gVVNTIFN0cmVhbQ");
+      });
+
+      it("should read via stream", [&]() -> void {
+        std::string test_content = "VVNTIFN0cmVhbSByZWFkIHRlc3QK"; // "USS Stream read test\n" base64
+        std::string write_request = "{\"jsonrpc\":\"2.0\",\"method\":\"writeFile\",\"params\":{\"fspath\":\"" + file_path + "\",\"data\":\"" + test_content + "\"},\"id\":50}\n";
+
+        write_to_server(server, write_request);
+        std::string write_response = read_line_from_server(server);
+
+        Expect(write_response).ToContain("\"success\":true");
+
+        int stream_id = 400;
+
+        std::string read_request = "{\"jsonrpc\":\"2.0\",\"method\":\"readFile\",\"params\":{\"fspath\":\"" + file_path + "\",\"stream\":" + std::to_string(stream_id) + "},\"id\":51}\n";
+
+        write_to_server(server, read_request);
+
+        std::string notification = read_line_from_server(server);
+        Expect(notification).ToContain("\"method\":\"receiveStream\"");
+        ExpectWithContext(notification, "Should have correct stream ID").ToContain("\"id\":" + std::to_string(stream_id));
+
+        size_t pipe_path_start = notification.find("\"pipePath\":\"") + 12;
+        size_t pipe_path_end = notification.find("\"", pipe_path_start);
+        std::string output_pipe = notification.substr(pipe_path_start, pipe_path_end - pipe_path_start);
+
+        std::string file_content;
+        std::thread reader([&]() -> void {
+          // Open FIFO for reading - this will block until the server opens it for writing
+          int fd = open(output_pipe.c_str(), O_RDONLY);
+          if (fd != -1) {
+            char buffer[4096];
+            ssize_t bytes_read = read(fd, buffer, sizeof(buffer) - 1);
+            if (bytes_read > 0) {
+              buffer[bytes_read] = '\0';
+              file_content = std::string(buffer, bytes_read);
+            }
+            close(fd);
+          }
+        });
+
+        std::string read_response = read_line_from_server(server);
+
+        reader.join();
+
+        Expect(read_response).ToContain("\"id\":51");
+
+        ExpectWithContext(file_content, "Streamed file should contain data").ToContain(test_content);
+        ExpectWithContext(read_response, "Should be valid JSON-RPC response").ToContain("jsonrpc");
+        ExpectWithContext(read_response, "Read streaming RPC interface should be supported").ToContain("\"id\":51");
+      });
+    });
 
   });
 }

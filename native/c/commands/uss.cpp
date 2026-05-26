@@ -415,6 +415,10 @@ int handle_uss_chmod(InvocationContext &context)
   if (mode == 0 && !context.get<std::string>("mode", "").empty())
   {
     std::string mode_str = context.get<std::string>("mode", "");
+    if (mode_str.find_first_not_of("01234567") != std::string::npos || mode_str.length() < 3 || mode_str.length() > 4) {
+      context.error_stream() << "Error: invalid octal mode provided. Examples of valid modes: 777, 0644" << std::endl;
+      return RTNCD_FAILURE;
+    }
     try
     {
       mode = std::stoll(mode_str);
