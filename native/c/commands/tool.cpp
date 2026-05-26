@@ -297,7 +297,7 @@ int handle_tool_run(InvocationContext &context)
   std::string program = context.get<std::string>("program", "");
   std::string parms = context.get<std::string>("parms", "");
   std::vector<std::string> dds;
-  std::map<std::string, bool> dd_is_sysout; // track which DDs are sysout
+  std::map<std::string, bool> dd_is_sysout;
 
   struct psa *psa = (struct psa *)0;
   struct ascb *ascb = (struct ascb *)psa->psaaold;

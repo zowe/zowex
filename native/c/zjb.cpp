@@ -11,6 +11,7 @@
 
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <cstring>
 #include <vector>
 #include <cctype>
@@ -89,32 +90,31 @@ int zjb_get_job_dsn_by_key(ZJB *zjb, const std::string &jobid, int key, std::str
   return RTNCD_SUCCESS;
 }
 
-static int zjb_parse_dsn_for_key(const std::string &dsn_str, std::string &jobid, int &key)
+static int zjb_parse_dsn_for_key(std::string_view dsn_str, std::string &jobid, int &key)
 {
   // dsn format: userid.jobname.jobid.Ddskey[.dsname]
   // https://www.ibm.com/docs/en/zos/3.1.0?topic=allocation-specifying-data-set-name-daldsnam
 
-  std::vector<std::string> parts;
-  std::stringstream ss(dsn_str);
-  std::string part;
-
-  // split on '.' delimiter
-  while (std::getline(ss, part, '.'))
-  {
-    parts.push_back(part);
-  }
-
-  // ensure at least userid.jobname.jobid.Ddskey
-  if (parts.size() < 4)
-  {
+  size_t pos_after_userid = dsn_str.find('.');
+  if (pos_after_userid == std::string_view::npos)
     return ZJB_RTNCD_PARSE_ERROR_SIZE;
-  }
+
+  size_t pos_after_jobname = dsn_str.find('.', pos_after_userid + 1);
+  if (pos_after_jobname == std::string_view::npos)
+    return ZJB_RTNCD_PARSE_ERROR_SIZE;
+
+  size_t pos_after_jobid = dsn_str.find('.', pos_after_jobname + 1);
+  if (pos_after_jobid == std::string_view::npos)
+    return ZJB_RTNCD_PARSE_ERROR_SIZE;
 
   // get jobid
-  jobid = parts[2];
+  jobid = dsn_str.substr(pos_after_jobname + 1, pos_after_jobid - pos_after_jobname - 1);
 
-  // get key
-  const std::string &ddskey = parts[3];
+  // get ddskey
+  size_t pos_after_ddskey = dsn_str.find('.', pos_after_jobid + 1);
+  std::string_view ddskey = (pos_after_ddskey != std::string_view::npos)
+                                ? dsn_str.substr(pos_after_jobid + 1, pos_after_ddskey - pos_after_jobid - 1)
+                                : dsn_str.substr(pos_after_jobid + 1);
 
   // validate key starts with 'D' and has digits after
   if (ddskey.empty() || ddskey[0] != 'D')
@@ -123,7 +123,7 @@ static int zjb_parse_dsn_for_key(const std::string &dsn_str, std::string &jobid,
   }
 
   // get key after 'D' (skip first character)
-  std::string key_str = ddskey.substr(1);
+  std::string_view key_str = ddskey.substr(1);
 
   // validate 7 chars max
   if (key_str.empty() || key_str.length() > 7)
@@ -141,7 +141,7 @@ static int zjb_parse_dsn_for_key(const std::string &dsn_str, std::string &jobid,
 
   try
   {
-    key = std::stoi(key_str);
+    key = std::stoi(std::string(key_str));
   }
   catch (const std::exception &)
   {
@@ -235,11 +235,11 @@ static int zjb_read_job_dynamic_allocation(ZJB *zjb, std::string jobdsn, std::st
 
   if (use_stvsctkn)
   {
-    iazbtokp->btoktype = btokstkn; // alternative type: btokstkn
+    iazbtokp->btoktype = btokstkn;
   }
   else
   {
-    iazbtokp->btoktype = btokbrws; // alternative type: btokstkn
+    iazbtokp->btoktype = btokbrws;
   }
   iazbtokp->btokvers = btokvrnm;
   len = sizeof(iazbtokp->btokiotp);
