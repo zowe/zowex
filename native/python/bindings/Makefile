@@ -6,6 +6,8 @@ all: swig-extenders build
 # Environment variables for z/OS compatibility
 _SWIG_ENV= \
 	export _BPXK_AUTOCVT=ON; \
+	export CC=ibm-clang; \
+	export CXX=ibm-clang++; \
 	export _CEE_RUNOPTS="FILETAG(AUTOCVT,AUTOTAG) POSIX(ON)" ; \
 	export _CC_CCMODE=1; \
 	export _CXX_CCMODE=1; \
