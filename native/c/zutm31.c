@@ -58,7 +58,7 @@
       :                                                       \
       : "r0", "r1", "r2", "r14", "r15");
 #else
-#define IAZXJSAB(ssob, rc)
+#define IAZXJSAB(user, rc)
 #endif
 
 #if defined(__IBM_METAL__)
