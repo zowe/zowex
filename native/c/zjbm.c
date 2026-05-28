@@ -486,6 +486,7 @@ int ZJBMTCOM(ZJB *zjb, STAT *PTR64 stat, ZJB_JOB_INFO **PTR64 job_info, int *ent
       zjb->diag.detail_rc = ZJB_RSNCD_MAX_JOBS_REACHED;
       ZDIAG_SET_MSG(&zjb->diag, "Reached maximum returned jobs requested %d", zjb->jobs_max);
       stat->stattype = statmem; // free storage
+      memset(&zenv, 0, sizeof(ZRCVY_ENV));
       if (0 == enable_recovery(&zenv))
       {
         rc = iefssreq(&ssobp);
@@ -497,7 +498,7 @@ int ZJBMTCOM(ZJB *zjb, STAT *PTR64 stat, ZJB_JOB_INFO **PTR64 job_info, int *ent
         return rc;
       }
       disable_recovery(&zenv);
-      break;
+      return rc == RTNCD_FAILURE ? rc : RTNCD_WARNING;
     }
 
     total_size += (int)sizeof(ZJB_JOB_INFO);
@@ -540,6 +541,7 @@ int ZJBMTCOM(ZJB *zjb, STAT *PTR64 stat, ZJB_JOB_INFO **PTR64 job_info, int *ent
   zjb->buffer_size_needed = total_size;
 
   stat->stattype = statmem; // free storage
+  memset(&zenv, 0, sizeof(ZRCVY_ENV));
   if (0 == enable_recovery(&zenv))
   {
     rc = iefssreq(&ssobp);
@@ -644,7 +646,7 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
       rc = RTNCD_FAILURE;
     }
     disable_recovery(&zenv);
-    return rc;
+    return rc == RTNCD_FAILURE ? rc : RTNCD_FAILURE;
   }
 
   stat.stattrsa = statjqp;
@@ -699,6 +701,7 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
     }
     zjb->diag.detail_rc = ZJB_RTNCD_JOB_NOT_FOUND;
     stat.stattype = statmem; // free storage
+    memset(&zenv, 0, sizeof(ZRCVY_ENV));
     if (0 == enable_recovery(&zenv))
     {
       rc = iefssreq(&ssobp);
@@ -708,7 +711,7 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
       rc = RTNCD_FAILURE;
     }
     disable_recovery(&zenv);
-    return rc;
+    return rc == RTNCD_FAILURE ? rc : RTNCD_FAILURE;
   }
 
   STATSEVB *statsetrsp = storage_get64(zjb->buffer_size);
@@ -769,6 +772,7 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
   zjb->buffer_size_needed = total_size;
 
   stat.stattype = statmem; // free storage
+  memset(&zenv, 0, sizeof(ZRCVY_ENV));
   if (0 == enable_recovery(&zenv))
   {
     rc = iefssreq(&ssobp);
@@ -881,6 +885,7 @@ int ZJBMLPRC(ZJB *zjb, char *buffer, int *buffer_size, int *entries)
   }
 
   ssjp.ssjpfreq = ssjpprrs; // free storage
+  memset(&zenv, 0, sizeof(ZRCVY_ENV));
   if (0 == enable_recovery(&zenv))
   {
     rc = iefssreq(&ssobp);
