@@ -28,6 +28,7 @@ extern "C"
   int ZRCVYNCL(void);
   int ZRCVYTHR(int *PTR64 thread_id, int *PTR64 rc);
   int ZRCVYNUL(void);
+  int ZRCVYSTK(void);
 
 #if defined(__cplusplus)
 }
