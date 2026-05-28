@@ -179,7 +179,7 @@ typedef struct
   SAVF4SA final_f4sa;
 
   ////////////////////////////////////////////////////////////////////////////////
-  // NOTE(Kelosky): end of fields are not part of the programming interface
+  // NOTE(Kelosky): end of fields are part of the programming interface
   ////////////////////////////////////////////////////////////////////////////////
 
   ////////////////////////////////////////////////////////////////////////////////
@@ -194,6 +194,10 @@ typedef struct
 
   int max_retries;
 
+  // abend information
+  unsigned int abend_rc;
+  unsigned int abend_rsn;
+
   // flags
   unsigned int recovery_entered : 1;
   unsigned int request_dump : 1;
@@ -203,9 +207,6 @@ typedef struct
   // NOTE(Kelosky): end of fields are part of the programming interface
   ////////////////////////////////////////////////////////////////////////////////
 
-  unsigned int estaex_token;
-  unsigned int estaex_list[16];
-
 } ZRCVY_ENV;
 
 typedef void (*PTR64 ROUTINE)(ZRCVY_ENV *);
@@ -213,10 +214,10 @@ typedef int (*PTR64 RECOVERY_ROUTINE)(SDWA);
 
 #pragma prolog(ZRCVYRTY, " ZWEPROLG NEWDSA=NO ")
 #pragma epilog(ZRCVYRTY, " ZWEEPILG ")
-typedef void (*RETRY_ROUTINE)(ZRCVY_ENV *);
-static void ZRCVYRTY(ZRCVY_ENV *zenv)
+typedef void (*RETRY_ROUTINE)(ZRCVY_ENV);
+static void ZRCVYRTY(ZRCVY_ENV zenv)
 {
-  JUMP_ENV(zenv->f4sa, 4); // TODO(Kelosky): document non-zero return code
+  JUMP_ENV(zenv.f4sa, 4); // TODO(Kelosky): document non-zero return code
 }
 
 static void vradata_init(SDWA *PTR64 sdwa)
@@ -262,6 +263,26 @@ static int ZRCVYARR(SDWA sdwa)
   }
   zenv->recovery_entered = 1;
 
+  // capture abend information from SDWA using IBM standards
+  // Extract completion code from SDWAABCC (4 bytes)  
+  unsigned int temp_abend_code = 0;
+  memcpy(&temp_abend_code, &sdwa.sdwafiob.sdwaabcc, sizeof(unsigned int)); //4 bytes
+  zenv->abend_rc = temp_abend_code;
+  
+  // Extract reason code from SDWAOCRC using the DSECT definition
+  if (sdwa.sdwaxpad) {
+    struct sdwaptrs *ptrs = (struct sdwaptrs *)sdwa.sdwaxpad;
+    if (ptrs->sdwasrvp) {
+      const struct sdwarc1 *rc1 = (const struct sdwarc1 *)ptrs->sdwasrvp;
+      // Use the DSECT macro directly, which expands to sdwaserv.sdwarc1p.sdwart12._sdwaocrc
+      zenv->abend_rsn = rc1->sdwaocrc;
+    } else {
+      zenv->abend_rsn = 0;
+    }
+  } else {
+    zenv->abend_rsn = 0; 
+  }
+
   if (sdwa.sdwaerrd & sdwaclup) // clean up only
   {
     if (zenv->perc_exit)
@@ -288,7 +309,7 @@ static int ZRCVYARR(SDWA sdwa)
   SETRP_RETRY(
       4, // RTNCD_RETRY
       retry_function,
-      &sdwa); // SETRP operates on an SDWA pointer, not a ZRCVY_ENV pointer
+      &sdwa);
 
   return RTNCD_RETRY;
 }
@@ -334,11 +355,12 @@ static int enable_recovery(ZRCVY_ENV *PTR64 zenv)
   // here we call a router routine which will route back to main line code
   // eventually, whenever we call to drop recovery, we then fall through after this
   // IEAARR invocation and jump back to where to drop was called
+  // ieaarr(ZRCVYRTE, zenv, ZRCVYARR, zenv);
   IEAARR(
       ZRCVYRTE,
       &zenv,
       ZRCVYARR,
-      zenv); // NOTE(Kelosky): passing zenv by reference may have unintended side effects since IEAARR alters GPR2
+      zenv);
 
   // jump back to main whenever drop was called
   JUMP_ENV(zenv->final_f4sa, 0);
