@@ -42,13 +42,13 @@ void zowex_ds_server_tests()
       stop_server(server);
     });
 
-    describe("compress", [&]() -> void {
+    xdescribe("compress", [&]() -> void {
       // Skipped: compressDataset RPC method not implemented in server
     });
 
 
     // TODO: Enable once RPC passing is fixed
-    xdescribe("copy", [&]() -> void {
+    describe("copy", [&]() -> void {
       std::string src_ds;
       std::string dest_ds;
 
