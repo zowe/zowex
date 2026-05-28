@@ -36,10 +36,7 @@ int ZRCVYEN()
 int ZRCVYDIS()
 {
   ZRCVY_ENV zenv = {0};
-  if (0 == enable_recovery(&zenv))
-  {
-    // do nothing
-  }
+  enable_recovery(&zenv);
   disable_recovery(&zenv);
   s0c3_abend(0);
   return 0;
@@ -57,7 +54,7 @@ static int ZRCVYNST_INNER(int *PTR64 rc2)
   }
   else
   {
-    *rc2 = 1;      // zenv2 recovery entered!
+    *rc2 = 1; // zenv2 recovery entered!
     disable_recovery(&zenv2);
     s0c3_abend(0); // Trigger outer abend -> goes to zenv1 else
   }
@@ -102,10 +99,8 @@ int ZRCVYNCL()
 
   if (0 == enable_recovery(&zenv1))
   {
-    if (0 == enable_recovery(&zenv2))
-    {
-      // do nothing, just establish both and exit inner
-    }
+    // Establish inner recovery as part of nested setup
+    enable_recovery(&zenv2);
   }
 
   disable_recovery(&zenv2);
