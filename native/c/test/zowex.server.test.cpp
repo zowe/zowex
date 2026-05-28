@@ -16,6 +16,7 @@
 #include <sys/stat.h>
 #include <fstream>
 #include <fcntl.h>
+#include <atomic>
 #include "ztest.hpp"
 #include "../ztype.h"
 #include "../commands/server.hpp"
@@ -127,6 +128,24 @@ void stop_server(ServerHandle &handle)
   fclose(handle.input_stream);
   fclose(handle.output_stream);
   waitpid(handle.pid, nullptr, 0);
+}
+
+int next_rpc_id()
+{
+  static std::atomic<int> id_counter{1};
+  return id_counter++;
+}
+
+std::string make_rpc_request(const std::string &method, const std::string &params, int &id)
+{
+  id = next_rpc_id();
+  return "{\"jsonrpc\":\"2.0\",\"method\":\"" + method + "\",\"params\":" + params + ",\"id\":" + std::to_string(id) + "}\n";
+}
+
+std::string make_rpc_request(const std::string &method, const std::string &params)
+{
+  int dummy_id;
+  return make_rpc_request(method, params, dummy_id);
 }
 
 const std::string zowex_dir = "./../build-out";

@@ -24,7 +24,7 @@
 
 using namespace ztst;
 
-// Custom robust reader to handle long JSON lines without truncating at 512 bytes
+// Custom reader to handle long JSON lines without truncating at 512 bytes
 static std::string read_rpc_response(ServerHandle &handle, int timeout_ms = 5000)
 {
   fd_set read_fds;
@@ -70,10 +70,10 @@ static std::string e2a_convert(const std::string &ebcdic_str)
 void zowex_job_server_tests()
 {
   describe("jobs server tests", []() -> void {
-    ServerHandle server;
-    std::vector<std::string> clean_jobs;
-    std::vector<std::string> clean_ds;
-    std::vector<std::string> clean_uss;
+    static ServerHandle server;
+    static std::vector<std::string> clean_jobs;
+    static std::vector<std::string> clean_ds;
+    static std::vector<std::string> clean_uss;
 
     beforeAll([&]() -> void {
       server = start_server(zowex_server_command, true);
@@ -97,20 +97,21 @@ void zowex_job_server_tests()
       stop_server(server);
     });
 
-    std::string active_jobid;
-    std::string spool_dsn;
-    int spool_id = -1;
+    static std::string active_jobid;
+    static std::string spool_dsn;
+    static int spool_id = -1;
 
     it("should submit JCL via submitJcl RPC", [&]() -> void {
       std::string jcl_raw = "//IEFBR14 JOB (IZUACCT),TEST,REGION=0M\n//RUN EXEC PGM=IEFBR14";
       std::string jcl_b64 = zbase64::encode(e2a_convert(jcl_raw));
-      std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"submitJcl\",\"params\":{\"jcl\":\"" + jcl_b64 + "\"},\"id\":1}\n";
+      int req_id;
+      std::string request = make_rpc_request("submitJcl", "{\"jcl\":\"" + jcl_b64 + "\"}", req_id);
       
       write_to_server(server, request);
       std::string response = read_rpc_response(server);
 
       Expect(response).ToContain("\"success\":true");
-      Expect(response).ToContain("\"id\":1");
+      Expect(response).ToContain("\"id\":" + std::to_string(req_id));
 
       auto opt_val = zjson::from_str<zjson::Value>(response);
       Expect(opt_val.has_value()).ToBe(true);
@@ -123,7 +124,7 @@ void zowex_job_server_tests()
       // Wait for the job to complete and reach OUTPUT status
       bool completed = false;
       for (int i = 0; i < 20; ++i) {
-        std::string status_req = "{\"jsonrpc\":\"2.0\",\"method\":\"getJobStatus\",\"params\":{\"jobId\":\"" + active_jobid + "\"},\"id\":100" + std::to_string(i) + "}\n";
+        std::string status_req = make_rpc_request("getJobStatus", "{\"jobId\":\"" + active_jobid + "\"}");
         write_to_server(server, status_req);
         std::string status_resp = read_rpc_response(server);
         
@@ -137,36 +138,40 @@ void zowex_job_server_tests()
     });
 
     it("should query job status via getJobStatus RPC", [&]() -> void {
-      std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"getJobStatus\",\"params\":{\"jobId\":\"" + active_jobid + "\"},\"id\":2}\n";
+      int req_id;
+      std::string request = make_rpc_request("getJobStatus", "{\"jobId\":\"" + active_jobid + "\"}", req_id);
       
       write_to_server(server, request);
       std::string response = read_rpc_response(server);
 
       Expect(response).ToContain("\"success\":true");
-      Expect(response).ToContain("\"id\":2");
+      Expect(response).ToContain("\"id\":" + std::to_string(req_id));
       Expect(response).ToContain("\"status\":\"OUTPUT\"");
     });
 
     it("should list jobs via listJobs RPC", [&]() -> void {
-      // Use current user as owner to target specifically and prevent large list outputs
-      std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"listJobs\",\"params\":{\"owner\":\"" + get_user() + "\"},\"id\":3}\n";
+      // Use current user as owner and IEF* prefix to narrow down outputs and find the job reliably
+      std::this_thread::sleep_for(std::chrono::milliseconds(500));
+      int req_id;
+      std::string request = make_rpc_request("listJobs", "{\"owner\":\"" + get_user() + "\",\"prefix\":\"IEF*\"}", req_id);
       
       write_to_server(server, request);
       std::string response = read_rpc_response(server);
 
       Expect(response).ToContain("\"success\":true");
-      Expect(response).ToContain("\"id\":3");
+      Expect(response).ToContain("\"id\":" + std::to_string(req_id));
       Expect(response).ToContain(active_jobid);
     });
 
     it("should list spool files via listSpools RPC", [&]() -> void {
-      std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"listSpools\",\"params\":{\"jobId\":\"" + active_jobid + "\"},\"id\":4}\n";
+      int req_id;
+      std::string request = make_rpc_request("listSpools", "{\"jobId\":\"" + active_jobid + "\"}", req_id);
       
       write_to_server(server, request);
       std::string response = read_rpc_response(server);
 
       Expect(response).ToContain("\"success\":true");
-      Expect(response).ToContain("\"id\":4");
+      Expect(response).ToContain("\"id\":" + std::to_string(req_id));
 
       auto opt_val = zjson::from_str<zjson::Value>(response);
       Expect(opt_val.has_value()).ToBe(true);
@@ -191,13 +196,14 @@ void zowex_job_server_tests()
     });
 
     it("should read spool file by id via readSpool RPC", [&]() -> void {
-      std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"readSpool\",\"params\":{\"jobId\":\"" + active_jobid + "\",\"spoolId\":" + std::to_string(spool_id) + "},\"id\":5}\n";
+      int req_id;
+      std::string request = make_rpc_request("readSpool", "{\"jobId\":\"" + active_jobid + "\",\"spoolId\":" + std::to_string(spool_id) + "}", req_id);
       
       write_to_server(server, request);
       std::string response = read_rpc_response(server);
 
       Expect(response).ToContain("\"success\":true");
-      Expect(response).ToContain("\"id\":5");
+      Expect(response).ToContain("\"id\":" + std::to_string(req_id));
       Expect(response).ToContain("data");
     });
 
@@ -206,13 +212,14 @@ void zowex_job_server_tests()
     });
 
     it("should view job JCL via getJcl RPC", [&]() -> void {
-      std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"getJcl\",\"params\":{\"jobId\":\"" + active_jobid + "\"},\"id\":7}\n";
+      int req_id;
+      std::string request = make_rpc_request("getJcl", "{\"jobId\":\"" + active_jobid + "\"}", req_id);
       
       write_to_server(server, request);
       std::string response = read_rpc_response(server);
 
       Expect(response).ToContain("\"success\":true");
-      Expect(response).ToContain("\"id\":7");
+      Expect(response).ToContain("\"id\":" + std::to_string(req_id));
       Expect(response).ToContain("data");
     });
 
@@ -233,13 +240,14 @@ void zowex_job_server_tests()
       rc = execute_command_with_output("echo '//IEFBR14 JOB (IZUACCT),TEST,REGION=0M\\n//RUN EXEC PGM=IEFBR14' | " + zowex_command + " ds write " + ds, out);
       Expect(rc).ToBe(0);
 
-      std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"submitJob\",\"params\":{\"dsname\":\"" + ds + "\"},\"id\":9}\n";
+      int req_id;
+      std::string request = make_rpc_request("submitJob", "{\"dsname\":\"" + ds + "\"}", req_id);
       
       write_to_server(server, request);
       std::string response = read_rpc_response(server);
 
       Expect(response).ToContain("\"success\":true");
-      Expect(response).ToContain("\"id\":9");
+      Expect(response).ToContain("\"id\":" + std::to_string(req_id));
 
       auto opt_val = zjson::from_str<zjson::Value>(response);
       Expect(opt_val.has_value()).ToBe(true);
@@ -254,7 +262,7 @@ void zowex_job_server_tests()
       std::string uss_file = "/tmp/zowex_srv_test_job_" + get_random_string(5) + ".jcl";
       clean_uss.push_back(uss_file);
 
-      // Create local file with JCL
+      // Create file with JCL
       FILE* f = fopen(uss_file.c_str(), "w");
       Expect(f != nullptr).ToBe(true);
       fputs("//IEFBR14 JOB (IZUACCT),TEST,REGION=0M\n//RUN EXEC PGM=IEFBR14\n", f);
@@ -264,13 +272,14 @@ void zowex_job_server_tests()
       std::string tag_out;
       execute_command_with_output("chtag -r " + uss_file, tag_out);
 
-      std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"submitUss\",\"params\":{\"fspath\":\"" + uss_file + "\"},\"id\":10}\n";
+      int req_id;
+      std::string request = make_rpc_request("submitUss", "{\"fspath\":\"" + uss_file + "\"}", req_id);
       
       write_to_server(server, request);
       std::string response = read_rpc_response(server);
 
       Expect(response).ToContain("\"success\":true");
-      Expect(response).ToContain("\"id\":10");
+      Expect(response).ToContain("\"id\":" + std::to_string(req_id));
 
       auto opt_val = zjson::from_str<zjson::Value>(response);
       Expect(opt_val.has_value()).ToBe(true);
@@ -287,7 +296,7 @@ void zowex_job_server_tests()
       // Submit JCL with TYPRUN=HOLD (base64-encoded)
       std::string held_jcl = "//HELDJOB JOB (IZUACCT),TEST,TYPRUN=HOLD,REGION=0M\n//RUN EXEC PGM=IEFBR14";
       std::string held_jcl_b64 = zbase64::encode(e2a_convert(held_jcl));
-      std::string submit_req = "{\"jsonrpc\":\"2.0\",\"method\":\"submitJcl\",\"params\":{\"jcl\":\"" + held_jcl_b64 + "\"},\"id\":110}\n";
+      std::string submit_req = make_rpc_request("submitJcl", "{\"jcl\":\"" + held_jcl_b64 + "\"}");
       write_to_server(server, submit_req);
       std::string submit_resp = read_rpc_response(server);
       Expect(submit_resp).ToContain("\"success\":true");
@@ -301,43 +310,47 @@ void zowex_job_server_tests()
       clean_jobs.push_back(held_jobid);
 
       // Now issue holdJob RPC
-      std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"holdJob\",\"params\":{\"jobId\":\"" + held_jobid + "\"},\"id\":11}\n";
+      int req_id;
+      std::string request = make_rpc_request("holdJob", "{\"jobId\":\"" + held_jobid + "\"}", req_id);
       
       write_to_server(server, request);
       std::string response = read_rpc_response(server);
 
       Expect(response).ToContain("\"success\":true");
-      Expect(response).ToContain("\"id\":11");
+      Expect(response).ToContain("\"id\":" + std::to_string(req_id));
     });
 
     it("should release job via releaseJob RPC", [&]() -> void {
-      std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"releaseJob\",\"params\":{\"jobId\":\"" + held_jobid + "\"},\"id\":12}\n";
+      int req_id;
+      std::string request = make_rpc_request("releaseJob", "{\"jobId\":\"" + held_jobid + "\"}", req_id);
       
       write_to_server(server, request);
       std::string response = read_rpc_response(server);
 
       Expect(response).ToContain("\"success\":true");
-      Expect(response).ToContain("\"id\":12");
+      Expect(response).ToContain("\"id\":" + std::to_string(req_id));
     });
 
     it("should cancel job via cancelJob RPC", [&]() -> void {
-      std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"cancelJob\",\"params\":{\"jobId\":\"" + held_jobid + "\"},\"id\":13}\n";
+      int req_id;
+      std::string request = make_rpc_request("cancelJob", "{\"jobId\":\"" + held_jobid + "\"}", req_id);
       
       write_to_server(server, request);
       std::string response = read_rpc_response(server);
 
       Expect(response).ToContain("\"success\":true");
-      Expect(response).ToContain("\"id\":13");
+      Expect(response).ToContain("\"id\":" + std::to_string(req_id));
     });
 
     it("should delete job via deleteJob RPC", [&]() -> void {
-      std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"deleteJob\",\"params\":{\"jobId\":\"" + held_jobid + "\"},\"id\":14}\n";
+      int req_id;
+      std::string request = make_rpc_request("deleteJob", "{\"jobId\":\"" + held_jobid + "\"}", req_id);
       
       write_to_server(server, request);
       std::string response = read_rpc_response(server);
 
       Expect(response).ToContain("\"success\":true");
-      Expect(response).ToContain("\"id\":14");
+      Expect(response).ToContain("\"id\":" + std::to_string(req_id));
     });
   });
 }
