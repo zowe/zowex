@@ -317,13 +317,14 @@ int ZJBMVIEW(ZJB *zjb, ZJB_JOB_INFO **PTR64 job_info, int *entries)
     memcpy(stat.statjbil, zjb->jobid, sizeof(stat.statjbil));
     memcpy(stat.statjbih, zjb->jobid, sizeof(stat.statjbih));
   }
-  else if (zjb->correlator != "" && 0 != strncmp(zjb->correlator, "                                                                ", sizeof(zjb->correlator)))
+  else
   {
     char correlator31[64] = {0};
     memcpy(correlator31, zjb->correlator, sizeof(zjb->correlator));
     stat.statsel5 = statscor;
     stat.statjcrp = &correlator31[0];
   }
+
   stat.stattype = statters;
 
   return ZJBMTCOM(zjb, &stat, job_info, entries);
@@ -360,7 +361,7 @@ int ZJBMLIST(ZJB *zjb, ZJB_JOB_INFO **PTR64 job_info, int *entries)
   return ZJBMTCOM(zjb, &stat, job_info, entries);
 }
 
-int ZJBMGJQ(ZJB *zjb, SSOB *ssobp, STAT *statp, STATJQ * PTR32 * PTR32 statjqp)
+int ZJBMGJQ(ZJB *zjb, SSOB *ssobp, STAT *statp, STATJQ *PTR32 *PTR32 statjqp)
 {
   int rc = 0;
 
