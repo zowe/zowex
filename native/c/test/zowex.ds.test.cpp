@@ -1114,129 +1114,30 @@ void zowex_ds_tests()
                          // TODO: What do?
                          xit("should fail to restore if not authorized", [&]() -> void {});
                        });
-             // CA Disk archival tests. Enable with: export ZNP_CADISK=1
-             // CA Disk is one of several possible archival methods on z/OS (others include DFSMShsm).
-             // The archival workflow uses two JCL jobs:
-             //   JCL 1 - submits the archive request for a specific data set.
-             //   JCL 2 - asks the CA Disk scheduler to start processing immediately.
-             describe("archived (CA Disk)",
-                      [&]() -> void
-                      {
-                        const bool cadisk_available = (std::getenv("ZNP_CADISK") != nullptr);
-
-                        if (!cadisk_available)
-                        {
-                          xit("should archive a data set via the two-step CA Disk JCL process (set ZNP_CADISK=1 to enable)", []() -> void {});
-                          xit("should restore a CA Disk-archived data set", []() -> void {});
-                          xit("should fail to restore a non-existent archived data set", []() -> void {});
-                          return;
-                        }
-
-                        TEST_OPTIONS cadisk_opts = {false, 120};
-                        std::string archive_ds;
-
-                        auto submit_and_wait = [](const std::string &jcl, int max_polls = 600, bool check_rc = false)
-                        {
-                          ZJB zjb = {0};
-                          std::string jobid;
-                          int rc = zjb_submit(&zjb, jcl, jobid);
-                          if (rc != 0)
-                            throw std::runtime_error("Failed to submit JCL: " + std::string(zjb.diag.e_msg));
-                          TestLog("Submitted job " + jobid + " (" + std::to_string(jcl.size()) + " bytes)");
-                          std::string correlator(zjb.correlator, sizeof(zjb.correlator));
-                          ZJob final_job = {};
-                          for (int i = 0; i < max_polls; ++i)
-                          {
-                            ZJB zjb_v = {0};
-                            final_job = {};
-                            int vrc = zjb_view(&zjb_v, correlator, final_job);
-                            if (vrc != 0)
-                              throw std::runtime_error("Failed to view job: " + std::string(zjb_v.diag.e_msg));
-                            if (!final_job.retcode.empty())
-                              break;
-                            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                          }
-                          TestLog("Job " + jobid + " retcode='" + final_job.retcode + "'");
-                          if (check_rc && final_job.retcode.find("CC 0000") == std::string::npos)
-                            throw std::runtime_error("Job failed with retcode='" + final_job.retcode + "'");
-                        };
-
-                        beforeAll([&]() -> void
-                                  {
-                                    archive_ds = get_random_ds();
-                                    _ds.push_back(archive_ds);
-                                    _create_ds(archive_ds, "--dsorg PS");
-
-                                    // Write recognizable content so we can verify it survives archival/restore
-                                    std::string response;
-                                    const std::string command = "echo 'cadisk archival test content' | " + zowex_command + " data-set write " + archive_ds;
-                                    const int rc = execute_command_with_output(command, response);
-                                    ExpectWithContext(rc, response).ToBe(0); },
-                                  cadisk_opts);
-
-                        it("should archive a data set via the two-step CA Disk JCL process",
-                           [&]() -> void
-                           {
-                             // JCL 1: Request CA Disk archival of the data set
-                             std::string arc_jcl;
-                             arc_jcl += "//CADARC$  JOB IZUACCT\n";
-                             arc_jcl += "//STEP1    EXEC PGM=CADAMSUP\n";
-                             arc_jcl += "//SYSPRINT DD SYSOUT=*\n";
-                             arc_jcl += "//SYSIN    DD *\n";
-                             arc_jcl += "  ARCHIVE DATASET(" + archive_ds + ")\n";
-                             arc_jcl += "/*\n";
-                             submit_and_wait(arc_jcl, 600, true);
-
-                             // JCL 2: Ask the CA Disk scheduler to process the request immediately
-                             std::string sched_jcl;
-                             sched_jcl += "//CADSCH$  JOB IZUACCT\n";
-                             sched_jcl += "//STEP1    EXEC PGM=CADAMSUP\n";
-                             sched_jcl += "//SYSPRINT DD SYSOUT=*\n";
-                             sched_jcl += "//SYSIN    DD *\n";
-                             sched_jcl += "  START IMMEDIATE\n";
-                             sched_jcl += "/*\n";
-                             submit_and_wait(sched_jcl, 600, true);
-
-                             // Verify the data set is now archived (CA Disk uses ARCIVE as the volser)
-                             std::string response;
-                             const std::string command = zowex_command + " data-set list " + archive_ds + " -a --rfc";
-                             const int rc = execute_command_with_output(command, response);
-                             ExpectWithContext(rc, response).ToBe(0);
-                             Expect(response).ToContain("ARCIVE");
-                           },
-                           cadisk_opts);
-
-                        it("should restore a CA Disk-archived data set",
-                           [&]() -> void
-                           {
-                             std::string response;
-                             const std::string command = zowex_command + " data-set restore " + archive_ds;
-                             const int rc = execute_command_with_output(command, response);
-                             ExpectWithContext(rc, response).ToBe(0);
-                             Expect(response).ToContain("Data set '" + archive_ds + "' restored");
-
-                             // Verify the data set is accessible and content is intact after restore
-                             const std::string view_command = zowex_command + " data-set view " + archive_ds;
-                             std::string view_response;
-                             const int view_rc = execute_command_with_output(view_command, view_response);
-                             ExpectWithContext(view_rc, view_response).ToBe(0);
-                             Expect(view_response).ToContain("cadisk archival test content");
-                           },
-                           cadisk_opts);
-
-                        it("should fail to restore a non-existent archived data set",
-                           [&]() -> void
-                           {
-                             const std::string ghost_ds = archive_ds + ".GHOST";
-                             std::string response;
-                             const std::string command = zowex_command + " data-set restore " + ghost_ds;
-                             const int rc = execute_command_with_output(command, response);
-                             ExpectWithContext(rc, response).Not().ToBe(0);
-                             Expect(response).ToContain("Error: could not restore data set: '" + ghost_ds + "'");
-                           },
-                           cadisk_opts);
-                      });
-             describe("view",
+            // CA Disk archival/restore is tested manually via native/c/test/test.cadisk.sh.
+            // See doc/ref/ds/ca-disk.md for instructions.
+            describe("archived (CA Disk)",
+                     [&]() -> void
+                     {
+                       xit("should archive a data set via DARCHIVE TSO command", []() -> void {});
+                       xit("should restore a CA Disk-archived data set", []() -> void {});
+                       xit("should fail to restore a non-existent archived data set", []() -> void {});
+                     });
+            // Manual test for https://github.com/zowe/zowex/issues/1007
+            // Bug: "data-set restore" returns success for a data set that was never archived.
+            //
+            // To verify manually once the fix is in place:
+            //   1. Create a plain data set (never archived):
+            //        zowex data-set create HLQ.UNARCHIVED --dsorg PS
+            //   2. Attempt to restore it:
+            //        zowex data-set restore HLQ.UNARCHIVED
+            //   3. Expected (after fix): non-zero RC and a message such as
+            //        "Error: data set 'HLQ.UNARCHIVED' is not archived"
+            //   4. Actual (current bug): RC 0 and "Data set 'HLQ.UNARCHIVED' restored"
+            //
+            // For the full end-to-end archival/restore flow, see test.cadisk.sh.
+            xit("should fail to restore a data set that was never archived", []() -> void {});
+            describe("view",
                       [&]() -> void
                       {
                         beforeEach(

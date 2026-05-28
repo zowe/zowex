@@ -23,4 +23,6 @@ profiles:
     # Use this to enable optional tests that depend on system-specific capabilities.
     # Local ZNP_* env vars always override these values when both are set.
     # testEnv:
-    #   ZNP_CADISK: "1"  # Enable CA Disk archival tests (only on systems with CA Disk installed)
+    #   # Archival mechanism available on this LPAR (uncomment one):
+    #   ZNP_CADISK: "1"      # CA Disk (Broadcom) — uses DARCHIVE / zowex data-set restore
+    #   ZNP_DFSMSHSM: "1"   # DFSMShsm (IBM)     — uses HMIGRATE / HRECALL
