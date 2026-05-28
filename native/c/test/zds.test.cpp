@@ -1607,6 +1607,36 @@ void zds_tests()
                              Expect(content.empty()).ToBe(false);
                            });
 
+                        it("should write and read DBCS multi-byte encoded content (IBM-939)",
+                           [&]() -> void
+                           {
+                             const std::string dsn = get_random_ds(3);
+                             created_dsns.push_back(dsn);
+                             ZDS zds = {0};
+                             create_seq(&zds, dsn);
+
+                             // Japanese こんにちは encoded as UTF-8 bytes
+                             const std::string utf8_japanese = "\xe3\x81\x93\xe3\x82\x93\xe3\x81\xab\xe3\x81\xa1\xe3\x81\xaf";
+
+                             ZDS write_zds{};
+                             write_zds.encoding_opts.data_type = eDataTypeText;
+                             strcpy(write_zds.encoding_opts.codepage, "IBM-939");
+                             ZDSWriteOpts write_opts{.zds = &write_zds, .dsname = dsn};
+                             int rc = zds_write(write_opts, utf8_japanese);
+                             ExpectWithContext(rc, write_zds.diag.e_msg).ToBe(0);
+
+                             // Read back in binary mode to verify DBCS EBCDIC encoding.
+                             // IBM-939 uses SO (0x0E) and SI (0x0F) byte delimiters around double-byte characters.
+                             ZDS read_zds{};
+                             read_zds.encoding_opts.data_type = eDataTypeBinary;
+                             ZDSReadOpts read_opts{.zds = &read_zds, .dsname = dsn};
+                             std::string content;
+                             rc = zds_read(read_opts, content);
+                             ExpectWithContext(rc, read_zds.diag.e_msg).ToBe(0);
+                             Expect(content.find('\x0e') != std::string::npos).ToBe(true);
+                             Expect(content.find('\x0f') != std::string::npos).ToBe(true);
+                           });
+
                         it("should default source encoding to UTF-8 when source_codepage is empty",
                            [&]() -> void
                            {
@@ -2239,6 +2269,89 @@ void zds_tests()
                              Expect([&]()
                                     { rc = zds_write(write_opts, large_data); })
                                  .ToAbend();
+                           });
+
+                        it("should release ENQ after DCB abend during write",
+                           [&]() -> void
+                           {
+                             DS_ATTRIBUTES attr{};
+                             attr.dsorg = "PO";
+                             attr.recfm = "FB";
+                             attr.lrecl = 80;
+                             attr.blksize = 6160;
+                             attr.alcunit = "TRACKS";
+                             attr.primary = 5;
+                             attr.secondary = 0;
+                             attr.dirblk = 5;
+
+                             const std::string ds = get_random_ds(3);
+                             created_dsns.push_back(ds);
+
+                             ZDS create_zds = {0};
+                             std::string response;
+                             int rc = zds_create_dsn(&create_zds, ds, attr, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+
+                             ZDS crash_zds{};
+                             crash_zds.encoding_opts.data_type = eDataTypeText;
+                             strcpy(crash_zds.encoding_opts.codepage, "IBM-1047");
+                             strcpy(crash_zds.encoding_opts.source_codepage, "IBM-1047");
+
+                             std::string large_data;
+                             large_data.reserve(81 * 1000);
+                             for (int i = 0; i < 1000; i++)
+                               large_data += std::string(80, 'A') + "\n";
+
+                             ZDSWriteOpts crash_opts{.zds = &crash_zds, .dsname = ds + "(M1)"};
+                             Expect([&]() { zds_write(crash_opts, large_data); }).ToAbend();
+
+                             // After recovery, verify ENQ was released by writing to a different member.
+                             // ZDS_RTNCD_ENQ_ERROR (-14) would indicate the ENQ was not released.
+                             ZDS write_zds{};
+                             write_zds.encoding_opts.data_type = eDataTypeText;
+                             strcpy(write_zds.encoding_opts.codepage, "IBM-1047");
+                             strcpy(write_zds.encoding_opts.source_codepage, "IBM-1047");
+                             ZDSWriteOpts verify_opts{.zds = &write_zds, .dsname = ds + "(M2)"};
+                             const std::string small_data = "ENQ released\n";
+                             rc = zds_write(verify_opts, small_data);
+                             ExpectWithContext(rc, std::string(write_zds.diag.e_msg)).Not().ToBe(ZDS_RTNCD_ENQ_ERROR);
+                           });
+
+                        it("should release ENQ after forced S0C3 abend (EXRL) during BPAM write",
+                           [&]() -> void
+                           {
+                             DS_ATTRIBUTES attr{};
+                             attr.dsorg = "PO";
+                             attr.recfm = "FB";
+                             attr.lrecl = 80;
+                             attr.blksize = 800;
+                             attr.dirblk = 5;
+                             attr.primary = 1;
+
+                             const std::string ds = get_random_ds(3);
+                             created_dsns.push_back(ds);
+
+                             ZDS create_zds = {0};
+                             std::string response;
+                             int rc = zds_create_dsn(&create_zds, ds, attr, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+
+                             // Open for BPAM write - this acquires the z/OS ENQ on the data set.
+                             // ioc->has_enq is the direct "is this locked" flag (see IO_CTRL in zamtypes.h).
+                             ZDS open_zds{};
+                             IO_CTRL *ioc = nullptr;
+                             rc = zds_open_output_bpam(&open_zds, ds + "(M1)", ioc);
+                             ExpectWithContext(rc, open_zds.diag.e_msg).ToBe(0);
+                             Expect(ioc->has_enq).ToBe(1);
+
+                             // Force a S0C3 abend (EXRL 0,* = execute-type instruction targeting itself)
+                             // while the ENQ is held. ESTAE recovery must call deq_data_set before
+                             // returning to the test for ioc->has_enq to become 0.
+                             Expect([&]() { __asm(" EXRL 0,*"); }).ToAbend();
+
+                             // After recovery: has_enq == 0 means the recovery path properly DEQ'd.
+                             // has_enq == 1 means a forced crash leaves ENQ unreleased (bug).
+                             Expect(ioc->has_enq).ToBe(0);
                            });
                       });
            });

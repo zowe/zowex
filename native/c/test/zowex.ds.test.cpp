@@ -2008,7 +2008,54 @@ void zowex_ds_tests()
                                    //   - Mutual tenancy: z/OS ENQ/RESERVE must prevent simultaneous exclusive
                                    //     writes from different users or processes to the same data set.
                                    //     Verify that the second writer receives a proper error or waits.
-                                   xit("should handle concurrent writes to the same PDS member gracefully (run by Dan)", []() -> void {});
+                                   it("should handle concurrent writes to the same PDS member gracefully",
+                                      [&]() -> void
+                                      {
+                                        const std::string ds = get_random_ds();
+                                        _ds.push_back(ds);
+                                        _create_ds(ds, "--dsorg PO --dirblk 5 --dsntype LIBRARY");
+
+                                        const int thread_count = 4;
+                                        std::vector<std::thread> threads;
+                                        std::vector<int> results(thread_count, -1);
+
+                                        for (int i = 0; i < thread_count; ++i)
+                                        {
+                                          threads.emplace_back([&, i]()
+                                                               {
+                                                                 std::string response;
+                                                                 const std::string command = "echo 'thread " + std::to_string(i) + " data' | " +
+                                                                                             zowex_command + " data-set write '" + ds + "(SHARED)'";
+                                                                 results[i] = execute_command_with_output(command, response); });
+                                        }
+
+                                        for (auto &t : threads)
+                                          t.join();
+
+                                        // z/OS ENQ serializes writes to the same member - at least one write must succeed
+                                        int successes = 0;
+                                        for (int i = 0; i < thread_count; ++i)
+                                          if (results[i] == 0)
+                                            ++successes;
+                                        Expect(successes).ToBeGreaterThan(0);
+
+                                        // Member must be readable and contain coherent data from one of the writes
+                                        std::string response;
+                                        const std::string view_cmd = zowex_command + " data-set view '" + ds + "(SHARED)'";
+                                        const int rc = execute_command_with_output(view_cmd, response);
+                                        ExpectWithContext(rc, response).ToBe(0);
+
+                                        bool has_thread_data = false;
+                                        for (int i = 0; i < thread_count; ++i)
+                                          if (response.find("thread " + std::to_string(i) + " data") != std::string::npos)
+                                            has_thread_data = true;
+                                        Expect(has_thread_data).ToBe(true);
+                                      },
+                                      concurrent_opts);
+                                   // ENQ release after a crash must be verified at the API level (zds_write directly),
+                                   // since simulating a DCB abend and inspecting ENQ state requires calling native functions
+                                   // that are not accessible through the zowex command interface.
+                                   // See "should release ENQ after DCB abend during write" in zds.test.cpp.
                                    xit("should release ENQ resources when a thread crashes during a write operation", []() -> void {});
                                  });
                       });
