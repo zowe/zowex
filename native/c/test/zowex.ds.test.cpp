@@ -2052,11 +2052,6 @@ void zowex_ds_tests()
                                         Expect(has_thread_data).ToBe(true);
                                       },
                                       concurrent_opts);
-                                   // ENQ release after a crash must be verified at the API level (zds_write directly),
-                                   // since simulating a DCB abend and inspecting ENQ state requires calling native functions
-                                   // that are not accessible through the zowex command interface.
-                                   // See "should release ENQ after DCB abend during write" in zds.test.cpp.
-                                   xit("should release ENQ resources when a thread crashes during a write operation", []() -> void {});
                                  });
                       });
            });
