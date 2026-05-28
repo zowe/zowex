@@ -14,6 +14,7 @@
 #include <string.h>
 #include "zjblkup.h"
 #include "iazjproc.h"
+#include "zrecovery.h"
 #include "zssitype.h"
 #include "zjbm.h"
 #include "zssi.h"
@@ -24,6 +25,7 @@
 #include "ihapsa.h"
 #include "cvt.h"
 #include "iefjesct.h"
+#include "ztype.h"
 
 // TODO(Kelosky):
 // https://www.ibm.com/docs/en/zos/3.1.0?topic=79-putget-requests
@@ -197,6 +199,8 @@ int ZJBMMOD(ZJB *zjb, int type, int flags)
   SSJM ssjm = {0};
   SSJF *ssjfp = NULL;
 
+  ZRCVY_ENV zenv = {0};
+
   // https://www.ibm.com/docs/en/zos/3.1.0?topic=sfcd-modify-job-function-call-ssi-function-code-85
   init_ssob(&ssob, &ssib, &ssjm, 85);
   rc = init_ssib(&ssib);
@@ -269,7 +273,16 @@ int ZJBMMOD(ZJB *zjb, int type, int flags)
 
   ssobp = &ssob;
   ssobp = (SSOB * PTR32)((unsigned int)ssobp | 0x80000000);
-  rc = iefssreq(&ssobp); // TODO(Kelosky): recovery
+  if (0 == enable_recovery(&zenv))
+  {
+    rc = iefssreq(&ssobp);
+  }
+  else
+  {
+    rc = RTNCD_FAILURE;
+  }
+
+  disable_recovery(&zenv);
 
   if (0 != rc || 0 != ssob.ssobretn)
   {
@@ -367,9 +380,20 @@ int ZJBMGJQ(ZJB *zjb, SSOB *ssobp, STAT *statp, STATJQ *PTR32 *PTR32 statjqp)
 
   SSOB *PTR32 ssobp2 = NULL;
 
+  ZRCVY_ENV zenv = {0};
+
   ssobp2 = ssobp;
   ssobp2 = (SSOB * PTR32)((unsigned int)ssobp2 | 0x80000000);
-  rc = iefssreq(&ssobp2); // TODO(Kelosky): recovery
+  if (0 == enable_recovery(&zenv))
+  {
+    rc = iefssreq(&ssobp2);
+  }
+  else
+  {
+    rc = RTNCD_FAILURE;
+  }
+
+  disable_recovery(&zenv);
 
   if (0 != rc || 0 != ssobp->ssobretn)
   {
@@ -412,6 +436,8 @@ int ZJBMTCOM(ZJB *zjb, STAT *PTR64 stat, ZJB_JOB_INFO **PTR64 job_info, int *ent
   SSOB ssob = {0};
   SSIB ssib = {0};
 
+  ZRCVY_ENV zenv = {0};
+
   // https://www.ibm.com/docs/en/zos/3.1.0?topic=sfcd-extended-status-function-call-ssi-function-code-80
   init_ssob(&ssob, &ssib, stat, 80);
   if (0 != init_ssib(&ssib))
@@ -423,7 +449,16 @@ int ZJBMTCOM(ZJB *zjb, STAT *PTR64 stat, ZJB_JOB_INFO **PTR64 job_info, int *ent
 
   ssobp = &ssob;
   ssobp = (SSOB * PTR32)((unsigned int)ssobp | 0x80000000);
-  rc = iefssreq(&ssobp); // TODO(Kelosky): recovery
+  if (0 == enable_recovery(&zenv))
+  {
+    rc = iefssreq(&ssobp);
+  }
+  else
+  {
+    rc = RTNCD_FAILURE;
+  }
+
+  disable_recovery(&zenv);
 
   if (0 != rc || 0 != ssob.ssobretn)
   {
@@ -451,8 +486,17 @@ int ZJBMTCOM(ZJB *zjb, STAT *PTR64 stat, ZJB_JOB_INFO **PTR64 job_info, int *ent
       zjb->diag.detail_rc = ZJB_RSNCD_MAX_JOBS_REACHED;
       ZDIAG_SET_MSG(&zjb->diag, "Reached maximum returned jobs requested %d", zjb->jobs_max);
       stat->stattype = statmem; // free storage
-      rc = iefssreq(&ssobp);
-      return RTNCD_WARNING;
+      if (0 == enable_recovery(&zenv))
+      {
+        rc = iefssreq(&ssobp);
+      }
+      else
+      {
+        rc = RTNCD_FAILURE;
+        disable_recovery(&zenv);
+        return rc;
+      }
+      disable_recovery(&zenv);
       break;
     }
 
@@ -496,9 +540,17 @@ int ZJBMTCOM(ZJB *zjb, STAT *PTR64 stat, ZJB_JOB_INFO **PTR64 job_info, int *ent
   zjb->buffer_size_needed = total_size;
 
   stat->stattype = statmem; // free storage
-  rc = iefssreq(&ssobp);    // TODO(Kelosky): recovery
+  if (0 == enable_recovery(&zenv))
+  {
+    rc = iefssreq(&ssobp);
+  }
+  else
+  {
+    rc = RTNCD_FAILURE;
+  }
+  disable_recovery(&zenv);
 
-  return RTNCD_SUCCESS;
+  return rc;
 }
 
 #define LOOP_MAX 100
@@ -516,6 +568,8 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
   SSOB ssob = {0};
   SSIB ssib = {0};
   STAT stat = {0};
+
+  ZRCVY_ENV zenv = {0};
 
   STATJQ *PTR32 statjqp = NULL;
   STATJQHD *PTR32 statjqhdp = NULL;
@@ -581,14 +635,30 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
     }
 
     stat.stattype = statmem; // free storage
-    rc = iefssreq(&ssobp);   // TODO(Kelosky): recovery
-    return RTNCD_FAILURE;
+    if (0 == enable_recovery(&zenv))
+    {
+      rc = iefssreq(&ssobp);
+    }
+    else
+    {
+      rc = RTNCD_FAILURE;
+    }
+    disable_recovery(&zenv);
+    return rc;
   }
 
   stat.stattrsa = statjqp;
   stat.stattype = statoutv;
 
-  rc = iefssreq(&ssobp); // TODO(Kelosky): recovery
+  if (0 == enable_recovery(&zenv))
+  {
+    rc = iefssreq(&ssobp);
+  }
+  else
+  {
+    rc = RTNCD_FAILURE;
+  }
+  disable_recovery(&zenv);
 
   if (0 != rc || 0 != ssob.ssobretn)
   {
@@ -603,6 +673,8 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
                   stat.statrea2); // STATREAS contains the reason
     return RTNCD_FAILURE;
   }
+
+  memset(&zenv, 0, sizeof(ZRCVY_ENV));
 
   statjqp = (STATJQ * PTR32) stat.statjobf;
   statvop = (STATVO * PTR32) statjqp->stjqsvrb;
@@ -627,8 +699,16 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
     }
     zjb->diag.detail_rc = ZJB_RTNCD_JOB_NOT_FOUND;
     stat.stattype = statmem; // free storage
-    rc = iefssreq(&ssobp);   // TODO(Kelosky): recovery
-    return RTNCD_FAILURE;
+    if (0 == enable_recovery(&zenv))
+    {
+      rc = iefssreq(&ssobp);
+    }
+    else
+    {
+      rc = RTNCD_FAILURE;
+    }
+    disable_recovery(&zenv);
+    return rc;
   }
 
   STATSEVB *statsetrsp = storage_get64(zjb->buffer_size);
@@ -647,10 +727,18 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
       if (loop_control >= zjb->dds_max)
       {
         stat.stattype = statmem; // free storage
-        rc = iefssreq(&ssobp);   // TODO(Kelosky): recovery
+        if (0 == enable_recovery(&zenv))
+        {
+          rc = iefssreq(&ssobp);
+        }
+        else
+        {
+          rc = RTNCD_FAILURE;
+        }
+        disable_recovery(&zenv);
         zjb->diag.detail_rc = ZJB_RSNCD_MAX_JOBS_REACHED;
         ZDIAG_SET_MSG(&zjb->diag, "max DDs reached '%d', results truncated", zjb->dds_max);
-        return RTNCD_WARNING;
+        return rc == RTNCD_FAILURE ? rc : RTNCD_WARNING;
       }
 
       total_size += (int)sizeof(STATSEVB);
@@ -681,9 +769,17 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
   zjb->buffer_size_needed = total_size;
 
   stat.stattype = statmem; // free storage
-  rc = iefssreq(&ssobp);   // TODO(Kelosky): recovery
+  if (0 == enable_recovery(&zenv))
+  {
+    rc = iefssreq(&ssobp);
+  }
+  else
+  {
+    rc = RTNCD_FAILURE;
+  }
+  disable_recovery(&zenv);
 
-  return RTNCD_SUCCESS;
+  return rc;
 }
 
 #pragma prolog(ZJBMLPRC, " ZWEPROLG NEWDSA=(YES,128) ")
@@ -698,6 +794,8 @@ int ZJBMLPRC(ZJB *zjb, char *buffer, int *buffer_size, int *entries)
   SSIB ssib = {0};
   SSJP ssjp = {0};
   JPROC jproc = {0};
+
+  ZRCVY_ENV zenv = {0};
 
   *entries = 0;
 
@@ -731,11 +829,19 @@ int ZJBMLPRC(ZJB *zjb, char *buffer, int *buffer_size, int *entries)
 
   ssobp = &ssob;
   ssobp = (SSOB * PTR32)((unsigned int)ssobp | 0x80000000);
-  rc = iefssreq(&ssobp); // TODO(Kelosky): recovery
+  if (0 == enable_recovery(&zenv))
+  {
+    rc = iefssreq(&ssobp);
+  }
+  else
+  {
+    rc = RTNCD_FAILURE;
+  }
+  disable_recovery(&zenv);
 
   if (0 != rc || 0 != ssob.ssobretn)
   {
-    strcpy(zjb->diag.service_name, "IEFSSREQ"); // TODO(Kelosky): recovery
+    strcpy(zjb->diag.service_name, "IEFSSREQ");
     zjb->diag.service_rc = ssob.ssobretn;
     zjb->diag.service_rsn = ssjp.ssjpretn;
     ZDIAG_SET_MSG(&zjb->diag, "IEFSSREQ rc was: '%d' SSOBRETN was: '%d', SSJPRETN was: '%d'", rc, ssob.ssobretn, ssjp.ssjpretn);
@@ -775,7 +881,15 @@ int ZJBMLPRC(ZJB *zjb, char *buffer, int *buffer_size, int *entries)
   }
 
   ssjp.ssjpfreq = ssjpprrs; // free storage
-  rc = iefssreq(&ssobp);    // TODO(Kelosky): recovery
+  if (0 == enable_recovery(&zenv))
+  {
+    rc = iefssreq(&ssobp);
+  }
+  else
+  {
+    rc = RTNCD_FAILURE;
+  }
+  disable_recovery(&zenv);
 
   return rc;
 }
