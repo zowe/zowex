@@ -87,6 +87,17 @@ static void init_stat(STAT *stat)
   stat->statlen = statsize;
 }
 
+static void zjb_recovery_diag(ZJB *zjb, const char *service_name, ZRCVY_ENV *zenv)
+{
+  memset(zjb->diag.service_name, 0, sizeof(zjb->diag.service_name));
+  strncpy(zjb->diag.service_name, service_name, sizeof(zjb->diag.service_name) - 1);
+  zjb->diag.detail_rc = ZJB_RTNCD_UNEXPECTED_ERROR;
+  zjb->diag.service_rc = zenv->abend_rc;
+  zjb->diag.service_rsn = zenv->abend_rsn;
+  ZDIAG_SET_MSG(&zjb->diag, "Unexpected abend occurred during %.16s (rc:%X, rsn:%X)", 
+                service_name, zenv->abend_rc, zenv->abend_rsn);
+}
+
 #pragma prolog(ZJBSYMB, " ZWEPROLG NEWDSA=(YES,128) ")
 #pragma epilog(ZJBSYMB, " ZWEEPILG ")
 int ZJBSYMB(ZJB *zjb, const char *symbol, char *value, int *value_size)
@@ -279,6 +290,7 @@ int ZJBMMOD(ZJB *zjb, int type, int flags)
   }
   else
   {
+    zjb_recovery_diag(zjb, "IEFSSREQ", &zenv);
     rc = RTNCD_FAILURE;
   }
 
@@ -390,6 +402,7 @@ int ZJBMGJQ(ZJB *zjb, SSOB *ssobp, STAT *statp, STATJQ *PTR32 *PTR32 statjqp)
   }
   else
   {
+    zjb_recovery_diag(zjb, "IEFSSREQ", &zenv);
     rc = RTNCD_FAILURE;
   }
 
@@ -455,6 +468,7 @@ int ZJBMTCOM(ZJB *zjb, STAT *PTR64 stat, ZJB_JOB_INFO **PTR64 job_info, int *ent
   }
   else
   {
+    zjb_recovery_diag(zjb, "IEFSSREQ", &zenv);
     rc = RTNCD_FAILURE;
   }
 
@@ -493,6 +507,7 @@ int ZJBMTCOM(ZJB *zjb, STAT *PTR64 stat, ZJB_JOB_INFO **PTR64 job_info, int *ent
       }
       else
       {
+        zjb_recovery_diag(zjb, "IEFSSREQ", &zenv);
         rc = RTNCD_FAILURE;
         disable_recovery(&zenv);
         return rc;
@@ -548,6 +563,7 @@ int ZJBMTCOM(ZJB *zjb, STAT *PTR64 stat, ZJB_JOB_INFO **PTR64 job_info, int *ent
   }
   else
   {
+    zjb_recovery_diag(zjb, "IEFSSREQ", &zenv);
     rc = RTNCD_FAILURE;
   }
   disable_recovery(&zenv);
@@ -643,6 +659,7 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
     }
     else
     {
+      zjb_recovery_diag(zjb, "IEFSSREQ", &zenv);
       rc = RTNCD_FAILURE;
     }
     disable_recovery(&zenv);
@@ -658,6 +675,7 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
   }
   else
   {
+    zjb_recovery_diag(zjb, "IEFSSREQ", &zenv);
     rc = RTNCD_FAILURE;
   }
   disable_recovery(&zenv);
@@ -708,6 +726,7 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
     }
     else
     {
+      zjb_recovery_diag(zjb, "IEFSSREQ", &zenv);
       rc = RTNCD_FAILURE;
     }
     disable_recovery(&zenv);
@@ -736,6 +755,7 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
         }
         else
         {
+          zjb_recovery_diag(zjb, "IEFSSREQ", &zenv);
           rc = RTNCD_FAILURE;
         }
         disable_recovery(&zenv);
@@ -779,6 +799,7 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
   }
   else
   {
+    zjb_recovery_diag(zjb, "IEFSSREQ", &zenv);
     rc = RTNCD_FAILURE;
   }
   disable_recovery(&zenv);
@@ -839,6 +860,7 @@ int ZJBMLPRC(ZJB *zjb, char *buffer, int *buffer_size, int *entries)
   }
   else
   {
+    zjb_recovery_diag(zjb, "IEFSSREQ", &zenv);
     rc = RTNCD_FAILURE;
   }
   disable_recovery(&zenv);
@@ -892,6 +914,7 @@ int ZJBMLPRC(ZJB *zjb, char *buffer, int *buffer_size, int *entries)
   }
   else
   {
+    zjb_recovery_diag(zjb, "IEFSSREQ", &zenv);
     rc = RTNCD_FAILURE;
   }
   disable_recovery(&zenv);
