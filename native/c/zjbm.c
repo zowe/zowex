@@ -94,7 +94,7 @@ static void zjb_recovery_diag(ZJB *zjb, const char *service_name, ZRCVY_ENV *zen
   zjb->diag.detail_rc = ZJB_RTNCD_UNEXPECTED_ERROR;
   zjb->diag.service_rc = zenv->abend_rc;
   zjb->diag.service_rsn = zenv->abend_rsn;
-  ZDIAG_SET_MSG(&zjb->diag, "Unexpected abend occurred during %.16s (rc:%X, rsn:%X)", 
+  ZDIAG_SET_MSG(&zjb->diag, "Unexpected abend occurred during %.16s (rc:%X, rsn:%X)",
                 service_name, zenv->abend_rc, zenv->abend_rsn);
 }
 
@@ -867,7 +867,8 @@ int ZJBMLPRC(ZJB *zjb, char *buffer, int *buffer_size, int *entries)
 
   if (0 != rc || 0 != ssob.ssobretn)
   {
-    strcpy(zjb->diag.service_name, "IEFSSREQ");
+    strncpy(zjb->diag.service_name, "IEFSSREQ", sizeof(zjb->diag.service_name) - 1);
+    zjb->diag.service_name[sizeof(zjb->diag.service_name) - 1] = '\0';
     zjb->diag.service_rc = ssob.ssobretn;
     zjb->diag.service_rsn = ssjp.ssjpretn;
     ZDIAG_SET_MSG(&zjb->diag, "IEFSSREQ rc was: '%d' SSOBRETN was: '%d', SSJPRETN was: '%d'", rc, ssob.ssobretn, ssjp.ssjpretn);
