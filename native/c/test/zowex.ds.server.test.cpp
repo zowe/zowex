@@ -42,7 +42,7 @@ void zowex_ds_server_tests()
       stop_server(server);
     });
 
-    describe("compress", [&]() -> void {
+    xdescribe("compress", [&]() -> void {
       // Skipped: compressDataset RPC method not implemented in server
     });
 
