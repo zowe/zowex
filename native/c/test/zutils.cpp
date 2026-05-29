@@ -17,6 +17,7 @@
 #include <chrono>
 #include <thread>
 #include <unistd.h>
+#include <fcntl.h>
 #include <stdexcept>
 #include <random>
 
@@ -380,4 +381,46 @@ void TestDirGuard::reset(const char *_dirname)
 TestDirGuard::operator std::string() const
 {
   return _dir;
+}
+
+std::thread start_pipe_writer_thread(const std::string &pipe_path, const std::string &data_to_write)
+{
+  return std::thread([pipe_path, data_to_write]() -> void {
+    int fd = -1;
+    for (int attempt = 0; attempt < 100 && fd == -1; ++attempt)
+    {
+      fd = open(pipe_path.c_str(), O_WRONLY | O_NONBLOCK);
+      if (fd == -1)
+      {
+        usleep(10000);
+      }
+    }
+    if (fd != -1)
+    {
+      write(fd, data_to_write.data(), data_to_write.size());
+      close(fd);
+    }
+  });
+}
+
+std::thread start_pipe_reader_thread(const std::string &pipe_path, std::string *output_content)
+{
+  return std::thread([pipe_path, output_content]() -> void {
+    if (output_content == nullptr)
+    {
+      return;
+    }
+    int fd = open(pipe_path.c_str(), O_RDONLY);
+    if (fd != -1)
+    {
+      char buffer[4096];
+      ssize_t bytes_read = read(fd, buffer, sizeof(buffer) - 1);
+      if (bytes_read > 0)
+      {
+        buffer[bytes_read] = '\0';
+        *output_content = std::string(buffer, bytes_read);
+      }
+      close(fd);
+    }
+  });
 }
