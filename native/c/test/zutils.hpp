@@ -13,6 +13,7 @@
 #define ZUTILS_HPP
 #include <string>
 #include <vector>
+#include <thread>
 #include "../zut.hpp"
 #include <sys/stat.h>
 #include "../zds.hpp"
@@ -89,5 +90,9 @@ void create_pds(ZDS *zds, const std::string &dsn);
 void create_pdse(ZDS *zds, const std::string &dsn);
 void create_seq(ZDS *zds, const std::string &dsn);
 void write_to_dsn(const std::string &dsn, const std::string &data);
+
+// Named pipe (streaming) test helpers
+std::thread start_pipe_writer_thread(const std::string &pipe_path, const std::string &data_to_write);
+std::thread start_pipe_reader_thread(const std::string &pipe_path, std::string *output_content);
 
 #endif
