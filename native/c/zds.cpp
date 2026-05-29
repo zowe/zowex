@@ -264,7 +264,7 @@ static int copy_sequential(ZDS *zds, const std::string &dsn1, const std::string 
     zut_free_dynalloc_dds(zds->diag, dds);
     return RTNCD_FAILURE;
   }
-  DFSMSdfp_ALT_DDS alt_dds{
+  DFSMSdfp_AltDDs alt_dds{
       .sysin = sysin_ddname,
       .sysprint = sysprint_ddname,
       .sysut1 = sysut1_ddname,
@@ -407,7 +407,7 @@ static int copy_partitioned(ZDS *zds, const ZDSTypeInfo &sourceInfo, const ZDSTy
     return RTNCD_FAILURE;
   }
 
-  DFSMSdfp_ALT_DDS alt_dds{
+  DFSMSdfp_AltDDs alt_dds{
       .sysin = sysin_ddname,
       .sysprint = sysprint_ddname,
       .sysut1 = src_ddname,

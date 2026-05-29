@@ -381,7 +381,13 @@ int zut_run(const std::string &program)
   return ZUTRUN(&diag, program.c_str(), nullptr);
 }
 
-static void zut_build_dfsmsdfp_dds_options(DFSMSdfp_DD_LIST &dd_list, const DFSMSdfp_ALT_DDS &alt_dds)
+/**
+ * @brief Build DFSMSdfp DD options for use with zutm utilities.
+ * @param dd_list Reference to DFSMSdfp DD list built by this function.
+ * @param alt_dds Reference to DFSMSdfp ALT DD options.
+ * @return void
+ */
+static void zut_build_dfsmsdfp_dds_options(DFSMSdfp_DD_LIST &dd_list, const DFSMSdfp_AltDDs &alt_dds)
 {
   // represents length of the DD list in IEBCOPY_ALT_DDS
   constexpr uint16_t DD_LEN_SYSUT2 = 72;
@@ -406,7 +412,15 @@ static void zut_build_dfsmsdfp_dds_options(DFSMSdfp_DD_LIST &dd_list, const DFSM
   dd_list.TotalLength = len;
 }
 
-static int zut_dfsmsdfp(ZDIAG &diag, ZUTMSDFP_UTILITY utility, const std::string &opts, const DFSMSdfp_ALT_DDS *alt_dds)
+/**
+ * @brief Run zutm DFSMSdfp utility with the given options and DD list.
+ * @param diag Reference to diagnostic information structure.
+ * @param utility Which supported DFSMSdfp utility to run.
+ * @param opts Options string for the DFSMSdfp utility.
+ * @param alt_dds Alternate DD options for the DFSMSdfp utility.
+ * @return The return code from the service.
+ */
+static int zut_dfsmsdfp(ZDIAG &diag, ZUTMSDFP_UTILITY utility, const std::string &opts, const DFSMSdfp_AltDDs *alt_dds)
 {
   DFSMSdfp_OPT_LIST opt_list = {0};
   DFSMSdfp_DD_LIST dd_list = {0};
@@ -424,12 +438,12 @@ static int zut_dfsmsdfp(ZDIAG &diag, ZUTMSDFP_UTILITY utility, const std::string
   return ZUTMSDFP(&diag, &utility, &opt_list, &dd_list);
 }
 
-int zut_iebcopy(ZDIAG &diag, const std::string &opts, const DFSMSdfp_ALT_DDS *alt_dd_list)
+int zut_iebcopy(ZDIAG &diag, const std::string &opts, const DFSMSdfp_AltDDs *alt_dd_list)
 {
   return zut_dfsmsdfp(diag, ZUTMSDFP_IEBCOPY, opts, alt_dd_list);
 }
 
-int zut_iebgener(ZDIAG &diag, const std::string &opts, const DFSMSdfp_ALT_DDS *alt_dd_list)
+int zut_iebgener(ZDIAG &diag, const std::string &opts, const DFSMSdfp_AltDDs *alt_dd_list)
 {
   return zut_dfsmsdfp(diag, ZUTMSDFP_IEBGENER, opts, alt_dd_list);
 }

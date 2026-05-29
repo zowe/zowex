@@ -34,7 +34,10 @@ struct ZConvData
   char *output_iter;      /**< Pointer to current position in output buffer. */
 };
 
-struct DFSMSdfp_ALT_DDS
+/**
+ * @brief Structure holding alternate DD names for DFSMSdfp utilities.
+ */
+struct DFSMSdfp_AltDDs
 {
   const std::string &sysin;
   const std::string &sysprint;
@@ -48,10 +51,10 @@ struct DFSMSdfp_ALT_DDS
  * @brief Run IEBCOPY utility
  * @param diag Reference to diagnostic information structure
  * @param opts Options string
- * @param options Pointer to DFSMSdfp_ALT_DDS structure
+ * @param options Pointer to DFSMSdfp_DD_Options structure
  * @return Return code (0 for success, non-zero for error)
  */
-int zut_iebcopy(ZDIAG &diag, const std::string &opts, const DFSMSdfp_ALT_DDS *options);
+int zut_iebcopy(ZDIAG &diag, const std::string &opts, const DFSMSdfp_AltDDs *options);
 
 /**
  * @brief Run IEBGENER utility
@@ -60,7 +63,7 @@ int zut_iebcopy(ZDIAG &diag, const std::string &opts, const DFSMSdfp_ALT_DDS *op
  * @param options Pointer to DFSMSdfp_ALT_DDS structure
  * @return Return code (0 for success, non-zero for error)
  */
-int zut_iebgener(ZDIAG &diag, const std::string &opts, const DFSMSdfp_ALT_DDS *options);
+int zut_iebgener(ZDIAG &diag, const std::string &opts, const DFSMSdfp_AltDDs *options);
 
 /**
  * @brief Strips the last character from input if it's a newline.
