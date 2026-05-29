@@ -34,7 +34,7 @@ static const char *const zut_dfsmsdfp_names[] = {
     [ZUTMSDFP_IEBGENER] = "IEBGENER",
 };
 
-#pragma prolog(ZUTMSDFP, " ZWEPROLG NEWDSA=(YES,64),LOC24=YES ")
+#pragma prolog(ZUTMSDFP, " ZWEPROLG NEWDSA=(YES,4),LOC24=YES ")
 #pragma epilog(ZUTMSDFP, " ZWEEPILG ")
 int ZUTMSDFP(ZDIAG *diag, ZUTMSDFP_UTILITY *utility, DFSMSdfp_OPT_LIST *opts, DFSMSdfp_DD_LIST *ddlist)
 {
