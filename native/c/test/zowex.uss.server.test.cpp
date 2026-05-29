@@ -58,7 +58,7 @@ void zowex_uss_server_tests()
         std::string request = make_rpc_request("chmodFile", "{\"fspath\":\"" + uss_path + "\",\"mode\":\"777\"}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
         Expect(response).ToContain("\"id\":" + std::to_string(req_id));
@@ -89,7 +89,7 @@ void zowex_uss_server_tests()
         std::string request = make_rpc_request("chownFile", "{\"fspath\":\"" + uss_path + "\",\"owner\":\"" + resp + "\"}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
         Expect(response).ToContain("\"id\":" + std::to_string(req_id));
@@ -121,7 +121,7 @@ void zowex_uss_server_tests()
         std::string request = make_rpc_request("chtagFile", "{\"fspath\":\"" + uss_path + "\",\"tag\":\"IBM-1047\"}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
         Expect(response).ToContain("\"id\":" + std::to_string(req_id));
@@ -146,7 +146,7 @@ void zowex_uss_server_tests()
         // Populate the source file with some sample content via RPC writeFile
         std::string write_req = make_rpc_request("writeFile", "{\"fspath\":\"" + src_path + "\",\"data\":\"SGVsbG8gY29weSE=\"}");
         write_to_server(server, write_req);
-        read_line_from_server(server); // consume response
+        read_rpc_response(server); // consume response
       });
 
       it("should properly copy a file via RPC", [&]() -> void {
@@ -154,7 +154,7 @@ void zowex_uss_server_tests()
         std::string request = make_rpc_request("copyUss", "{\"srcFsPath\":\"" + src_path + "\",\"dstFsPath\":\"" + dest_path + "\"}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
         Expect(response).ToContain("\"id\":" + std::to_string(req_id));
@@ -168,7 +168,7 @@ void zowex_uss_server_tests()
         int read_id;
         std::string read_req = make_rpc_request("readFile", "{\"fspath\":\"" + dest_path + "\"}", read_id);
         write_to_server(server, read_req);
-        std::string read_resp = read_line_from_server(server);
+        std::string read_resp = read_rpc_response(server);
 
         Expect(read_resp).ToContain("\"success\":true");
         Expect(read_resp).ToContain("\"id\":" + std::to_string(read_id));
@@ -188,7 +188,7 @@ void zowex_uss_server_tests()
         std::string request = make_rpc_request("createFile", "{\"fspath\":\"" + dir_path + "\",\"isDir\":true}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
         Expect(response).ToContain("\"id\":" + std::to_string(req_id));
@@ -213,7 +213,7 @@ void zowex_uss_server_tests()
         std::string request = make_rpc_request("createFile", "{\"fspath\":\"" + file_path + "\",\"isDir\":false}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
         Expect(response).ToContain("\"id\":" + std::to_string(req_id));
@@ -238,7 +238,7 @@ void zowex_uss_server_tests()
         std::string request = make_rpc_request("deleteFile", "{\"fspath\":\"" + file_path + "\"}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
         Expect(response).ToContain("\"id\":" + std::to_string(req_id));
@@ -256,7 +256,7 @@ void zowex_uss_server_tests()
         std::string request = make_rpc_request("unixCommand", "{\"commandText\":\"echo hello\"}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
         Expect(response).ToContain("\"id\":" + std::to_string(req_id));
@@ -280,7 +280,7 @@ void zowex_uss_server_tests()
         std::string request = make_rpc_request("listFiles", "{\"fspath\":\"" + dir_path + "\"}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
         Expect(response).ToContain("\"id\":" + std::to_string(req_id));
@@ -301,7 +301,7 @@ void zowex_uss_server_tests()
         // Populate the source file with some sample content via RPC writeFile
         std::string write_req = make_rpc_request("writeFile", "{\"fspath\":\"" + src_path + "\",\"data\":\"SGVsbG8gbW92ZSE=\"}");
         write_to_server(server, write_req);
-        read_line_from_server(server); // consume response
+        read_rpc_response(server); // consume response
       });
 
       it("should properly move a file via RPC", [&]() -> void {
@@ -309,7 +309,7 @@ void zowex_uss_server_tests()
         std::string request = make_rpc_request("moveFile", "{\"source\":\"" + src_path + "\",\"target\":\"" + dest_path + "\"}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
         Expect(response).ToContain("\"id\":" + std::to_string(req_id));
@@ -325,7 +325,7 @@ void zowex_uss_server_tests()
         int read_id;
         std::string read_req = make_rpc_request("readFile", "{\"fspath\":\"" + dest_path + "\"}", read_id);
         write_to_server(server, read_req);
-        std::string read_resp = read_line_from_server(server);
+        std::string read_resp = read_rpc_response(server);
 
         Expect(read_resp).ToContain("\"success\":true");
         Expect(read_resp).ToContain("\"id\":" + std::to_string(read_id));
@@ -346,7 +346,7 @@ void zowex_uss_server_tests()
         std::string write_req = make_rpc_request("writeFile", "{\"fspath\":\"" + file_path + "\",\"data\":\"SGVsbG8gV29ybGQh\"}", write_id);
         
         write_to_server(server, write_req);
-        std::string write_resp = read_line_from_server(server);
+        std::string write_resp = read_rpc_response(server);
 
         Expect(write_resp).ToContain("\"success\":true");
         Expect(write_resp).ToContain("\"id\":" + std::to_string(write_id));
@@ -356,7 +356,7 @@ void zowex_uss_server_tests()
         std::string read_req = make_rpc_request("readFile", "{\"fspath\":\"" + file_path + "\"}", read_id);
         
         write_to_server(server, read_req);
-        std::string read_resp = read_line_from_server(server);
+        std::string read_resp = read_rpc_response(server);
 
         Expect(read_resp).ToContain("\"success\":true");
         Expect(read_resp).ToContain("\"id\":" + std::to_string(read_id));
@@ -386,7 +386,7 @@ void zowex_uss_server_tests()
 
         write_to_server(server, request);
 
-        std::string notification = read_line_from_server(server);
+        std::string notification = read_rpc_response(server);
 
         ExpectWithContext(notification, "Should be sendStream notification").ToContain("\"method\":\"sendStream\"");
         ExpectWithContext(notification, "Should have correct stream ID").ToContain("\"id\":" + std::to_string(stream_id));
@@ -397,7 +397,7 @@ void zowex_uss_server_tests()
 
         writer = start_pipe_writer_thread(pipe_path, encoded_payload);
 
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         if (writer.joinable()) {
           writer.join();
@@ -410,7 +410,7 @@ void zowex_uss_server_tests()
         std::string read_request = make_rpc_request("readFile", "{\"fspath\":\"" + file_path + "\"}", read_id);
 
         write_to_server(server, read_request);
-        std::string read_response = read_line_from_server(server);
+        std::string read_response = read_rpc_response(server);
 
         Expect(read_response).ToContain("\"success\":true");
         ExpectWithContext(read_response, "Should contain streamed text").ToContain("SGVsbG8gVVNTIFN0cmVhbQ");
@@ -421,7 +421,7 @@ void zowex_uss_server_tests()
         std::string write_request = make_rpc_request("writeFile", "{\"fspath\":\"" + file_path + "\",\"data\":\"" + test_content + "\"}");
 
         write_to_server(server, write_request);
-        std::string write_response = read_line_from_server(server);
+        std::string write_response = read_rpc_response(server);
 
         Expect(write_response).ToContain("\"success\":true");
 
@@ -432,7 +432,7 @@ void zowex_uss_server_tests()
 
         write_to_server(server, read_request);
 
-        std::string notification = read_line_from_server(server);
+        std::string notification = read_rpc_response(server);
         Expect(notification).ToContain("\"method\":\"receiveStream\"");
         ExpectWithContext(notification, "Should have correct stream ID").ToContain("\"id\":" + std::to_string(stream_id));
 
@@ -443,7 +443,7 @@ void zowex_uss_server_tests()
         std::string file_content;
         std::thread reader = start_pipe_reader_thread(output_pipe, &file_content);
 
-        std::string read_response = read_line_from_server(server);
+        std::string read_response = read_rpc_response(server);
 
         reader.join();
 

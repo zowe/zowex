@@ -24,46 +24,12 @@
 
 using namespace ztst;
 
-// Custom reader to handle long JSON lines without truncating at 512 bytes
-static std::string read_rpc_response(ServerHandle &handle, int timeout_ms = 5000)
-{
-  fd_set read_fds;
-  struct timeval timeout;
-  int fd = fileno(handle.output_stream);
-  if (fd == -1)
-  {
-    throw std::runtime_error("Failed to get file descriptor");
-  }
-
-  FD_ZERO(&read_fds);
-  FD_SET(fd, &read_fds);
-
-  timeout.tv_sec = timeout_ms / 1000;
-  timeout.tv_usec = (timeout_ms % 1000) * 1000;
-
-  int result = select(fd + 1, &read_fds, nullptr, nullptr, &timeout);
-  if (result <= 0)
-  {
-    throw std::runtime_error("Timeout waiting for server output");
-  }
-
-  std::string line;
-  int c;
-  while ((c = fgetc(handle.output_stream)) != EOF)
-  {
-    line += static_cast<char>(c);
-    if (c == '\n')
-    {
-      break;
-    }
-  }
-  return line;
-}
-
 static std::string e2a_convert(const std::string &ebcdic_str)
 {
   std::string ascii_str = ebcdic_str;
-  __e2a_s(const_cast<char *>(ascii_str.c_str()));
+  if (!ascii_str.empty()) {
+    __e2a_s(&ascii_str[0]);
+  }
   return ascii_str;
 }
 

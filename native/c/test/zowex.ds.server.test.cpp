@@ -75,7 +75,7 @@ void zowex_ds_server_tests()
         std::string request = make_rpc_request("copyDatasetOrMember", "{\"source\":\"" + src_ds + "\",\"target\":\"" + dest_ds + "\"}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
         Expect(response).ToContain("\"id\":" + std::to_string(req_id));
@@ -115,7 +115,7 @@ void zowex_ds_server_tests()
         std::string request = make_rpc_request("createDataset", "{\"dsname\":\"" + ds_name + "\",\"attributes\":{\"dsorg\":\"PO\",\"recfm\":\"FB\",\"lrecl\":80,\"primary\":5,\"dirblk\":25}}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
         Expect(response).ToContain("\"id\":" + std::to_string(req_id));
@@ -144,7 +144,7 @@ void zowex_ds_server_tests()
         std::string request = make_rpc_request("createDataset", "{\"dsname\":\"" + ds_name + "\",\"attributes\":{\"dsorg\":\"PO\",\"recfm\":\"VB\",\"lrecl\":32756,\"primary\":5,\"dirblk\":25}}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
         Expect(response).ToContain("\"id\":" + std::to_string(req_id));
@@ -168,7 +168,7 @@ void zowex_ds_server_tests()
         std::string request = make_rpc_request("createDataset", "{\"dsname\":\"" + ds_name + "\",\"attributes\":{\"dsorg\":\"PO\",\"recfm\":\"FB\",\"lrecl\":80,\"primary\":5,\"dirblk\":25}}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
         Expect(response).ToContain("\"id\":" + std::to_string(req_id));
@@ -192,7 +192,7 @@ void zowex_ds_server_tests()
         std::string request = make_rpc_request("createDataset", "{\"dsname\":\"" + ds_name + "\",\"attributes\":{\"dsorg\":\"PO\",\"recfm\":\"U\",\"lrecl\":0,\"primary\":5,\"dirblk\":25}}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
         Expect(response).ToContain("\"id\":" + std::to_string(req_id));
@@ -223,7 +223,7 @@ void zowex_ds_server_tests()
         std::string request = make_rpc_request("createMember", "{\"dsname\":\"" + full_dsname + "\"}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
         Expect(response).ToContain("\"id\":" + std::to_string(req_id));
@@ -253,7 +253,7 @@ void zowex_ds_server_tests()
         std::string request = make_rpc_request("createDataset", "{\"dsname\":\"" + ds_name + "\",\"attributes\":{\"dsorg\":\"PO\",\"recfm\":\"VB\",\"lrecl\":255,\"primary\":5,\"dirblk\":25}}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
         Expect(response).ToContain("\"id\":" + std::to_string(req_id));
@@ -276,7 +276,7 @@ void zowex_ds_server_tests()
         std::string request = make_rpc_request("deleteDataset", "{\"dsname\":\"" + ds_name + "\"}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
         Expect(response).ToContain("\"id\":" + std::to_string(req_id));
@@ -300,7 +300,7 @@ void zowex_ds_server_tests()
         std::string request = make_rpc_request("listDatasets", "{\"pattern\":\"" + ds_pattern + "\"}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
         Expect(response).ToContain("\"id\":" + std::to_string(req_id));
@@ -332,7 +332,7 @@ void zowex_ds_server_tests()
         std::string request = make_rpc_request("listDsMembers", "{\"dsname\":\"" + ds_name + "\"}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
         Expect(response).ToContain("\"id\":" + std::to_string(req_id));
@@ -365,7 +365,7 @@ void zowex_ds_server_tests()
         std::string request = make_rpc_request("renameDataset", "{\"dsnameBefore\":\"" + ds_before + "\",\"dsnameAfter\":\"" + ds_after + "\"}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
         Expect(response).ToContain("\"id\":" + std::to_string(req_id));
@@ -405,7 +405,7 @@ void zowex_ds_server_tests()
         std::string request = make_rpc_request("renameMember", "{\"dsname\":\"" + ds_name + "\",\"memberBefore\":\"" + member_before + "\",\"memberAfter\":\"" + member_after + "\"}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
         Expect(response).ToContain("\"id\":" + std::to_string(req_id));
@@ -439,7 +439,7 @@ void zowex_ds_server_tests()
         std::string request = make_rpc_request("restoreDataset", "{\"dsname\":\"" + ds_name + "\"}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
         Expect(response).ToContain("\"id\":" + std::to_string(req_id));
@@ -468,7 +468,7 @@ void zowex_ds_server_tests()
         std::string request = make_rpc_request("readDataset", "{\"dsname\":\"" + ds_name + "\"}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
         Expect(response).ToContain("\"id\":" + std::to_string(req_id));
@@ -498,7 +498,7 @@ void zowex_ds_server_tests()
         std::string write_req = make_rpc_request("writeDataset", "{\"dsname\":\"" + ds_name + "\",\"data\":\"SGVsbG8gV29ybGQh\"}", write_id);
         
         write_to_server(server, write_req);
-        std::string write_resp = read_line_from_server(server);
+        std::string write_resp = read_rpc_response(server);
 
         Expect(write_resp).ToContain("\"success\":true");
         Expect(write_resp).ToContain("\"id\":" + std::to_string(write_id));
@@ -508,7 +508,7 @@ void zowex_ds_server_tests()
         std::string read_req = make_rpc_request("readDataset", "{\"dsname\":\"" + ds_name + "\"}", read_id);
         
         write_to_server(server, read_req);
-        std::string read_resp = read_line_from_server(server);
+        std::string read_resp = read_rpc_response(server);
 
         Expect(read_resp).ToContain("\"success\":true");
         Expect(read_resp).ToContain("\"id\":" + std::to_string(read_id));
@@ -553,7 +553,7 @@ void zowex_ds_server_tests()
         write_to_server(server, request);
         
         // Read the sendStream notification to get the actual pipe path
-        std::string notification = read_line_from_server(server);
+        std::string notification = read_rpc_response(server);
         
         ExpectWithContext(notification, "Should be sendStream notification").ToContain("\"method\":\"sendStream\"");
         ExpectWithContext(notification, "Should have correct stream ID").ToContain("\"id\":" + std::to_string(stream_id));
@@ -567,7 +567,7 @@ void zowex_ds_server_tests()
         writer = start_pipe_writer_thread(pipe_path, encoded_payload);
         
         // Read the actual RPC response
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
         
         if (writer.joinable()) {
           writer.join();
@@ -581,7 +581,7 @@ void zowex_ds_server_tests()
         std::string read_request = make_rpc_request("readDataset", "{\"dsname\":\"" + ds_name + "\"}", read_id);
         
         write_to_server(server, read_request);
-        std::string read_response = read_line_from_server(server);
+        std::string read_response = read_rpc_response(server);
         
         Expect(read_response).ToContain("\"success\":true");
         ExpectWithContext(read_response, "Should contain streamed text").ToContain("SGVsbG8");
@@ -592,7 +592,7 @@ void zowex_ds_server_tests()
         std::string write_request = make_rpc_request("writeDataset", "{\"dsname\":\"" + ds_name + "\",\"data\":\"" + test_content + "\"}");
         
         write_to_server(server, write_request);
-        std::string write_response = read_line_from_server(server);
+        std::string write_response = read_rpc_response(server);
         
         Expect(write_response).ToContain("\"success\":true");
 
@@ -604,7 +604,7 @@ void zowex_ds_server_tests()
         write_to_server(server, read_request);
         
         // Read the receiveStream notification to get the actual pipe path
-        std::string notification = read_line_from_server(server);
+        std::string notification = read_rpc_response(server);
         Expect(notification).ToContain("\"method\":\"receiveStream\"");
         ExpectWithContext(notification, "Should have correct stream ID").ToContain("\"id\":" + std::to_string(stream_id));
         
@@ -617,7 +617,7 @@ void zowex_ds_server_tests()
         std::string file_content;
         std::thread reader = start_pipe_reader_thread(output_pipe, &file_content);
         
-        std::string read_response = read_line_from_server(server);
+        std::string read_response = read_rpc_response(server);
         
         // Wait for reader to complete
         reader.join();

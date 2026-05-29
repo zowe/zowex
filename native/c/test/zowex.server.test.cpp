@@ -55,6 +55,41 @@ std::string read_line_from_server(ServerHandle &handle, int timeout_ms)
   throw std::runtime_error("Failed to read from server");
 }
 
+std::string read_rpc_response(ServerHandle &handle, int timeout_ms)
+{
+  fd_set read_fds;
+  struct timeval timeout;
+  int fd = fileno(handle.output_stream);
+  if (fd == -1)
+  {
+    throw std::runtime_error("Failed to get file descriptor");
+  }
+
+  FD_ZERO(&read_fds);
+  FD_SET(fd, &read_fds);
+
+  timeout.tv_sec = timeout_ms / 1000;
+  timeout.tv_usec = (timeout_ms % 1000) * 1000;
+
+  int result = select(fd + 1, &read_fds, nullptr, nullptr, &timeout);
+  if (result <= 0)
+  {
+    throw std::runtime_error("Timeout waiting for server output");
+  }
+
+  std::string line;
+  int c;
+  while ((c = fgetc(handle.output_stream)) != EOF)
+  {
+    line += static_cast<char>(c);
+    if (c == '\n')
+    {
+      break;
+    }
+  }
+  return line;
+}
+
 void write_to_server(ServerHandle &handle, const std::string &input)
 {
   if (fputs(input.c_str(), handle.input_stream) == EOF || fflush(handle.input_stream) != 0)
