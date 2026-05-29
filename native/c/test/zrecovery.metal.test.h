@@ -12,6 +12,8 @@
 #ifndef ZRECOVERY_METAL_TEST_H
 #define ZRECOVERY_METAL_TEST_H
 
+#include "ztype.h"
+
 #if defined(__cplusplus) && defined(__MVS__)
 extern "OS"
 {
@@ -21,6 +23,12 @@ extern "C"
 #endif
 
   int ZRCVYEN(void);
+  int ZRCVYDIS(void);
+  int ZRCVYNST(int *PTR64 rc1, int *PTR64 rc2);
+  int ZRCVYNCL(void);
+  int ZRCVYTHR(int *PTR64 thread_id, int *PTR64 rc);
+  int ZRCVYNUL(void);
+  int ZRCVYSTK(void);
 
 #if defined(__cplusplus)
 }
