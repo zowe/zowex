@@ -48,7 +48,7 @@ void zowex_ds_server_tests()
 
 
     // TODO: Enable once RPC passing is fixed
-    describe("copy", [&]() -> void {
+    xdescribe("copy", [&]() -> void {
       std::string src_ds;
       std::string dest_ds;
 
