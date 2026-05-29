@@ -370,40 +370,15 @@ int zut_search(const std::string &parms)
   return ZUTSRCH(parms.c_str());
 }
 
-int zut_build_program_option_list(PROGRAM_OPTION_LIST *opt_list, const std::vector<PROGRAM_OPTION *> &options, ZDIAG &diag)
-{
-
-  if (options.size() > 4)
-  {
-    ZDIAG_SET_MSG(&diag, "ZUTRUN called with more than 4 program options. Only up to 4 are supported.");
-    return RTNCD_FAILURE;
-  }
-
-  opt_list->count = options.size();
-
-  for (size_t i = 0; i < options.size(); i++)
-  {
-    // data pointer must remain valid for the duration of the ZUTRUN call;
-    // ZUTRUN copies it to 31-bit memory before invoking the load module
-    opt_list->options[i] = options[i];
-  }
-  return RTNCD_SUCCESS;
-}
-
-int zut_run_with_options(ZDIAG &diag, const std::string &program, const std::string &parms, PROGRAM_OPTION_LIST *options)
-{
-  return ZUTRUN(&diag, program.c_str(), parms.c_str(), options);
-}
-
 int zut_run(ZDIAG &diag, const std::string &program, const std::string &parms)
 {
-  return zut_run_with_options(diag, program, parms, nullptr);
+  return ZUTRUN(&diag, program.c_str(), parms.c_str());
 }
 
 int zut_run(const std::string &program)
 {
   ZDIAG diag{};
-  return zut_run_with_options(diag, program, "", nullptr);
+  return ZUTRUN(&diag, program.c_str(), nullptr);
 }
 
 static void zut_build_dfsmsdfp_dds_options(DFSMSdfp_DD_LIST &dd_list, const DFSMSdfp_ALT_DDS &alt_dds)
@@ -435,7 +410,6 @@ static int zut_dfsmsdfp(ZDIAG &diag, ZUTMSDFP_UTILITY utility, const std::string
 {
   DFSMSdfp_OPT_LIST opt_list = {0};
   DFSMSdfp_DD_LIST dd_list = {0};
-  DFSMSdfp_PAGE_LIST page_list = {0};
 
   if (!opts.empty())
   {
@@ -447,7 +421,7 @@ static int zut_dfsmsdfp(ZDIAG &diag, ZUTMSDFP_UTILITY utility, const std::string
     zut_build_dfsmsdfp_dds_options(dd_list, *alt_dds);
   }
 
-  return ZUTMSDFP(&diag, &utility, &opt_list, &dd_list, &page_list);
+  return ZUTMSDFP(&diag, &utility, &opt_list, &dd_list);
 }
 
 int zut_iebcopy(ZDIAG &diag, const std::string &opts, const DFSMSdfp_ALT_DDS *alt_dd_list)

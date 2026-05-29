@@ -25,7 +25,6 @@ extern "C"
 #endif
 
 #define DFSMSdfp_OPT_MAX_LEN 128
-#define DFSMSdfp_DD_LIST_MAX_LEN 88
 #define RET_ARG_MAX_LEN 260
 #define MSG_ENTRIES 25
 
@@ -45,7 +44,7 @@ extern "C"
   typedef struct
   {
     short len;
-    char str[RET_ARG_MAX_LEN];
+    char str[DFSMSdfp_OPT_MAX_LEN];
   } DFSMSdfp_OPT_LIST;
 
   // see https://www.ibm.com/docs/en/SSLTBW_3.1.0/pdf/idau100_v3r1.pdf "ddname List"
@@ -78,8 +77,6 @@ extern "C"
     char sysut4[8];
 
   } DFSMSdfp_DD_LIST;
-
-  typedef DFSMSdfp_OPT_LIST DFSMSdfp_PAGE_LIST;
   typedef struct
   {
     short len;
@@ -141,17 +138,16 @@ extern "C"
    * @param utility The DFSMSdfp utility to run
    * @param opt_list Pointer to DFSMSdfp option list
    * @param dd_list Pointer to DFSMSdfp DD list
-   * @param page_list Pointer to DFSMSdfp page list
    * @return The return code from the service
    */
-  int ZUTMSDFP(ZDIAG *, ZUTMSDFP_UTILITY *, DFSMSdfp_OPT_LIST *, DFSMSdfp_DD_LIST *, DFSMSdfp_PAGE_LIST *);
+  int ZUTMSDFP(ZDIAG *, ZUTMSDFP_UTILITY *, DFSMSdfp_OPT_LIST *, DFSMSdfp_DD_LIST *);
 
   int ZUTMGUSR(char[8]);
   int ZUTWDYN(BPXWDYN_PARM *, BPXWDYN_RESPONSE *);
   int ZUTEDSCT();
   int ZUTSYMBP(SYMBOL_DATA *);
   int ZUTSRCH(const char *);
-  int ZUTRUN(ZDIAG *, const char *, const char *, PROGRAM_OPTION_LIST *);
+  int ZUTRUN(ZDIAG *, const char *, const char *);
   void ZUTDBGMG(const char *);
   unsigned char ZUTMGKEY();
   int ZUTMLPLB(ZDIAG *, int *, PARMLIB_DSNS *);

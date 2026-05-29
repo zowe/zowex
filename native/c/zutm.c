@@ -27,17 +27,16 @@
 
 typedef int (*DFSMSPGM)(
     DFSMSdfp_OPT_LIST *PTR32,
-    DFSMSdfp_DD_LIST *PTR32,
-    DFSMSdfp_PAGE_LIST *PTR32) ATTRIBUTE(amode31);
+    DFSMSdfp_DD_LIST *PTR32) ATTRIBUTE(amode31);
 
 static const char *const zut_dfsmsdfp_names[] = {
     [ZUTMSDFP_IEBCOPY] = "IEBCOPY",
     [ZUTMSDFP_IEBGENER] = "IEBGENER",
 };
 
-#pragma prolog(ZUTMSDFP, " ZWEPROLG NEWDSA=(YES,128) ")
+#pragma prolog(ZUTMSDFP, " ZWEPROLG NEWDSA=(YES,64),LOC24=YES ")
 #pragma epilog(ZUTMSDFP, " ZWEEPILG ")
-int ZUTMSDFP(ZDIAG *diag, ZUTMSDFP_UTILITY *utility, DFSMSdfp_OPT_LIST *opts, DFSMSdfp_DD_LIST *ddlist, DFSMSdfp_PAGE_LIST *pagelist)
+int ZUTMSDFP(ZDIAG *diag, ZUTMSDFP_UTILITY *utility, DFSMSdfp_OPT_LIST *opts, DFSMSdfp_DD_LIST *ddlist)
 {
   int rc = 0;
 
@@ -62,7 +61,6 @@ int ZUTMSDFP(ZDIAG *diag, ZUTMSDFP_UTILITY *utility, DFSMSdfp_OPT_LIST *opts, DF
   // below the bar
   DFSMSdfp_OPT_LIST btb_opts = {0};
   DFSMSdfp_DD_LIST btb_dd_list = {0};
-  DFSMSdfp_PAGE_LIST btb_page_list = {0};
 
   if (opts)
   {
@@ -72,12 +70,8 @@ int ZUTMSDFP(ZDIAG *diag, ZUTMSDFP_UTILITY *utility, DFSMSdfp_OPT_LIST *opts, DF
   {
     memcpy(&btb_dd_list, ddlist, sizeof(DFSMSdfp_DD_LIST));
   }
-  if (pagelist)
-  {
-    memcpy(&btb_page_list, pagelist, sizeof(DFSMSdfp_PAGE_LIST));
-  }
 
-  rc = dyn_dfsms(&btb_opts, (void *)&btb_dd_list.TotalLength, (void *)((uintptr_t)&btb_page_list | 0x80000000));
+  rc = dyn_dfsms(&btb_opts, (void *)((uintptr_t)&btb_dd_list.TotalLength | 0x80000000));
 
   delete_module(utility_name);
 
@@ -324,13 +318,11 @@ int ZUTSRCH(const char *parms)
 
 #pragma prolog(ZUTRUN, " ZWEPROLG NEWDSA=(YES,16),LOC24=YES ")
 #pragma epilog(ZUTRUN, " ZWEEPILG ")
+typedef int (*PGM31)(void *) ATTRIBUTE(amode31);
+typedef int (*PGM64)(void *) ATTRIBUTE(amode64);
 
-typedef int (*PGM31)(PARAM_CHAIN31) ATTRIBUTE(amode31);
-typedef int (*PGM64)(PARAM_CHAIN64) ATTRIBUTE(amode64);
-
-int ZUTRUN(ZDIAG *diag, const char *program, const char *parms, PROGRAM_OPTION_LIST *opt_list)
+int ZUTRUN(ZDIAG *diag, const char *program, const char *parms)
 {
-
   int rc = 0;
 
   PARMS pstruct = {0};
@@ -339,65 +331,29 @@ int ZUTRUN(ZDIAG *diag, const char *program, const char *parms, PROGRAM_OPTION_L
     pstruct.len = sprintf(pstruct.parms, "%.*s", (int)(sizeof(pstruct.parms) - 1), parms);
   }
 
-  unsigned int opt_count = opt_list ? opt_list->count : 0;
-  if (opt_count > 4)
-  {
-    ZDIAG_SET_MSG(diag, "ZUTRUN called with more than 4 program options. Only up to 4 are supported.");
-    diag->detail_rc = ZUT_CALLER_ERROR;
-    return RTNCD_FAILURE;
-  }
+  PARMS *pptr = &pstruct;
 
   char name_truncated[8 + 1] = {0};
   memset(name_truncated, ' ', sizeof(name_truncated) - 1);                                                                      // pad with spaces
   memcpy(name_truncated, program, strlen(program) > sizeof(name_truncated) - 1 ? sizeof(name_truncated) - 1 : strlen(program)); // truncate
 
-  // parms[0] holds the PARMS struct; options occupy slots 1..opt_count.
-  // Re-allocation here on the stack is only technically necessary for 31 bit programs.
-  //   64-bit programs could use memory as-is. However, most program calls will be 31 bit...
-  char option_data[4][512] = {{0}};
-  PARAM_CHAIN31 pchain = {0};
-  pchain.params[0] = (unsigned int)(uintptr_t)&pstruct;
-  for (unsigned int i = 0; i < opt_count; i++)
-  {
-    PROGRAM_OPTION *p = opt_list->options[i];
-    if (p->size > sizeof(option_data[0]))
-    {
-      ZDIAG_SET_MSG(diag, "ZUTRUN option %u size %u exceeds maximum %u", i, p->size, (unsigned int)sizeof(option_data[0]));
-      diag->detail_rc = ZUT_CALLER_ERROR;
-      return RTNCD_FAILURE;
-    }
-    memcpy(option_data[i], p->data, p->size);
-    pchain.params[i + 1] = (unsigned int)(uintptr_t)option_data[i] + p->chain_ptr_offset;
-  }
-
   void *p = load_module(name_truncated);
-  // https://www.ibm.com/docs/en/zos/3.1.0?topic=c-metal-mvs-linkage-conventions
   if (p)
   {
+
     long long unsigned int ifunction = (long long unsigned int)p;
 
     if (ifunction & 0x00000000000000001ULL)
     {
       ifunction &= 0xFFFFFFFFFFFFFFFEULL; // clear low bit
-
-      // must widen to 8 bytes for 64 bit chain-of-pointers
-      PARAM_CHAIN64 pchain64 = {0};
-      for (int j = 0; j < 5; j++)
-      {
-        pchain64.params[j] = (unsigned long)pchain.params[j];
-      }
       PGM64 p64 = (PGM64)ifunction;
-      rc = p64(pchain64);
+      rc = p64(pptr);
     }
     else
     {
       ifunction &= 0x000000007FFFFFFFULL; // clear high bit
-      if (opt_count > 0)
-      { // only set high order bit when variable length opts
-        pchain.params[opt_count] |= 0x80000000U;
-      }
       PGM31 p31 = (PGM31)ifunction;
-      rc = p31(pchain);
+      rc = p31(pptr);
     }
   }
   else

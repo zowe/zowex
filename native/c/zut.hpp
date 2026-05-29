@@ -63,16 +63,6 @@ int zut_iebcopy(ZDIAG &diag, const std::string &opts, const DFSMSdfp_ALT_DDS *op
 int zut_iebgener(ZDIAG &diag, const std::string &opts, const DFSMSdfp_ALT_DDS *options);
 
 /**
- * @brief Build a PROGRAM_OPTION_LIST from a vector of PROGRAM_OPTION pointers.
- *        This function populates the option_list structure with the provided options,
- *        setting the count and option array appropriately.
- * @param opt_list Pointer to PROGRAM_OPTION_LIST structure to populate
- * @param options Vector of PROGRAM_OPTION pointers to include in the list
- */
-
-int zut_build_program_option_list(PROGRAM_OPTION_LIST *opt_list, const std::vector<PROGRAM_OPTION *> &options, ZDIAG &diag);
-
-/**
  * @brief Strips the last character from input if it's a newline.
  * @param input The string to modify
  * @returns Nothing. The input is modified if its last character is a newline.
@@ -133,18 +123,7 @@ int zut_run(const std::string &program);
 int zut_run(ZDIAG &diag, const std::string &input, const std::string &parms);
 
 /**
- * @brief Run a z/OS load module with optional parameter options (e.g. alternate DD lists).
- *        The caller is responsible for freeing opt_list after this call returns.
- * @param diag Reference to diagnostic information structure
- * @param input The load module name
- * @param parms Parameter string passed as the first positional argument
- * @param opt_list Optional program option list (nullptr for none)
- * @return Return code (0 for success, non-zero for error)
- */
-int zut_run_with_options(ZDIAG &diag, const std::string &input, const std::string &parms, PROGRAM_OPTION_LIST *opt_list);
-
-/**
- * @brief Set a DD name in char array with padded spaces, or binary zeros for null. For use as PROGRAM_OPTION content.
+ * @brief Set a DD name in char array with padded spaces, or binary zeros for null.
  * @param arr The 8-byte character array to set
  * @param ddname The DD name to set
  */
