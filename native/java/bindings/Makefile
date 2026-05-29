@@ -42,6 +42,7 @@ $(OUT_DIR)/%.o: %.cpp
 $(OUT_DIR)/libzowex_java.so: $(OBJS) $(C_LIBS)
 	@echo 'Building $(OUT_DIR)/libzowex_java.so'
 	$(CXX) $(DLL_BND_FLAGS) -o $@ $^
+	extattr +p $@
 
 clean:
 	rm -rf $(OUT_DIR)

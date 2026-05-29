@@ -39,6 +39,9 @@ MACLIBS=-ISYS1.MACLIB \
 
 MTL_HEADERS=-I/usr/include/metal
 
+JAVA_HOME=/usr/lpp/java/J8.0_64
+JAVA_SIDEDECK_DIR=bin/j9vm
+
 DLL_CPP_FLAGS=-W "c,lp64,langlvl(extended),dll,xplink,exportall" \
  -qsearch=$(JAVA_HOME)/include \
  -qsource \
@@ -51,7 +54,7 @@ DLL_BND_FLAGS=-W "l,lp64,dll,dynam=dll,xplink,map,list" \
 
 ASM_FLAGS=-mrent
 
-SIDEDECKPATH = $(JAVA_HOME)/bin/j9vm
+SIDEDECKPATH = $(JAVA_HOME)/$(JAVA_SIDEDECK_DIR)
 SIDEDECK = libjvm
 
 PREFIX := "../lib/"
