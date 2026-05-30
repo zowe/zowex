@@ -190,7 +190,8 @@ int zjb_read_job_jcl(ZJB *zjb, const std::string &jobid, std::string &response)
 
 #define NUM_TEXT_UNITS 5
 
-static int zjb_read_job_dynamic_allocation(ZJB *zjb, std::string jobdsn, std::string &ddname)
+// Disable optimization for this function since `ibm-clang` -O2 removes required assignments.
+__attribute__((optnone)) static int zjb_read_job_dynamic_allocation(ZJB *zjb, std::string jobdsn, std::string &ddname)
 {
   int rc = 0;
 
@@ -333,13 +334,6 @@ static int zjb_read_job_dynamic_allocation(ZJB *zjb, std::string jobdsn, std::st
   s99parms->__S99FLAG1 = 0x4000;  // s99nocnv;
   s99parms->__S99TXTPP = s99tupl;
 
-  // NOTE(Kelosky): `ibm-clang` appears to optimize the previous assignments, so this approach is to
-  // force the compiler to not optimize the assignments.
-  unsigned char size = sizeof(__S99parms);
-  unsigned char verb = s99vrbal;
-  memcpy(&s99parms->__S99RBLN, &size, sizeof(size));
-  memcpy(&s99parms->__S99VERB, &verb, sizeof(verb));
-
   // s99parms->__S99S99X = s99parmsx; // TODO(Kelosky): reenable when we look at s99parmsx->__S99ENMSG and free
 
   // https://www.ibm.com/docs/en/zos/3.1.0?topic=list-coding-dynamic-allocation-request
@@ -463,7 +457,13 @@ int zjb_read_syslog(ZJB *zjb, ZJBSyslogOptions &opts, ZJBSyslogResponse &respons
     //
     uint32_t utc_cs = 0;
     memcpy(&utc_cs, &zds.ts_binary, sizeof(utc_cs));
-    uint32_t local_cs = utc_cs + (uint32_t)tz_offset_cs;
+    const int64_t cs_per_day = 24LL * 360000LL; // Number of centiseconds in a day
+    int64_t local_cs = (int64_t)utc_cs + (int64_t)tz_offset_cs;
+    local_cs %= cs_per_day;
+    if (local_cs < 0)
+    {
+      local_cs += cs_per_day;
+    }
     unsigned end_hh = local_cs / 360000U;
     unsigned end_mm = (local_cs / 6000U) % 60U;
     unsigned end_ss = (local_cs / 100U) % 60U;
