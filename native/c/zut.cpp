@@ -390,6 +390,7 @@ int zut_run(const std::string &program)
 static void zut_build_dfsmsdfp_dds_options(DFSMSdfp_DD_LIST &dd_list, const DFSMSdfp_AltDDs &alt_dds)
 {
   // represents length of the DD list in IEBCOPY_ALT_DDS
+  // see https://www.ibm.com/docs/en/SSLTBW_3.1.0/pdf/idau100_v3r1.pdf, "ddname List"
   constexpr uint16_t DD_LEN_SYSUT2 = 72;
   constexpr uint16_t DD_LEN_SYSUT3 = 80;
   constexpr uint16_t DD_LEN_SYSUT4 = 88;

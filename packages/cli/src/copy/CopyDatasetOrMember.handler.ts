@@ -17,15 +17,13 @@ export default class CopyDatasetOrMemberHandler extends SshBaseHandler {
     public async processWithClient(params: IHandlerParameters, client: ZSshClient): Promise<ds.CopyDatasetResponse> {
         const fromDataset = params.arguments.fromDataset as string;
         const toDataset = params.arguments.toDataset as string;
-        const replace = params.arguments?.replace as boolean;
-        const overwrite = params.arguments?.overwrite as boolean;
 
         try {
             const response = await client.ds.copyDatasetOrMember({
                 source: fromDataset,
                 target: toDataset,
-                replace,
-                overwrite,
+                replace: params.arguments?.replace,
+                overwrite: params.arguments?.overwrite,
             });
 
             if (response.success) {

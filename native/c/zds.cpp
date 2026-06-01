@@ -217,7 +217,7 @@ static int zds_alloc_rtdd(ZDIAG &diag, const std::string &cmd, const std::string
   if (zut_bpxwdyn_rtdd(cmd, &code, resp, ddname) != RTNCD_SUCCESS)
   {
     ZDIAG_SET_MSG(&diag, "Failed to allocate DD for %s: %s", label.c_str(), resp.c_str());
-    return false;
+    return RTNCD_FAILURE;
   }
   dds.emplace_back("dd(" + ddname + ")");
   return RTNCD_SUCCESS;
