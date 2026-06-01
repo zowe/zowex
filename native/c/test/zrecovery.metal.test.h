@@ -26,7 +26,7 @@ extern "C"
   int ZRCVYDIS(void);
   int ZRCVYNST(int *PTR64 rc1, int *PTR64 rc2);
   int ZRCVYNCL(void);
-  int ZRCVYTHR(int *PTR64 thread_id, int *PTR64 rc);
+  int ZRCVYTHR(const int *PTR64 thread_id, int *PTR64 rc);
   int ZRCVYNUL(void);
   int ZRCVYSTK(void);
 

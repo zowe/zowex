@@ -111,7 +111,7 @@ int ZRCVYNCL()
 
 #pragma prolog(ZRCVYTHR, " ZWEPROLG NEWDSA=(YES,128) ")
 #pragma epilog(ZRCVYTHR, " ZWEEPILG ")
-int ZRCVYTHR(int *PTR64 thread_id, int *PTR64 rc)
+int ZRCVYTHR(const int *PTR64 thread_id, int *PTR64 rc)
 {
   ZRCVY_ENV zenv = {0};
   *rc = -1;

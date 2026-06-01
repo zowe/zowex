@@ -87,7 +87,7 @@ static void init_stat(STAT *stat)
   stat->statlen = statsize;
 }
 
-static void zjb_recovery_diag(ZJB *zjb, const char *service_name, ZRCVY_ENV *zenv)
+static void zjb_recovery_diag(ZJB *zjb, const char *service_name, const ZRCVY_ENV *zenv)
 {
   memset(zjb->diag.service_name, 0, sizeof(zjb->diag.service_name));
   strncpy(zjb->diag.service_name, service_name, sizeof(zjb->diag.service_name) - 1);
