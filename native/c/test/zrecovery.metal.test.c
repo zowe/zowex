@@ -162,21 +162,9 @@ static int ZRCVYSTI(void)
 #pragma epilog(ZRCVYSTK, " ZWEEPILG ")
 int ZRCVYSTK(void)
 {
-  unsigned long long int r5_before = 0;
-  unsigned long long int r6_before = 0;
-  unsigned long long int r7_before = 0;
-  unsigned long long int r8_before = 0;
-  unsigned long long int r9_before = 0;
-  unsigned long long int r10_before = 0;
-  unsigned long long int r11_before = 0;
-
-  unsigned long long int r5_after = 0;
-  unsigned long long int r6_after = 0;
-  unsigned long long int r7_after = 0;
-  unsigned long long int r8_after = 0;
-  unsigned long long int r9_after = 0;
-  unsigned long long int r10_after = 0;
-  unsigned long long int r11_after = 0;
+  unsigned long long int regs_before[7] = {0};
+  unsigned long long int regs_after[7] = {0};
+  int i;
 
   __asm(
       "*                                                   \n"
@@ -187,16 +175,9 @@ int ZRCVYSTK(void)
       " LGHI   9,1009             Set R9                   \n"
       " LGHI   10,1010            Set R10                  \n"
       " LGHI   11,1011            Set R11                  \n"
-      " STG    5,%0               Capture before R5        \n"
-      " STG    6,%1               Capture before R6        \n"
-      " STG    7,%2               Capture before R7        \n"
-      " STG    8,%3               Capture before R8        \n"
-      " STG    9,%4               Capture before R9        \n"
-      " STG    10,%5              Capture before R10       \n"
-      " STG    11,%6              Capture before R11       \n"
+      " STMG   5,11,%0            Capture before R5-R11    \n"
       "*                                                    "
-      : "=m"(r5_before), "=m"(r6_before), "=m"(r7_before), "=m"(r8_before),
-        "=m"(r9_before), "=m"(r10_before), "=m"(r11_before)
+      : "=m"(regs_before[0])
       :
       : "r5", "r6", "r7", "r8", "r9", "r10", "r11");
 
@@ -204,25 +185,18 @@ int ZRCVYSTK(void)
 
   __asm(
       "*                                                   \n"
-      " STG    5,%0               Capture after R5         \n"
-      " STG    6,%1               Capture after R6         \n"
-      " STG    7,%2               Capture after R7         \n"
-      " STG    8,%3               Capture after R8         \n"
-      " STG    9,%4               Capture after R9         \n"
-      " STG    10,%5              Capture after R10        \n"
-      " STG    11,%6              Capture after R11        \n"
+      " STMG   5,11,%0            Capture after R5-R11     \n"
       "*                                                    "
-      : "=m"(r5_after), "=m"(r6_after), "=m"(r7_after), "=m"(r8_after),
-        "=m"(r9_after), "=m"(r10_after), "=m"(r11_after)
+      : "=m"(regs_after[0])
       :
       :);
 
-  if (r5_before != r5_after || r6_before != r6_after ||
-      r7_before != r7_after || r8_before != r8_after ||
-      r9_before != r9_after || r10_before != r10_after ||
-      r11_before != r11_after)
+  for (i = 0; i < 7; i++)
   {
-    return -1;
+    if (regs_before[i] != regs_after[i])
+    {
+      return -1;
+    }
   }
 
   return 0;
