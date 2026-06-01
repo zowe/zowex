@@ -162,20 +162,13 @@ static int ZRCVYSTI(void)
 #pragma epilog(ZRCVYSTK, " ZWEEPILG ")
 int ZRCVYSTK(void)
 {
-  unsigned long long int regs_before[7] = {0};
+  unsigned long long int regs_before[7] = {1005, 1006, 1007, 1008, 1009, 1010, 1011};
   unsigned long long int regs_after[7] = {0};
   int i;
 
   __asm(
-      "*                                                   \n"
-      " LGHI   5,1005             Set R5                   \n"
-      " LGHI   6,1006             Set R6                   \n"
-      " LGHI   7,1007             Set R7                   \n"
-      " LGHI   8,1008             Set R8                   \n"
-      " LGHI   9,1009             Set R9                   \n"
-      " LGHI   10,1010            Set R10                  \n"
-      " LGHI   11,1011            Set R11                  \n"
-      " STMG   5,11,%0            Capture before R5-R11    \n"
+      "*                                                          \n"
+      " LMG   5,11,%0            Load regs_before into R5-R11    \n"
       "*                                                    "
       : "=m"(regs_before[0])
       :
@@ -184,8 +177,8 @@ int ZRCVYSTK(void)
   ZRCVYSTI();
 
   __asm(
-      "*                                                   \n"
-      " STMG   5,11,%0            Capture after R5-R11     \n"
+      "*                                                        \n"
+      " STMG   5,11,%0            Store R5-R11 into regs_after    \n"
       "*                                                    "
       : "=m"(regs_after[0])
       :
