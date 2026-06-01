@@ -9,15 +9,9 @@
  *
  */
 
-#ifndef ZUTM31_H
-#define ZUTM31_H
+#ifndef ZOWEX_USS_SERVER_TEST_HPP
+#define ZOWEX_USS_SERVER_TEST_HPP
 
-#include "ztype.h"
-#include "zprmtype.h"
-#include "csvapfaa.h"
-
-int zutm1lpl(ZDIAG *, int *, PARMLIB_DSNS *) ATTRIBUTE(amode31);
-int zutm1gur(char[8]) ATTRIBUTE(amode31);
-int zutm1apf(struct apfhdr *, int *, int *) ATTRIBUTE(amode31);
+void zowex_uss_server_tests();
 
 #endif

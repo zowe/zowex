@@ -11,5 +11,26 @@
 
 #ifndef ZOWEX_SERVER_TEST_HPP
 #define ZOWEX_SERVER_TEST_HPP
+
+#include <string>
+#include <cstdio>
+#include <sys/types.h>
+
+struct ServerHandle
+{
+  pid_t pid;
+  FILE *output_stream;
+  FILE *input_stream;
+};
+
+std::string read_line_from_server(ServerHandle &handle, int timeout_ms = 5000);
+void write_to_server(ServerHandle &handle, const std::string &input);
+ServerHandle start_server(const std::string &command, bool read_ready_message = false);
+void stop_server(ServerHandle &handle);
+
+extern const std::string zowex_dir;
+extern const std::string zowex_server_command;
+
 void zowex_server_tests();
+
 #endif

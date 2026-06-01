@@ -39,6 +39,7 @@ struct ZJobDD
   std::string dsn;
   std::string stepname;
   std::string procstep;
+  unsigned char token[80];
   int key;
 };
 
@@ -135,7 +136,7 @@ int zjb_list_dds(ZJB *zjb, const std::string &jobid, std::vector<ZJobDD> &job_dd
  * @param response return job file output
  * @return int 0 for success; non zero otherwise
  */
-int zjb_read_jobs_output_by_key(ZJB *zjb, const std::string &jobid, int key, std::string &response);
+int zjb_read_job_content_by_key(ZJB *zjb, const std::string &jobid, int key, std::string &response);
 
 int zjb_get_job_dsn_by_key(ZJB *zjb, const std::string &, int, std::string &);
 

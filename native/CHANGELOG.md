@@ -7,6 +7,9 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## Recent Changes
 
 - `c`: Added system tests for data set operations covering GDG (Generation Data Group) listing and reading, multibyte encoding, concurrent PDSE member writes, and ENQ resource release after abend. CA Disk archival/restore is covered by a manual test script (`native/c/test/test.cadisk.sh`); see `doc/ref/ds/ca-disk.md`.
+- **Breaking:** `c`: Renamed C function `zjb_read_jobs_output_by_key` in zjb.hpp to `zjb_read_job_content_by_key` to be consistent with `zjb_read_job_content_by_dsn.
+- `c`: Fixes issue where `zowex` failed to allocate `sysout` DDs that were dynamically allocated under z/OS UNIX. [#840](https://github.com/zowe/zowex/issues/840)
+- `c`: Add command `zowex system list-apf` to list APF authorized data sets.
 - `c`: Fixed several vulnerabilities in C++ and Metal C code to improve stability. [#997](https://github.com/zowe/zowex/pull/997)
 - `c`: Optimized USS file list operations by replacing CSV formatting and parsing with structured data transfer via the `ZusfListEntry` struct. This improves performance for `zowex uss list` and provides type-safe, programmatic access to file attributes for SDK consumers. [#990](https://github.com/zowe/zowex/pull/990)
 - `c`: Fixed parsing of file names containing commas in USS list API responses, which caused data misalignment for SDK consumers. [#989](https://github.com/zowe/zowex/issues/989)

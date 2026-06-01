@@ -1819,22 +1819,7 @@ void zowex_ds_tests()
                                         const auto encoded = zbase64::encode(payload.c_str(), payload.size());
                                         const std::string encoded_payload(encoded.begin(), encoded.end());
 
-                                        std::thread writer([&]() -> void
-                                                           {
-                                                           int fd = -1;
-                                                           for (int attempt = 0; attempt < 100 && fd == -1; ++attempt)
-                                                           {
-                                                             fd = open(pipe_path.c_str(), O_WRONLY | O_NONBLOCK);
-                                                             if (fd == -1)
-                                                             {
-                                                               usleep(10000);
-                                                             }
-                                                           }
-                                                           if (fd != -1)
-                                                           {
-                                                             write(fd, encoded_payload.data(), encoded_payload.size());
-                                                             close(fd);
-                                                           } });
+                                        std::thread writer = start_pipe_writer_thread(pipe_path, encoded_payload);
 
                                         command = zowex_command + " data-set write '" + ds + "(ASA3)' --pipe-path " + pipe_path +
                                                   " --local-encoding IBM-1047 --encoding IBM-1047";
