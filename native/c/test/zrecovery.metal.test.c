@@ -137,10 +137,10 @@ int ZRCVYNUL()
   return iefssreq(NULL);
 }
 
-#pragma prolog(ZRCVYSTK_INNER, " ZWEPROLG NEWDSA=(YES,128),SAVE=BAKR ")
-#pragma epilog(ZRCVYSTK_INNER, " ZWEEPILG ")
-static int ZRCVYSTK_INNER(void) ATTRIBUTE(noinline);
-static int ZRCVYSTK_INNER(void)
+#pragma prolog(ZRCVYSTI, " ZWEPROLG NEWDSA=(YES,128),SAVE=BAKR ")
+#pragma epilog(ZRCVYSTI, " ZWEEPILG ")
+static int ZRCVYSTI(void) ATTRIBUTE(noinline);
+static int ZRCVYSTI(void)
 {
   __asm(
       "*                                                   \n"
@@ -200,7 +200,7 @@ int ZRCVYSTK(void)
       :
       : "r5", "r6", "r7", "r8", "r9", "r10", "r11");
 
-  ZRCVYSTK_INNER();
+  ZRCVYSTI();
 
   __asm(
       "*                                                   \n"
