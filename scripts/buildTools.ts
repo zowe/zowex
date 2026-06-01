@@ -1309,7 +1309,8 @@ async function test(connection: Client) {
         .join(" ");
     // Wrap multi-word pattern in single quotes to avoid shell expansion
     const testPattern = args[1] ? `'${args[1].replaceAll("'", String.raw`'\''`)}'` : "";
-    const cTestCmd = `cd ${deployDirs.cTestDir} && ${envPrefix ? `${envPrefix} ` : ""}./build-out/ztest_runner ${testPattern}`;
+    const envString = envPrefix ? `${envPrefix} ` : "";
+    const cTestCmd = `cd ${deployDirs.cTestDir} && ${envString}./build-out/ztest_runner ${testPattern}`;
     await runCommandInShell(connection, `${cTestCmd}\n`, {
         streamOutput: true,
         stepName: "Running tests",

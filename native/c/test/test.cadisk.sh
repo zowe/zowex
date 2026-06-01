@@ -29,8 +29,10 @@ CONTENT="cadisk archival test content"
 MAX_POLLS=23      # 23 x 120s = ~46 minutes max
 POLL_INTERVAL=120 # seconds between volser checks
 
+SEPARATOR="=========================================="
+
 pass() { echo "  ..passed!"; }
-fail() { echo "  ..FAILED: $1"; exit 1; }
+fail() { local msg="$1"; echo "  ..FAILED: $msg"; exit 1; }
 
 cleanup() {
   echo ""
@@ -39,9 +41,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "=========================================="
+echo "$SEPARATOR"
 echo " CA Disk Archival / Restore — Manual Test"
-echo "=========================================="
+echo "$SEPARATOR"
 echo "  Data set : $DS"
 echo "  Max wait : $((MAX_POLLS * POLL_INTERVAL / 60)) minutes"
 echo ""
@@ -76,7 +78,7 @@ for i in $(seq 1 "$MAX_POLLS"); do
   sleep "$POLL_INTERVAL"
 done
 
-if [ "$archived" != "true" ]; then
+if [[ "$archived" != "true" ]]; then
   fail "data set was not archived within $((MAX_POLLS * POLL_INTERVAL / 60)) minutes"
 fi
 pass
@@ -99,6 +101,6 @@ fi
 pass
 
 echo ""
-echo "=========================================="
+echo "$SEPARATOR"
 echo " All CA Disk tests passed!"
-echo "=========================================="
+echo "$SEPARATOR"
