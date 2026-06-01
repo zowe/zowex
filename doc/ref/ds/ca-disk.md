@@ -31,7 +31,7 @@ ZOWEX=/path/to/zowex ./test.cadisk.sh
 | Step | Action |
 |------|--------|
 | 1 | Creates a sequential data set |
-| 2 | Writes recognizable content to it |
+| 2 | Writes content to it |
 | 3 | Submits a deferred archive request via `DARCHIVE <dsn>` |
 | 4 | Polls every 2 minutes until the volser changes to `ARCIVE` (CA Disk's pseudo-volume), up to ~46 minutes |
 | 5 | Restores the data set with `zowex data-set restore` |
