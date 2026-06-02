@@ -54,13 +54,14 @@ void zowex_uss_server_tests()
       });
 
       it("should properly chmod a file via RPC", [&]() -> void {
-        std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"chmodFile\",\"params\":{\"fspath\":\"" + uss_path + "\",\"mode\":\"777\"},\"id\":1}\n";
+        int req_id;
+        std::string request = make_rpc_request("chmodFile", "{\"fspath\":\"" + uss_path + "\",\"mode\":\"777\"}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
-        Expect(response).ToContain("\"id\":1");
+        Expect(response).ToContain("\"id\":" + std::to_string(req_id));
 
         // Verify permissions were actually set by checking ls output
         std::string ls_response;
@@ -84,13 +85,14 @@ void zowex_uss_server_tests()
         execute_command_with_output("id -u", resp);
         resp.erase(resp.find_last_not_of(" \t\r\n") + 1); // trim whitespace
         
-        std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"chownFile\",\"params\":{\"fspath\":\"" + uss_path + "\",\"owner\":\"" + resp + "\"},\"id\":2}\n";
+        int req_id;
+        std::string request = make_rpc_request("chownFile", "{\"fspath\":\"" + uss_path + "\",\"owner\":\"" + resp + "\"}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
-        Expect(response).ToContain("\"id\":2");
+        Expect(response).ToContain("\"id\":" + std::to_string(req_id));
 
         // Verify ownership was actually set by checking ls -l output
         std::string ls_response;
@@ -115,13 +117,14 @@ void zowex_uss_server_tests()
       });
 
       it("should properly chtag a file via RPC", [&]() -> void {
-        std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"chtagFile\",\"params\":{\"fspath\":\"" + uss_path + "\",\"tag\":\"IBM-1047\"},\"id\":3}\n";
+        int req_id;
+        std::string request = make_rpc_request("chtagFile", "{\"fspath\":\"" + uss_path + "\",\"tag\":\"IBM-1047\"}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
-        Expect(response).ToContain("\"id\":3");
+        Expect(response).ToContain("\"id\":" + std::to_string(req_id));
         
         // Verify tag was applied using ls -alT (shows encoding tags)
         std::string ls_response;
@@ -141,19 +144,20 @@ void zowex_uss_server_tests()
         execute_command_with_output(zowex_command + " uss create-file " + src_path, response);
 
         // Populate the source file with some sample content via RPC writeFile
-        std::string write_req = "{\"jsonrpc\":\"2.0\",\"method\":\"writeFile\",\"params\":{\"fspath\":\"" + src_path + "\",\"data\":\"SGVsbG8gY29weSE=\"},\"id\":40}\n";
+        std::string write_req = make_rpc_request("writeFile", "{\"fspath\":\"" + src_path + "\",\"data\":\"SGVsbG8gY29weSE=\"}");
         write_to_server(server, write_req);
-        read_line_from_server(server); // consume response
+        read_rpc_response(server); // consume response
       });
 
       it("should properly copy a file via RPC", [&]() -> void {
-        std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"copyUss\",\"params\":{\"srcFsPath\":\"" + src_path + "\",\"dstFsPath\":\"" + dest_path + "\"},\"id\":4}\n";
+        int req_id;
+        std::string request = make_rpc_request("copyUss", "{\"srcFsPath\":\"" + src_path + "\",\"dstFsPath\":\"" + dest_path + "\"}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
-        Expect(response).ToContain("\"id\":4");
+        Expect(response).ToContain("\"id\":" + std::to_string(req_id));
         
         // Verify destination file exists after copy
         std::string ls_response;
@@ -161,12 +165,13 @@ void zowex_uss_server_tests()
         Expect(rc).ToBe(0);
 
         // Verify the destination file contains the identical content via RPC readFile
-        std::string read_req = "{\"jsonrpc\":\"2.0\",\"method\":\"readFile\",\"params\":{\"fspath\":\"" + dest_path + "\"},\"id\":41}\n";
+        int read_id;
+        std::string read_req = make_rpc_request("readFile", "{\"fspath\":\"" + dest_path + "\"}", read_id);
         write_to_server(server, read_req);
-        std::string read_resp = read_line_from_server(server);
+        std::string read_resp = read_rpc_response(server);
 
         Expect(read_resp).ToContain("\"success\":true");
-        Expect(read_resp).ToContain("\"id\":41");
+        Expect(read_resp).ToContain("\"id\":" + std::to_string(read_id));
         Expect(read_resp).ToContain("\"SGVsbG8gY29weSE=\""); // same base64 data
       });
     });
@@ -179,13 +184,14 @@ void zowex_uss_server_tests()
       });
 
       it("should properly create a directory via RPC", [&]() -> void {
-        std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"createFile\",\"params\":{\"fspath\":\"" + dir_path + "\",\"isDir\":true},\"id\":5}\n";
+        int req_id;
+        std::string request = make_rpc_request("createFile", "{\"fspath\":\"" + dir_path + "\",\"isDir\":true}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
-        Expect(response).ToContain("\"id\":5");
+        Expect(response).ToContain("\"id\":" + std::to_string(req_id));
         
         // Verify directory was created and has directory permissions
         std::string ls_response;
@@ -203,13 +209,14 @@ void zowex_uss_server_tests()
       });
 
       it("should properly create a file via RPC", [&]() -> void {
-        std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"createFile\",\"params\":{\"fspath\":\"" + file_path + "\",\"isDir\":false},\"id\":6}\n";
+        int req_id;
+        std::string request = make_rpc_request("createFile", "{\"fspath\":\"" + file_path + "\",\"isDir\":false}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
-        Expect(response).ToContain("\"id\":6");
+        Expect(response).ToContain("\"id\":" + std::to_string(req_id));
         
         std::string ls_response;
         int rc = execute_command_with_output("ls -l " + file_path, ls_response);
@@ -227,13 +234,14 @@ void zowex_uss_server_tests()
       });
 
       it("should properly delete a file via RPC", [&]() -> void {
-        std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"deleteFile\",\"params\":{\"fspath\":\"" + file_path + "\"},\"id\":7}\n";
+        int req_id;
+        std::string request = make_rpc_request("deleteFile", "{\"fspath\":\"" + file_path + "\"}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
-        Expect(response).ToContain("\"id\":7");
+        Expect(response).ToContain("\"id\":" + std::to_string(req_id));
         
         // Verify file no longer exists (ls should fail)
         std::string ls_response;
@@ -244,13 +252,14 @@ void zowex_uss_server_tests()
 
     describe("issue", [&]() -> void {
       it("should properly issue a UNIX command via RPC", [&]() -> void {
-        std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"unixCommand\",\"params\":{\"commandText\":\"echo hello\"},\"id\":8}\n";
+        int req_id;
+        std::string request = make_rpc_request("unixCommand", "{\"commandText\":\"echo hello\"}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
-        Expect(response).ToContain("\"id\":8");
+        Expect(response).ToContain("\"id\":" + std::to_string(req_id));
         Expect(response).ToContain("\"data\":\"hello\\n\"");
       });
     });
@@ -267,13 +276,14 @@ void zowex_uss_server_tests()
       });
 
       it("should properly list files via RPC", [&]() -> void {
-        std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"listFiles\",\"params\":{\"fspath\":\"" + dir_path + "\"},\"id\":9}\n";
+        int req_id;
+        std::string request = make_rpc_request("listFiles", "{\"fspath\":\"" + dir_path + "\"}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
-        Expect(response).ToContain("\"id\":9");
+        Expect(response).ToContain("\"id\":" + std::to_string(req_id));
         Expect(response).ToContain("\"testfile\"");
       });
     });
@@ -289,19 +299,20 @@ void zowex_uss_server_tests()
         execute_command_with_output(zowex_command + " uss create-file " + src_path, response);
 
         // Populate the source file with some sample content via RPC writeFile
-        std::string write_req = "{\"jsonrpc\":\"2.0\",\"method\":\"writeFile\",\"params\":{\"fspath\":\"" + src_path + "\",\"data\":\"SGVsbG8gbW92ZSE=\"},\"id\":100}\n";
+        std::string write_req = make_rpc_request("writeFile", "{\"fspath\":\"" + src_path + "\",\"data\":\"SGVsbG8gbW92ZSE=\"}");
         write_to_server(server, write_req);
-        read_line_from_server(server); // consume response
+        read_rpc_response(server); // consume response
       });
 
       it("should properly move a file via RPC", [&]() -> void {
-        std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"moveFile\",\"params\":{\"source\":\"" + src_path + "\",\"target\":\"" + dest_path + "\"},\"id\":10}\n";
+        int req_id;
+        std::string request = make_rpc_request("moveFile", "{\"source\":\"" + src_path + "\",\"target\":\"" + dest_path + "\"}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
-        Expect(response).ToContain("\"id\":10");
+        Expect(response).ToContain("\"id\":" + std::to_string(req_id));
         
         // Verify move: source should not exist, destination should exist
         std::string ls_response;
@@ -311,12 +322,13 @@ void zowex_uss_server_tests()
         Expect(rc2).ToBe(0); // destination file exists
 
         // Verify the destination file contains the identical content via RPC readFile
-        std::string read_req = "{\"jsonrpc\":\"2.0\",\"method\":\"readFile\",\"params\":{\"fspath\":\"" + dest_path + "\"},\"id\":101}\n";
+        int read_id;
+        std::string read_req = make_rpc_request("readFile", "{\"fspath\":\"" + dest_path + "\"}", read_id);
         write_to_server(server, read_req);
-        std::string read_resp = read_line_from_server(server);
+        std::string read_resp = read_rpc_response(server);
 
         Expect(read_resp).ToContain("\"success\":true");
-        Expect(read_resp).ToContain("\"id\":101");
+        Expect(read_resp).ToContain("\"id\":" + std::to_string(read_id));
         Expect(read_resp).ToContain("\"SGVsbG8gbW92ZSE=\""); // same base64 data
       });
     });
@@ -330,22 +342,24 @@ void zowex_uss_server_tests()
 
       it("should properly write and view a file via RPC", [&]() -> void {
         // Write operation: base64 encoded "Hello World!" is "SGVsbG8gV29ybGQh"
-        std::string write_req = "{\"jsonrpc\":\"2.0\",\"method\":\"writeFile\",\"params\":{\"fspath\":\"" + file_path + "\",\"data\":\"SGVsbG8gV29ybGQh\"},\"id\":11}\n";
+        int write_id;
+        std::string write_req = make_rpc_request("writeFile", "{\"fspath\":\"" + file_path + "\",\"data\":\"SGVsbG8gV29ybGQh\"}", write_id);
         
         write_to_server(server, write_req);
-        std::string write_resp = read_line_from_server(server);
+        std::string write_resp = read_rpc_response(server);
 
         Expect(write_resp).ToContain("\"success\":true");
-        Expect(write_resp).ToContain("\"id\":11");
+        Expect(write_resp).ToContain("\"id\":" + std::to_string(write_id));
         
         // Read operation: verify we get back the same base64 content
-        std::string read_req = "{\"jsonrpc\":\"2.0\",\"method\":\"readFile\",\"params\":{\"fspath\":\"" + file_path + "\"},\"id\":12}\n";
+        int read_id;
+        std::string read_req = make_rpc_request("readFile", "{\"fspath\":\"" + file_path + "\"}", read_id);
         
         write_to_server(server, read_req);
-        std::string read_resp = read_line_from_server(server);
+        std::string read_resp = read_rpc_response(server);
 
         Expect(read_resp).ToContain("\"success\":true");
-        Expect(read_resp).ToContain("\"id\":12");
+        Expect(read_resp).ToContain("\"id\":" + std::to_string(read_id));
         Expect(read_resp).ToContain("\"SGVsbG8gV29ybGQh\""); // same base64 data
       });
     });
@@ -367,11 +381,12 @@ void zowex_uss_server_tests()
         std::string pipe_path;
         std::thread writer;
 
-        std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"writeFile\",\"params\":{\"fspath\":\"" + file_path + "\",\"stream\":" + std::to_string(stream_id) + ",\"encoding\":\"binary\"},\"id\":45}\n";
+        int req_id;
+        std::string request = make_rpc_request("writeFile", "{\"fspath\":\"" + file_path + "\",\"stream\":" + std::to_string(stream_id) + ",\"encoding\":\"binary\"}", req_id);
 
         write_to_server(server, request);
 
-        std::string notification = read_line_from_server(server);
+        std::string notification = read_rpc_response(server);
 
         ExpectWithContext(notification, "Should be sendStream notification").ToContain("\"method\":\"sendStream\"");
         ExpectWithContext(notification, "Should have correct stream ID").ToContain("\"id\":" + std::to_string(stream_id));
@@ -382,19 +397,20 @@ void zowex_uss_server_tests()
 
         writer = start_pipe_writer_thread(pipe_path, encoded_payload);
 
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         if (writer.joinable()) {
           writer.join();
         }
 
-        Expect(response).ToContain("\"id\":45");
+        Expect(response).ToContain("\"id\":" + std::to_string(req_id));
         Expect(response).ToContain("\"success\":true");
 
-        std::string read_request = "{\"jsonrpc\":\"2.0\",\"method\":\"readFile\",\"params\":{\"fspath\":\"" + file_path + "\"},\"id\":46}\n";
+        int read_id;
+        std::string read_request = make_rpc_request("readFile", "{\"fspath\":\"" + file_path + "\"}", read_id);
 
         write_to_server(server, read_request);
-        std::string read_response = read_line_from_server(server);
+        std::string read_response = read_rpc_response(server);
 
         Expect(read_response).ToContain("\"success\":true");
         ExpectWithContext(read_response, "Should contain streamed text").ToContain("SGVsbG8gVVNTIFN0cmVhbQ");
@@ -402,20 +418,21 @@ void zowex_uss_server_tests()
 
       it("should read via stream", [&]() -> void {
         std::string test_content = "VVNTIFN0cmVhbSByZWFkIHRlc3QK"; // "USS Stream read test\n" base64
-        std::string write_request = "{\"jsonrpc\":\"2.0\",\"method\":\"writeFile\",\"params\":{\"fspath\":\"" + file_path + "\",\"data\":\"" + test_content + "\"},\"id\":50}\n";
+        std::string write_request = make_rpc_request("writeFile", "{\"fspath\":\"" + file_path + "\",\"data\":\"" + test_content + "\"}");
 
         write_to_server(server, write_request);
-        std::string write_response = read_line_from_server(server);
+        std::string write_response = read_rpc_response(server);
 
         Expect(write_response).ToContain("\"success\":true");
 
         int stream_id = 400;
 
-        std::string read_request = "{\"jsonrpc\":\"2.0\",\"method\":\"readFile\",\"params\":{\"fspath\":\"" + file_path + "\",\"stream\":" + std::to_string(stream_id) + "},\"id\":51}\n";
+        int read_id;
+        std::string read_request = make_rpc_request("readFile", "{\"fspath\":\"" + file_path + "\",\"stream\":" + std::to_string(stream_id) + "}", read_id);
 
         write_to_server(server, read_request);
 
-        std::string notification = read_line_from_server(server);
+        std::string notification = read_rpc_response(server);
         Expect(notification).ToContain("\"method\":\"receiveStream\"");
         ExpectWithContext(notification, "Should have correct stream ID").ToContain("\"id\":" + std::to_string(stream_id));
 
@@ -426,15 +443,15 @@ void zowex_uss_server_tests()
         std::string file_content;
         std::thread reader = start_pipe_reader_thread(output_pipe, &file_content);
 
-        std::string read_response = read_line_from_server(server);
+        std::string read_response = read_rpc_response(server);
 
         reader.join();
 
-        Expect(read_response).ToContain("\"id\":51");
+        Expect(read_response).ToContain("\"id\":" + std::to_string(read_id));
 
         ExpectWithContext(file_content, "Streamed file should contain data").ToContain(test_content);
         ExpectWithContext(read_response, "Should be valid JSON-RPC response").ToContain("jsonrpc");
-        ExpectWithContext(read_response, "Read streaming RPC interface should be supported").ToContain("\"id\":51");
+        ExpectWithContext(read_response, "Read streaming RPC interface should be supported").ToContain("\"id\":" + std::to_string(read_id));
       });
     });
 
