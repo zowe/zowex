@@ -2380,6 +2380,36 @@ bool is_match(const char *s, const char *p)
   return *p == '\0';
 }
 
+/**
+ * @brief Validate if the provided user data is a valid ISPF statistics entry
+ * @param stats Pointer to the ISPF statistics structure
+ * @param user_data_len Length of the user data in bytes
+ * @return true if valid, false otherwise
+ */
+static bool is_valid_ispf_stats(const ISPF_STATS *stats, int user_data_len)
+{
+  bool is_extended = (stats->flags & 0x20) != 0;
+  bool is_valid = false;
+
+  // 1. Must be 15 halfwords (30 bytes) with blanks at 29-30, OR 20 halfwords (40 bytes) with extended flag ON
+  if (!is_extended && user_data_len == 30 && memcmp(stats->extended, "  ", 2) == 0)
+  {
+    is_valid = true;
+  }
+  else if (is_extended && user_data_len == 40)
+  {
+    is_valid = true;
+  }
+
+  // 2. Century indicators must be valid (1900s - 0x00 or 2000s - 0x01)
+  if (stats->created_date_century > 0x01 || stats->modified_date_century > 0x01)
+  {
+    is_valid = false;
+  }
+
+  return is_valid;
+}
+
 int zds_list_members(ZDS *zds, std::string dsn, std::vector<ZDSMem> &members, const std::string &pattern, bool show_attributes)
 {
   // PO
@@ -2482,34 +2512,38 @@ int zds_list_members(ZDS *zds, std::string dsn, std::vector<ZDSMem> &members, co
 
           ZDSMem mem{};
           mem.name = std::string(name);
-          int user_data_len = info * 2;
+          int user_data_len = info * 2; // convert halfwords to bytes
 
           if (show_attributes && user_data_len >= sizeof(ISPF_STATS))
           {
             const ISPF_STATS *stats = reinterpret_cast<const ISPF_STATS *>(data + sizeof(entry));
-            mem.vers = stats->version;
-            mem.mod = stats->level;
 
-            mem.sclm = (stats->flags & 0x80) != 0;
+            if (is_valid_ispf_stats(stats, user_data_len))
+            {
+              mem.vers = stats->version;
+              mem.mod = stats->level;
 
-            int rc = zut_convert_date(&stats->created_date_century, mem.c4date);
+              mem.sclm = (stats->flags & 0x80) != 0;
 
-            // Convert Modified Date
-            rc = zut_convert_date(&stats->modified_date_century, mem.m4date);
+              int rc = zut_convert_date(&stats->created_date_century, mem.c4date);
 
-            parse_packed_time(
-                stats->modified_time_hours,
-                stats->modified_time_minutes,
-                stats->modified_time_seconds,
-                &mem.mtime);
+              // Convert Modified Date
+              rc = zut_convert_date(&stats->modified_date_century, mem.m4date);
 
-            mem.cnorc = stats->current_number_of_lines;
-            mem.inorc = stats->initial_number_of_lines;
-            mem.mnorc = stats->modified_number_of_lines;
+              parse_packed_time(
+                  stats->modified_time_hours,
+                  stats->modified_time_minutes,
+                  stats->modified_time_seconds,
+                  &mem.mtime);
 
-            char user[9] = {0};
-            memcpy(user, stats->userid, 8);
-            mem.user = std::string(user);
+              mem.cnorc = stats->current_number_of_lines;
+              mem.inorc = stats->initial_number_of_lines;
+              mem.mnorc = stats->modified_number_of_lines;
+
+              char user[9] = {0};
+              memcpy(user, stats->userid, 8);
+              mem.user = std::string(user);
+            }
           }
           members.push_back(mem);
         }
