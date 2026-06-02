@@ -337,7 +337,7 @@ int handle_job_view_file_by_id(InvocationContext &context)
   }
 
   std::string resp;
-  rc = zjb_read_jobs_output_by_key(&zjb, jobid, key, resp);
+  rc = zjb_read_job_content_by_key(&zjb, jobid, key, resp);
 
   if (0 != rc)
   {

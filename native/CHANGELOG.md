@@ -6,6 +6,11 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- `c`: Added z/OS recovery around JES operations in the `zowex` CLI binary to allow recovering from abends. [#1011](https://github.com/zowe/zowex/pull/1011)
+- **Breaking:** `c`: Renamed C function `zjb_read_jobs_output_by_key` in zjb.hpp to `zjb_read_job_content_by_key` to be consistent with `zjb_read_job_content_by_dsn.
+- `c`: Fixes issue where `zowex` failed to allocate `sysout` DDs that were dynamically allocated under z/OS UNIX. [#840](https://github.com/zowe/zowex/issues/840)
+- `c`: Add command `zowex system list-apf` to list APF authorized data sets.
+- `c`: Fixed several vulnerabilities in C++ and Metal C code to improve stability. [#997](https://github.com/zowe/zowex/pull/997)
 - `c`: Optimized USS file list operations by replacing CSV formatting and parsing with structured data transfer via the `ZusfListEntry` struct. This improves performance for `zowex uss list` and provides type-safe, programmatic access to file attributes for SDK consumers. [#990](https://github.com/zowe/zowex/pull/990)
 - `c`: Fixed parsing of file names containing commas in USS list API responses, which caused data misalignment for SDK consumers. [#989](https://github.com/zowe/zowex/issues/989)
 - `c`: Fixed an issue where the `zoweax` authorized CLI binary could run the `server` command or `plugin` command group as privileged. Now, `zoweax` disables privileges before commands are executed. Commands in the `console` group continue to run as privileged. [#958](https://github.com/zowe/zowex/issues/958)

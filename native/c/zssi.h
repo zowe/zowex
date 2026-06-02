@@ -131,6 +131,11 @@ static int iefssi_query(JQRY_HEADER *PTR32 *PTR32 area, int *PTR32 rsn, const ch
 // https://www.ibm.com/docs/en/zos/3.1.0?topic=subsystem-making-request-iefssreq-macro
 static int iefssreq(SSOB *PTR32 *PTR32 ssob)
 {
+  if (!ssob)
+  {
+    return RTNCD_FAILURE;
+  }
+
   int rc = 0;
   IEFSSREQ(ssob, rc);
   return rc;
