@@ -152,7 +152,7 @@ struct ReadDatasetResponse {};
 ZJSON_SCHEMA(ReadDatasetResponse,
     FIELD_REQUIRED(success, BOOL),
     FIELD_OPTIONAL(encoding, STRING),
-    FIELD_REQUIRED(etag, STRING),
+    FIELD_OPTIONAL(etag, STRING),
     FIELD_REQUIRED(data, STRING),
     FIELD_OPTIONAL(contentLen, NUMBER)
 );
