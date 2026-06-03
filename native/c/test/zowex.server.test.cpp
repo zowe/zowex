@@ -16,6 +16,7 @@
 #include <sys/stat.h>
 #include <fstream>
 #include <fcntl.h>
+#include <atomic>
 #include "ztest.hpp"
 #include "../ztype.h"
 #include "../commands/server.hpp"
@@ -52,6 +53,41 @@ std::string read_line_from_server(ServerHandle &handle, int timeout_ms)
   }
 
   throw std::runtime_error("Failed to read from server");
+}
+
+std::string read_rpc_response(ServerHandle &handle, int timeout_ms)
+{
+  fd_set read_fds;
+  struct timeval timeout;
+  int fd = fileno(handle.output_stream);
+  if (fd == -1)
+  {
+    throw std::runtime_error("Failed to get file descriptor");
+  }
+
+  FD_ZERO(&read_fds);
+  FD_SET(fd, &read_fds);
+
+  timeout.tv_sec = timeout_ms / 1000;
+  timeout.tv_usec = (timeout_ms % 1000) * 1000;
+
+  int result = select(fd + 1, &read_fds, nullptr, nullptr, &timeout);
+  if (result <= 0)
+  {
+    throw std::runtime_error("Timeout waiting for server output");
+  }
+
+  std::string line;
+  int c;
+  while ((c = fgetc(handle.output_stream)) != EOF)
+  {
+    line += static_cast<char>(c);
+    if (c == '\n')
+    {
+      break;
+    }
+  }
+  return line;
 }
 
 void write_to_server(ServerHandle &handle, const std::string &input)
@@ -127,6 +163,24 @@ void stop_server(ServerHandle &handle)
   fclose(handle.input_stream);
   fclose(handle.output_stream);
   waitpid(handle.pid, nullptr, 0);
+}
+
+int next_rpc_id()
+{
+  static std::atomic<int> id_counter{1};
+  return id_counter++;
+}
+
+std::string make_rpc_request(const std::string &method, const std::string &params, int &id)
+{
+  id = next_rpc_id();
+  return "{\"jsonrpc\":\"2.0\",\"method\":\"" + method + "\",\"params\":" + params + ",\"id\":" + std::to_string(id) + "}\n";
+}
+
+std::string make_rpc_request(const std::string &method, const std::string &params)
+{
+  int dummy_id;
+  return make_rpc_request(method, params, dummy_id);
 }
 
 const std::string zowex_dir = "./../build-out";
