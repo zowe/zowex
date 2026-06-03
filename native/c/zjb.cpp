@@ -191,7 +191,8 @@ int zjb_read_job_jcl(ZJB *zjb, const std::string &jobid, std::string &response)
 #define NUM_TEXT_UNITS 5
 
 // Disable optimization for this function since `ibm-clang` -O2 removes required assignments.
-__attribute__((optnone)) static int zjb_read_job_dynamic_allocation(ZJB *zjb, std::string jobdsn, std::string &ddname)
+static int zjb_read_job_dynamic_allocation(ZJB *zjb, std::string jobdsn, std::string &ddname) ATTRIBUTE(optnone);
+static int zjb_read_job_dynamic_allocation(ZJB *zjb, std::string jobdsn, std::string &ddname)
 {
   int rc = 0;
 
