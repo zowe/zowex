@@ -191,8 +191,7 @@ int zjb_read_job_jcl(ZJB *zjb, const std::string &jobid, std::string &response)
 #define NUM_TEXT_UNITS 5
 
 // Disable optimization for this function since `ibm-clang` -O2 removes required assignments.
-static int zjb_read_job_dynamic_allocation(ZJB *zjb, std::string jobdsn, std::string &ddname) ATTRIBUTE(optnone);
-static int zjb_read_job_dynamic_allocation(ZJB *zjb, std::string jobdsn, std::string &ddname)
+__attribute__((optnone)) static int zjb_read_job_dynamic_allocation(ZJB *zjb, std::string jobdsn, std::string &ddname)
 {
   int rc = 0;
 
@@ -458,13 +457,7 @@ int zjb_read_syslog(ZJB *zjb, ZJBSyslogOptions &opts, ZJBSyslogResponse &respons
     //
     uint32_t utc_cs = 0;
     memcpy(&utc_cs, &zds.ts_binary, sizeof(utc_cs));
-    const int64_t cs_per_day = 24LL * 360000LL; // Number of centiseconds in a day
-    int64_t local_cs = (int64_t)utc_cs + (int64_t)tz_offset_cs;
-    local_cs %= cs_per_day;
-    if (local_cs < 0)
-    {
-      local_cs += cs_per_day;
-    }
+    uint32_t local_cs = utc_cs + (uint32_t)tz_offset_cs;
     unsigned end_hh = local_cs / 360000U;
     unsigned end_mm = (local_cs / 6000U) % 60U;
     unsigned end_ss = (local_cs / 100U) % 60U;
