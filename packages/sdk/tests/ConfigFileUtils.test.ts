@@ -251,6 +251,44 @@ describe("ConfigFileUtils", () => {
             const comments = writtenLayerJson?.properties.profiles.testprofile[afterPropertiesSymbol];
             expect(comments).toBeUndefined();
         });
+
+        it("should return false when profile is not found in layerJson during uncommentProperty", () => {
+            const testConfig = createMockConfigWithCommentedKey();
+            mockTeamConfig = createMockTeamConfig(testConfig);
+
+            const success = ConfigFileUtils.getInstance().uncommentProperty(mockTeamConfig, "nonexistentprofile", {
+                layerPath: MOCK_LAYER_PATH,
+                propertyPath: "properties.privateKey",
+                originalValue: EXAMPLE_PRIVATE_KEY_PATH,
+                commentText: EXAMPLE_PRIVATE_KEY_COMMENT,
+            });
+            expect(success).toBe(false);
+        });
+
+        it("should return false and log error when uncommentProperty throws", () => {
+            const badTeamConfig = {
+                api: {
+                    layers: {
+                        find: () => {
+                            throw new Error("Simulated error in layers.find");
+                        },
+                    },
+                },
+            } as any;
+
+            const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+            const success = ConfigFileUtils.getInstance().uncommentProperty(badTeamConfig, "testprofile", {
+                layerPath: MOCK_LAYER_PATH,
+                propertyPath: "properties.privateKey",
+                originalValue: EXAMPLE_PRIVATE_KEY_PATH,
+                commentText: EXAMPLE_PRIVATE_KEY_COMMENT,
+            });
+
+            expect(success).toBe(false);
+            expect(consoleErrorSpy).toHaveBeenCalledWith("Error uncommenting property:", expect.any(Error));
+            consoleErrorSpy.mockRestore();
+        });
     });
 
     describe("deleteCommentedLine", () => {
@@ -301,6 +339,31 @@ describe("ConfigFileUtils", () => {
                 invalidCommentInfo,
             );
             expect(success).toBe(false);
+        });
+
+        it("should return false and log error when deleteCommentedLine throws", () => {
+            const badTeamConfig = {
+                api: {
+                    layers: {
+                        find: () => {
+                            throw new Error("Simulated error in layers.find");
+                        },
+                    },
+                },
+            } as any;
+
+            const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+            const success = ConfigFileUtils.getInstance().deleteCommentedLine(badTeamConfig, "testprofile", {
+                layerPath: MOCK_LAYER_PATH,
+                propertyPath: "properties.privateKey",
+                originalValue: EXAMPLE_PRIVATE_KEY_PATH,
+                commentText: EXAMPLE_PRIVATE_KEY_COMMENT,
+            });
+
+            expect(success).toBe(false);
+            expect(consoleErrorSpy).toHaveBeenCalledWith("Error deleting comment lines:", expect.any(Error));
+            consoleErrorSpy.mockRestore();
         });
     });
 });

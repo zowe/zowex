@@ -13,23 +13,6 @@ import { readFileSync } from "node:fs";
 import { join, normalize, resolve } from "node:path";
 import { SshConfigUtils } from "../src/SshConfigUtils";
 
-vi.mock("node:os", () => ({
-    homedir: vi.fn(() => "/home/dir"),
-}));
-
-describe("findPrivateKeys", () => {
-    it("should find private keys in home directory", async () => {
-        const homeDir = "/home/dir";
-        const expected = [
-            resolve(join(homeDir, ".ssh", "id_ed25519")),
-            resolve(join(homeDir, ".ssh", "id_rsa")),
-            resolve(join(homeDir, ".ssh", "id_ecdsa")),
-            resolve(join(homeDir, ".ssh", "id_dsa")),
-        ];
-        expect(await SshConfigUtils.findPrivateKeys()).toStrictEqual(expected);
-    });
-});
-
 vi.mock("node:fs", () => ({
     accessSync: vi.fn(),
     readFileSync: vi.fn(),
@@ -50,6 +33,21 @@ describe("findPrivateKeys", () => {
             resolve(join(homeDir, ".ssh", "id_ecdsa")),
             resolve(join(homeDir, ".ssh", "id_dsa")),
         ];
+        expect(await SshConfigUtils.findPrivateKeys()).toStrictEqual(expected);
+    });
+
+    it("should ignore keys that are not readable/accessible", async () => {
+        const { accessSync } = await import("node:fs");
+        const mockAccessSync = accessSync as ReturnType<typeof vi.fn>;
+        mockAccessSync.mockImplementation((path: string) => {
+            if (path.endsWith("id_rsa")) {
+                return; // success
+            }
+            throw new Error("not accessible");
+        });
+
+        const homeDir = "/home/dir";
+        const expected = [resolve(join(homeDir, ".ssh", "id_rsa"))];
         expect(await SshConfigUtils.findPrivateKeys()).toStrictEqual(expected);
     });
 });
