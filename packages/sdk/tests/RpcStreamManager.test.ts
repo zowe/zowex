@@ -7,7 +7,6 @@
  *
  * Copyright Contributors to the Zowe Project.
  *
- * This test file covers the RpcStreamManager class.
  */
 
 import { PassThrough, Readable, Writable } from "node:stream";

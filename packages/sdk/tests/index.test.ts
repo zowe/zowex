@@ -7,7 +7,6 @@
  *
  * Copyright Contributors to the Zowe Project.
  *
- * This test file covers the index and utils exports.
  */
 
 import { describe, expect, it } from "vitest";

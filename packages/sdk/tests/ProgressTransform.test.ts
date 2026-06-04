@@ -7,7 +7,6 @@
  *
  * Copyright Contributors to the Zowe Project.
  *
- * This test file covers the ProgressTransform stream class.
  */
 
 import { pipeline, Readable, Writable } from "node:stream";

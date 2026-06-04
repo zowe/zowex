@@ -7,7 +7,6 @@
  *
  * Copyright Contributors to the Zowe Project.
  *
- * This test file covers the RpcClientApi abstract class.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
