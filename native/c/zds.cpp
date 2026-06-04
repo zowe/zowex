@@ -215,6 +215,10 @@ static int copy_sequential(ZDS *zds, const std::string &dsn1, const std::string 
   int rc = 0;
   std::vector<std::string> dds{};
 
+  fprintf(stderr, "[copy_sequential] src='%s' tgt='%s' replace=%d overwrite=%d target_exists=%d\n",
+          dsn1.c_str(), dsn2.c_str(), options->replace, options->overwrite, options->target_exists);
+  fflush(stderr);
+
   if (options->overwrite)
   {
     zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
@@ -234,6 +238,12 @@ static int copy_sequential(ZDS *zds, const std::string &dsn1, const std::string 
   dds.push_back("alloc dd(SYSUT2) da('" + dsn2 + "') shr");
   dds.push_back("alloc dd(SYSPRINT) new delete space(1,1) tracks recfm(f,b,a) lrecl(121) reuse");
   dds.push_back("alloc dd(SYSIN) dummy reuse");
+
+  for (const auto &dd : dds)
+  {
+    fprintf(stderr, "[copy_sequential] dd alloc: %s\n", dd.c_str());
+  }
+  fflush(stderr);
 
   rc = zut_loop_dynalloc(zds->diag, dds);
   if (rc != RTNCD_SUCCESS)
@@ -277,6 +287,12 @@ static int copy_partitioned(ZDS *zds, const ZDSTypeInfo &sourceInfo, const ZDSTy
 {
   bool sourceIsPds = sourceInfo.member_name.empty();
   bool targetIsPds = targetInfo.member_name.empty();
+
+  fprintf(stderr, "[copy_partitioned] src='%s' member='%s' tgt='%s' member='%s' replace=%d overwrite=%d target_exists=%d\n",
+          sourceInfo.base_dsn.c_str(), sourceInfo.member_name.c_str(),
+          targetInfo.base_dsn.c_str(), targetInfo.member_name.c_str(),
+          options->replace, options->overwrite, options->target_exists);
+  fflush(stderr);
 
   if (options->overwrite && !targetIsPds)
   {
@@ -333,6 +349,12 @@ static int copy_partitioned(ZDS *zds, const ZDSTypeInfo &sourceInfo, const ZDSTy
   dds.push_back("alloc dd(sysin) lrecl(80) recfm(f,b)");
   dds.push_back("alloc dd(sysprint) lrecl(121) recfm(f,b,a)");
 
+  for (const auto &dd : dds)
+  {
+    fprintf(stderr, "[copy_partitioned] dd alloc: %s\n", dd.c_str());
+  }
+  fflush(stderr);
+
   rc = zut_loop_dynalloc(zds->diag, dds);
   if (rc != RTNCD_SUCCESS)
     return RTNCD_FAILURE;
@@ -360,6 +382,9 @@ static int copy_partitioned(ZDS *zds, const ZDSTypeInfo &sourceInfo, const ZDSTy
       control_stmt = "  COPY OUTDD=SYSUT2,INDD=SYSUT1";
     }
   }
+
+  fprintf(stderr, "[copy_partitioned] IEBCOPY control:\n%s\n", control_stmt.c_str());
+  fflush(stderr);
 
   ZDSWriteOpts wopts{};
   wopts.zds = zds;

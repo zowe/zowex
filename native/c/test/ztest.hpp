@@ -241,6 +241,11 @@ private:
 #endif
     sigaction(SIGABRT, &sa, nullptr);
     sigaction(SIGILL, &sa, nullptr);
+    // Program checks (e.g. 0C4 protection exception) surface as these POSIX
+    // signals on z/OS UNIX; trap them so the runner recovers instead of dying.
+    sigaction(SIGSEGV, &sa, nullptr);
+    sigaction(SIGFPE, &sa, nullptr);
+    sigaction(SIGBUS, &sa, nullptr);
   }
 
   static void reset_signal_handlers(struct sigaction &sa)
@@ -252,6 +257,9 @@ private:
 #endif
     sigaction(SIGABRT, &sa, nullptr);
     sigaction(SIGILL, &sa, nullptr);
+    sigaction(SIGSEGV, &sa, nullptr);
+    sigaction(SIGFPE, &sa, nullptr);
+    sigaction(SIGBUS, &sa, nullptr);
   }
 
   static void setup_timeout_handler(struct sigaction &sa, struct sigaction &old_sa)
