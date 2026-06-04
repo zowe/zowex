@@ -365,5 +365,106 @@ describe("ConfigFileUtils", () => {
             expect(consoleErrorSpy).toHaveBeenCalledWith("Error deleting comment lines:", expect.any(Error));
             consoleErrorSpy.mockRestore();
         });
+
+        it("should return undefined in commentOutProperty when layerFromProfName is not found", () => {
+            const testConfig = createMockConfigWithPrivateKey();
+            const configWithNoLayer = createMockTeamConfig(testConfig);
+            configWithNoLayer.api.layers.find = vi.fn().mockReturnValue(undefined);
+
+            const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+            const result = ConfigFileUtils.getInstance().commentOutProperty(
+                configWithNoLayer,
+                "testprofile",
+                "privateKey",
+            );
+
+            expect(result).toBeUndefined();
+            expect(consoleWarnSpy).toHaveBeenCalledWith("Could not determine active config layer path");
+            consoleWarnSpy.mockRestore();
+        });
+
+        it("should unshift comment when comments array already exists in commentOutProperty", () => {
+            const testConfig = createMockConfigWithPrivateKey();
+            // Pre-initialize comments array
+            testConfig.properties.profiles.testprofile[AFTER_PROPERTIES_SYMBOL] = [
+                { type: "LineComment", value: " pre-existing comment", inline: false } as CommentToken,
+            ];
+            mockLayerJson = cloneDeep(testConfig);
+            mockLayerJson.properties.profiles.testprofile[AFTER_PROPERTIES_SYMBOL] =
+                testConfig.properties.profiles.testprofile[AFTER_PROPERTIES_SYMBOL];
+            mockTeamConfig = createMockTeamConfig(testConfig);
+
+            const result = ConfigFileUtils.getInstance().commentOutProperty(
+                mockTeamConfig,
+                "testprofile",
+                "privateKey",
+            );
+
+            expect(result).toBeDefined();
+            expect(writtenLayerJson).toBeDefined();
+            const comments = writtenLayerJson?.properties.profiles.testprofile[AFTER_PROPERTIES_SYMBOL];
+            expect(comments).toHaveLength(2);
+            expect(comments?.[0].value).toContain(EXAMPLE_PRIVATE_KEY_COMMENT);
+            expect(comments?.[1].value).toBe(" pre-existing comment");
+        });
+
+        it("should handle throw in commentOutProperty and return undefined", () => {
+            const badTeamConfig = {
+                api: {
+                    layers: {
+                        find: () => {
+                            throw new Error("Simulated find error");
+                        },
+                    },
+                },
+            } as any;
+
+            const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+            const result = ConfigFileUtils.getInstance().commentOutProperty(badTeamConfig, "testprofile", "privateKey");
+
+            expect(result).toBeUndefined();
+            expect(consoleErrorSpy).toHaveBeenCalled();
+            consoleErrorSpy.mockRestore();
+        });
+
+        it("should return early in removeCommentsInObject when comments are null", () => {
+            const obj = {};
+            // Call the private method directly
+            (ConfigFileUtils.getInstance() as any).removeCommentsInObject(
+                obj,
+                "some text",
+                ConfigFileUtils.AFTER_PROPERTIES_SYMBOL,
+            );
+            expect(obj[ConfigFileUtils.AFTER_PROPERTIES_SYMBOL]).toBeUndefined();
+        });
+
+        it("should retain other comments when matching comment is removed in removeCommentsInObject", () => {
+            const testConfig = createMockConfigWithCommentedKey();
+            // Add a second non-matching comment
+            testConfig.properties.profiles.testprofile[AFTER_PROPERTIES_SYMBOL]!.push({
+                type: "LineComment",
+                value: " another comment",
+                inline: false,
+            } as CommentToken);
+            mockLayerJson = cloneDeep(testConfig);
+            mockLayerJson.properties.profiles.testprofile[AFTER_PROPERTIES_SYMBOL] =
+                testConfig.properties.profiles.testprofile[AFTER_PROPERTIES_SYMBOL];
+            mockTeamConfig = createMockTeamConfig(testConfig);
+
+            const success = ConfigFileUtils.getInstance().uncommentProperty(mockTeamConfig, "testprofile", {
+                layerPath: MOCK_LAYER_PATH,
+                propertyPath: "properties.privateKey",
+                originalValue: EXAMPLE_PRIVATE_KEY_PATH,
+                commentText: EXAMPLE_PRIVATE_KEY_COMMENT,
+            });
+
+            expect(success).toBe(true);
+            expect(writtenLayerJson).toBeDefined();
+            const comments = writtenLayerJson?.properties.profiles.testprofile[AFTER_PROPERTIES_SYMBOL];
+            expect(comments).toHaveLength(1);
+            expect(comments?.[0].value).toBe(" another comment");
+        });
     });
 });

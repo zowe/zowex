@@ -437,8 +437,109 @@ describe("ZSshClient", () => {
             await expect(response).rejects.toBeDefined();
         });
 
+        it("should handle receiveStream and sendStream notifications and route them correctly", async () => {
+            const request: CommandRequest = { command: "ping" };
+            const fakeStdout = new EventEmitter();
+            const sshStream = { stdin: { write: vi.fn() }, stdout: fakeStdout, stderr: { on: vi.fn() } };
+            const client: ZSshClient = new (ZSshClient as any)();
+            const linkStreamMock = vi.fn();
+            (client as any).mStreamMgr = {
+                linkStreamToPromise: linkStreamMock,
+            };
+            (client as any).mSshStream = sshStream;
+            (client as any).getServerStatus(sshStream, readyMessage, "zowex server");
+
+            const responsePromise = client.request(request);
+
+            // Emit a receiveStream notification
+            const receiveStreamNotification = {
+                jsonrpc: "2.0",
+                method: "receiveStream",
+                params: { id: 1, pipePath: "/tmp/pipe" },
+            };
+            fakeStdout.emit("data", `${JSON.stringify(receiveStreamNotification)}\n`);
+            expect(linkStreamMock).toHaveBeenLastCalledWith(expect.any(Object), receiveStreamNotification, "GET");
+
+            // Emit a sendStream notification
+            const sendStreamNotification = {
+                jsonrpc: "2.0",
+                method: "sendStream",
+                params: { id: 1, pipePath: "/tmp/pipe" },
+            };
+            fakeStdout.emit("data", `${JSON.stringify(sendStreamNotification)}\n`);
+            expect(linkStreamMock).toHaveBeenLastCalledWith(expect.any(Object), sendStreamNotification, "PUT");
+
+            // Emit an unknown notification
+            const unknownNotification = {
+                jsonrpc: "2.0",
+                method: "unknownStream",
+                params: { id: 1, pipePath: "/tmp/pipe" },
+            };
+            const errHandlerMock = vi.fn();
+            (client as any).mErrHandler = errHandlerMock;
+            fakeStdout.emit("data", `${JSON.stringify(unknownNotification)}\n`);
+            expect(errHandlerMock).toHaveBeenCalled();
+
+            // Finally resolve the response to clean up
+            fakeStdout.emit("data", `${JSON.stringify(rpcResponseGood)}\n`);
+            await responsePromise;
+        });
+
+        it("should register a stream with a progressCallback but without contentLen", async () => {
+            const streamFn = () => new EventEmitter();
+            const request: CommandRequest = { command: "ping", stream: streamFn };
+            const fakeStdout = new EventEmitter();
+            const sshStream = { stdin: { write: vi.fn() }, stdout: fakeStdout, stderr: { on: vi.fn() } };
+            const client: ZSshClient = new (ZSshClient as any)();
+            const registerStreamMock = vi.fn();
+            (client as any).mStreamMgr = {
+                registerStream: registerStreamMock,
+            };
+            (client as any).mSshStream = sshStream;
+            (client as any).getServerStatus(sshStream, readyMessage, "zowex server");
+
+            const progressCallback = vi.fn();
+            const responsePromise = client.request(request, progressCallback);
+
+            expect(registerStreamMock).toHaveBeenCalledWith(expect.any(Object), streamFn, expect.any(Object), {
+                callback: progressCallback,
+                totalBytes: undefined,
+            });
+
+            // Clean up
+            fakeStdout.emit("data", `${JSON.stringify(rpcResponseGood)}\n`);
+            await responsePromise;
+        });
+
+        it("should register a stream with a progressCallback and with contentLen", async () => {
+            const streamFn = () => new EventEmitter();
+            const request: CommandRequest = { command: "ping", stream: streamFn, contentLen: 42 } as any;
+            const fakeStdout = new EventEmitter();
+            const sshStream = { stdin: { write: vi.fn() }, stdout: fakeStdout, stderr: { on: vi.fn() } };
+            const client: ZSshClient = new (ZSshClient as any)();
+            const registerStreamMock = vi.fn();
+            (client as any).mStreamMgr = {
+                registerStream: registerStreamMock,
+            };
+            (client as any).mSshStream = sshStream;
+            (client as any).getServerStatus(sshStream, readyMessage, "zowex server");
+
+            const progressCallback = vi.fn();
+            const responsePromise = client.request(request, progressCallback);
+
+            expect(registerStreamMock).toHaveBeenCalledWith(expect.any(Object), streamFn, expect.any(Object), {
+                callback: progressCallback,
+                totalBytes: 42,
+            });
+
+            // Clean up
+            fakeStdout.emit("data", `${JSON.stringify(rpcResponseGood)}\n`);
+            await responsePromise;
+        });
+
         it("should log message with default error handler", () => {
             const logErrorMock = vi.fn();
+            const consoleErrorMock = vi.spyOn(console, "error").mockImplementation(() => {});
             vi.spyOn(Logger, "getAppLogger").mockReturnValue({
                 error: logErrorMock,
             } as any);
@@ -446,6 +547,8 @@ describe("ZSshClient", () => {
             (ZSshClient as any).defaultErrHandler(testError);
             expect(logErrorMock).toHaveBeenCalledTimes(1);
             expect(logErrorMock.mock.calls[0][0]).toBe(`Error: ${testError.message}`);
+            expect(consoleErrorMock).toHaveBeenCalledTimes(1);
+            consoleErrorMock.mockRestore();
         });
     });
 

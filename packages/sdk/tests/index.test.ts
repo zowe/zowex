@@ -11,6 +11,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { B64String } from "../src/doc/types";
 import * as index from "../src/index";
 import * as utilsIndex from "../src/utils/index";
 
@@ -27,5 +28,19 @@ describe("index exports", () => {
 describe("utils index exports", () => {
     it("should export search parser", () => {
         expect(utilsIndex.parseSearchOutput).toBeDefined();
+    });
+});
+
+describe("B64String", () => {
+    it("should encode, decode and decodeBytes correctly", () => {
+        const input = "Hello mainframe!";
+        const encoded = B64String.encode(input);
+        expect(encoded).toBe(Buffer.from(input).toString("base64"));
+
+        const decoded = B64String.decode(encoded);
+        expect(decoded).toBe(input);
+
+        const decodedBytes = B64String.decodeBytes(encoded);
+        expect(decodedBytes).toEqual(Buffer.from(input));
     });
 });

@@ -398,5 +398,83 @@ describe("RpcStreamManager", () => {
 
             expect(rpcPromise.reject).toHaveBeenCalledWith(sshError);
         });
+
+        it("should propagate SSH exec errors in downloadStream", async () => {
+            const request: RpcRequest = {
+                jsonrpc: "2.0",
+                id: 7,
+                method: "readDataset",
+                params: { dsname: "USER.DATASET" },
+            };
+
+            const writeStream = new PassThrough();
+            streamManager.registerStream(request, () => writeStream);
+
+            const rpcPromise: RpcPromise = {
+                rpc: { id: 7, method: "readDataset", params: {} },
+                resolve: vi.fn(),
+                reject: vi.fn(),
+            };
+
+            const notif: RpcNotification = {
+                jsonrpc: "2.0",
+                method: "receiveStream",
+                params: { id: 7, pipePath: "/tmp/pipe_7" },
+            };
+
+            const sshError = new Error("SSH download connection lost");
+            mockSshClient.exec.mockImplementation((_, cb) => cb(sshError));
+
+            streamManager.linkStreamToPromise(rpcPromise, notif, "GET");
+
+            await rpcPromise.resolve({ success: true });
+
+            expect(rpcPromise.reject).toHaveBeenCalledWith(sshError);
+        });
+
+        it("should reject with generic mismatch message if resourceName is undefined", async () => {
+            const request: RpcRequest = {
+                jsonrpc: "2.0",
+                id: 8,
+                method: "readDataset",
+                params: {}, // No dsname or fspath
+            };
+
+            const writeStream = new PassThrough();
+            streamManager.registerStream(request, () => writeStream);
+
+            const rpcPromise: RpcPromise = {
+                rpc: { id: 8, method: "readDataset", params: {} },
+                resolve: vi.fn(),
+                reject: vi.fn(),
+            };
+
+            const notif: RpcNotification = {
+                jsonrpc: "2.0",
+                method: "receiveStream",
+                params: { id: 8, pipePath: "/tmp/pipe_8" },
+            };
+
+            const mockChannel = {
+                stdout: new PassThrough(),
+            };
+            mockSshClient.exec.mockImplementation((_, cb) => cb(null, mockChannel));
+
+            streamManager.linkStreamToPromise(rpcPromise, notif, "GET");
+
+            mockChannel.stdout.write(Buffer.from("Hello").toString("base64"));
+            mockChannel.stdout.end();
+
+            const response = {
+                success: true,
+                contentLen: 100,
+            };
+            await rpcPromise.resolve(response);
+
+            expect(rpcPromise.reject).toHaveBeenCalled();
+            const errorArg = rpcPromise.reject.mock.calls[0][0] as Error;
+            expect(errorArg.message).toContain("Content length mismatch");
+            expect(errorArg.message).not.toContain("for ");
+        });
     });
 });

@@ -94,7 +94,7 @@ describe("ZSshUtils", () => {
             const fastPutMock = vi.fn((_local: string, _remote: string, _opts: any, cb: (err?: Error) => void) => cb());
             const unlinkMock = vi.fn((_path: string, cb: (err?: Error) => void) => cb());
             const sftpMock = { fastPut: fastPutMock, unlink: unlinkMock };
-            const sshMock = { execCommand: vi.fn().mockResolvedValue({ code: 0, stdout: "", stderr: "" }) };
+            const sshMock = { execCommand: vi.fn().mockResolvedValue({ code: 0, stdout: "" }) };
             setupSftpMocks(sftpMock, sshMock);
 
             const result = await ZSshUtils.installServer(new SshSession(fakeSession), "~/.zowe-server");
@@ -127,9 +127,11 @@ describe("ZSshUtils", () => {
         });
 
         it("should return false when SFTP upload fails and no onError callback", async () => {
-            const fastPutMock = vi.fn((_local: string, _remote: string, _opts: any, cb: (err?: Error) => void) =>
-                cb(new Error("upload failed")),
-            );
+            const fastPutMock = vi.fn((_local: string, _remote: string, _opts: any, cb: (err?: Error) => void) => {
+                const err = new Error("upload failed");
+                (err as any).code = "PERMISSION_DENIED";
+                cb(err);
+            });
             const sftpMock = { fastPut: fastPutMock };
             const sshMock = { execCommand: vi.fn().mockResolvedValue({ code: 0, stdout: "", stderr: "" }) };
             setupSftpMocks(sftpMock, sshMock);
@@ -288,7 +290,7 @@ describe("ZSshUtils", () => {
                     if (callCount === 1) {
                         return { code: 1, stderr: "temporary error", stdout: "" };
                     }
-                    return { code: 0, stderr: "", stdout: "" };
+                    return { code: 0, stdout: "" };
                 }),
             };
             setupSftpMocks(sftpMock, sshMock, { mockGetBinDir: false, mockExistsSync: false });
@@ -297,6 +299,170 @@ describe("ZSshUtils", () => {
             await ZSshUtils.uninstallServer(new SshSession(fakeSession), "~/.zowe-server", { onError });
             expect(onError).toHaveBeenCalledOnce();
             expect(sshMock.execCommand).toHaveBeenCalledTimes(2);
+        });
+
+        it("should call onError when fastPut fails and handle retry if onError returns true", async () => {
+            let fastPutCallCount = 0;
+            const fastPutMock = vi.fn((_local: string, _remote: string, _opts: any, cb: (err?: Error) => void) => {
+                fastPutCallCount++;
+                if (fastPutCallCount === 1) {
+                    cb(new Error("fastPut temp error"));
+                } else {
+                    cb();
+                }
+            });
+            const unlinkMock = vi.fn((_path: string, cb: (err?: Error) => void) => cb());
+            const sftpMock = { fastPut: fastPutMock, unlink: unlinkMock };
+            const sshMock = { execCommand: vi.fn().mockResolvedValue({ code: 0, stdout: "", stderr: "" }) };
+            setupSftpMocks(sftpMock, sshMock);
+
+            const onError = vi.fn().mockResolvedValue(true);
+            const result = await ZSshUtils.installServer(new SshSession(fakeSession), "~/.zowe-server", { onError });
+            expect(result).toBe(true);
+            expect(onError).toHaveBeenCalledOnce();
+            expect(fastPutMock).toHaveBeenCalledTimes(2);
+        });
+
+        it("should return false when pax extraction fails and no onError callback is provided", async () => {
+            const fastPutMock = vi.fn((_local: string, _remote: string, _opts: any, cb: (err?: Error) => void) => cb());
+            const sftpMock = { fastPut: fastPutMock };
+            const sshMock = {
+                execCommand: vi.fn().mockImplementation(async (cmd) => {
+                    if (cmd.startsWith("pax")) {
+                        return { code: 1, stderr: "pax failed", stdout: "" };
+                    }
+                    return { code: 0, stderr: "", stdout: "" };
+                }),
+            };
+            setupSftpMocks(sftpMock, sshMock);
+
+            const result = await ZSshUtils.installServer(new SshSession(fakeSession), "~/.zowe-server");
+            expect(result).toBe(false);
+        });
+
+        it("should call onError when pax extraction fails and return false if onError returns false", async () => {
+            const fastPutMock = vi.fn((_local: string, _remote: string, _opts: any, cb: (err?: Error) => void) => cb());
+            const sftpMock = { fastPut: fastPutMock };
+            const sshMock = {
+                execCommand: vi.fn().mockImplementation(async (cmd) => {
+                    if (cmd.startsWith("pax")) {
+                        return { code: 1, stderr: "pax failed", stdout: "" };
+                    }
+                    return { code: 0, stderr: "", stdout: "" };
+                }),
+            };
+            setupSftpMocks(sftpMock, sshMock);
+
+            const onError = vi.fn().mockResolvedValue(false);
+            const result = await ZSshUtils.installServer(new SshSession(fakeSession), "~/.zowe-server", { onError });
+            expect(result).toBe(false);
+            expect(onError).toHaveBeenCalledOnce();
+        });
+
+        it("should call onError when pax extraction fails and continue if onError returns true", async () => {
+            const fastPutMock = vi.fn((_local: string, _remote: string, _opts: any, cb: (err?: Error) => void) => cb());
+            const unlinkMock = vi.fn((_path: string, cb: (err?: Error) => void) => cb());
+            const sftpMock = { fastPut: fastPutMock, unlink: unlinkMock };
+            const sshMock = {
+                execCommand: vi.fn().mockImplementation(async (cmd) => {
+                    if (cmd.startsWith("pax")) {
+                        return { code: 1, stderr: "pax failed", stdout: "" };
+                    }
+                    return { code: 0, stderr: "", stdout: "" };
+                }),
+            };
+            setupSftpMocks(sftpMock, sshMock);
+
+            const onError = vi.fn().mockResolvedValue(true);
+            const result = await ZSshUtils.installServer(new SshSession(fakeSession), "~/.zowe-server", { onError });
+            expect(result).toBe(true);
+            expect(onError).toHaveBeenCalledOnce();
+        });
+
+        it("should throw ImperativeError when password is expired during SFTP upload (fastPut)", async () => {
+            const expiredStderr =
+                "FOTS1668 WARNING: Your password has expired.\nFOTS1669 Password change required but no TTY available.";
+            const fastPutMock = vi.fn((_local: string, _remote: string, _opts: any, cb: (err?: Error) => void) =>
+                cb(new Error(expiredStderr)),
+            );
+            const sftpMock = { fastPut: fastPutMock };
+            const sshMock = { execCommand: vi.fn().mockResolvedValue({ code: 0, stdout: "", stderr: "" }) };
+            setupSftpMocks(sftpMock, sshMock);
+
+            await expect(ZSshUtils.installServer(new SshSession(fakeSession), "~/.zowe-server")).rejects.toMatchObject({
+                message: SshErrors.FOTS1668.summary,
+                errorCode: "EPASSWD_EXPIRED",
+            });
+        });
+
+        it("should return false when password is expired during upload and onError is provided", async () => {
+            const expiredStderr =
+                "FOTS1668 WARNING: Your password has expired.\nFOTS1669 Password change required but no TTY available.";
+            const fastPutMock = vi.fn((_local: string, _remote: string, _opts: any, cb: (err?: Error) => void) =>
+                cb(new Error(expiredStderr)),
+            );
+            const sftpMock = { fastPut: fastPutMock };
+            const sshMock = { execCommand: vi.fn().mockResolvedValue({ code: 0, stdout: "", stderr: "" }) };
+            setupSftpMocks(sftpMock, sshMock);
+
+            const onError = vi.fn().mockResolvedValue(false);
+            const result = await ZSshUtils.installServer(new SshSession(fakeSession), "~/.zowe-server", { onError });
+            expect(result).toBe(false);
+            expect(onError).toHaveBeenCalledOnce();
+        });
+
+        it("should throw ImperativeError when password is expired during PAX extraction", async () => {
+            const expiredStderr =
+                "FOTS1668 WARNING: Your password has expired.\nFOTS1669 Password change required but no TTY available.";
+            const fastPutMock = vi.fn((_local: string, _remote: string, _opts: any, cb: (err?: Error) => void) => cb());
+            const sftpMock = { fastPut: fastPutMock };
+            const sshMock = {
+                execCommand: vi.fn().mockImplementation(async (cmd) => {
+                    if (cmd.startsWith("pax")) {
+                        return { code: 1, stderr: expiredStderr, stdout: "" };
+                    }
+                    return { code: 0, stderr: "", stdout: "" };
+                }),
+            };
+            setupSftpMocks(sftpMock, sshMock);
+
+            await expect(ZSshUtils.installServer(new SshSession(fakeSession), "~/.zowe-server")).rejects.toMatchObject({
+                message: SshErrors.FOTS1668.summary,
+                errorCode: "EPASSWD_EXPIRED",
+            });
+        });
+
+        it("should return false when password is expired during PAX extraction and onError is provided", async () => {
+            const expiredStderr =
+                "FOTS1668 WARNING: Your password has expired.\nFOTS1669 Password change required but no TTY available.";
+            const fastPutMock = vi.fn((_local: string, _remote: string, _opts: any, cb: (err?: Error) => void) => cb());
+            const sftpMock = { fastPut: fastPutMock };
+            const sshMock = {
+                execCommand: vi.fn().mockImplementation(async (cmd) => {
+                    if (cmd.startsWith("pax")) {
+                        return { code: 1, stderr: expiredStderr, stdout: "" };
+                    }
+                    return { code: 0, stderr: "", stdout: "" };
+                }),
+            };
+            setupSftpMocks(sftpMock, sshMock);
+
+            const onError = vi.fn().mockResolvedValue(false);
+            const result = await ZSshUtils.installServer(new SshSession(fakeSession), "~/.zowe-server", { onError });
+            expect(result).toBe(false);
+            expect(onError).toHaveBeenCalledOnce();
+        });
+
+        it("should abort on uninstall when password is expired and routeExpiredPasswordError handles it with onError returning void", async () => {
+            const expiredStderr =
+                "FOTS1668 WARNING: Your password has expired.\nFOTS1669 Password change required but no TTY available.";
+            const sftpMock = {};
+            const sshMock = { execCommand: vi.fn().mockResolvedValue({ code: 1, stderr: expiredStderr, stdout: "" }) };
+            setupSftpMocks(sftpMock, sshMock, { mockGetBinDir: false, mockExistsSync: false });
+
+            const onError = vi.fn().mockResolvedValue(true);
+            await ZSshUtils.uninstallServer(new SshSession(fakeSession), "~/.zowe-server", { onError });
+            expect(onError).toHaveBeenCalledOnce();
         });
 
         it("should call onError when rm -rf fails during uninstall and throw rmErr if onError returns false", async () => {

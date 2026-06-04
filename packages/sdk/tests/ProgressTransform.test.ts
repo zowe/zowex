@@ -74,6 +74,20 @@ describe("ProgressTransform", () => {
         expect(transform.bytesProcessed).toBe(expectedBytes);
     });
 
+    it("should process string chunks with no encoding specified", async () => {
+        const transform = new ProgressTransform();
+        await new Promise<void>((resolve) => {
+            transform.write("Hello", () => resolve());
+        });
+        expect(transform.bytesProcessed).toBe(5);
+    });
+
+    it("should process string chunk with undefined encoding directly", () => {
+        const transform = new ProgressTransform();
+        transform._transform("hello", undefined as any, () => {});
+        expect(transform.bytesProcessed).toBe(5);
+    });
+
     it("should deduplicate progress callback calls when percentage does not change", async () => {
         const callback = vi.fn();
         const callbackInfo: CallbackInfo = { callback, totalBytes: 1000 };
@@ -113,6 +127,21 @@ describe("ProgressTransform", () => {
     it("should handle totalBytes of 0 without dividing by zero", async () => {
         const callback = vi.fn();
         const callbackInfo: CallbackInfo = { callback, totalBytes: 0 };
+        const transform = new ProgressTransform(callbackInfo);
+
+        await new Promise<void>((resolve) => {
+            transform.write(Buffer.alloc(10), () => resolve());
+        });
+
+        expect(transform.bytesProcessed).toBe(10);
+        // Should only be called once with 0 from constructor
+        expect(callback).toHaveBeenCalledTimes(1);
+        expect(callback).toHaveBeenCalledWith(0);
+    });
+
+    it("should handle CallbackInfo with undefined totalBytes", async () => {
+        const callback = vi.fn();
+        const callbackInfo: CallbackInfo = { callback };
         const transform = new ProgressTransform(callbackInfo);
 
         await new Promise<void>((resolve) => {

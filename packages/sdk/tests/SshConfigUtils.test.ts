@@ -209,4 +209,34 @@ Host server
         const result = await SshConfigUtils.migrateSshConfig();
         expect(result[0].handshakeTimeout).toBe(45000);
     });
+
+    it("should skip wildcard hosts containing * or ?", async () => {
+        const configContent = `
+Host *
+    HostName generic.com
+Host my?server
+    HostName specific.com
+Host normal
+    HostName normal.com
+`;
+        mockReadFileSync.mockReturnValue(configContent);
+
+        const result = await SshConfigUtils.migrateSshConfig();
+        expect(result).toHaveLength(1);
+        expect(result[0].name).toBe("normal");
+        expect(result[0].hostname).toBe("normal.com");
+    });
+
+    it("should parse IdentityFile using non-~ (absolute) path", async () => {
+        const configContent = `
+Host server
+    HostName example.com
+    IdentityFile /var/lib/ssh/key
+`;
+        mockReadFileSync.mockReturnValue(configContent);
+
+        const result = await SshConfigUtils.migrateSshConfig();
+        expect(result).toHaveLength(1);
+        expect(result[0].privateKey).toBe(normalize("/var/lib/ssh/key"));
+    });
 });
