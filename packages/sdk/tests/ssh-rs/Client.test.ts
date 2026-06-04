@@ -194,7 +194,7 @@ describe("Client", () => {
     it("should handle exec commands error when not connected", () => {
         const client = new Client();
         client.exec("whoami", (err, ch) => {
-            expect(err!.message).toBe("Not connected");
+            expect(err.message).toBe("Not connected");
             expect(ch).toBeUndefined();
         });
     });

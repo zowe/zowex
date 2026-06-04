@@ -443,7 +443,7 @@ describe("ConfigFileUtils", () => {
         it("should retain other comments when matching comment is removed in removeCommentsInObject", () => {
             const testConfig = createMockConfigWithCommentedKey();
             // Add a second non-matching comment
-            testConfig.properties.profiles.testprofile[AFTER_PROPERTIES_SYMBOL]!.push({
+            testConfig.properties.profiles.testprofile[AFTER_PROPERTIES_SYMBOL].push({
                 type: "LineComment",
                 value: " another comment",
                 inline: false,
