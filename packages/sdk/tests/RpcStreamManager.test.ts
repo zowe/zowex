@@ -13,7 +13,6 @@ import { PassThrough, Readable, Writable } from "node:stream";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CallbackInfo, RpcNotification, RpcPromise, RpcRequest } from "../src/doc";
 import { RpcStreamManager } from "../src/RpcStreamManager";
-import type { Client } from "../src/ssh-rs";
 
 describe("RpcStreamManager", () => {
     let mockSshClient: any;
@@ -23,7 +22,7 @@ describe("RpcStreamManager", () => {
         mockSshClient = {
             exec: vi.fn(),
         };
-        streamManager = new RpcStreamManager(mockSshClient as unknown as Client);
+        streamManager = new RpcStreamManager(mockSshClient);
     });
 
     describe("registerStream", () => {
