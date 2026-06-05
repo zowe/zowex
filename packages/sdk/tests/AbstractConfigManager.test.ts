@@ -13,7 +13,6 @@ import {
     ConfigBuilder,
     ConfigSchema,
     ConfigUtils,
-    type IProfileLoaded,
     type IProfileTypeConfiguration,
     type ProfileInfo,
 } from "@zowe/imperative";
@@ -27,6 +26,7 @@ import { AbstractConfigManager } from "../src/AbstractConfigManager";
 import { ConfigFileUtils } from "../src/ConfigFileUtils";
 import { type inputBoxOpts, MESSAGE_TYPE, type qpItem, type qpOpts } from "../src/doc";
 import { type ISshConfigExt, SshConfigUtils } from "../src/SshConfigUtils";
+import { migratedSshConfigs, migratedSshConfigsValidation, sshProfiles } from "./fixtures/sshConfigs.fixture";
 
 vi.mock("path", async (importOriginal) => {
     const actual = await importOriginal<typeof import("path")>();
@@ -56,71 +56,6 @@ vi.mock("@zowe/zowe-explorer-api", () => ({
         }),
     },
 }));
-
-const sshProfiles: IProfileLoaded[] = [
-    {
-        message: "",
-        name: "ssh1",
-        type: "ssh",
-        failNotFound: false,
-        profile: { host: "lpar1.com", port: 22, user: "zoweUser1", privateKey: "/path/to/id_rsa" },
-    },
-    {
-        message: "",
-        name: "ssh2",
-        type: "ssh",
-        failNotFound: false,
-        profile: { host: "lpar2.com", port: 22, user: "zoweUser2", password: "password" },
-    },
-];
-
-const migratedSshConfigs: ISshConfigExt[] = [
-    {
-        hostname: "lpar3.com",
-        name: "SSHlpar3",
-        port: 22,
-        privateKey: "/Users/users/.ssh/id_rsa",
-        user: "zoweUser3",
-    },
-    {
-        hostname: "lpar4.com",
-        name: "SSHlpar4",
-        port: 22,
-        privateKey: "/Users/users/.ssh/id_rsa",
-        user: "zoweUser4",
-    },
-];
-
-const migratedSshConfigsValidation: ISshConfigExt[] = [
-    {
-        hostname: "lpar3.com",
-        name: "SSHlpar3",
-        port: 22,
-        privateKey: "/Users/users/.ssh/id_rsa",
-        user: "zoweUser3",
-    },
-    {
-        hostname: "lpar4.com",
-        name: "SSHlpar4",
-        port: 22,
-        privateKey: "/Users/users/.ssh/id_rsa",
-        user: "zoweUser4",
-    },
-    {
-        hostname: "lpar1.com",
-        name: "SSHlpar4",
-        port: 22,
-        privateKey: "/Users/users/.ssh/id_rsa",
-        user: "user1",
-    },
-    {
-        hostname: "lpar1.com",
-        name: "SSHlpar4",
-        port: 22,
-        privateKey: "/Users/users/.ssh/id_rsa",
-        user: "user2",
-    },
-];
 
 export class TestAbstractConfigManager extends AbstractConfigManager {
     // All overridden methods are initialized as spies that do nothing
@@ -171,8 +106,8 @@ describe("AbstractConfigManager", async () => {
             const mockProfile = { attrs: "fake" };
             const mockMenuItems = [
                 { label: "$(plus) Add New SSH Host..." },
-                { description: "lpar1.com", label: "ssh1" },
-                { description: "lpar2.com", label: "ssh2" },
+                { description: "lpar1.com", label: "sshKey" },
+                { description: "lpar2.com", label: "sshBasic" },
                 { label: "Migrate From SSH Config", separator: true },
                 { description: "lpar3.com", label: "SSHlpar3" },
                 { description: "lpar4.com", label: "SSHlpar4" },
@@ -220,7 +155,7 @@ describe("AbstractConfigManager", async () => {
                 });
 
                 describe("profile validation", () => {
-                    const mockSelection = { description: "lpar1.com", label: "ssh1" };
+                    const mockSelection = { description: "lpar1.com", label: "sshKey" };
 
                     it("should set profile when validation passes with empty config", async () => {
                         vi.spyOn(testManager, "showCustomMenu").mockResolvedValueOnce(mockSelection);
@@ -230,7 +165,7 @@ describe("AbstractConfigManager", async () => {
                         await testManager.promptForProfile();
 
                         expect(validateSpy).toHaveBeenCalled();
-                        expect(setProfileSpy).toHaveBeenCalledWith({}, "ssh1");
+                        expect(setProfileSpy).toHaveBeenCalledWith({}, "sshKey");
                     });
 
                     it("should set profile when validation returns modified config", async () => {
@@ -244,7 +179,7 @@ describe("AbstractConfigManager", async () => {
 
                         expect(result).toBeDefined();
                         expect(validateSpy).toHaveBeenCalled();
-                        expect(setProfileSpy).toHaveBeenCalledWith(mockValidConfig, "ssh1");
+                        expect(setProfileSpy).toHaveBeenCalledWith(mockValidConfig, "sshKey");
                     });
 
                     it("should set profile and clear privateKey when validation returns password config", async () => {
@@ -264,7 +199,7 @@ describe("AbstractConfigManager", async () => {
                         expect(validateSpy).toHaveBeenCalled();
                         expect(sshProfiles[0].profile.privateKey).toBeUndefined();
                         expect(sshProfiles[0].profile.keyPassphrase).toBeUndefined();
-                        expect(setProfileSpy).toHaveBeenCalledWith(mockPasswordConfig, "ssh1");
+                        expect(setProfileSpy).toHaveBeenCalledWith(mockPasswordConfig, "sshKey");
 
                         // Restore for subsequent tests
                         sshProfiles[0].profile.privateKey = "/path/to/id_rsa";
@@ -521,7 +456,7 @@ describe("AbstractConfigManager", async () => {
                 });
 
                 it("should disable profile creation when disableCreateNewProfile is true", async () => {
-                    const showMenuSpy = vi.spyOn(testManager, "showMenu").mockResolvedValueOnce("ssh1");
+                    const showMenuSpy = vi.spyOn(testManager, "showMenu").mockResolvedValueOnce("sshKey");
                     const showCustomMenuSpy = vi.spyOn(testManager, "showCustomMenu");
                     vi.spyOn(testManager as any, "validateConfig").mockReturnValue({});
                     vi.spyOn(testManager as any, "setProfile").mockImplementation(() => {});
@@ -530,8 +465,8 @@ describe("AbstractConfigManager", async () => {
 
                     expect(showMenuSpy).toHaveBeenCalledWith({
                         items: [
-                            { description: "lpar1.com", label: "ssh1" },
-                            { description: "lpar2.com", label: "ssh2" },
+                            { description: "lpar1.com", label: "sshKey" },
+                            { description: "lpar2.com", label: "sshBasic" },
                         ],
                         placeholder: "Select configured SSH host",
                     });
@@ -547,8 +482,8 @@ describe("AbstractConfigManager", async () => {
                     expect(showCustomMenuSpy).toHaveBeenCalledWith({
                         items: [
                             { label: "$(plus) Add New SSH Host..." },
-                            { description: "lpar1.com", label: "ssh1" },
-                            { description: "lpar2.com", label: "ssh2" },
+                            { description: "lpar1.com", label: "sshKey" },
+                            { description: "lpar2.com", label: "sshBasic" },
                             { label: "Migrate From SSH Config", separator: true },
                             { description: "lpar3.com", label: "SSHlpar3" },
                             { description: "lpar4.com", label: "SSHlpar4" },

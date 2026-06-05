@@ -43,31 +43,35 @@ describe("ZSshUtils", () => {
             expect(readFileSyncSpy).not.toHaveBeenCalled();
         });
 
-        it("should return false for matching checksums with different order", async () => {
-            const readFileSyncSpy = vi.spyOn(fs, "readFileSync").mockReturnValueOnce("123 abc\n456 def");
-            const isOutdated = await ZSshUtils.checkIfOutdated({ def: "456", abc: "123" });
-            expect(isOutdated).toBe(false);
-            expect(readFileSyncSpy).toHaveBeenCalled();
-        });
-
-        it("should return true for different checksums", async () => {
-            const readFileSyncSpy = vi.spyOn(fs, "readFileSync").mockReturnValueOnce("123 abc\n456 def");
-            const isOutdated = await ZSshUtils.checkIfOutdated({ abc: "789", def: "456" });
-            expect(isOutdated).toBe(true);
-            expect(readFileSyncSpy).toHaveBeenCalled();
-        });
-
-        it("should return true for same checksums and local file added", async () => {
-            const readFileSyncSpy = vi.spyOn(fs, "readFileSync").mockReturnValueOnce("123 abc\n456 def\n789 ghi");
-            const isOutdated = await ZSshUtils.checkIfOutdated({ abc: "123", def: "456" });
-            expect(isOutdated).toBe(true);
-            expect(readFileSyncSpy).toHaveBeenCalled();
-        });
-
-        it("should return true for same checksums and local file removed", async () => {
-            const readFileSyncSpy = vi.spyOn(fs, "readFileSync").mockReturnValueOnce("123 abc");
-            const isOutdated = await ZSshUtils.checkIfOutdated({ abc: "123", def: "456" });
-            expect(isOutdated).toBe(true);
+        it.each([
+            {
+                desc: "matching checksums with different order",
+                fileContent: "123 abc\n456 def",
+                remote: { def: "456", abc: "123" },
+                expected: false,
+            },
+            {
+                desc: "different checksums",
+                fileContent: "123 abc\n456 def",
+                remote: { abc: "789", def: "456" },
+                expected: true,
+            },
+            {
+                desc: "same checksums and local file added",
+                fileContent: "123 abc\n456 def\n789 ghi",
+                remote: { abc: "123", def: "456" },
+                expected: true,
+            },
+            {
+                desc: "same checksums and local file removed",
+                fileContent: "123 abc",
+                remote: { abc: "123", def: "456" },
+                expected: true,
+            },
+        ])("should return $expected for $desc", async ({ fileContent, remote, expected }) => {
+            const readFileSyncSpy = vi.spyOn(fs, "readFileSync").mockReturnValueOnce(fileContent);
+            const isOutdated = await ZSshUtils.checkIfOutdated(remote);
+            expect(isOutdated).toBe(expected);
             expect(readFileSyncSpy).toHaveBeenCalled();
         });
     });
