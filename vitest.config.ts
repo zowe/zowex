@@ -31,7 +31,6 @@ export default defineConfig({
                 "**/*.test.ts",
                 "**/node_modules/**",
                 "**/*.js",
-                "**/ssh-rs/**",
             ],
         },
         include: ["tests/**/*.test.ts"],

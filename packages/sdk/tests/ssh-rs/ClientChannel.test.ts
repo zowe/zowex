@@ -38,7 +38,7 @@ describe("ClientChannel", () => {
 
         // Test stdin write (string chunk)
         await new Promise<void>((resolve, reject) => {
-            channel.stdin.write("test string", (err) => (err ? reject(err) : resolve()));
+            (channel.stdin as any)._write("test string", "utf8", (err: any) => (err ? reject(err) : resolve()));
         });
         expect(mockInner.write).toHaveBeenCalledWith(new Uint8Array(Buffer.from("test string")));
         expect(debugMock).toHaveBeenCalled();
@@ -52,7 +52,7 @@ describe("ClientChannel", () => {
 
         // Test stdin final / EOF
         await new Promise<void>((resolve, reject) => {
-            channel.stdin.end((err) => (err ? reject(err) : resolve()));
+            channel.stdin.end((err: unknown) => (err ? reject(err) : resolve()));
         });
         expect(mockInner.eof).toHaveBeenCalled();
     });
@@ -152,7 +152,11 @@ describe("ClientChannel", () => {
         const cleanupSpy = vi.spyOn(channel as any, "cleanup");
 
         mockInner.eof$.next();
-        expect(cleanupSpy).toHaveBeenCalled();
+        expect(cleanupSpy).toHaveBeenCalledTimes(1);
+
+        // Directly call cleanup a second time to cover the "if (this.ended) return;" branch
+        (channel as any).cleanup();
+        expect(cleanupSpy).toHaveBeenCalledTimes(2);
     });
 
     it("should handle remote closed and emit close", async () => {

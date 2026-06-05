@@ -76,17 +76,32 @@ describe("Client", () => {
             client.on("ready", resolve);
         });
 
+        const debugMock = vi.fn();
         client.connect({
             host: "test-host",
             port: 22,
             username: "user",
             password: "pwd",
+            debug: debugMock,
+            readyTimeout: 15000,
+            keepaliveInterval: 5000,
         });
 
         await readyPromise;
         expect(SshTransport.newSocket).toHaveBeenCalledWith("test-host:22");
         expect(SSHClient.connect).toHaveBeenCalled();
         expect(mockUnauthClient.authenticateWithPassword).toHaveBeenCalledWith("user", "pwd");
+
+        // Execute and verify the host key check callback for full coverage
+        const connectCall = vi.mocked(SSHClient.connect).mock.calls[0];
+        const verifyCallback = connectCall[1];
+        const mockKey = {
+            algorithm: () => "ssh-ed25519",
+            fingerprint: () => "SHA256:fingerprint_data",
+        };
+        const result = await verifyCallback(mockKey as any);
+        expect(result).toBe(true);
+        expect(debugMock).toHaveBeenCalledWith("russh: server key ssh-ed25519 fingerprint=SHA256:fingerprint_data");
     });
 
     it("should connect using privateKey successfully (string and buffer, with passphrase)", async () => {
@@ -237,6 +252,11 @@ describe("Client", () => {
         await closePromise;
 
         expect(mockAuthClient.disconnect).toHaveBeenCalled();
+
+        // Directly call emitClose a second time to cover the early return "if (this.closed) return;" branch
+        const emitCloseSpy = vi.spyOn(client as any, "emitClose");
+        (client as any).emitClose();
+        expect(emitCloseSpy).toHaveReturned();
     });
 
     it("should disconnect and emit close on disconnect$ event from server", async () => {
