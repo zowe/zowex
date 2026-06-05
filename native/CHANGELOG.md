@@ -6,7 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
-- `c`: Optimized Adler32 calculations to compute e-tags incrementally during streamed data set downloads. This significantly reduces memory footprint and resolves a failure when downloading large data sets.
+- `c`: Optimized Adler32 calculations to compute e-tags incrementally during streamed data set downloads. This significantly reduces memory footprint and resolves a failure when downloading large data sets. [#1016](https://github.com/zowe/zowex/issues/1016)
 - `c`: Added z/OS recovery around JES operations in the `zowex` CLI binary to allow recovering from abends. [#1011](https://github.com/zowe/zowex/pull/1011)
 - **Breaking:** `c`: Renamed C function `zjb_read_jobs_output_by_key` in zjb.hpp to `zjb_read_job_content_by_key` to be consistent with `zjb_read_job_content_by_dsn.
 - `c`: Fixes issue where `zowex` failed to allocate `sysout` DDs that were dynamically allocated under z/OS UNIX. [#840](https://github.com/zowe/zowex/issues/840)
