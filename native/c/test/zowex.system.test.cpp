@@ -338,7 +338,7 @@ void zowex_system_tests()
                   auto end_pos = stderr1.find("End: ");
                   Expect(end_pos).Not().ToBe(string::npos);
                   string end_date = stderr1.substr(end_pos + 5, 10);
-                  string end_time = stderr1.substr(end_pos + 13, 8);
+                  string end_time = stderr1.substr(end_pos + 16, 8);
 
                   string stdout2, stderr2;
                   rc = execute_command(zowex_command + " system view-syslog --date " + end_date + " --time " + end_time + " --max-lines 3", stdout2, stderr2);
