@@ -375,25 +375,13 @@ int zut_search(const std::string &parms)
 
 int zut_run(ZDIAG &diag, const std::string &program, const std::string &parms)
 {
-  // Flush before the call so this trace survives an abend (e.g. 0C4) in the loaded program.
-  fprintf(stderr, "[zut_run] invoking program='%s' parms='%s'\n", program.c_str(), parms.c_str());
-  fflush(stderr);
-  int rc = ZUTRUN(&diag, program.c_str(), parms.c_str());
-  fprintf(stderr, "[zut_run] program='%s' returned rc=%d\n", program.c_str(), rc);
-  fflush(stderr);
-  return rc;
+  return ZUTRUN(&diag, program.c_str(), parms.c_str());
 }
 
 int zut_run(const std::string &program)
 {
   ZDIAG diag{};
-  // Flush before the call so this trace survives an abend (e.g. 0C4) in the loaded program.
-  fprintf(stderr, "[zut_run] invoking program='%s' (no parms)\n", program.c_str());
-  fflush(stderr);
-  int rc = ZUTRUN(&diag, program.c_str(), nullptr);
-  fprintf(stderr, "[zut_run] program='%s' returned rc=%d\n", program.c_str(), rc);
-  fflush(stderr);
-  return rc;
+  return ZUTRUN(&diag, program.c_str(), nullptr);
 }
 
 unsigned char zut_get_key()

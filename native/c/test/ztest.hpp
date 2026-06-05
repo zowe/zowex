@@ -68,6 +68,18 @@ inline std::string get_indent(int level)
 inline void signal_handler(int code, siginfo_t *info, void *context);
 inline void timeout_handler(int sig);
 
+inline void register_sigactions(struct sigaction &sa)
+{
+#if defined(__MVS__)
+  sigaction(SIGABND, &sa, nullptr);
+#endif
+  sigaction(SIGABRT, &sa, nullptr);
+  sigaction(SIGBUS, &sa, nullptr);
+  sigaction(SIGFPE, &sa, nullptr);
+  sigaction(SIGILL, &sa, nullptr);
+  sigaction(SIGSEGV, &sa, nullptr);
+}
+
 // ANSI color codes
 struct Colors
 {
@@ -235,31 +247,14 @@ private:
     memset(&sa, 0, sizeof(struct sigaction));
     sa.sa_sigaction = signal_handler;
     sa.sa_flags = SA_SIGINFO;
-
-#if defined(__MVS__)
-    sigaction(SIGABND, &sa, nullptr);
-#endif
-    sigaction(SIGABRT, &sa, nullptr);
-    sigaction(SIGILL, &sa, nullptr);
-    // Program checks (e.g. 0C4 protection exception) surface as these POSIX
-    // signals on z/OS UNIX; trap them so the runner recovers instead of dying.
-    sigaction(SIGSEGV, &sa, nullptr);
-    sigaction(SIGFPE, &sa, nullptr);
-    sigaction(SIGBUS, &sa, nullptr);
+    register_sigactions(sa);
   }
 
   static void reset_signal_handlers(struct sigaction &sa)
   {
     sa.sa_flags = 0;
     sa.sa_handler = SIG_DFL;
-#if defined(__MVS__)
-    sigaction(SIGABND, &sa, nullptr);
-#endif
-    sigaction(SIGABRT, &sa, nullptr);
-    sigaction(SIGILL, &sa, nullptr);
-    sigaction(SIGSEGV, &sa, nullptr);
-    sigaction(SIGFPE, &sa, nullptr);
-    sigaction(SIGBUS, &sa, nullptr);
+    register_sigactions(sa);
   }
 
   static void setup_timeout_handler(struct sigaction &sa, struct sigaction &old_sa)
