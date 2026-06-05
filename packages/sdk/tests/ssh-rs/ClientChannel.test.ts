@@ -199,4 +199,13 @@ describe("ClientChannel", () => {
         mockInner.data$.complete();
         expect(stdoutCleanupSpy).toHaveBeenCalled();
     });
+
+    it("should complete stdout/stderr when extendedData$ completes", () => {
+        const mockInner = createMockInnerChannel();
+        const channel = new ClientChannel(mockInner as any);
+
+        const stdoutCleanupSpy = vi.spyOn(channel as any, "cleanup");
+        mockInner.extendedData$.complete();
+        expect(stdoutCleanupSpy).toHaveBeenCalled();
+    });
 });

@@ -694,6 +694,18 @@ describe("AbstractConfigManager", async () => {
             expect(showMessageMock).toHaveBeenCalled();
             expect(storeMock).not.toHaveBeenCalled();
         });
+
+        it("triggers input validation through validateInput option", async () => {
+            const showInputBoxSpy = vi.spyOn(testManager, "showInputBox").mockImplementation(async (opts) => {
+                if (opts?.validateInput) {
+                    opts.validateInput(" /valid/path ");
+                }
+                return defaultServerPath;
+            });
+            const result = await testManager.promptForDeployDirectory(host, defaultServerPath);
+            expect(result).toBe(defaultServerPath);
+            expect(showInputBoxSpy).toHaveBeenCalled();
+        });
     });
 
     describe("validateDeployPath", () => {
