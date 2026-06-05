@@ -70,6 +70,7 @@ void register_ds_commands(CommandDispatcher &dispatcher)
                               create_ds_builder(ds::handle_data_set_view)
                                   .validate<ReadDatasetRequest, ReadDatasetResponse>()
                                   .rename_arg("volume", "volser")
+                                  .rename_arg("returnEtag", "return-etag")
                                   .set_default("encoding", "IBM-1047")
                                   .read_stdout("data", true)
                                   .handle_fifo("stream", "pipe-path", FifoMode::GET));

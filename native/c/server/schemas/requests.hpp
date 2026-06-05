@@ -100,7 +100,8 @@ ZJSON_SCHEMA(ReadDatasetRequest,
     FIELD_OPTIONAL(encoding, STRING),
     FIELD_OPTIONAL(localEncoding, STRING),
     FIELD_OPTIONAL(volume, STRING),
-    FIELD_REQUIRED(dsname, STRING)
+    FIELD_REQUIRED(dsname, STRING),
+    FIELD_OPTIONAL(returnEtag, BOOL)
 );
 
 struct RestoreDatasetRequest {};

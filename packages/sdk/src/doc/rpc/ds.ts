@@ -156,6 +156,10 @@ export interface ReadDatasetRequest extends common.CommandRequest<"readDataset">
      * Stream to write contents to
      */
     stream?: () => Writable;
+    /**
+     * Whether to return the e-tag for the data set (optional)
+     */
+    returnEtag?: boolean;
 }
 
 export interface ReadDatasetResponse extends common.CommandResponse {
@@ -164,9 +168,9 @@ export interface ReadDatasetResponse extends common.CommandResponse {
      */
     encoding?: string;
     /**
-     * Returned e-tag for the data set
+     * Returned e-tag for the data set (optional)
      */
-    etag: string;
+    etag?: string;
     /**
      * Dataset contents (omitted if streaming)
      */
