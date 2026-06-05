@@ -190,7 +190,8 @@ int zjb_read_job_jcl(ZJB *zjb, const std::string &jobid, std::string &response)
 
 #define NUM_TEXT_UNITS 5
 
-static int zjb_read_job_dynamic_allocation(ZJB *zjb, std::string jobdsn, std::string &ddname)
+// Disable optimization for this function since `ibm-clang` -O2 removes required assignments.
+__attribute__((optnone)) static int zjb_read_job_dynamic_allocation(ZJB *zjb, std::string jobdsn, std::string &ddname)
 {
   int rc = 0;
 
@@ -246,7 +247,7 @@ static int zjb_read_job_dynamic_allocation(ZJB *zjb, std::string jobdsn, std::st
 
   if (use_stvsctkn)
   {
-    memcpy(&iazbtokp->btokiotp[0], &token31, 4);
+    memcpy(&iazbtokp->btokiotp[0], &token31, sizeof(token31));
   }
 
   memcpy(iazbtokp->btokpl3, &len, sizeof(len));
@@ -332,13 +333,6 @@ static int zjb_read_job_dynamic_allocation(ZJB *zjb, std::string jobdsn, std::st
   s99parms->__S99VERB = s99vrbal; // allocation
   s99parms->__S99FLAG1 = 0x4000;  // s99nocnv;
   s99parms->__S99TXTPP = s99tupl;
-
-  // NOTE(Kelosky): `ibm-clang` appears to optimize the previous assignments, so this approach is to
-  // force the compiler to not optimize the assignments.
-  unsigned char size = sizeof(__S99parms);
-  unsigned char verb = s99vrbal;
-  memcpy(&s99parms->__S99RBLN, &size, sizeof(size));
-  memcpy(&s99parms->__S99VERB, &verb, sizeof(verb));
 
   // s99parms->__S99S99X = s99parmsx; // TODO(Kelosky): reenable when we look at s99parmsx->__S99ENMSG and free
 
@@ -490,7 +484,7 @@ int zjb_read_job_content_by_dsn(ZJB *zjb, const std::string &dsn, std::string &r
   ZDS zds = {};
 
   std::string parsed_jobid;
-  int parsed_key;
+  int parsed_key = 0;
 
   // parse dsn for jobid and key - if found, attempt to get the token for the dsn
   memset(zjb->token, 0, sizeof(zjb->token));

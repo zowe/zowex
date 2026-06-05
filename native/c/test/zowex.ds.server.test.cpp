@@ -71,13 +71,14 @@ void zowex_ds_server_tests()
       });
 
       it("should properly copy a data set via RPC", [&]() -> void {
-        std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"copyDatasetOrMember\",\"params\":{\"source\":\"" + src_ds + "\",\"target\":\"" + dest_ds + "\"},\"id\":2}\n";
+        int req_id;
+        std::string request = make_rpc_request("copyDatasetOrMember", "{\"source\":\"" + src_ds + "\",\"target\":\"" + dest_ds + "\"}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
-        Expect(response).ToContain("\"id\":2");
+        Expect(response).ToContain("\"id\":" + std::to_string(req_id));
 
         // Verify destination data set exists
         std::string ls_response;
@@ -110,13 +111,14 @@ void zowex_ds_server_tests()
       });
 
       it("should properly create a data set via RPC", [&]() -> void {
-        std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"createDataset\",\"params\":{\"dsname\":\"" + ds_name + "\",\"attributes\":{\"dsorg\":\"PO\",\"recfm\":\"FB\",\"lrecl\":80,\"primary\":5,\"dirblk\":25}},\"id\":3}\n";
+        int req_id;
+        std::string request = make_rpc_request("createDataset", "{\"dsname\":\"" + ds_name + "\",\"attributes\":{\"dsorg\":\"PO\",\"recfm\":\"FB\",\"lrecl\":80,\"primary\":5,\"dirblk\":25}}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
-        Expect(response).ToContain("\"id\":3");
+        Expect(response).ToContain("\"id\":" + std::to_string(req_id));
 
         // Verify data set was created
         std::string ls_response;
@@ -138,13 +140,14 @@ void zowex_ds_server_tests()
       });
 
       it("should properly create VB data set with defaults via RPC", [&]() -> void {
-        std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"createDataset\",\"params\":{\"dsname\":\"" + ds_name + "\",\"attributes\":{\"dsorg\":\"PO\",\"recfm\":\"VB\",\"lrecl\":32756,\"primary\":5,\"dirblk\":25}},\"id\":4}\n";
+        int req_id;
+        std::string request = make_rpc_request("createDataset", "{\"dsname\":\"" + ds_name + "\",\"attributes\":{\"dsorg\":\"PO\",\"recfm\":\"VB\",\"lrecl\":32756,\"primary\":5,\"dirblk\":25}}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
-        Expect(response).ToContain("\"id\":4");
+        Expect(response).ToContain("\"id\":" + std::to_string(req_id));
       });
     });
 
@@ -161,13 +164,14 @@ void zowex_ds_server_tests()
       });
 
       it("should properly create FB data set with defaults via RPC", [&]() -> void {
-        std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"createDataset\",\"params\":{\"dsname\":\"" + ds_name + "\",\"attributes\":{\"dsorg\":\"PO\",\"recfm\":\"FB\",\"lrecl\":80,\"primary\":5,\"dirblk\":25}},\"id\":5}\n";
+        int req_id;
+        std::string request = make_rpc_request("createDataset", "{\"dsname\":\"" + ds_name + "\",\"attributes\":{\"dsorg\":\"PO\",\"recfm\":\"FB\",\"lrecl\":80,\"primary\":5,\"dirblk\":25}}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
-        Expect(response).ToContain("\"id\":5");
+        Expect(response).ToContain("\"id\":" + std::to_string(req_id));
       });
     });
 
@@ -184,13 +188,14 @@ void zowex_ds_server_tests()
       });
 
       it("should properly create loadlib data set with defaults via RPC", [&]() -> void {
-        std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"createDataset\",\"params\":{\"dsname\":\"" + ds_name + "\",\"attributes\":{\"dsorg\":\"PO\",\"recfm\":\"U\",\"lrecl\":0,\"primary\":5,\"dirblk\":25}},\"id\":6}\n";
+        int req_id;
+        std::string request = make_rpc_request("createDataset", "{\"dsname\":\"" + ds_name + "\",\"attributes\":{\"dsorg\":\"PO\",\"recfm\":\"U\",\"lrecl\":0,\"primary\":5,\"dirblk\":25}}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
-        Expect(response).ToContain("\"id\":6");
+        Expect(response).ToContain("\"id\":" + std::to_string(req_id));
       });
     });
 
@@ -214,13 +219,14 @@ void zowex_ds_server_tests()
 
       it("should properly create a member via RPC", [&]() -> void {
         std::string full_dsname = ds_name + "(" + member_name + ")";
-        std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"createMember\",\"params\":{\"dsname\":\"" + full_dsname + "\"},\"id\":7}\n";
+        int req_id;
+        std::string request = make_rpc_request("createMember", "{\"dsname\":\"" + full_dsname + "\"}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
-        Expect(response).ToContain("\"id\":7");
+        Expect(response).ToContain("\"id\":" + std::to_string(req_id));
 
         // Verify member exists
         std::string ls_response;
@@ -243,13 +249,14 @@ void zowex_ds_server_tests()
       });
 
       it("should properly create VB data set with defaults via RPC", [&]() -> void {
-        std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"createDataset\",\"params\":{\"dsname\":\"" + ds_name + "\",\"attributes\":{\"dsorg\":\"PO\",\"recfm\":\"VB\",\"lrecl\":255,\"primary\":5,\"dirblk\":25}},\"id\":8}\n";
+        int req_id;
+        std::string request = make_rpc_request("createDataset", "{\"dsname\":\"" + ds_name + "\",\"attributes\":{\"dsorg\":\"PO\",\"recfm\":\"VB\",\"lrecl\":255,\"primary\":5,\"dirblk\":25}}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
-        Expect(response).ToContain("\"id\":8");
+        Expect(response).ToContain("\"id\":" + std::to_string(req_id));
       });
     });
 
@@ -265,13 +272,14 @@ void zowex_ds_server_tests()
       });
 
       it("should properly delete a data set via RPC", [&]() -> void {
-        std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"deleteDataset\",\"params\":{\"dsname\":\"" + ds_name + "\"},\"id\":9}\n";
+        int req_id;
+        std::string request = make_rpc_request("deleteDataset", "{\"dsname\":\"" + ds_name + "\"}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
-        Expect(response).ToContain("\"id\":9");
+        Expect(response).ToContain("\"id\":" + std::to_string(req_id));
 
         // Verify data set no longer exists
         std::string ls_response;
@@ -288,13 +296,14 @@ void zowex_ds_server_tests()
       });
 
       it("should properly list data sets via RPC", [&]() -> void {
-        std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"listDatasets\",\"params\":{\"pattern\":\"" + ds_pattern + "\"},\"id\":10}\n";
+        int req_id;
+        std::string request = make_rpc_request("listDatasets", "{\"pattern\":\"" + ds_pattern + "\"}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
-        Expect(response).ToContain("\"id\":10");
+        Expect(response).ToContain("\"id\":" + std::to_string(req_id));
         Expect(response).ToContain("\"items\"");
       });
     });
@@ -319,13 +328,14 @@ void zowex_ds_server_tests()
       });
 
       it("should properly list data set members via RPC", [&]() -> void {
-        std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"listDsMembers\",\"params\":{\"dsname\":\"" + ds_name + "\"},\"id\":11}\n";
+        int req_id;
+        std::string request = make_rpc_request("listDsMembers", "{\"dsname\":\"" + ds_name + "\"}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
-        Expect(response).ToContain("\"id\":11");
+        Expect(response).ToContain("\"id\":" + std::to_string(req_id));
         Expect(response).ToContain("\"items\"");
         Expect(response).ToContain(member_name);
       });
@@ -351,13 +361,14 @@ void zowex_ds_server_tests()
       });
 
       it("should properly rename a data set via RPC", [&]() -> void {
-        std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"renameDataset\",\"params\":{\"dsnameBefore\":\"" + ds_before + "\",\"dsnameAfter\":\"" + ds_after + "\"},\"id\":12}\n";
+        int req_id;
+        std::string request = make_rpc_request("renameDataset", "{\"dsnameBefore\":\"" + ds_before + "\",\"dsnameAfter\":\"" + ds_after + "\"}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
-        Expect(response).ToContain("\"id\":12");
+        Expect(response).ToContain("\"id\":" + std::to_string(req_id));
 
         // Verify old name doesn't exist, new name does
         std::string ls_response;
@@ -390,13 +401,14 @@ void zowex_ds_server_tests()
       });
 
       it("should properly rename a member via RPC", [&]() -> void {
-        std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"renameMember\",\"params\":{\"dsname\":\"" + ds_name + "\",\"memberBefore\":\"" + member_before + "\",\"memberAfter\":\"" + member_after + "\"},\"id\":13}\n";
+        int req_id;
+        std::string request = make_rpc_request("renameMember", "{\"dsname\":\"" + ds_name + "\",\"memberBefore\":\"" + member_before + "\",\"memberAfter\":\"" + member_after + "\"}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
-        Expect(response).ToContain("\"id\":13");
+        Expect(response).ToContain("\"id\":" + std::to_string(req_id));
 
         // Verify old member doesn't exist, new member does
         std::string ls_response;
@@ -423,13 +435,14 @@ void zowex_ds_server_tests()
       });
 
       it("should properly restore/recall a data set via RPC", [&]() -> void {
-        std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"restoreDataset\",\"params\":{\"dsname\":\"" + ds_name + "\"},\"id\":14}\n";
+        int req_id;
+        std::string request = make_rpc_request("restoreDataset", "{\"dsname\":\"" + ds_name + "\"}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
-        Expect(response).ToContain("\"id\":14");
+        Expect(response).ToContain("\"id\":" + std::to_string(req_id));
       });
     });
 
@@ -451,13 +464,14 @@ void zowex_ds_server_tests()
       });
 
       it("should properly view/read a data set via RPC", [&]() -> void {
-        std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"readDataset\",\"params\":{\"dsname\":\"" + ds_name + "\"},\"id\":15}\n";
+        int req_id;
+        std::string request = make_rpc_request("readDataset", "{\"dsname\":\"" + ds_name + "\"}", req_id);
         
         write_to_server(server, request);
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
-        Expect(response).ToContain("\"id\":15");
+        Expect(response).ToContain("\"id\":" + std::to_string(req_id));
         Expect(response).ToContain("\"data\"");
       });
     });
@@ -480,22 +494,24 @@ void zowex_ds_server_tests()
 
       it("should properly write and read a data set via RPC", [&]() -> void {
         // Write operation: base64 encoded "Hello World!" is "SGVsbG8gV29ybGQh"
-        std::string write_req = "{\"jsonrpc\":\"2.0\",\"method\":\"writeDataset\",\"params\":{\"dsname\":\"" + ds_name + "\",\"data\":\"SGVsbG8gV29ybGQh\"},\"id\":16}\n";
+        int write_id;
+        std::string write_req = make_rpc_request("writeDataset", "{\"dsname\":\"" + ds_name + "\",\"data\":\"SGVsbG8gV29ybGQh\"}", write_id);
         
         write_to_server(server, write_req);
-        std::string write_resp = read_line_from_server(server);
+        std::string write_resp = read_rpc_response(server);
 
         Expect(write_resp).ToContain("\"success\":true");
-        Expect(write_resp).ToContain("\"id\":16");
+        Expect(write_resp).ToContain("\"id\":" + std::to_string(write_id));
         
         // Read operation: verify we get back the same base64 content
-        std::string read_req = "{\"jsonrpc\":\"2.0\",\"method\":\"readDataset\",\"params\":{\"dsname\":\"" + ds_name + "\"},\"id\":17}\n";
+        int read_id;
+        std::string read_req = make_rpc_request("readDataset", "{\"dsname\":\"" + ds_name + "\"}", read_id);
         
         write_to_server(server, read_req);
-        std::string read_resp = read_line_from_server(server);
+        std::string read_resp = read_rpc_response(server);
 
         Expect(read_resp).ToContain("\"success\":true");
-        Expect(read_resp).ToContain("\"id\":17");
+        Expect(read_resp).ToContain("\"id\":" + std::to_string(read_id));
         Expect(read_resp).ToContain("\"data\":");
         // Note: Data set may add trailing newline, so we check that data is returned
         // The returned base64 may be "SGVsbG8gV29ybGQhCg==" (with newline) instead of "SGVsbG8gV29ybGQh"
@@ -531,12 +547,13 @@ void zowex_ds_server_tests()
         std::thread writer;
         
         // RPC request with stream ID - set encoding to binary for simplicity
-        std::string request = "{\"jsonrpc\":\"2.0\",\"method\":\"writeDataset\",\"params\":{\"dsname\":\"" + ds_name + "\",\"stream\":" + std::to_string(stream_id) + ",\"encoding\":\"binary\"},\"id\":25}\n";
+        int req_id;
+        std::string request = make_rpc_request("writeDataset", "{\"dsname\":\"" + ds_name + "\",\"stream\":" + std::to_string(stream_id) + ",\"encoding\":\"binary\"}", req_id);
         
         write_to_server(server, request);
         
         // Read the sendStream notification to get the actual pipe path
-        std::string notification = read_line_from_server(server);
+        std::string notification = read_rpc_response(server);
         
         ExpectWithContext(notification, "Should be sendStream notification").ToContain("\"method\":\"sendStream\"");
         ExpectWithContext(notification, "Should have correct stream ID").ToContain("\"id\":" + std::to_string(stream_id));
@@ -550,20 +567,21 @@ void zowex_ds_server_tests()
         writer = start_pipe_writer_thread(pipe_path, encoded_payload);
         
         // Read the actual RPC response
-        std::string response = read_line_from_server(server);
+        std::string response = read_rpc_response(server);
         
         if (writer.joinable()) {
           writer.join();
         }
 
-        Expect(response).ToContain("\"id\":25");
+        Expect(response).ToContain("\"id\":" + std::to_string(req_id));
         Expect(response).ToContain("\"success\":true");
         
         // Verify the streamed data was written correctly
-        std::string read_request = "{\"jsonrpc\":\"2.0\",\"method\":\"readDataset\",\"params\":{\"dsname\":\"" + ds_name + "\"},\"id\":26}\n";
+        int read_id;
+        std::string read_request = make_rpc_request("readDataset", "{\"dsname\":\"" + ds_name + "\"}", read_id);
         
         write_to_server(server, read_request);
-        std::string read_response = read_line_from_server(server);
+        std::string read_response = read_rpc_response(server);
         
         Expect(read_response).ToContain("\"success\":true");
         ExpectWithContext(read_response, "Should contain streamed text").ToContain("SGVsbG8");
@@ -571,21 +589,22 @@ void zowex_ds_server_tests()
 
       it("should read via stream", [&]() -> void {
         std::string test_content = "U3RyZWFtIHJlYWQgdGVzdAo=";
-        std::string write_request = "{\"jsonrpc\":\"2.0\",\"method\":\"writeDataset\",\"params\":{\"dsname\":\"" + ds_name + "\",\"data\":\"" + test_content + "\"},\"id\":30}\n";
+        std::string write_request = make_rpc_request("writeDataset", "{\"dsname\":\"" + ds_name + "\",\"data\":\"" + test_content + "\"}");
         
         write_to_server(server, write_request);
-        std::string write_response = read_line_from_server(server);
+        std::string write_response = read_rpc_response(server);
         
         Expect(write_response).ToContain("\"success\":true");
 
         int stream_id = 200;
         
-        std::string read_request = "{\"jsonrpc\":\"2.0\",\"method\":\"readDataset\",\"params\":{\"dsname\":\"" + ds_name + "\",\"stream\":" + std::to_string(stream_id) + "},\"id\":31}\n";
+        int read_id;
+        std::string read_request = make_rpc_request("readDataset", "{\"dsname\":\"" + ds_name + "\",\"stream\":" + std::to_string(stream_id) + "}", read_id);
         
         write_to_server(server, read_request);
         
         // Read the receiveStream notification to get the actual pipe path
-        std::string notification = read_line_from_server(server);
+        std::string notification = read_rpc_response(server);
         Expect(notification).ToContain("\"method\":\"receiveStream\"");
         ExpectWithContext(notification, "Should have correct stream ID").ToContain("\"id\":" + std::to_string(stream_id));
         
@@ -598,18 +617,18 @@ void zowex_ds_server_tests()
         std::string file_content;
         std::thread reader = start_pipe_reader_thread(output_pipe, &file_content);
         
-        std::string read_response = read_line_from_server(server);
+        std::string read_response = read_rpc_response(server);
         
         // Wait for reader to complete
         reader.join();
 
-        Expect(read_response).ToContain("\"id\":31");
+        Expect(read_response).ToContain("\"id\":" + std::to_string(read_id));
 
         ExpectWithContext(file_content, "Streamed file should contain data").ToContain(test_content);
 
         ExpectWithContext(read_response, "Should be valid JSON-RPC response").ToContain("jsonrpc");
 
-        ExpectWithContext(read_response, "Read streaming RPC interface should be supported").ToContain("\"id\":31");
+        ExpectWithContext(read_response, "Read streaming RPC interface should be supported").ToContain("\"id\":" + std::to_string(read_id));
       });
     });
 
