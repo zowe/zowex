@@ -53,7 +53,7 @@ jobs:
                 user: "${{ secrets.SSH_MARIST_ZNP_ID }}"
                 password: "${{ secrets.SSH_MARIST_ZNP_PASS }}"
               deployDir: "/ZOWE/tmp/zowex"
-              preBuildCmd: "export PATH=/usr/lpp/IBM/cnw/v2r1/openxl/bin:$PATH"
+              preBuildCmd: "export PATH=/usr/lpp/IBM/cnw/v2r2/openxl/bin:$PATH"
           EOF
 
       - name: Install Dependencies
