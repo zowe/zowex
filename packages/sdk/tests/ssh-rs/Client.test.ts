@@ -62,6 +62,16 @@ describe("Client", () => {
         };
     });
 
+    const createAndConnectClient = async (options?: any) => {
+        const client = new Client();
+        mockUnauthClient.authenticateWithPassword.mockResolvedValue(mockAuthClient);
+        await new Promise<void>((resolve) => {
+            client.on("ready", resolve);
+            client.connect({ password: "pwd", ...options });
+        });
+        return client;
+    };
+
     it("should throw error if attempting to connect a closed client", () => {
         const client = new Client();
         (client as any).closed = true;
@@ -187,13 +197,7 @@ describe("Client", () => {
     });
 
     it("should handle exec commands correctly when connected", async () => {
-        const client = new Client();
-        mockUnauthClient.authenticateWithPassword.mockResolvedValue(mockAuthClient);
-
-        await new Promise<void>((resolve) => {
-            client.on("ready", resolve);
-            client.connect({ password: "pwd" });
-        });
+        const client = await createAndConnectClient();
 
         // Test exec
         const execPromise = new Promise<ClientChannel>((resolve, reject) => {
@@ -215,13 +219,7 @@ describe("Client", () => {
     });
 
     it("should handle exec errors in connect client", async () => {
-        const client = new Client();
-        mockUnauthClient.authenticateWithPassword.mockResolvedValue(mockAuthClient);
-
-        await new Promise<void>((resolve) => {
-            client.on("ready", resolve);
-            client.connect({ password: "pwd" });
-        });
+        const client = await createAndConnectClient();
 
         const testErr = new Error("exec fail");
         mockAuthClient.activateChannel.mockRejectedValueOnce(testErr);
@@ -236,13 +234,7 @@ describe("Client", () => {
     });
 
     it("should disconnect and emit close on end()", async () => {
-        const client = new Client();
-        mockUnauthClient.authenticateWithPassword.mockResolvedValue(mockAuthClient);
-
-        await new Promise<void>((resolve) => {
-            client.on("ready", resolve);
-            client.connect({ password: "pwd" });
-        });
+        const client = await createAndConnectClient();
 
         const closePromise = new Promise<void>((resolve) => {
             client.on("close", resolve);
@@ -260,13 +252,7 @@ describe("Client", () => {
     });
 
     it("should disconnect and emit close on disconnect$ event from server", async () => {
-        const client = new Client();
-        mockUnauthClient.authenticateWithPassword.mockResolvedValue(mockAuthClient);
-
-        await new Promise<void>((resolve) => {
-            client.on("ready", resolve);
-            client.connect({ password: "pwd" });
-        });
+        const client = await createAndConnectClient();
 
         const closePromise = new Promise<void>((resolve) => {
             client.on("close", resolve);
