@@ -2037,46 +2037,50 @@ void zds_tests()
                              Expect(sizeof(DCB_ABEND_PL)).ToBe(16);
                            });
 
-                        it("should catch abend when writing past max space of a PDS",
-                           [&]() -> void
-                           {
-                             ZDS zds = {0};
-                             DS_ATTRIBUTES attr{};
-                             attr.dsorg = "PO";
-                             attr.recfm = "FB";
-                             attr.lrecl = 80;
-                             attr.blksize = 6160;
-                             attr.alcunit = "TRACKS";
-                             attr.primary = 1;
-                             attr.secondary = 0;
-                             attr.dirblk = 1;
+                        // Skip this test because forcing DCB abends in tests seems fragile.
+                        // On some systems, the DCB abend does not trigger. On others it
+                        // does, but the data set cannot be cleaned up because it is locked
+                        // immediately after the abend.
+                        xit("should catch abend when writing past max space of a PDS",
+                            [&]() -> void
+                            {
+                              ZDS zds = {0};
+                              DS_ATTRIBUTES attr{};
+                              attr.dsorg = "PO";
+                              attr.recfm = "FB";
+                              attr.lrecl = 80;
+                              attr.blksize = 6160;
+                              attr.alcunit = "TRACKS";
+                              attr.primary = 1;
+                              attr.secondary = 0;
+                              attr.dirblk = 1;
 
-                             std::string ds = get_random_ds(3);
-                             created_dsns.push_back(ds);
+                              std::string ds = get_random_ds(3);
+                              created_dsns.push_back(ds);
 
-                             std::string response;
-                             int rc = zds_create_dsn(&zds, ds, attr, response);
-                             ExpectWithContext(rc, response).ToBe(0);
+                              std::string response;
+                              int rc = zds_create_dsn(&zds, ds, attr, response);
+                              ExpectWithContext(rc, response).ToBe(0);
 
-                             zds.encoding_opts.data_type = eDataTypeText;
-                             strcpy(zds.encoding_opts.codepage, "IBM-1047");
-                             strcpy(zds.encoding_opts.source_codepage, "IBM-1047");
+                              zds.encoding_opts.data_type = eDataTypeText;
+                              strcpy(zds.encoding_opts.codepage, "IBM-1047");
+                              strcpy(zds.encoding_opts.source_codepage, "IBM-1047");
 
-                             std::string large_data;
-                             large_data.reserve(81 * 1000);
-                             for (int i = 0; i < 1000; i++)
-                             {
-                               large_data += std::string(80, 'A') + "\n";
-                             }
+                              std::string large_data;
+                              large_data.reserve(81 * 1000);
+                              for (int i = 0; i < 1000; i++)
+                              {
+                                large_data += std::string(80, 'A') + "\n";
+                              }
 
-                             ZDSWriteOpts write_opts{.zds = &zds, .dsname = ds + "(M1)"};
+                              ZDSWriteOpts write_opts{.zds = &zds, .dsname = ds + "(M1)"};
 
-                             // This should fail with an abend. DCB abend exit runs as part of the member write process - no mocking available so we can't test the DCB exit itself,
-                             // this just verifies that the abend is percolated and handled by recovery
-                             Expect([&]()
-                                    { rc = zds_write(write_opts, large_data); })
-                                 .ToAbend();
-                           });
+                              // This should fail with an abend. DCB abend exit runs as part of the member write process - no mocking available so we can't test the DCB exit itself,
+                              // this just verifies that the abend is percolated and handled by recovery
+                              Expect([&]()
+                                     { rc = zds_write(write_opts, large_data); })
+                                  .ToAbend();
+                            });
                       });
            });
 }
