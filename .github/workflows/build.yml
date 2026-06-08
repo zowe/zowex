@@ -45,17 +45,17 @@ jobs:
           script: |
             const artifactName = "zowe-server-bin";
             const runId = process.env.RUN_ID;
-            const timeoutMs = 10 * 60 * 1000;
+            const timeoutMs = 30 * 60 * 1000;
             const intervalMs = 5 * 1000;
             const deadline = Date.now() + timeoutMs;
             let attempts = 0;
-            const isRunning = async () => {
+            const isCompleted = async () => {
               const { data: run } = await github.rest.actions.getWorkflowRun({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 run_id: runId,
               });
-              return run.status === "in_progress";
+              return run.status === "completed";
             };
             const hasArtifact = async () => {
               const { data } = await github.rest.actions.listWorkflowRunArtifacts({
@@ -67,7 +67,7 @@ jobs:
             };
             while (Date.now() < deadline) {
               core.info(`Checking for artifact "${artifactName}" (attempt ${++attempts})...`);
-              if (!(await isRunning())) {
+              if (await isCompleted()) {
                 core.setFailed(`z/OS build run ${runId} completed without producing "${artifactName}"`);
                 return;
               }
