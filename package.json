@@ -18,7 +18,7 @@
     "tools": "tsx scripts/buildTools.ts",
     "watch": "npm run watch --workspaces",
     "watch:all": "concurrently \"npm run z:watch\" \"npm run watch\"",
-    "z:all": "npm run z:rebuild && npm run z:test && npm run z:package",
+    "z:all": "npm run z:rebuild && npm run z:package && npm run z:test",
     "z:artifacts": "tsx scripts/buildTools.ts artifacts",
     "z:build": "tsx scripts/buildTools.ts build",
     "z:build:python": "tsx scripts/buildTools.ts build:python",

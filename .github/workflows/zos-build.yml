@@ -64,7 +64,7 @@ jobs:
         run: npm pkg set version=${{ inputs.version }}
 
       - name: Build on z/OS
-        run: npm run z:build && npm run z:package
+        run: npm run z:rebuild && npm run z:package
 
       - uses: actions/upload-artifact@v4
         with:
