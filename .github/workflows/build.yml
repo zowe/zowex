@@ -66,7 +66,7 @@ jobs:
               return data.artifacts.some((a) => a.name === artifactName);
             };
             while (Date.now() < deadline) {
-              core.info(`Checking for artifact "${artifactName}" (attempt ${++attempts})...`);
+              core.info(`Checking for artifact "${artifactName}" (attempt ${++attempts} of ${Math.ceil(timeoutMs / intervalMs)})...`);
               if (await isCompleted()) {
                 core.setFailed(`z/OS build run ${runId} completed without producing "${artifactName}"`);
                 return;
