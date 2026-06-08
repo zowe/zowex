@@ -181,7 +181,7 @@ int handle_system_view_syslog(InvocationContext &context)
     }
     strftime(buf, sizeof(buf), "%Y-%m-%d", tm_start);
     date_value = buf;
-    strftime(buf, sizeof(buf), "%H:%M:%S.00", tm_start);
+    strftime(buf, sizeof(buf), "%H:%M:%S", tm_start);
     time_value = buf;
   }
   else
