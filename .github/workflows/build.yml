@@ -44,6 +44,7 @@ jobs:
         with:
           script: |
             const artifactName = "zowe-server-bin";
+            const runId = process.env.RUN_ID;
             const timeoutMs = 10 * 60 * 1000;
             const intervalMs = 5 * 1000;
             const deadline = Date.now() + timeoutMs;
