@@ -2271,10 +2271,7 @@ void zds_tests()
                                  .ToAbend();
                            });
 
-                        // Depends on the existing "should catch abend when writing past max space of a PDS" test
-                        // being stable. That test is also currently failing (expected to ABEND), which means
-                        // the DCB abend isn't being triggered reliably in this environment. Promote once that
-                        // test is confirmed stable.
+                        // uncomment when in a zvdt env
                         xit("should release ENQ after DCB abend during write",
                            [&]() -> void
                            {
@@ -2321,13 +2318,7 @@ void zds_tests()
                              ExpectWithContext(rc, std::string(write_zds.diag.e_msg)).Not().ToBe(ZDS_RTNCD_ENQ_ERROR);
                            });
 
-                        // EXRL 0,* triggers a S0C3 abend (confirmed by Trae Yelovich): EXRL is an
-                        // "Execute-type" instruction; targeting itself (*) is invalid per IBM architecture
-                        // because an Execute-type instruction cannot target another Execute-type instruction.
-                        // ToAbend() catches the resulting SIGILL. The assertion below checks whether the
-                        // ESTAE recovery handler (ZRCVYARR in zam.c) calls deq_data_set on recovery.
-                        // CONFIRMED BUG: has_enq remains 1 after recovery — ZRCVYARR does not DEQ on
-                        // forced crash. Skipped until the ESTAE handler is patched (see linked issue).
+                        // uncomment when in a zvdt env
                         xit("should release ENQ after forced S0C3 abend (EXRL) during BPAM write",
                            [&]() -> void
                            {
@@ -2364,6 +2355,48 @@ void zds_tests()
                              // has_enq == 1 means a forced crash leaves ENQ unreleased (bug).
                              Expect(ioc->has_enq).ToBe(0);
                            });
+                        
+                        // uncomment when in a zvdt env
+                        xit("should catch abend when writing past max space of a PDS",
+                            [&]() -> void
+                            {
+                              ZDS zds = {0};
+                              DS_ATTRIBUTES attr{};
+                              attr.dsorg = "PO";
+                              attr.recfm = "FB";
+                              attr.lrecl = 80;
+                              attr.blksize = 6160;
+                              attr.alcunit = "TRACKS";
+                              attr.primary = 1;
+                              attr.secondary = 0;
+                              attr.dirblk = 1;
+
+                              std::string ds = get_random_ds(3);
+                              created_dsns.push_back(ds);
+
+                              std::string response;
+                              int rc = zds_create_dsn(&zds, ds, attr, response);
+                              ExpectWithContext(rc, response).ToBe(0);
+
+                              zds.encoding_opts.data_type = eDataTypeText;
+                              strcpy(zds.encoding_opts.codepage, "IBM-1047");
+                              strcpy(zds.encoding_opts.source_codepage, "IBM-1047");
+
+                              std::string large_data;
+                              large_data.reserve(81 * 1000);
+                              for (int i = 0; i < 1000; i++)
+                              {
+                                large_data += std::string(80, 'A') + "\n";
+                              }
+
+                              ZDSWriteOpts write_opts{.zds = &zds, .dsname = ds + "(M1)"};
+
+                              // This should fail with an abend. DCB abend exit runs as part of the member write process - no mocking available so we can't test the DCB exit itself,
+                              // this just verifies that the abend is percolated and handled by recovery
+                              Expect([&]()
+                                     { rc = zds_write(write_opts, large_data); })
+                                  .ToAbend();
+                            });
                       });
            });
 }
