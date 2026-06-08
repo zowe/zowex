@@ -2388,6 +2388,7 @@ bool is_match(const char *s, const char *p)
  */
 static bool is_valid_ispf_stats(const ISPF_STATS *stats, int user_data_len)
 {
+  // https://www.ibm.com/docs/en/zos/3.2.0?topic=di-ispf-statistics-entry-in-pds-directory
   bool is_extended = (stats->flags & 0x20) != 0;
   bool is_valid = false;
 
@@ -2404,7 +2405,7 @@ static bool is_valid_ispf_stats(const ISPF_STATS *stats, int user_data_len)
   // 2. Century indicators must be valid (1900s - 0x00 or 2000s - 0x01)
   if (stats->created_date_century > 0x01 || stats->modified_date_century > 0x01)
   {
-    is_valid = false;
+    return false;
   }
 
   return is_valid;
