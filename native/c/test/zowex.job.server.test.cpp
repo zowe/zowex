@@ -124,6 +124,7 @@ void zowex_job_server_tests()
       write_to_server(server, request);
       std::string response = read_rpc_response(server);
 
+      
       Expect(response).ToContain("\"success\":true");
       Expect(response).ToContain("\"id\":" + std::to_string(req_id));
       Expect(response).ToContain(active_jobid);
