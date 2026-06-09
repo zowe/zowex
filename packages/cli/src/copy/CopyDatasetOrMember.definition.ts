@@ -24,7 +24,7 @@ export const CopyDatasetOrMemberDefinition: ICommandDefinition = {
             options: "'ibmuser.test.cntl' 'ibmuser.backup.cntl'",
         },
         {
-            description: "Copy a data    set with replace option",
+            description: "Copy a data set with replace option",
             options: "'ibmuser.test.cntl' 'ibmuser.backup.cntl' --replace",
         },
         {
