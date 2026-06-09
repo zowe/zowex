@@ -77,7 +77,7 @@ jobs:
               }
               await new Promise((r) => setTimeout(r, intervalMs));
             }
-            core.setFailed(`Timed out after 10 minutes waiting for "${artifactName}"`);
+            core.setFailed(`Timed out after ${Math.round(timeoutMs / 60000)} minutes waiting for "${artifactName}"`);
 
       - name: Download server PAX into SDK bin
         if: ${{ matrix.os == 'ubuntu' }}
