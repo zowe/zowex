@@ -99,7 +99,7 @@ static int enq_data_set(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
   int rc = 0;
   QNAME qname = {0};
   RNAME rname = {0};
-  strcpy(qname.value, "SPFEDIT ");
+  memcpy(qname.value, "SPFEDIT ", sizeof(qname.value));
   rname.rlen = sprintf(rname.value, "%.*s%.*s", sizeof(ioc->jfcb.jfcbdsnm), ioc->jfcb.jfcbdsnm, sizeof(ioc->jfcb.jfcbelnm), ioc->jfcb.jfcbelnm);
   rc = enq(&qname, &rname);
 
