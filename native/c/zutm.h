@@ -15,6 +15,7 @@
 #include "ztype.h"
 #include "zprmtype.h"
 #include "iefjsqry.h"
+#include "csvapfaa.h"
 
 #if defined(__cplusplus) && defined(__MVS__)
 extern "OS"
@@ -150,7 +151,26 @@ extern "C"
   int ZUTRUN(ZDIAG *, const char *, const char *);
   void ZUTDBGMG(const char *);
   unsigned char ZUTMGKEY();
+
+  /**
+   * @brief Query the APF list
+   * @param diag The diagnostic structure
+   * @param answer The answer structure
+   * @param answer_len The length of the answer
+   * @param rsn The reason code
+   * @return The return code from the service
+   */
+  int ZUTMAPFQ(ZDIAG *, struct apfhdr *, int *, int *);
+
+  /**
+   * @brief List the PLIB datasets
+   * @param diag The diagnostic structure
+   * @param num_dsns The number of datasets
+   * @param dsns The datasets
+   * @return The return code from the service
+   */
   int ZUTMLPLB(ZDIAG *, int *, PARMLIB_DSNS *);
+
   int ZUTSSIQ(ZDIAG *, JQRY_HEADER **, const char *filter);
   int ZUTCVTD(const char *ptr, char *time_out);
   int ZUTNOAUT();

@@ -382,6 +382,14 @@ int zut_loop_dynalloc(ZDIAG &diag, const std::vector<std::string> &list);
 int zut_free_dynalloc_dds(ZDIAG &diag, const std::vector<std::string> &list);
 
 /**
+ * @brief List APF using ZUTMAPFQ
+ * @param diag Reference to diagnostic information structure
+ * @param apf Reference to vector of APF names
+ * @return Return code (0 for success, non-zero for error)
+ */
+int zut_list_apf(ZDIAG &diag, std::vector<std::pair<std::string, std::string>> &apf);
+
+/**
  * @brief List a parmlib
  * @param diag Reference to diagnostic information structure
  * @param parmlibs Reference to vector of parmlib names

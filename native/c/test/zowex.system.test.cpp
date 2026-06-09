@@ -37,6 +37,18 @@ void zowex_system_tests()
                   ExpectWithContext(rc, response).ToBeGreaterThanOrEqualTo(0);
                 });
            });
+  describe("list-apf tests",
+           [&]() -> void
+           {
+             it("should list apf",
+                []()
+                {
+                  int rc = 0;
+                  string response;
+                  rc = execute_command_with_output(zowex_command + " system list-apf", response);
+                  ExpectWithContext(rc, response).ToBeGreaterThanOrEqualTo(0);
+                });
+           });
   describe("list-subsystems tests",
            [&]() -> void
            {
@@ -326,7 +338,7 @@ void zowex_system_tests()
                   auto end_pos = stderr1.find("End: ");
                   Expect(end_pos).Not().ToBe(string::npos);
                   string end_date = stderr1.substr(end_pos + 5, 10);
-                  string end_time = stderr1.substr(end_pos + 16, 11);
+                  string end_time = stderr1.substr(end_pos + 16, 8);
 
                   string stdout2, stderr2;
                   rc = execute_command(zowex_command + " system view-syslog --date " + end_date + " --time " + end_time + " --max-lines 3", stdout2, stderr2);

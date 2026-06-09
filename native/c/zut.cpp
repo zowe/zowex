@@ -35,7 +35,9 @@
 #include <spawn.h>
 #include <sys/wait.h>
 #include <poll.h>
+#include <stdlib.h>
 #include <_Nascii.h>
+#include "csvapfaa.h"
 #include "iefjsqry.h"
 
 void zut_strip_final_newline(std::string &input)
@@ -667,6 +669,50 @@ int zut_list_subsystems(ZDIAG &diag, std::vector<std::string> &subsystems, std::
 
   ZUTMSREL(&area->jqrylen, area);
 
+  return rc;
+}
+
+int zut_list_apf(ZDIAG &diag, std::vector<std::pair<std::string, std::string>> &apf)
+{
+  int rc = 0;
+  int size = sizeof(struct apfhdr);
+  struct apfhdr *answer_fixed = (struct apfhdr *)__malloc31(size);
+  int answer_len = size;
+  int rsn = 0;
+  rc = ZUTMAPFQ(&diag, answer_fixed, &answer_len, &rsn);
+  if (0 != rc)
+  {
+    if (csvapfrsnnotalldatareturned == rsn)
+    {
+      int needed_len = answer_fixed->apfhtlen;
+      struct apfhdr *answer_dynamic = (struct apfhdr *)__malloc31(needed_len);
+      rc = ZUTMAPFQ(&diag, answer_dynamic, &needed_len, &rsn);
+
+      if (0 != rc)
+      {
+        free(answer_fixed);
+        free(answer_dynamic);
+        return rc;
+      }
+
+      struct apfe *apfe = (struct apfe *)((unsigned char *)answer_dynamic + answer_dynamic->apfhoff);
+      for (int i = 0; i < answer_dynamic->apfh_n_rec; i++)
+      {
+        std::string dsn = std::string((char *)apfe->apfedsname, apfe->apfedslen);
+        std::string volume = std::string((char *)apfe->apfevolume, sizeof(apfe->apfevolume));
+        apf.push_back(std::make_pair(dsn, volume));
+        apfe = (struct apfe *)((unsigned char *)apfe + apfe->apfelen);
+      }
+      free(answer_dynamic);
+    }
+    else
+    {
+      free(answer_fixed);
+      return rc;
+    }
+  }
+
+  free(answer_fixed);
   return rc;
 }
 

@@ -21,7 +21,9 @@
 #include "zam.h"
 #include "zuttype.h"
 #include "zssi.h"
+#include "csvapfaa.h"
 #include "zwto.h"
+#include "zdbg.h"
 
 #define ZUT_BPXWDYN_SERVICE_FAILURE -2
 
@@ -386,6 +388,29 @@ int ZUTEDSCT()
   p.len = sprintf(p.parms, "%.100s", "PPCOND,EQUATE(DEF),BITF0XL,HDRSKIP,UNIQ,LP64,LEGACY,SECT(ALL)");
   rc = convert(&p);
   delete_module("CCNEDSCT");
+  return rc;
+}
+
+#pragma prolog(ZUTMAPFQ, " ZWEPROLG NEWDSA=(YES,8) ")
+#pragma epilog(ZUTMAPFQ, " ZWEEPILG ")
+int ZUTMAPFQ(ZDIAG *diag, struct apfhdr *answer, int *answer_len, int *rsn) //, int *num_dsns, PARMLIB_DSNS *dsns)
+{
+  int rsn31 = 0;
+  int rc = 0;
+  int answer_len31 = *answer_len;
+
+  rc = zutm1apf(answer, &answer_len31, &rsn31);
+  *rsn = (rsn31 & 0x0000FFFF);
+
+  if (0 != rc)
+  {
+    ZDIAG_SET_MSG(diag, "CSVAPF failed with return code '%d' and reason code '%x'", rc, *rsn);
+    diag->detail_rc = ZUT_RTNCD_SERVICE_FAILURE;
+    diag->service_rc = rc;
+    diag->service_rsn = *rsn;
+    return RTNCD_FAILURE;
+  }
+
   return rc;
 }
 
