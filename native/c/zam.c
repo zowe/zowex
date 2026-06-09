@@ -64,7 +64,7 @@ static int handle_dcb_abend(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc, const char *P
     {
       strcpy(diag->service_name, operation);
       ZDIAG_SET_MSG(diag, "DCB abend during %.16s for %8.8s data set: %44.44s",
-                                operation, ioc->ddname, ioc->jfcb.jfcbdsnm);
+                    operation, ioc->ddname, ioc->jfcb.jfcbdsnm);
       diag->detail_rc = ZDS_RTNCD_DCB_ABEND_ERROR;
     }
     return RTNCD_FAILURE;
@@ -99,7 +99,7 @@ static int enq_data_set(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
   int rc = 0;
   QNAME qname = {0};
   RNAME rname = {0};
-  strcpy(qname.value, "SPFEDIT");
+  memcpy(qname.value, "SPFEDIT ", sizeof(qname.value));
   rname.rlen = sprintf(rname.value, "%.*s%.*s", sizeof(ioc->jfcb.jfcbdsnm), ioc->jfcb.jfcbdsnm, sizeof(ioc->jfcb.jfcbelnm), ioc->jfcb.jfcbelnm);
   rc = enq(&qname, &rname);
 
