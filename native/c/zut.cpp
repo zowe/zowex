@@ -456,7 +456,7 @@ void zut_set_dd_with_padding(char arr[8], const char *ddname)
   if (ddname && ddname[0] != '\0')
   {
     memset(arr, ' ', 8); // Pad with spaces for standard DD format
-    unsigned long int len = strlen(ddname);
+    size_t len = strnlen(ddname, 8);
     memcpy(arr, ddname, len > 8 ? 8 : len);
   }
   else
