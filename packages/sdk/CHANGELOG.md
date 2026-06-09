@@ -7,6 +7,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## Recent Changes
 
 - Added support for viewing syslog.
+- Added response content for copy data sets and members operations. [#995](https://github.com/zowe/zowex/pull/995)
 
 ## `0.6.0`
 
