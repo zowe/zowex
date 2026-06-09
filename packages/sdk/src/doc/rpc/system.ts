@@ -62,3 +62,40 @@ export interface ViewSyslogResponse extends common.CommandResponse {
      */
     hasMore?: boolean;
 }
+
+export interface ListProclibRequest extends common.CommandRequest<"listProclib"> {}
+
+export interface ListProclibResponse extends common.CommandResponse {
+    /**
+     * List of proclib data set names.
+     */
+    items: string[];
+    /**
+     * Number of rows returned.
+     */
+    returnedRows: number;
+}
+
+export interface ListApfRequest extends common.CommandRequest<"listApf"> {}
+
+export interface ApfDataset {
+    /**
+     * Data set name.
+     */
+    dsname: string;
+    /**
+     * Volume serial.
+     */
+    volume: string;
+}
+
+export interface ListApfResponse extends common.CommandResponse {
+    /**
+     * List of APF data sets.
+     */
+    items: ApfDataset[];
+    /**
+     * Number of rows returned.
+     */
+    returnedRows: number;
+}

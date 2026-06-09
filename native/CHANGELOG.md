@@ -6,6 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- `c`: Added support for listing APF and PROCLIB data sets to JSON-RPC server.
 - `c`: Fix regression on ENQ qname.  [#1027](https://github.com/zowe/zowex/issues/1027)
 - `c`: Added z/OS recovery around JES operations in the `zowex` CLI binary to allow recovering from abends. [#1011](https://github.com/zowe/zowex/pull/1011)
 - **Breaking:** `c`: Renamed C function `zjb_read_jobs_output_by_key` in zjb.hpp to `zjb_read_job_content_by_key` to be consistent with `zjb_read_job_content_by_dsn.

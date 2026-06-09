@@ -6,6 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- Added support to list APF and PROCLIB data sets.
 - Added support for viewing syslog.
 
 ## `0.6.0`
