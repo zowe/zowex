@@ -7,6 +7,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## Recent Changes
 
 - `c`: Fixed an issue where the `zowex ds copy` command would fail to allocate DDs when copying PDS members in parallel. [#994](https://github.com/zowe/zowex/issues/994)
+- `c`: Fix regression on ENQ qname.  [#1027](https://github.com/zowe/zowex/issues/1027)
 - `c`: Added z/OS recovery around JES operations in the `zowex` CLI binary to allow recovering from abends. [#1011](https://github.com/zowe/zowex/pull/1011)
 - **Breaking:** `c`: Renamed C function `zjb_read_jobs_output_by_key` in zjb.hpp to `zjb_read_job_content_by_key` to be consistent with `zjb_read_job_content_by_dsn.
 - `c`: Fixes issue where `zowex` failed to allocate `sysout` DDs that were dynamically allocated under z/OS UNIX. [#840](https://github.com/zowe/zowex/issues/840)
