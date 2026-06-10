@@ -1305,7 +1305,7 @@ async function test(connection: Client) {
     );
     const mergedEnv = { ...configTestEnv, ...localZnpEnv };
     const envPrefix = Object.entries(mergedEnv)
-        .map(([key, val]) => `${key}=${val}`)
+        .map(([key, val]) => `${key}="${val}"`)
         .join(" ");
     // Wrap multi-word pattern in single quotes to avoid shell expansion
     const testPattern = args[1] ? `'${args[1].replaceAll("'", String.raw`'\''`)}'` : "";

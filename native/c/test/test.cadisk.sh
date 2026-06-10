@@ -95,7 +95,7 @@ pass
 # ── 6. Verify content ────────────────────────────────────────────────────────
 echo "[6/6] Verifying restored content..."
 view_out=$("$ZOWEX" data-set view "$DS" 2>&1)
-if ! echo "$view_out" | grep -q "$CONTENT"; then
+if ! echo "$view_out" | grep -Fq "$CONTENT"; then
   fail "content not found after restore (got: $view_out)"
 fi
 pass

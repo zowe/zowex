@@ -2271,6 +2271,10 @@ void zds_tests()
                                  .ToAbend();
                            });
 
+                        // Skip this test because forcing DCB abends in tests seems fragile.
+                        // On some systems, the DCB abend does not trigger. On others it
+                        // does, but the data set cannot be cleaned up because it is locked
+                        // immediately after the abend.
                         // uncomment when in a zvdt env
                         xit("should release ENQ after DCB abend during write",
                            [&]() -> void
