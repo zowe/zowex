@@ -675,6 +675,7 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
   }
 
   stat.stattrsa = statjqp;
+  stat.statopt1 |= stat1wmb;
   stat.stattype = statoutv;
 
   if (0 == enable_recovery(&zenv))
@@ -705,8 +706,8 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
   memset(&zenv, 0, sizeof(ZRCVY_ENV));
 
   statjqp = (STATJQ * PTR32) stat.statjobf;
-  // statvop = (STATVO * PTR32) statjqp->stjqsvrb;
-  statvop = NULL;
+  statvop = (STATVO * PTR32) statjqp->stjqsvrb;
+  // statvop = NULL;
 
   if (NULL == statjqp)
   {
