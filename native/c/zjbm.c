@@ -716,8 +716,19 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
   if (NULL == statvop)
   {
     // statvop = statjqp->stjqse;
-    // statsep = statjqp->stjqse;
+     // statsep = statjqp->stjqse;
     zut_print_debug("problem?");
+    char ptr_msg[100] = {0};
+    sprintf(ptr_msg, "----- stjqsvrb___64: '%p' ------", statjqp->stjqsvrb___64);
+    zut_print_debug(ptr_msg);
+    sprintf(ptr_msg, "----- stjqse: '%p' ------", statjqp->stjqse);
+    zut_print_debug(ptr_msg);
+
+    zut_dump_storage("STAT", &stat, statsize);
+    zut_dump_storage("SSIB", &ssib, sizeof(SSIB));
+    zut_dump_storage("SSOB", &ssob, sizeof(SSOB));
+    zut_dump_storage("STATJQ", statjqp, stjqsiz2);
+
   }
 
   if (NULL == statjqp)
@@ -749,6 +760,11 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
     return rc == RTNCD_FAILURE ? rc : RTNCD_FAILURE;
   }
 
+  zut_dump_storage("STAT", &stat, statsize);
+  zut_dump_storage("SSIB", &ssib, sizeof(SSIB));
+  zut_dump_storage("SSOB", &ssob, sizeof(SSOB));
+  if (NULL != statjqp) { zut_dump_storage("STATJQ", statjqp, stjqsiz2); }
+
   STATSEVB *statsetrsp = storage_get64(zjb->buffer_size);
   *sysoutInfo = statsetrsp;
 
@@ -758,6 +774,9 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
   {
     statjqhdp = (STATJQHD * PTR32)((unsigned char *PTR32)statjqp + statjqp->stjqohdr);
     statjqtrp = (STATJQTR * PTR32)((unsigned char *PTR32)statjqhdp + sizeof(STATJQHD));
+
+    if (NULL != statjqhdp) { zut_dump_storage("STATJQHD", statjqhdp, sthdsize); }
+    if (NULL != statjqtrp) { zut_dump_storage("STATJQTR", statjqtrp, sttrsize); }
 
     while (statvop || statsep)
     {
@@ -796,6 +815,10 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
         }
 
         statsevbp = (STATSEVB * PTR32)((unsigned char *PTR32)statsvhdp + sizeof(STATSVHD));
+
+        if (NULL != statvop)   { zut_dump_storage("STATVO", statvop, stvosize); }
+        if (NULL != statsvhdp) { zut_dump_storage("STATSVHD", statsvhdp, stsvsize); }
+        if (NULL != statsevbp) { zut_dump_storage("STATSEVB", statsevbp, stvssize); }
 
         memcpy(statsetrsp, statsevbp, sizeof(STATSEVB));
         statsetrsp++;
