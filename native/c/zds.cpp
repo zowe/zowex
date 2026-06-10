@@ -3590,7 +3590,7 @@ int zds_list_data_sets(ZDS *zds, std::string dsn, std::vector<ZDSEntry> &dataset
  *
  * @return RTNCD_SUCCESS on success, RTNCD_FAILURE on failure
  */
-int zds_read_streamed(const ZDSReadOpts &opts, const std::string &pipe, size_t *content_len)
+int zds_read_streamed(const ZDSReadOpts &opts, const std::string &pipe, size_t *content_len, uint32_t *etag_checksum)
 {
   const int vrc = zds_validate_read_opts(opts, "zds_read_streamed");
   if (vrc != RTNCD_SUCCESS)
@@ -3605,6 +3605,9 @@ int zds_read_streamed(const ZDSReadOpts &opts, const std::string &pipe, size_t *
     ZDIAG_SET_MSG(&zds->diag, "content_len must be a valid size_t pointer");
     return RTNCD_FAILURE;
   }
+
+  // Initialize incremental Adler32 state for etag computation
+  Adler32State adler_state;
 
   const std::string dsname = zds_resolve_dsname(opts);
   const auto is_dd = !opts.ddname.empty();
@@ -3706,6 +3709,8 @@ int zds_read_streamed(const ZDSReadOpts &opts, const std::string &pipe, size_t *
       }
 
       *content_len += chunk_len;
+      if (etag_checksum)
+        zut_adler32_update(adler_state, chunk, chunk_len);
       temp_encoded = zbase64::encode(chunk, chunk_len, &left_over);
       fwrite(&temp_encoded[0], 1, temp_encoded.size(), fout);
     }
@@ -3733,6 +3738,8 @@ int zds_read_streamed(const ZDSReadOpts &opts, const std::string &pipe, size_t *
       }
 
       *content_len += chunk_len;
+      if (etag_checksum)
+        zut_adler32_update(adler_state, chunk, chunk_len);
       temp_encoded = zbase64::encode(chunk, chunk_len, &left_over);
       fwrite(&temp_encoded[0], 1, temp_encoded.size(), fout);
     }
@@ -3765,6 +3772,8 @@ int zds_read_streamed(const ZDSReadOpts &opts, const std::string &pipe, size_t *
       }
 
       *content_len += chunk_len;
+      if (etag_checksum)
+        zut_adler32_update(adler_state, chunk, chunk_len);
       temp_encoded = zbase64::encode(chunk, chunk_len, &left_over);
       fwrite(&temp_encoded[0], 1, temp_encoded.size(), fout);
     }
@@ -3785,6 +3794,8 @@ int zds_read_streamed(const ZDSReadOpts &opts, const std::string &pipe, size_t *
       if (!flush_buffer.empty())
       {
         *content_len += flush_buffer.size();
+        if (etag_checksum)
+          zut_adler32_update(adler_state, &flush_buffer[0], flush_buffer.size());
         temp_encoded = zbase64::encode(&flush_buffer[0], flush_buffer.size(), &left_over);
         fwrite(&temp_encoded[0], 1, temp_encoded.size(), fout);
       }
@@ -3803,6 +3814,9 @@ int zds_read_streamed(const ZDSReadOpts &opts, const std::string &pipe, size_t *
   }
 
   fflush(fout);
+
+  if (etag_checksum)
+    *etag_checksum = zut_adler32_finalize(adler_state);
 
   return RTNCD_SUCCESS;
 }
