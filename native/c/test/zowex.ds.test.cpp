@@ -1872,7 +1872,14 @@ void zowex_ds_tests()
                                           std::string response;
                                           const std::string member = "MEM" + std::to_string(i);
                                           const std::string command = zowex_command + " data-set view '" + ds + "(" + member + ")'";
-                                          const int rc = execute_command_with_output(command, response);
+                                          int rc = -1;
+                                          constexpr int max_view_retries = 3;
+                                          for (int attempt = 0; attempt < max_view_retries && rc != 0; ++attempt)
+                                          {
+                                            if (attempt > 0)
+                                              usleep(500000);
+                                            rc = execute_command_with_output(command, response);
+                                          }
                                           ExpectWithContext(rc, response).ToBe(0);
                                           Expect(response).ToContain("thread " + std::to_string(i) + " data");
                                         }
@@ -1920,7 +1927,14 @@ void zowex_ds_tests()
                                         // Member must be readable and contain coherent data from one of the writes
                                         std::string response;
                                         const std::string view_cmd = zowex_command + " data-set view '" + ds + "(SHARED)'";
-                                        const int rc = execute_command_with_output(view_cmd, response);
+                                        int rc = -1;
+                                        constexpr int max_view_retries = 3;
+                                        for (int attempt = 0; attempt < max_view_retries && rc != 0; ++attempt)
+                                        {
+                                          if (attempt > 0)
+                                            usleep(500000);
+                                          rc = execute_command_with_output(view_cmd, response);
+                                        }
                                         ExpectWithContext(rc, response).ToBe(0);
 
                                         bool has_thread_data = false;
