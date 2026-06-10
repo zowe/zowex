@@ -12,7 +12,7 @@
 import type { ICommandDefinition } from "@zowe/imperative";
 import { SshSession } from "@zowe/zos-uss-for-zowe-sdk";
 import { Constants } from "../Constants";
-import { CopyDatasetOrMemberDefinition } from "./CopyDatasetOrMember.definition";
+import { CopyDatasetOrMemberDefinition } from "./data-set/DataSet.definition";
 
 const CopyDefinition: ICommandDefinition = {
     name: "copy",

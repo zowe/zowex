@@ -12,7 +12,7 @@
 import type { ICommandDefinition } from "@zowe/imperative";
 
 export const CopyDatasetOrMemberDefinition: ICommandDefinition = {
-    handler: `${__dirname}/CopyDatasetOrMember.handler`,
+    handler: `${__dirname}/DataSet.handler`,
     description: "Copy a data set or member",
     type: "command",
     name: "data-set",

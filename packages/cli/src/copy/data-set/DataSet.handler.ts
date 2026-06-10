@@ -11,7 +11,7 @@
 
 import type { IHandlerParameters } from "@zowe/imperative";
 import type { ds, ZSshClient } from "@zowe/zowex-for-zowe-sdk";
-import { SshBaseHandler } from "../SshBaseHandler";
+import { SshBaseHandler } from "../../SshBaseHandler";
 
 export default class CopyDatasetOrMemberHandler extends SshBaseHandler {
     public async processWithClient(params: IHandlerParameters, client: ZSshClient): Promise<ds.CopyDatasetResponse> {
