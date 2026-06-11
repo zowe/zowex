@@ -31,6 +31,31 @@ const fakeSession: ISshSession = {
     privateKey: "~/.ssh/id_rsa",
 };
 
+function setupMockSshClient(options?: {
+    connectEvent?: "ready" | "error" | "close";
+    connectError?: Error;
+    sshStream?: any;
+    mockExecAsync?: boolean;
+}) {
+    const sshStream = options?.sshStream ?? new EventEmitter();
+    const connectSpy = vi.spyOn(Client.prototype, "connect").mockImplementation(function (_config: ConnectConfig) {
+        if (options?.connectEvent === "error") {
+            this.emit("error", options.connectError ?? new Error("bad ssh"));
+        } else if (options?.connectEvent === "close") {
+            this.emit("ready");
+            this.emit("close");
+        } else {
+            this.emit("ready");
+        }
+        return this;
+    });
+    let execAsyncSpy: any;
+    if (options?.mockExecAsync !== false) {
+        execAsyncSpy = vi.spyOn(ZSshClient.prototype as any, "execAsync").mockResolvedValue(sshStream);
+    }
+    return { sshStream, connectSpy, execAsyncSpy };
+}
+
 describe("ZSshClient", () => {
     const readyMessage = JSON.stringify({ status: "ready", data: { checksums: "sha256" } });
     const rpcRequest: RpcRequest = {
@@ -60,31 +85,20 @@ describe("ZSshClient", () => {
 
     describe("create function", () => {
         it("should start SSH client with default options", async () => {
-            const sshStream = new EventEmitter();
-            vi.spyOn(Client.prototype, "connect").mockImplementation(function (_config: ConnectConfig) {
-                this.emit("ready");
-                return this;
-            });
-            vi.spyOn(ZSshClient.prototype as any, "execAsync").mockResolvedValue(sshStream);
+            setupMockSshClient();
             const client = await ZSshClient.create(new SshSession(fakeSession));
             expect(client).toBeInstanceOf(ZSshClient);
         });
 
         it("should handle error thrown by SSH client", async () => {
             const sshError = new Error("bad ssh");
-            vi.spyOn(Client.prototype, "connect").mockImplementation(function (_config: ConnectConfig) {
-                this.emit("error", sshError);
-                return this;
-            });
+            setupMockSshClient({ connectEvent: "error", connectError: sshError });
             await expect(ZSshClient.create(new SshSession(fakeSession))).rejects.toThrow(sshError);
         });
 
         it("should handle error in SSH exec callback", async () => {
             const sshError = new Error("bad ssh");
-            vi.spyOn(Client.prototype, "connect").mockImplementation(function (_config: ConnectConfig) {
-                this.emit("ready");
-                return this;
-            });
+            setupMockSshClient({ mockExecAsync: false });
             vi.spyOn(Client.prototype, "exec").mockImplementation(function (
                 _command: string,
                 callback: ClientCallback,
@@ -98,10 +112,7 @@ describe("ZSshClient", () => {
         it("should handle error in SSH data handler", async () => {
             const sshError = new Error("bad ssh");
             const sshStream = { stderr: new EventEmitter(), stdout: new EventEmitter() };
-            vi.spyOn(Client.prototype, "connect").mockImplementation(function (_config: ConnectConfig) {
-                this.emit("ready");
-                return this;
-            });
+            setupMockSshClient({ sshStream, mockExecAsync: false });
             vi.spyOn(Client.prototype, "exec").mockImplementation(function (
                 _command: string,
                 callback: ClientCallback,
@@ -117,13 +128,7 @@ describe("ZSshClient", () => {
         });
 
         it("should invoke onClose callback", async () => {
-            const sshStream = new EventEmitter();
-            vi.spyOn(Client.prototype, "connect").mockImplementation(function (_config: ConnectConfig) {
-                this.emit("ready");
-                this.emit("close");
-                return this;
-            });
-            vi.spyOn(ZSshClient.prototype as any, "execAsync").mockResolvedValue(sshStream);
+            setupMockSshClient({ connectEvent: "close" });
             const onCloseMock = vi.fn();
             await ZSshClient.create(new SshSession(fakeSession), {
                 onClose: onCloseMock,
@@ -132,12 +137,7 @@ describe("ZSshClient", () => {
         });
 
         it("should invoke onError callback", async () => {
-            const sshStream = new EventEmitter();
-            vi.spyOn(Client.prototype, "connect").mockImplementation(function (_config: ConnectConfig) {
-                this.emit("ready");
-                return this;
-            });
-            vi.spyOn(ZSshClient.prototype as any, "execAsync").mockResolvedValue(sshStream);
+            setupMockSshClient();
             const onErrorMock = vi.fn();
             const client = await ZSshClient.create(new SshSession(fakeSession), {
                 onError: onErrorMock,
@@ -147,12 +147,7 @@ describe("ZSshClient", () => {
         });
 
         it("should respect keepAliveInterval option", async () => {
-            const sshStream = new EventEmitter();
-            vi.spyOn(Client.prototype, "connect").mockImplementation(function (_config: ConnectConfig) {
-                this.emit("ready");
-                return this;
-            });
-            vi.spyOn(ZSshClient.prototype as any, "execAsync").mockResolvedValue(sshStream);
+            setupMockSshClient();
             const buildSshConfigMock = vi.spyOn(ZSshUtils, "buildSshConfig");
             await ZSshClient.create(new SshSession(fakeSession), {
                 keepAliveInterval: 5,
@@ -164,40 +159,25 @@ describe("ZSshClient", () => {
         });
 
         it("should respect numWorkers option", async () => {
-            const sshStream = new EventEmitter();
-            vi.spyOn(Client.prototype, "connect").mockImplementation(function (_config: ConnectConfig) {
-                this.emit("ready");
-                return this;
-            });
-            const execAsyncMock = vi.spyOn(ZSshClient.prototype as any, "execAsync").mockResolvedValue(sshStream);
+            const { execAsyncSpy } = setupMockSshClient();
             await ZSshClient.create(new SshSession(fakeSession), {
                 numWorkers: 1,
             });
-            expect(execAsyncMock).toHaveBeenCalledTimes(1);
-            expect(execAsyncMock.mock.calls[0].slice(1)).toEqual(["server", "--num-workers", "1"]);
+            expect(execAsyncSpy).toHaveBeenCalledTimes(1);
+            expect(execAsyncSpy!.mock.calls[0].slice(1)).toEqual(["server", "--num-workers", "1"]);
         });
 
         it("should respect requestTimeout option", async () => {
-            const sshStream = new EventEmitter();
-            vi.spyOn(Client.prototype, "connect").mockImplementation(function (_config: ConnectConfig) {
-                this.emit("ready");
-                return this;
-            });
-            const execAsyncMock = vi.spyOn(ZSshClient.prototype as any, "execAsync").mockResolvedValue(sshStream);
+            const { execAsyncSpy } = setupMockSshClient();
             await ZSshClient.create(new SshSession(fakeSession), {
                 requestTimeout: 300,
             });
-            expect(execAsyncMock).toHaveBeenCalledTimes(1);
-            expect(execAsyncMock.mock.calls[0].slice(1)).toEqual(["server", "--request-timeout", "300"]);
+            expect(execAsyncSpy).toHaveBeenCalledTimes(1);
+            expect(execAsyncSpy!.mock.calls[0].slice(1)).toEqual(["server", "--request-timeout", "300"]);
         });
 
         it("should respect responseTimeout option", async () => {
-            const sshStream = new EventEmitter();
-            vi.spyOn(Client.prototype, "connect").mockImplementation(function (_config: ConnectConfig) {
-                this.emit("ready");
-                return this;
-            });
-            vi.spyOn(ZSshClient.prototype as any, "execAsync").mockResolvedValue(sshStream);
+            setupMockSshClient();
             const client = await ZSshClient.create(new SshSession(fakeSession), {
                 responseTimeout: 300,
             });
@@ -205,40 +185,25 @@ describe("ZSshClient", () => {
         });
 
         it("should respect verbose option", async () => {
-            const sshStream = new EventEmitter();
-            vi.spyOn(Client.prototype, "connect").mockImplementation(function (_config: ConnectConfig) {
-                this.emit("ready");
-                return this;
-            });
-            const execAsyncMock = vi.spyOn(ZSshClient.prototype as any, "execAsync").mockResolvedValue(sshStream);
+            const { execAsyncSpy } = setupMockSshClient();
             await ZSshClient.create(new SshSession(fakeSession), {
                 verbose: true,
             });
-            expect(execAsyncMock).toHaveBeenCalledTimes(1);
-            expect(execAsyncMock.mock.calls[0].slice(1)).toEqual(["server", "--verbose"]);
+            expect(execAsyncSpy).toHaveBeenCalledTimes(1);
+            expect(execAsyncSpy!.mock.calls[0].slice(1)).toEqual(["server", "--verbose"]);
         });
 
         it("should respect serverPath option", async () => {
-            const sshStream = new EventEmitter();
-            vi.spyOn(Client.prototype, "connect").mockImplementation(function (_config: ConnectConfig) {
-                this.emit("ready");
-                return this;
-            });
-            const execAsyncMock = vi.spyOn(ZSshClient.prototype as any, "execAsync").mockResolvedValue(sshStream);
+            const { execAsyncSpy } = setupMockSshClient();
             await ZSshClient.create(new SshSession(fakeSession), {
                 serverPath: "/tmp/zowe-server",
             });
-            expect(execAsyncMock).toHaveBeenCalledTimes(1);
-            expect(execAsyncMock.mock.calls[0][0]).toBe("/tmp/zowe-server/zowex");
+            expect(execAsyncSpy).toHaveBeenCalledTimes(1);
+            expect(execAsyncSpy!.mock.calls[0][0]).toBe("/tmp/zowe-server/zowex");
         });
 
         it("should respect useNativeSsh option", async () => {
-            const sshStream = new EventEmitter();
-            vi.spyOn(Client.prototype, "connect").mockImplementation(function (_config: ConnectConfig) {
-                this.emit("ready");
-                return this;
-            });
-            vi.spyOn(ZSshClient.prototype as any, "execAsync").mockResolvedValue(sshStream);
+            setupMockSshClient();
             const createClientMock = vi.spyOn(sshRs, "createClient").mockReturnValue(new Client() as any);
             await ZSshClient.create(new SshSession(fakeSession), { useNativeSsh: true });
             expect(createClientMock).toHaveBeenCalledWith(true);
@@ -437,8 +402,109 @@ describe("ZSshClient", () => {
             await expect(response).rejects.toBeDefined();
         });
 
+        it("should handle receiveStream and sendStream notifications and route them correctly", async () => {
+            const request: CommandRequest = { command: "ping" };
+            const fakeStdout = new EventEmitter();
+            const sshStream = { stdin: { write: vi.fn() }, stdout: fakeStdout, stderr: { on: vi.fn() } };
+            const client: ZSshClient = new (ZSshClient as any)();
+            const linkStreamMock = vi.fn();
+            (client as any).mStreamMgr = {
+                linkStreamToPromise: linkStreamMock,
+            };
+            (client as any).mSshStream = sshStream;
+            (client as any).getServerStatus(sshStream, readyMessage, "zowex server");
+
+            const responsePromise = client.request(request);
+
+            // Emit a receiveStream notification
+            const receiveStreamNotification = {
+                jsonrpc: "2.0",
+                method: "receiveStream",
+                params: { id: 1, pipePath: "/tmp/pipe" },
+            };
+            fakeStdout.emit("data", `${JSON.stringify(receiveStreamNotification)}\n`);
+            expect(linkStreamMock).toHaveBeenLastCalledWith(expect.any(Object), receiveStreamNotification, "GET");
+
+            // Emit a sendStream notification
+            const sendStreamNotification = {
+                jsonrpc: "2.0",
+                method: "sendStream",
+                params: { id: 1, pipePath: "/tmp/pipe" },
+            };
+            fakeStdout.emit("data", `${JSON.stringify(sendStreamNotification)}\n`);
+            expect(linkStreamMock).toHaveBeenLastCalledWith(expect.any(Object), sendStreamNotification, "PUT");
+
+            // Emit an unknown notification
+            const unknownNotification = {
+                jsonrpc: "2.0",
+                method: "unknownStream",
+                params: { id: 1, pipePath: "/tmp/pipe" },
+            };
+            const errHandlerMock = vi.fn();
+            (client as any).mErrHandler = errHandlerMock;
+            fakeStdout.emit("data", `${JSON.stringify(unknownNotification)}\n`);
+            expect(errHandlerMock).toHaveBeenCalled();
+
+            // Finally resolve the response to clean up
+            fakeStdout.emit("data", `${JSON.stringify(rpcResponseGood)}\n`);
+            await responsePromise;
+        });
+
+        it("should register a stream with a progressCallback but without contentLen", async () => {
+            const streamFn = () => new EventEmitter();
+            const request: CommandRequest = { command: "ping", stream: streamFn };
+            const fakeStdout = new EventEmitter();
+            const sshStream = { stdin: { write: vi.fn() }, stdout: fakeStdout, stderr: { on: vi.fn() } };
+            const client: ZSshClient = new (ZSshClient as any)();
+            const registerStreamMock = vi.fn();
+            (client as any).mStreamMgr = {
+                registerStream: registerStreamMock,
+            };
+            (client as any).mSshStream = sshStream;
+            (client as any).getServerStatus(sshStream, readyMessage, "zowex server");
+
+            const progressCallback = vi.fn();
+            const responsePromise = client.request(request, progressCallback);
+
+            expect(registerStreamMock).toHaveBeenCalledWith(expect.any(Object), streamFn, expect.any(Object), {
+                callback: progressCallback,
+                totalBytes: undefined,
+            });
+
+            // Clean up
+            fakeStdout.emit("data", `${JSON.stringify(rpcResponseGood)}\n`);
+            await responsePromise;
+        });
+
+        it("should register a stream with a progressCallback and with contentLen", async () => {
+            const streamFn = () => new EventEmitter();
+            const request: CommandRequest = { command: "ping", stream: streamFn, contentLen: 42 } as any;
+            const fakeStdout = new EventEmitter();
+            const sshStream = { stdin: { write: vi.fn() }, stdout: fakeStdout, stderr: { on: vi.fn() } };
+            const client: ZSshClient = new (ZSshClient as any)();
+            const registerStreamMock = vi.fn();
+            (client as any).mStreamMgr = {
+                registerStream: registerStreamMock,
+            };
+            (client as any).mSshStream = sshStream;
+            (client as any).getServerStatus(sshStream, readyMessage, "zowex server");
+
+            const progressCallback = vi.fn();
+            const responsePromise = client.request(request, progressCallback);
+
+            expect(registerStreamMock).toHaveBeenCalledWith(expect.any(Object), streamFn, expect.any(Object), {
+                callback: progressCallback,
+                totalBytes: 42,
+            });
+
+            // Clean up
+            fakeStdout.emit("data", `${JSON.stringify(rpcResponseGood)}\n`);
+            await responsePromise;
+        });
+
         it("should log message with default error handler", () => {
             const logErrorMock = vi.fn();
+            const consoleErrorMock = vi.spyOn(console, "error").mockImplementation(() => {});
             vi.spyOn(Logger, "getAppLogger").mockReturnValue({
                 error: logErrorMock,
             } as any);
@@ -446,6 +512,8 @@ describe("ZSshClient", () => {
             (ZSshClient as any).defaultErrHandler(testError);
             expect(logErrorMock).toHaveBeenCalledTimes(1);
             expect(logErrorMock.mock.calls[0][0]).toBe(`Error: ${testError.message}`);
+            expect(consoleErrorMock).toHaveBeenCalledTimes(1);
+            consoleErrorMock.mockRestore();
         });
     });
 
@@ -676,11 +744,7 @@ describe("ZSshClient", () => {
 
             const requestSpy = vi.spyOn(ZSshClient.prototype, "request").mockResolvedValue({ success: true } as any);
 
-            vi.spyOn(Client.prototype, "connect").mockImplementation(function () {
-                this.emit("ready");
-                return this;
-            });
-            vi.spyOn(ZSshClient.prototype as any, "execAsync").mockResolvedValue(new EventEmitter());
+            setupMockSshClient();
 
             await ZSshClient.create(new SshSession(fakeSession), {
                 requests: new Set([harvestedRequest] as any),

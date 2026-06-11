@@ -80,4 +80,39 @@ describe("parseSearchOutput", () => {
         expect(result.members[1].matches.map((m) => m.lineNumber)).toEqual([4]);
         expect(result.summary.linesFound).toBe(10);
     });
+
+    it("should handle member with no matches at SOURCE SECTION transition and end of file", () => {
+        const output = [
+            "\f  ASMFSUPC    -     MVS FILE/LINE/WORD/BYTE/SFOR COMPARE UTILITY- V1R6M0  (2021/11/01)  2026/04/21   8.49    PAGE     1",
+            " LINE-#  SOURCE SECTION                    SRCH DSN: SYS1.SAMPLIB(MEMBER1)",
+            " LINE-#  SOURCE SECTION                    SRCH DSN: SYS1.SAMPLIB(MEMBER2)",
+            "",
+        ].join("\n");
+
+        const result = parseSearchOutput(output);
+        expect(result.members).toHaveLength(2);
+        expect(result.members[0].name).toBe("MEMBER1");
+        expect(result.members[0].matches).toHaveLength(0);
+        expect(result.members[1].name).toBe("MEMBER2");
+        expect(result.members[1].matches).toHaveLength(0);
+    });
+
+    it("should handle member with matches at SOURCE SECTION transitions", () => {
+        const output = [
+            "\f  ASMFSUPC    -     MVS FILE/LINE/WORD/BYTE/SFOR COMPARE UTILITY- V1R6M0  (2021/11/01)  2026/04/21   8.49    PAGE     1",
+            " LINE-#  SOURCE SECTION                    SRCH DSN: SYS1.SAMPLIB(MEMBER1)",
+            "      5        *  Match in member 1",
+            "      *  Some context in member 1",
+            " LINE-#  SOURCE SECTION                    SRCH DSN: SYS1.SAMPLIB(MEMBER2)",
+            "     10        *  Match in member 2",
+            "      *  Some context in member 2",
+        ].join("\n");
+
+        const result = parseSearchOutput(output);
+        expect(result.members).toHaveLength(2);
+        expect(result.members[0].name).toBe("MEMBER1");
+        expect(result.members[0].matches[0].afterContext).toContain("Some context in member 1");
+        expect(result.members[1].name).toBe("MEMBER2");
+        expect(result.members[1].matches[0].afterContext).toContain("Some context in member 2");
+    });
 });
