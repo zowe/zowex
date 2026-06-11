@@ -33,6 +33,8 @@ export type CallbackInfo = {
 };
 
 type PromiseExecutorParams<T> = Parameters<ConstructorParameters<typeof Promise<T>>[0]>;
-type PromiseResolve<T> = PromiseExecutorParams<T>[0];
 type PromiseReject = PromiseExecutorParams<unknown>[1];
-export type RpcPromise = { resolve: PromiseResolve<CommandResponse>; reject: PromiseReject };
+export type RpcPromise = {
+    resolve: (value: CommandResponse) => void | Promise<void>;
+    reject: PromiseReject;
+};

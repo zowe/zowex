@@ -13,23 +13,6 @@ import { readFileSync } from "node:fs";
 import { join, normalize, resolve } from "node:path";
 import { SshConfigUtils } from "../src/SshConfigUtils";
 
-vi.mock("node:os", () => ({
-    homedir: vi.fn(() => "/home/dir"),
-}));
-
-describe("findPrivateKeys", () => {
-    it("should find private keys in home directory", async () => {
-        const homeDir = "/home/dir";
-        const expected = [
-            resolve(join(homeDir, ".ssh", "id_ed25519")),
-            resolve(join(homeDir, ".ssh", "id_rsa")),
-            resolve(join(homeDir, ".ssh", "id_ecdsa")),
-            resolve(join(homeDir, ".ssh", "id_dsa")),
-        ];
-        expect(await SshConfigUtils.findPrivateKeys()).toStrictEqual(expected);
-    });
-});
-
 vi.mock("node:fs", () => ({
     accessSync: vi.fn(),
     readFileSync: vi.fn(),
@@ -50,6 +33,21 @@ describe("findPrivateKeys", () => {
             resolve(join(homeDir, ".ssh", "id_ecdsa")),
             resolve(join(homeDir, ".ssh", "id_dsa")),
         ];
+        expect(await SshConfigUtils.findPrivateKeys()).toStrictEqual(expected);
+    });
+
+    it("should ignore keys that are not readable/accessible", async () => {
+        const { accessSync } = await import("node:fs");
+        const mockAccessSync = accessSync as ReturnType<typeof vi.fn>;
+        mockAccessSync.mockImplementation((path: string) => {
+            if (path.endsWith("id_rsa")) {
+                return; // success
+            }
+            throw new Error("not accessible");
+        });
+
+        const homeDir = "/home/dir";
+        const expected = [resolve(join(homeDir, ".ssh", "id_rsa"))];
         expect(await SshConfigUtils.findPrivateKeys()).toStrictEqual(expected);
     });
 });
@@ -210,5 +208,35 @@ Host server
 
         const result = await SshConfigUtils.migrateSshConfig();
         expect(result[0].handshakeTimeout).toBe(45000);
+    });
+
+    it("should skip wildcard hosts containing * or ?", async () => {
+        const configContent = `
+Host *
+    HostName generic.com
+Host my?server
+    HostName specific.com
+Host normal
+    HostName normal.com
+`;
+        mockReadFileSync.mockReturnValue(configContent);
+
+        const result = await SshConfigUtils.migrateSshConfig();
+        expect(result).toHaveLength(1);
+        expect(result[0].name).toBe("normal");
+        expect(result[0].hostname).toBe("normal.com");
+    });
+
+    it("should parse IdentityFile using non-~ (absolute) path", async () => {
+        const configContent = `
+Host server
+    HostName example.com
+    IdentityFile /var/lib/ssh/key
+`;
+        mockReadFileSync.mockReturnValue(configContent);
+
+        const result = await SshConfigUtils.migrateSshConfig();
+        expect(result).toHaveLength(1);
+        expect(result[0].privateKey).toBe(normalize("/var/lib/ssh/key"));
     });
 });
