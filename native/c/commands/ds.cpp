@@ -212,7 +212,7 @@ const ast::Node build_member_object(const ZDSMem &member, bool attributes)
   std::string trimmed_name = member.name;
   obj_member->set("name", str(zut_rtrim(trimmed_name)));
 
-  if (!attributes)
+  if (!attributes || !member.stats_valid)
     return obj_member;
 
   if (member.vers != -1)
@@ -599,7 +599,7 @@ int handle_data_set_list_members(InvocationContext &context)
       {
         fields.push_back(it->name);
 
-        if (attributes)
+        if (attributes && it->stats_valid)
         {
           fields.push_back(it->vers == -1 ? "" : std::to_string(it->vers));
           fields.push_back(it->mod == -1 ? "" : std::to_string(it->mod));
@@ -618,7 +618,7 @@ int handle_data_set_list_members(InvocationContext &context)
       }
       else
       {
-        if (attributes)
+        if (attributes && it->stats_valid)
         {
           context.output_stream() << std::left
                                   << std::setw(12) << it->name << " "

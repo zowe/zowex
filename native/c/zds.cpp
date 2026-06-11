@@ -2518,8 +2518,9 @@ int zds_list_members(ZDS *zds, std::string dsn, std::vector<ZDSMem> &members, co
           if (show_attributes && user_data_len >= sizeof(ISPF_STATS))
           {
             const ISPF_STATS *stats = reinterpret_cast<const ISPF_STATS *>(data + sizeof(entry));
+            mem.stats_valid = is_valid_ispf_stats(stats, user_data_len);
 
-            if (is_valid_ispf_stats(stats, user_data_len))
+            if (mem.stats_valid)
             {
               mem.vers = stats->version;
               mem.mod = stats->level;
