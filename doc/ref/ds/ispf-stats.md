@@ -1,31 +1,42 @@
 # ISPF Member Statistics
 
-This document summarizes how ISPF statistics are stored in Partitioned Data Set (PDS) directory entries on z/OS and how `zowex` validates them.
+How `zowex` handles and validates ISPF member statistics stored inside PDS directory entries.
 
-## PDS Directory Structure
+## Storage in PDS Directories
 
-PDS directories are comprised of 256-byte blocks containing variable-length member entries. Each entry starts with a 12-byte header (`NAME`, `TTR`, and control flag `C`), followed by up to 62 bytes of `USER_DATA`.
+PDS directory blocks (256 bytes) contain variable-length member entries. Each entry starts with a 12-byte prefix:
 
-The control byte `C` specifies the `USER_DATA` length in halfwords. ISPF uses this space to store member statistics of either:
+- `NAME` (8 bytes)
+- `TTR` (3 bytes)
+- `C` (1 byte, control/flags)
 
-- **30 bytes** (15 halfwords) for standard statistics.
-- **40 bytes** (20 halfwords) for extended statistics (used when line counts exceed 65,535).
+The rest of the entry contains up to 62 bytes of custom `USER_DATA`. The length is determined by bits 3-7 of the control byte `C` (in halfwords).
 
-## Member Statistics Validation
+ISPF uses this `USER_DATA` field to store member statistics:
 
-To avoid displaying corrupted attributes from non-standard user data (e.g., load module metadata or custom SCM attributes), `zowex` validates directory entries in `zds.cpp` using two heuristics:
+- **Standard stats:** 30 bytes (15 halfwords).
+- **Extended stats:** 40 bytes (20 halfwords), used if member line counts exceed 65,535.
 
-1. **Size and Flag Check:** Standard stats must be exactly 30 bytes with trailing spaces in the `extended` field. Extended stats must be exactly 40 bytes with the extended flag (`0x20`) set in `flags`.
-2. **Century Check:** Creation and modification century bytes must be `0x00` (1900s) or `0x01` (2000s). This will break in the year 2100.
+## Validation Logic (`zds.cpp`)
 
-If validation fails, `zowex` skips parsing stats and leaves the member's attributes blank instead of rendering garbled dates or line counts.
+Because directory `USER_DATA` can store anything (such as load module linkage editor data or custom SCM metadata), `zowex` verifies if the bytes actually contain valid ISPF stats before parsing them. This prevents displaying garbled text or encountering errors.
+
+We run two checks in `is_valid_ispf_stats`:
+
+1. **Size & Flag Check:** Standard stats must be exactly 30 bytes, and the `extended` field must end with blanks (`"  "`). Extended stats must be exactly 40 bytes, and the extended flag (`0x20` in `flags`) must be active.
+2. **Century Check:** The creation and modification century bytes must be either `0x00` (1900s) or `0x01` (2000s).
+
+If these checks fail, we safely leave the member attributes blank.
 
 ## Manual Testing
 
-1. **Locate Corrupted Member:** Find a PDS containing a member with invalid user data in its directory entry (e.g., custom SCM metadata or link-edited load modules).
-2. **Verify in ISPF:** View the member list in **ISPF Option 3.4**. It should display blank attributes, warning symbols, or question marks (`??/??/??`) for the corrupted member.
-3. **Query via CLI:** Run the `zowex` command with attributes enabled:
+To verify this:
+
+1. **Find a corrupted member:** Find or create a PDS member with non-ISPF directory user data (e.g., load module entries or custom SCM tags).
+2. **Check ISPF:** Open the data set in **ISPF Option 3.4**. The corrupted member should show blanks, warnings, or question marks (`??/??/??`).
+3. **Check zowex:** List member attributes for the data set via the `zowex` CLI:
    ```bash
    zowex ds list-members "MY.CORRUPTED.PDS" --attributes
    ```
-4. **Confirm Safe Handling:** Verify the member is listed successfully, but its stats (dates and line counts) are cleanly omitted rather than displaying garbled strings.
+   Alternatively you can check the member attributes using an SSH profile in Zowe Explorer.
+4. **Verify Result:** The member(s) should list successfully without crashing and the corrupted attributes should simply be blank.
