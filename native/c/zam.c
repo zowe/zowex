@@ -64,7 +64,7 @@ static int handle_dcb_abend(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc, const char *P
     {
       strcpy(diag->service_name, operation);
       ZDIAG_SET_MSG(diag, "DCB abend during %.16s for %8.8s data set: %44.44s",
-                                operation, ioc->ddname, ioc->jfcb.jfcbdsnm);
+                    operation, ioc->ddname, ioc->jfcb.jfcbdsnm);
       diag->detail_rc = ZDS_RTNCD_DCB_ABEND_ERROR;
     }
     return RTNCD_FAILURE;
@@ -272,7 +272,7 @@ static int note_member(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc, NOTE_RESPONSE *PTR
 }
 
 #define MAX_SYSLOG_LRECL 256
-int open_input_vsam(ZDIAG *PTR32 diag, IO_CTRL *PTR32 *PTR32 ioc, const char *PTR32 ddname)
+int open_input_vsam(ZDIAG *PTR32 diag, IO_CTRL * PTR32 * PTR32 ioc, const char *PTR32 ddname)
 {
   int rc = 0;
   int rsn = 0;
@@ -431,7 +431,7 @@ int close_input_vsam(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
   return rc;
 }
 
-int open_output_bpam(ZDIAG *PTR32 diag, IO_CTRL *PTR32 *PTR32 ioc, const char *PTR32 ddname)
+int open_output_bpam(ZDIAG *PTR32 diag, IO_CTRL * PTR32 * PTR32 ioc, const char *PTR32 ddname)
 {
   int rc = 0;
   IO_CTRL *PTR32 ioc31 = NULL;
@@ -811,7 +811,7 @@ static int update_ispf_statistics(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
       //
       // Ensure this random spot in the user data is set to spaces :-(
       //
-      memset(statsp->unused, ' ', sizeof(statsp->unused)); // NOTE(Kelosky): unclear what the 2 remaining bytes are for but if not set to spaces, stats will not be updated for a newly created member
+      memset(statsp->extended, ' ', sizeof(statsp->extended)); // NOTE(Kelosky): unclear what the 2 remaining bytes are for but if not set to spaces, stats will not be updated for a newly created member
 
       //
       // Set initial user
