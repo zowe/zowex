@@ -675,7 +675,6 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
   }
 
   stat.stattrsa = statjqp;
-  stat.statopt1 |= stat1wmb;
   stat.stattype = statoutv;
 
   if (0 == enable_recovery(&zenv))
