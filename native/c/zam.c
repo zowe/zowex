@@ -99,7 +99,7 @@ static int enq_data_set(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
   int rc = 0;
   QNAME qname = {0};
   RNAME rname = {0};
-  strcpy(qname.value, "SPFEDIT");
+  memcpy(qname.value, "SPFEDIT ", sizeof(qname.value));
   rname.rlen = sprintf(rname.value, "%.*s%.*s", sizeof(ioc->jfcb.jfcbdsnm), ioc->jfcb.jfcbdsnm, sizeof(ioc->jfcb.jfcbelnm), ioc->jfcb.jfcbelnm);
   rc = enq(&qname, &rname);
 
@@ -160,7 +160,7 @@ static int reserve_data_set(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
   int rc = 0;
   QNAME qname_reserve = {0};
   RNAME rname_reserve = {0};
-  strcpy(qname_reserve.value, "SPFEDIT");
+  memcpy(qname_reserve.value, "SPFEDIT ", sizeof(qname_reserve.value));
   rname_reserve.rlen = sprintf(rname_reserve.value, "%.*s", sizeof(ioc->jfcb.jfcbdsnm), ioc->jfcb.jfcbdsnm);
   rc = reserve(&qname_reserve, &rname_reserve, (UCB * PTR32) ioc->ucb);
   if (0 != rc)
@@ -962,7 +962,7 @@ static int deq_reserve_data_set(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
   {
     QNAME qname_reserve = {0};
     RNAME rname_reserve = {0};
-    strcpy(qname_reserve.value, "SPFEDIT");
+    memcpy(qname_reserve.value, "SPFEDIT ", sizeof(qname_reserve.value));
     rname_reserve.rlen = sprintf(rname_reserve.value, "%.*s", sizeof(ioc->jfcb.jfcbdsnm), ioc->jfcb.jfcbdsnm);
     rc = deq_reserve(&qname_reserve, &rname_reserve, (UCB * PTR32) ioc->ucb);
     if (0 != rc)
@@ -988,7 +988,7 @@ static int deq_data_set(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
   {
     RNAME rname = {0};
     QNAME qname = {0};
-    strcpy(qname.value, "SPFEDIT");
+    memcpy(qname.value, "SPFEDIT ", sizeof(qname.value));
     rname.rlen = sprintf(rname.value, "%.*s%.*s", sizeof(ioc->jfcb.jfcbdsnm), ioc->jfcb.jfcbdsnm, sizeof(ioc->jfcb.jfcbelnm), ioc->jfcb.jfcbelnm);
     rc = deq(&qname, &rname);
     if (0 != rc)
