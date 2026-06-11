@@ -196,6 +196,30 @@ void zut_print_string_as_bytes(std::string &input, std::ostream *out_stream = nu
 std::vector<uint8_t> zut_get_contents_as_bytes(const std::string &hex_string);
 
 /**
+ * @brief State for incremental Adler-32 checksum computation
+ */
+struct Adler32State
+{
+  uint32_t a = 1u;
+  uint32_t b = 0u;
+};
+
+/**
+ * @brief Update Adler-32 state with new data incrementally
+ * @param state The current Adler-32 state
+ * @param data Pointer to the data
+ * @param len Length of the data
+ */
+void zut_adler32_update(Adler32State &state, const char *data, size_t len);
+
+/**
+ * @brief Finalize the Adler-32 checksum from the given state
+ * @param state The Adler-32 state
+ * @return The final Adler-32 checksum
+ */
+uint32_t zut_adler32_finalize(const Adler32State &state);
+
+/**
  * @brief Calculate the Adler-32 checksum of a string
  * @param input The input string
  * @return The Adler-32 checksum

@@ -670,15 +670,9 @@ char zut_get_hex_char(int num)
 }
 
 // built from pseudocode in https://en.wikipedia.org/wiki/Adler-32#Calculation
-// exploits SIMD for performance boosts on z13+
-uint32_t zut_calc_adler32_checksum(const std::string &input)
+void zut_adler32_update(Adler32State &state, const char *data, size_t len)
 {
   const uint32_t MOD_ADLER = 65521u;
-  uint32_t a = 1u;
-  uint32_t b = 0u;
-  const size_t len = input.length();
-  const char *data = input.data();
-
   const size_t block_size = 16;
   size_t i = 0;
 
@@ -687,31 +681,37 @@ uint32_t zut_calc_adler32_checksum(const std::string &input)
   {
     for (size_t j = 0; j < block_size; j++)
     {
-      // A_i = 1 + (D_i + D_(i+1) + ... + D_(i+n-1))
-      a += (uint8_t)data[i + j];
-      // B_i = A_i + B_(i-1)
-      b += a;
+      state.a += static_cast<uint8_t>(data[i + j]);
+      state.b += state.a;
     }
 
-    // Apply modulo to prevent overflow
-    a %= MOD_ADLER;
-    b %= MOD_ADLER;
+    state.a %= MOD_ADLER;
+    state.b %= MOD_ADLER;
     i += block_size;
   }
 
-  // Process remaining bytes in the input
+  // Process remaining bytes
   while (i < len)
   {
-    a += (uint8_t)data[i];
-    b += a;
+    state.a += static_cast<uint8_t>(data[i]);
+    state.b += state.a;
     i++;
   }
 
-  a %= MOD_ADLER;
-  b %= MOD_ADLER;
+  state.a %= MOD_ADLER;
+  state.b %= MOD_ADLER;
+}
 
-  // Adler-32(D) = B * 65536 + A
-  return (b << 16) | a;
+uint32_t zut_adler32_finalize(const Adler32State &state)
+{
+  return (state.b << 16) | state.a;
+}
+
+uint32_t zut_calc_adler32_checksum(const std::string &input)
+{
+  Adler32State state;
+  zut_adler32_update(state, input.data(), input.length());
+  return zut_adler32_finalize(state);
 }
 
 /**
