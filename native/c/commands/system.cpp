@@ -78,10 +78,18 @@ int handle_system_list_proclib(InvocationContext &context)
     return RTNCD_FAILURE;
   }
 
-  for (vector<string>::iterator it = proclib.begin(); it != proclib.end(); it++)
+  const auto result = obj();
+  const auto items = arr();
+  
+  for (const auto &dsn : proclib)
   {
-    context.output_stream() << *it << endl;
+    context.output_stream() << dsn << endl;
+    items->push(str(dsn));
   }
+  
+  result->set("items", items);
+  result->set("returnedRows", i64(proclib.size()));
+  context.set_object(result);
 
   return RTNCD_SUCCESS;
 }
@@ -292,12 +300,27 @@ int handle_system_list_apf(InvocationContext &context)
     context.error_stream() << "  Details: " << diag.e_msg << endl;
     return RTNCD_FAILURE;
   }
-  for (std::vector<std::pair<std::string, std::string>>::iterator it = apf.begin(); it != apf.end(); it++)
+
+  const auto result = obj();
+  const auto items = arr();
+  
+  for (const auto &entry : apf)
   {
-    context.output_stream() << setw(44) << left << it->first << " " << setw(6) << right << it->second << endl;
+    context.output_stream() << setw(44) << left << entry.first << " " << setw(6) << right << entry.second << endl;
+    
+    const auto item = obj();
+    item->set("dsname", str(entry.first));
+    item->set("volume", str(entry.second));
+    items->push(item);
   }
+  
+  result->set("items", items);
+  result->set("returnedRows", i64(apf.size()));
+  context.set_object(result);
+  
   return RTNCD_SUCCESS;
 }
+
 
 void register_commands(parser::Command &root_command)
 {
