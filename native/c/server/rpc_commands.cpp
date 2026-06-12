@@ -223,6 +223,10 @@ void register_system_commands(CommandDispatcher &dispatcher)
                                   .rename_arg("secondsAgo", "seconds-ago")
                                   .rename_arg("maxLines", "max-lines")
                                   .read_stdout("data", false));
+  dispatcher.register_command("listProclib",
+                              CommandBuilder(sys::handle_system_list_proclib));
+  dispatcher.register_command("listApf",
+                              CommandBuilder(sys::handle_system_list_apf));
 }
 
 void register_all_commands(CommandDispatcher &dispatcher)

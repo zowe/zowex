@@ -204,6 +204,10 @@ ZJSON_SCHEMA(ViewSyslogRequest,
     FIELD_OPTIONAL(maxLines, NUMBER)
 );
 
+struct ListProclibRequest {};
+
+struct ListApfRequest {};
+
 struct ToolSearchRequest {};
 ZJSON_SCHEMA(ToolSearchRequest,
     FIELD_REQUIRED(dsname, STRING),
