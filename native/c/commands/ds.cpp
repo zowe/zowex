@@ -599,18 +599,25 @@ int handle_data_set_list_members(InvocationContext &context)
       {
         fields.push_back(it->name);
 
-        if (attributes && it->stats_valid)
+        if (attributes)
         {
-          fields.push_back(it->vers == -1 ? "" : std::to_string(it->vers));
-          fields.push_back(it->mod == -1 ? "" : std::to_string(it->mod));
-          fields.push_back(it->c4date);
-          fields.push_back(it->m4date);
-          fields.push_back(it->mtime);
-          fields.push_back(it->cnorc == -1 ? "" : std::to_string(it->cnorc));
-          fields.push_back(it->inorc == -1 ? "" : std::to_string(it->inorc));
-          fields.push_back(it->mnorc == -1 ? "" : std::to_string(it->mnorc));
-          fields.push_back(it->user);
-          fields.push_back(it->sclm ? "Y" : "N");
+          if (it->stats_valid)
+          {
+            fields.push_back(it->vers == -1 ? "" : std::to_string(it->vers));
+            fields.push_back(it->mod == -1 ? "" : std::to_string(it->mod));
+            fields.push_back(it->c4date);
+            fields.push_back(it->m4date);
+            fields.push_back(it->mtime);
+            fields.push_back(it->cnorc == -1 ? "" : std::to_string(it->cnorc));
+            fields.push_back(it->inorc == -1 ? "" : std::to_string(it->inorc));
+            fields.push_back(it->mnorc == -1 ? "" : std::to_string(it->mnorc));
+            fields.push_back(it->user);
+            fields.push_back(it->sclm ? "Y" : "N");
+          }
+          else
+          {
+            fields.insert(fields.end(), 10, "");
+          }
         }
 
         context.output_stream() << zut_format_as_csv(fields) << std::endl;
