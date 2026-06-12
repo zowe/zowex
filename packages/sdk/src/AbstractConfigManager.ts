@@ -473,14 +473,6 @@ export abstract class AbstractConfigManager {
                     ? await this.promptForPassword(newConfig, configModifications)
                     : undefined;
 
-                // If password authentication succeeded and we had a private key that failed,
-                // comment out the private key in the configuration file
-                if (passwordPrompt && newConfig.privateKey) {
-                    if (!(await this.handleInvalidPrivateKey(newConfig))) {
-                        return undefined;
-                    }
-                }
-
                 return passwordPrompt ? { ...configModifications, ...passwordPrompt } : undefined;
             }
 
