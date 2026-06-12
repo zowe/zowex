@@ -180,7 +180,10 @@ export class ZSshClient extends RpcClientApi implements Disposable {
             }
             this.mRequestMap.set(rpcRequest.id, {
                 command: request,
-                rpc: { resolve, reject },
+                rpc: {
+                    resolve: resolve as (value: CommandResponse) => void | Promise<void>,
+                    reject,
+                },
                 silenced: false,
                 timeoutId,
             });

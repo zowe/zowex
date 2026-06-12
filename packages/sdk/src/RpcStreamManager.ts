@@ -52,8 +52,8 @@ export class RpcStreamManager {
         const { resourceName } = this.mPendingStreamMap.get(notif.params.id)!;
         const streamPromise = mode === "PUT" ? this.uploadStream(notif.params) : this.downloadStream(notif.params);
         rpcPromise.resolve = async (response: CommandResponse) => {
-            const clientLen = await streamPromise;
             try {
+                const clientLen = await streamPromise;
                 this.expectContentLengthMatches(response, clientLen, mode, resourceName);
                 resolve(response);
             } catch (err) {
