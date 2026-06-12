@@ -39,7 +39,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Watch z/OS build
-        if: ${{ matrix.os == 'ubuntu' }}
+        if: ${{ matrix.os == 'ubuntu' && env.RUN_ID }}
         uses: actions/github-script@v7
         with:
           script: |
