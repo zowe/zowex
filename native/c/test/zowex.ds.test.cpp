@@ -1253,6 +1253,102 @@ void zowex_ds_tests()
                         xit("should view the content of a VSAM ESDS data set", []() -> void {});
                         xit("should view the content of a VSAM RRDS data set", []() -> void {});
                         xit("should view the content of a VSAM LDS data set", []() -> void {});
+
+                        // zds_read uses POSIX fopen("r") which allocates the data set with DISP=SHR.
+                        // SHR allocation allows multiple concurrent openers without ENQ or RESERVE,
+                        // making concurrent reads safe on both PDS and PDSE. These tests verify that
+                        // behavior by calling zds_read directly from threads (no fork/popen involved).
+                        describe("concurrent reads",
+                                 [&]() -> void
+                                 {
+                                   TEST_OPTIONS concurrent_opts = {false, 60};
+
+                                   it("should not block concurrent reads of different PDSE members: fopen(r) does not take an exclusive ENQ",
+                                      [&]() -> void
+                                      {
+                                        const std::string ds = get_random_ds();
+                                        _ds.push_back(ds);
+                                        _create_ds(ds, "--dsorg PO --dirblk 5 --dsntype LIBRARY");
+
+                                        const int thread_count = 4;
+                                        for (int i = 0; i < thread_count; ++i)
+                                        {
+                                          const std::string member = "MEM" + std::to_string(i);
+                                          const std::string data = "content for member " + std::to_string(i);
+                                          const std::string command = "echo '" + data + "' | " +
+                                                                      zowex_command + " data-set write '" + ds + "(" + member + ")'";
+                                          std::string response;
+                                          const int rc = execute_command_with_output(command, response);
+                                          ExpectWithContext(rc, response).ToBe(0);
+                                        }
+
+                                        std::vector<int> results(thread_count, -1);
+                                        std::vector<std::string> contents(thread_count);
+                                        std::vector<std::thread> threads;
+
+                                        for (int i = 0; i < thread_count; ++i)
+                                        {
+                                          threads.emplace_back([&, i]()
+                                                               {
+                                                                 ZDS zds = {};
+                                                                 const std::string member_path = ds + "(MEM" + std::to_string(i) + ")";
+                                                                 ZDSReadOpts read_opts{.zds = &zds, .dsname = member_path};
+                                                                 results[i] = zds_read(read_opts, contents[i]);
+                                                               });
+                                        }
+
+                                        for (auto &t : threads)
+                                          t.join();
+
+                                        for (int i = 0; i < thread_count; ++i)
+                                        {
+                                          ExpectWithContext(results[i], contents[i]).ToBe(0);
+                                          Expect(contents[i]).ToContain("content for member " + std::to_string(i));
+                                        }
+                                      },
+                                      concurrent_opts);
+
+                                   it("should not block concurrent reads of the same PDSE member: fopen(r) uses SHR not exclusive ENQ",
+                                      [&]() -> void
+                                      {
+                                        const std::string ds = get_random_ds();
+                                        _ds.push_back(ds);
+                                        _create_ds(ds, "--dsorg PO --dirblk 5 --dsntype LIBRARY");
+
+                                        const std::string expected = "shared member content";
+                                        const std::string write_cmd = "echo '" + expected + "' | " +
+                                                                      zowex_command + " data-set write '" + ds + "(SHARED)'";
+                                        std::string setup_response;
+                                        const int setup_rc = execute_command_with_output(write_cmd, setup_response);
+                                        ExpectWithContext(setup_rc, setup_response).ToBe(0);
+
+                                        const int thread_count = 4;
+                                        std::vector<int> results(thread_count, -1);
+                                        std::vector<std::string> contents(thread_count);
+                                        std::vector<std::thread> threads;
+
+                                        for (int i = 0; i < thread_count; ++i)
+                                        {
+                                          threads.emplace_back([&, i]()
+                                                               {
+                                                                 ZDS zds = {};
+                                                                 const std::string member_path = ds + "(SHARED)";
+                                                                 ZDSReadOpts read_opts{.zds = &zds, .dsname = member_path};
+                                                                 results[i] = zds_read(read_opts, contents[i]);
+                                                               });
+                                        }
+
+                                        for (auto &t : threads)
+                                          t.join();
+
+                                        for (int i = 0; i < thread_count; ++i)
+                                        {
+                                          ExpectWithContext(results[i], contents[i]).ToBe(0);
+                                          Expect(contents[i]).ToContain(expected);
+                                        }
+                                      },
+                                      concurrent_opts);
+                                 });
                       });
              describe("write",
                       [&]() -> void
@@ -1846,7 +1942,12 @@ void zowex_ds_tests()
                                  {
                                    TEST_OPTIONS concurrent_opts = {false, 60};
 
-                                   it("should handle concurrent writes to different PDSE members",
+                                   // ENQ rname = DSNAME+MEMBER (member-level): different members don't conflict at ENQ.
+                                   // RESERVE rname = DSNAME (PDSE-level): all concurrent BPAM writes to the same PDSE
+                                   // compete for the same RESERVE regardless of member. EXCLUSIVE+RET=USE means the
+                                   // holder gets RC=0; concurrent requestors get RC=4 immediately. At least one write
+                                   // must succeed, and every member that was written must contain coherent data.
+                                   it("should serialize concurrent BPAM writes to the same PDSE via RESERVE: even across different members",
                                       [&]() -> void
                                       {
                                         const std::string ds = get_random_ds();
@@ -1856,98 +1957,90 @@ void zowex_ds_tests()
                                         const int thread_count = 4;
                                         std::vector<std::thread> threads;
                                         std::vector<int> results(thread_count, -1);
+                                        std::vector<std::string> errors(thread_count);
 
                                         for (int i = 0; i < thread_count; ++i)
                                         {
                                           threads.emplace_back([&, i]()
                                                                {
-                                                                 std::string response;
-                                                                 const std::string member = "MEM" + std::to_string(i);
-                                                                 const std::string command = "echo 'thread " + std::to_string(i) + " data' | " +
-                                                                                             zowex_command + " data-set write '" + ds + "(" + member + ")'";
-                                                                 results[i] = execute_command_with_output(command, response); });
+                                                                 ZDS zds = {};
+                                                                 const std::string data = "thread " + std::to_string(i) + " data";
+                                                                 ZDSWriteOpts write_opts{.zds = &zds, .dsname = ds + "(MEM" + std::to_string(i) + ")"};
+                                                                 results[i] = zds_write(write_opts, data);
+                                                                 errors[i] = zds.diag.e_msg;
+                                                               });
                                         }
 
                                         for (auto &t : threads)
                                           t.join();
 
-                                        for (int i = 0; i < thread_count; ++i)
-                                        {
-                                          ExpectWithContext(results[i], "Thread " + std::to_string(i) + " write failed").ToBe(0);
-
-                                          std::string response;
-                                          const std::string member = "MEM" + std::to_string(i);
-                                          const std::string command = zowex_command + " data-set view '" + ds + "(" + member + ")'";
-                                          int rc = -1;
-                                          constexpr int max_view_retries = 3;
-                                          for (int attempt = 0; attempt < max_view_retries && rc != 0; ++attempt)
-                                          {
-                                            if (attempt > 0)
-                                              usleep(500000);
-                                            rc = execute_command_with_output(command, response);
-                                          }
-                                          ExpectWithContext(rc, response).ToBe(0);
-                                          Expect(response).ToContain("thread " + std::to_string(i) + " data");
-                                        }
-                                      },
-                                      concurrent_opts);
-
-                                   // The following tests require a controlled environment and manual verification.
-                                   // Key areas to investigate:
-                                   //   - Logger thread safety: concurrent calls to zlogger from multiple threads
-                                   //     may interleave or corrupt log output. Verify output integrity.
-                                   //   - Mutual tenancy: z/OS ENQ/RESERVE must prevent simultaneous exclusive
-                                   //     writes from different users or processes to the same data set.
-                                   //     Verify that the second writer receives a proper error or waits.
-                                   it("should handle concurrent writes to the same PDS member gracefully",
-                                      [&]() -> void
-                                      {
-                                        const std::string ds = get_random_ds();
-                                        _ds.push_back(ds);
-                                        _create_ds(ds, "--dsorg PO --dirblk 5 --dsntype LIBRARY");
-
-                                        const int thread_count = 4;
-                                        std::vector<std::thread> threads;
-                                        std::vector<int> results(thread_count, -1);
-
-                                        for (int i = 0; i < thread_count; ++i)
-                                        {
-                                          threads.emplace_back([&, i]()
-                                                               {
-                                                                 std::string response;
-                                                                 const std::string command = "echo 'thread " + std::to_string(i) + " data' | " +
-                                                                                             zowex_command + " data-set write '" + ds + "(SHARED)'";
-                                                                 results[i] = execute_command_with_output(command, response); });
-                                        }
-
-                                        for (auto &t : threads)
-                                          t.join();
-
-                                        // z/OS ENQ serializes writes to the same member - at least one write must succeed
+                                        // RESERVE (PDSE-level) serializes all BPAM writes: at least one must succeed
                                         int successes = 0;
                                         for (int i = 0; i < thread_count; ++i)
                                           if (results[i] == 0)
                                             ++successes;
                                         Expect(successes).ToBeGreaterThan(0);
 
-                                        // Member must be readable and contain coherent data from one of the writes
-                                        std::string response;
-                                        const std::string view_cmd = zowex_command + " data-set view '" + ds + "(SHARED)'";
-                                        int rc = -1;
-                                        constexpr int max_view_retries = 3;
-                                        for (int attempt = 0; attempt < max_view_retries && rc != 0; ++attempt)
-                                        {
-                                          if (attempt > 0)
-                                            usleep(500000);
-                                          rc = execute_command_with_output(view_cmd, response);
-                                        }
-                                        ExpectWithContext(rc, response).ToBe(0);
-
-                                        bool has_thread_data = false;
+                                        // Every member that was written must contain coherent data from its thread
                                         for (int i = 0; i < thread_count; ++i)
-                                          if (response.find("thread " + std::to_string(i) + " data") != std::string::npos)
-                                            has_thread_data = true;
-                                        Expect(has_thread_data).ToBe(true);
+                                        {
+                                          if (results[i] != 0)
+                                            continue;
+                                          ZDS read_zds = {};
+                                          std::string content;
+                                          ZDSReadOpts read_opts{.zds = &read_zds, .dsname = ds + "(MEM" + std::to_string(i) + ")"};
+                                          ExpectWithContext(zds_read(read_opts, content), content).ToBe(0);
+                                          Expect(content).ToContain("thread " + std::to_string(i) + " data");
+                                        }
+                                      },
+                                      concurrent_opts);
+
+                                   // Same member = same ENQ rname. ENQ uses EXCLUSIVE+RET=USE: the holder gets RC=0,
+                                   // concurrent requestors get RC=4 immediately (no wait). At least one write must
+                                   // succeed, and the final content must come from exactly one write (no interleaving).
+                                   it("should serialize concurrent writes to the same PDSE member via exclusive ENQ",
+                                      [&]() -> void
+                                      {
+                                        const std::string ds = get_random_ds();
+                                        _ds.push_back(ds);
+                                        _create_ds(ds, "--dsorg PO --dirblk 5 --dsntype LIBRARY");
+
+                                        const int thread_count = 4;
+                                        std::vector<std::thread> threads;
+                                        std::vector<int> results(thread_count, -1);
+
+                                        for (int i = 0; i < thread_count; ++i)
+                                        {
+                                          threads.emplace_back([&, i]()
+                                                               {
+                                                                 ZDS zds = {};
+                                                                 const std::string data = "thread " + std::to_string(i) + " data";
+                                                                 ZDSWriteOpts write_opts{.zds = &zds, .dsname = ds + "(SHARED)"};
+                                                                 results[i] = zds_write(write_opts, data);
+                                                               });
+                                        }
+
+                                        for (auto &t : threads)
+                                          t.join();
+
+                                        // At least one write must succeed
+                                        int successes = 0;
+                                        for (int i = 0; i < thread_count; ++i)
+                                          if (results[i] == 0)
+                                            ++successes;
+                                        Expect(successes).ToBeGreaterThan(0);
+
+                                        // Content must be coherent: from exactly one thread, not interleaved
+                                        ZDS read_zds = {};
+                                        std::string content;
+                                        ZDSReadOpts read_opts{.zds = &read_zds, .dsname = ds + "(SHARED)"};
+                                        ExpectWithContext(zds_read(read_opts, content), content).ToBe(0);
+
+                                        int matching_threads = 0;
+                                        for (int i = 0; i < thread_count; ++i)
+                                          if (content.find("thread " + std::to_string(i) + " data") != std::string::npos)
+                                            ++matching_threads;
+                                        Expect(matching_threads).ToBe(1);
                                       },
                                       concurrent_opts);
                                  });
