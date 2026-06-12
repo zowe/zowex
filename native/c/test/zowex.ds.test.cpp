@@ -918,17 +918,23 @@ void zowex_ds_tests()
                         {
                           ZJB zjb = {0};
                           std::string jobid;
-                          int rc = zjb_submit(&zjb, jcl, jobid);
+                          const int rc = zjb_submit(&zjb, jcl, jobid);
                           if (rc != 0)
                             throw std::runtime_error("Failed to submit JCL: " + std::string(zjb.diag.e_msg));
                           TestLog("Submitted job " + jobid + " (" + std::to_string(jcl.size()) + " bytes)");
-                          if (!wait_for_job(jobid, max_polls))
-                            throw std::runtime_error("Timed out waiting for job " + jobid);
                           const std::string correlator(zjb.correlator, sizeof(zjb.correlator));
-                          ZJB zjb_v = {0};
                           ZJob final_job = {};
-                          if (zjb_view(&zjb_v, correlator, final_job) != 0)
-                            throw std::runtime_error("Failed to view job: " + std::string(zjb_v.diag.e_msg));
+                          for (int i = 0; i < max_polls; ++i)
+                          {
+                            ZJB zjb_v = {0};
+                            final_job = {};
+                            const int vrc = zjb_view(&zjb_v, correlator, final_job);
+                            if (vrc != 0)
+                              throw std::runtime_error("Failed to view job: " + std::string(zjb_v.diag.e_msg));
+                            if (!final_job.retcode.empty())
+                              break;
+                            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                          }
                           TestLog("Job " + jobid + " retcode='" + final_job.retcode + "'");
                           if (check_rc && final_job.retcode.find("CC 0000") == std::string::npos)
                             throw std::runtime_error("Job failed with retcode='" + final_job.retcode + "'");

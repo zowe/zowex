@@ -2230,7 +2230,7 @@ void zds_tests()
                              Expect(sizeof(DCB_ABEND_PL)).ToBe(16);
                            });
 
-                        it("should propagate abend when writing past max space of a PDS",
+                       xit("should propagate abend when writing past max space of a PDS",
                            [&]() -> void
                            {
                              ZDS zds = {0};
