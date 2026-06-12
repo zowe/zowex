@@ -273,6 +273,20 @@ ZJSON_SCHEMA(ViewSyslogResponse,
     FIELD_OPTIONAL(hasMore, BOOL)
 );
 
+struct ListProclibResponse {};
+ZJSON_SCHEMA(ListProclibResponse,
+    FIELD_REQUIRED(success, BOOL),
+    FIELD_REQUIRED_ARRAY(items, STRING),
+    FIELD_REQUIRED(returnedRows, NUMBER)
+);
+
+struct ListApfResponse {};
+ZJSON_SCHEMA(ListApfResponse,
+    FIELD_REQUIRED(success, BOOL),
+    FIELD_REQUIRED_ARRAY(items, ANY),
+    FIELD_REQUIRED(returnedRows, NUMBER)
+);
+
 struct ToolSearchResponse {};
 ZJSON_SCHEMA(ToolSearchResponse,
     FIELD_REQUIRED(success, BOOL),
