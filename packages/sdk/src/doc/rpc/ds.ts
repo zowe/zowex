@@ -233,13 +233,45 @@ export interface WriteDatasetResponse extends common.CommandResponse {
 }
 
 export interface CopyDatasetRequest extends common.CommandRequest {
+    /**
+     * Source dataset name to copy from
+     */
     source: string;
 
+    /**
+     * Target dataset name to copy to
+     */
     target: string;
 
+    /**
+     * Whether to replace the target dataset if it already exists
+     */
     replace?: boolean;
 
+    /**
+     * Whether to overwrite the target dataset if it already exists
+     */
     overwrite?: boolean;
 }
 
-export type CopyDatasetResponse = common.CommandResponse;
+export interface CopyDatasetResponse extends common.CommandResponse {
+    /**
+     * Whether the target dataset was created
+     */
+    targetCreated?: boolean;
+
+    /**
+     * Whether the target member was created
+     */
+    memberCreated?: boolean;
+
+    /**
+     * Whether the target dataset was overwritten
+     */
+    overwrite?: boolean;
+
+    /**
+     * Whether the target dataset was replaced
+     */
+    replace?: boolean;
+}

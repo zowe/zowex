@@ -139,7 +139,9 @@ int handle_tool_search(InvocationContext &context)
   zds_write(write_opts, data);
   if (0 != rc)
   {
-    context.error_stream() << "Error: could not write to dd: '" << "sysin" << "' rc: '" << rc << "'" << std::endl;
+    context.error_stream() << "Error: could not write to dd: '"
+                           << "sysin"
+                           << "' rc: '" << rc << "'" << std::endl;
     context.error_stream() << "  Details: " << zds.diag.e_msg << std::endl;
     return RTNCD_FAILURE;
   }
@@ -165,7 +167,9 @@ int handle_tool_search(InvocationContext &context)
   rc = zds_read(superc_read_opts, output);
   if (0 != rc)
   {
-    context.error_stream() << "Error: could not read from dd: '" << "OUTDD" << "' rc: '" << rc << "'" << std::endl;
+    context.error_stream() << "Error: could not read from dd: '"
+                           << "OUTDD"
+                           << "' rc: '" << rc << "'" << std::endl;
     context.error_stream() << "  Details: " << superc_zds.diag.e_msg << std::endl;
     zut_free_dynalloc_dds(diag, dds);
     return RTNCD_FAILURE;
@@ -209,7 +213,9 @@ int handle_tool_amblist(InvocationContext &context)
   zds_write(write_opts, statements);
   if (0 != rc)
   {
-    context.error_stream() << "Error: could not write to dd: '" << "sysin" << "' rc: '" << rc << "'" << std::endl;
+    context.error_stream() << "Error: could not write to dd: '"
+                           << "sysin"
+                           << "' rc: '" << rc << "'" << std::endl;
     context.error_stream() << "  Details: " << zds.diag.e_msg << std::endl;
     zut_free_dynalloc_dds(diag, dds);
     return RTNCD_FAILURE;
@@ -231,7 +237,9 @@ int handle_tool_amblist(InvocationContext &context)
   rc = zds_read(amblist_read_opts, output);
   if (0 != rc)
   {
-    context.error_stream() << "Error: could not read from dd: '" << "SYSPRINT" << "' rc: '" << rc << "'" << std::endl;
+    context.error_stream() << "Error: could not read from dd: '"
+                           << "SYSPRINT"
+                           << "' rc: '" << rc << "'" << std::endl;
     context.error_stream() << "  Details: " << amblist_zds.diag.e_msg << std::endl;
     zut_free_dynalloc_dds(diag, dds);
     return RTNCD_FAILURE;
