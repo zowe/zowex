@@ -6,6 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- `python`: Fixed compilation of Python bindings on z/OS by passing required Language Environment feature macros `_EXT` and `_OPEN_SYS_FILE_EXT` to the compiler in `setup.py`.
 - `c`: Fixed an issue where the `zowex ds copy` command would fail to allocate DDs when copying PDS members in parallel. [#994](https://github.com/zowe/zowex/issues/994)
 - `c`: Added support for listing APF and PROCLIB data sets to JSON-RPC server.
 - `c`: Optimized Adler32 calculations to compute e-tags incrementally during streamed data set downloads. This significantly reduces memory footprint and resolves a failure when downloading large data sets. [#1016](https://github.com/zowe/zowex/issues/1016)
