@@ -1,0 +1,15 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    assignees:
+      - ATorrise
+      - CBForZ
+      - jace-roell
+      - MarkAckert
+      - pujal0909
+      - t1m0thyj
+      - traeok
+      - zFernand0
