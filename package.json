@@ -18,7 +18,7 @@
     "tools": "tsx scripts/buildTools.ts",
     "watch": "npm run watch --workspaces",
     "watch:all": "concurrently \"npm run z:watch\" \"npm run watch\"",
-    "z:all": "npm run z:rebuild && npm run z:test && npm run z:package",
+    "z:all": "npm run z:rebuild && npm run z:package && npm run z:test",
     "z:artifacts": "tsx scripts/buildTools.ts artifacts",
     "z:build": "tsx scripts/buildTools.ts build",
     "z:build:python": "tsx scripts/buildTools.ts build:python",
@@ -45,8 +45,8 @@
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.13.4",
     "@types/ssh2": "^1.15.4",
-    "@vitest/coverage-v8": "^3.2.4",
-    "@vitest/ui": "^3.2.4",
+    "@vitest/coverage-v8": "^3.2.6",
+    "@vitest/ui": "^3.2.6",
     "@zowe/imperative": "^8.30.1",
     "@zowe/secrets-for-zowe-sdk": "^8.24.2",
     "chokidar": "^3",
@@ -58,6 +58,6 @@
     "rimraf": "^6.0.1",
     "ssh2": "^1.16.0",
     "tsx": "^4.19.3",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.6"
   }
 }

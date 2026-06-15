@@ -53,7 +53,7 @@ jobs:
                 user: "${{ secrets.SSH_MARIST_ZNP_ID }}"
                 password: "${{ secrets.SSH_MARIST_ZNP_PASS }}"
               deployDir: "/ZOWE/tmp/zowex"
-              preBuildCmd: "export PATH=/usr/lpp/IBM/cnw/v2r1/openxl/bin:$PATH"
+              preBuildCmd: "export PATH=/usr/lpp/IBM/cnw/v2r2/openxl/bin:$PATH"
           EOF
 
       - name: Install Dependencies
@@ -64,7 +64,7 @@ jobs:
         run: npm pkg set version=${{ inputs.version }}
 
       - name: Build on z/OS
-        run: npm run z:all
+        run: npm run z:rebuild && npm run z:package
 
       - uses: actions/upload-artifact@v4
         with:
@@ -86,6 +86,9 @@ jobs:
           message: |
             Server artifacts:
              - PAX: ${{ steps.pax-artifact-upload.outputs.artifact-url }}
+
+      - name: Test on z/OS
+        run: npm run z:test
 
       - name: Test Report
         uses: dorny/test-reporter@v2

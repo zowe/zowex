@@ -170,7 +170,8 @@ int handle_uss_list(InvocationContext &context)
 
   ZUSF zusf{};
   std::string response;
-  rc = zusf_list_uss_file_path(&zusf, uss_file, response, list_options, use_csv_format);
+  std::vector<ZusfListEntry> entries;
+  rc = zusf_list_uss_file_path(&zusf, uss_file, response, list_options, use_csv_format, use_csv_format ? &entries : nullptr);
   if (0 != rc)
   {
     context.error_stream() << "Error: could not list USS files: '" << uss_file << "' rc: '" << rc << "'" << std::endl;
@@ -187,59 +188,32 @@ int handle_uss_list(InvocationContext &context)
     const auto result = obj();
     const auto entries_array = arr();
 
-    // Parse CSV lines
-    std::stringstream ss(response);
-    std::string line;
-    int row_count = 0;
-
-    while (std::getline(ss, line))
+    for (const auto& list_entry : entries)
     {
-      if (line.empty())
-      {
-        continue;
-      }
-
       const auto entry = obj();
 
       if (list_options.long_format)
       {
-        // Parse CSV fields: mode,links,user,group,size,tag,date,name
-        std::vector<std::string> fields;
-        std::stringstream line_ss(line);
-        std::string field;
-
-        while (std::getline(line_ss, field, ','))
-        {
-          fields.push_back(field);
-        }
-
-        // We should have 8 fields: mode, links, user, group, size, filetag, mtime, name
-        if (fields.size() < 8)
-        {
-          continue;
-        }
-
-        entry->set("mode", str(fields[0]));
-        entry->set("links", i64(atoi(fields[1].c_str())));
-        entry->set("user", str(fields[2]));
-        entry->set("group", str(fields[3]));
-        entry->set("size", i64(atoi(fields[4].c_str())));
-        entry->set("filetag", str(fields[5]));
-        entry->set("mtime", str(fields[6]));
-        entry->set("name", str(fields[7]));
+        entry->set("mode", str(list_entry.mode));
+        entry->set("links", i64(list_entry.links));
+        entry->set("user", str(list_entry.user));
+        entry->set("group", str(list_entry.group));
+        entry->set("size", i64(list_entry.size));
+        entry->set("filetag", str(list_entry.filetag));
+        entry->set("mtime", str(list_entry.mtime));
+        entry->set("name", str(list_entry.name));
       }
       else
       {
         // Simple format: just the name
-        entry->set("name", str(line));
+        entry->set("name", str(list_entry.name));
       }
 
       entries_array->push(entry);
-      row_count++;
     }
 
     result->set("items", entries_array);
-    result->set("returnedRows", i64(row_count));
+    result->set("returnedRows", i64(entries.size()));
     context.set_object(result);
   }
 
@@ -440,8 +414,20 @@ int handle_uss_chmod(InvocationContext &context)
   long long mode = context.get<long long>("mode", 0);
   if (mode == 0 && !context.get<std::string>("mode", "").empty())
   {
-    context.error_stream() << "Error: invalid mode provided.\nExamples of valid modes: 777, 0644" << std::endl;
-    return RTNCD_FAILURE;
+    std::string mode_str = context.get<std::string>("mode", "");
+    if (mode_str.find_first_not_of("01234567") != std::string::npos || mode_str.length() < 3 || mode_str.length() > 4) {
+      context.error_stream() << "Error: invalid octal mode provided. Examples of valid modes: 777, 0644" << std::endl;
+      return RTNCD_FAILURE;
+    }
+    try
+    {
+      mode = std::stoll(mode_str);
+    }
+    catch (...)
+    {
+      context.error_stream() << "Error: invalid mode provided.\nExamples of valid modes: 777, 0644" << std::endl;
+      return RTNCD_FAILURE;
+    }
   }
 
   std::string file_path = context.get<std::string>("file-path", "");

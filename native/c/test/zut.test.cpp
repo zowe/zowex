@@ -17,6 +17,8 @@
 #include "zut.hpp"
 #include "../zlogger.hpp"
 #include "zstorage.metal.test.h"
+#include "zutils.hpp"
+#include "../zds.hpp"
 
 using namespace ztst;
 
@@ -862,6 +864,212 @@ void zut_tests()
                              std::string roundtrip = zut_encode(result, "IBM-870", "IBM-1047", diag);
                              expect(diag.e_msg_len).ToBe(0);
                              expect(roundtrip).ToBe(input_str);
+                           });
+                      });
+
+             describe("zut_set_dd_with_padding",
+                      []() -> void
+                      {
+                        it("should pad a short DD name with spaces to 8 characters",
+                           []() -> void
+                           {
+                             char arr[8] = {0};
+                             zut_set_dd_with_padding(arr, "ABC");
+                             expect(std::string(arr, 8)).ToBe("ABC     ");
+                           });
+
+                        it("should handle an exact 8-character DD name without modification",
+                           []() -> void
+                           {
+                             char arr[8] = {0};
+                             zut_set_dd_with_padding(arr, "LONGNAME");
+                             expect(std::string(arr, 8)).ToBe("LONGNAME");
+                           });
+
+                        it("should truncate a DD name that exceeds 8 characters",
+                           []() -> void
+                           {
+                             char arr[8] = {0};
+                             zut_set_dd_with_padding(arr, "TOOLONGNAME");
+                             expect(std::string(arr, 8)).ToBe("TOOLONGN");
+                           });
+
+                        it("should fill with binary zeros for an empty DD name",
+                           []() -> void
+                           {
+                             char arr[8];
+                             memset(arr, 0x41, 8);
+                             zut_set_dd_with_padding(arr, "");
+                             for (int i = 0; i < 8; i++)
+                             {
+                               expect((int)(unsigned char)arr[i]).ToBe(0);
+                             }
+                           });
+
+                        it("should fill with binary zeros for a nullptr DD name",
+                           []() -> void
+                           {
+                             char arr[8];
+                             memset(arr, 0x41, 8);
+                             zut_set_dd_with_padding(arr, nullptr);
+                             for (int i = 0; i < 8; i++)
+                             {
+                               expect((int)(unsigned char)arr[i]).ToBe(0);
+                             }
+                           });
+                      });
+
+             describe("zut_iebcopy and zut_iebgener",
+                      []() -> void
+                      {
+                        // Allocates a DD using RTDDN (returned DD name) and records it for cleanup.
+                        auto alloc_rtdd = [](const std::string &cmd, unsigned int &code, std::string &resp,
+                                             std::string &ddname, std::vector<std::string> &dds) -> int
+                        {
+                          int rc = zut_bpxwdyn_rtdd(cmd, &code, resp, ddname);
+                          if (rc == RTNCD_SUCCESS)
+                            dds.emplace_back("dd(" + ddname + ")");
+                          return rc;
+                        };
+
+                        it("should run IEBGENER using step DDs when alt_dds is null",
+                           [&alloc_rtdd]() -> void
+                           {
+                             ZDS zds{};
+                             std::string src = get_random_ds(3);
+                             std::string tgt = get_random_ds(3);
+
+                             create_seq(&zds, src);
+                             create_seq(&zds, tgt);
+                             zds_write(ZDSWriteOpts{.zds = &zds, .dsname = src}, std::string("iebgener null alt_dds test data"));
+
+                             // Pre-allocate step DDs with fixed names so IEBGENER can find them
+                             // without an alternate DD list (simulates the legacy step-DD usage).
+                             ZDIAG alloc_diag{};
+                             std::vector<std::string> alloc_cmds = {
+                                 "alloc dd(SYSUT1) da('" + src + "') shr reuse",
+                                 "alloc dd(SYSUT2) da('" + tgt + "') shr reuse",
+                                 "alloc dd(SYSPRINT) new delete space(1,1) tracks lrecl(121) recfm(f,b,a) reuse",
+                                 "alloc dd(SYSIN) dummy reuse",
+                             };
+                             int alloc_rc = zut_loop_dynalloc(alloc_diag, alloc_cmds);
+                             ExpectWithContext(alloc_rc, alloc_diag.e_msg).ToBe(RTNCD_SUCCESS);
+
+                             ZDIAG diag{};
+                             int rc = zut_iebgener(diag, "", nullptr);
+
+                             ZDIAG free_diag{};
+                             std::vector<std::string> free_list = {"dd(SYSUT1)", "dd(SYSUT2)", "dd(SYSPRINT)", "dd(SYSIN)"};
+                             zut_free_dynalloc_dds(free_diag, free_list);
+
+                             ZDS cleanup{};
+                             zds_delete_dsn(&cleanup, src);
+                             zds_delete_dsn(&cleanup, tgt);
+
+                             ExpectWithContext(rc, diag.e_msg).ToBe(RTNCD_SUCCESS);
+                           });
+
+                        it("should run IEBCOPY using step DDs when alt_dds is null",
+                           [&alloc_rtdd]() -> void
+                           {
+                             ZDS zds{};
+                             std::string src = get_random_ds(3);
+                             std::string tgt = get_random_ds(3);
+
+                             create_pds(&zds, src);
+                             create_pds(&zds, tgt);
+                             zds_write(ZDSWriteOpts{.zds = &zds, .dsname = src + "(MBR)"}, std::string("iebcopy null alt_dds test data"));
+
+                             // Pre-allocate step DDs with fixed names so IEBCOPY can find them
+                             // without an alternate DD list (simulates the legacy step-DD usage).
+                             ZDIAG alloc_diag{};
+                             std::vector<std::string> alloc_cmds = {
+                                 "alloc dd(SYSUT1) da('" + src + "') shr reuse",
+                                 "alloc dd(SYSUT2) da('" + tgt + "') shr reuse",
+                                 "alloc dd(SYSIN) lrecl(80) recfm(f,b) reuse",
+                                 "alloc dd(SYSPRINT) lrecl(121) recfm(f,b,a) reuse",
+                             };
+                             int alloc_rc = zut_loop_dynalloc(alloc_diag, alloc_cmds);
+                             ExpectWithContext(alloc_rc, alloc_diag.e_msg).ToBe(RTNCD_SUCCESS);
+
+                             std::string ctrl = "  COPY OUTDD=SYSUT2,INDD=SYSUT1";
+                             zds_write(ZDSWriteOpts{.zds = &zds, .ddname = "SYSIN"}, ctrl);
+
+                             ZDIAG diag{};
+                             int rc = zut_iebcopy(diag, "", nullptr);
+
+                             ZDIAG free_diag{};
+                             std::vector<std::string> free_list = {"dd(SYSUT1)", "dd(SYSUT2)", "dd(SYSIN)", "dd(SYSPRINT)"};
+                             zut_free_dynalloc_dds(free_diag, free_list);
+
+                             ZDS cleanup{};
+                             zds_delete_dsn(&cleanup, src);
+
+                             ExpectWithContext(rc, diag.e_msg).ToBe(RTNCD_SUCCESS);
+
+                             std::string out;
+                             ZDS read_zds{};
+                             zds_read(ZDSReadOpts{.zds = &read_zds, .dsname = tgt + "(MBR)"}, out);
+                             Expect(out).ToContain("iebcopy null alt_dds test data");
+
+                             zds_delete_dsn(&cleanup, tgt);
+                           });
+
+                        // Exercises the sysut3 and sysut4 optional fields in DFSMSdfp_AltDDs.
+                        // When populated, zut_build_dfsmsdfp_dds_options extends TotalLength from
+                        // 72 (SYSUT2 only) to 80 (SYSUT3) or 88 (SYSUT3+SYSUT4), which controls
+                        // how far IEBCOPY reads into the alternate DD list. A successful copy here
+                        // confirms TotalLength is set correctly for the extended list.
+                        it("should run IEBCOPY successfully with sysut3 and sysut4 in alt_dds",
+                           [&alloc_rtdd]() -> void
+                           {
+                             ZDS zds{};
+                             std::string src = get_random_ds(3);
+                             std::string tgt = get_random_ds(3);
+                             std::vector<std::string> dds;
+                             unsigned int code = 0;
+                             std::string resp;
+
+                             create_pds(&zds, src);
+                             create_pds(&zds, tgt);
+                             zds_write(ZDSWriteOpts{.zds = &zds, .dsname = src + "(MBR)"}, std::string("sysut3 sysut4 test data"));
+
+                             std::string sysut1_dd, sysut2_dd, sysin_dd, sysprint_dd, sysut3_dd, sysut4_dd;
+                             ExpectWithContext(alloc_rtdd("alloc da('" + src + "') shr", code, resp, sysut1_dd, dds), resp).ToBe(RTNCD_SUCCESS);
+                             ExpectWithContext(alloc_rtdd("alloc da('" + tgt + "') shr", code, resp, sysut2_dd, dds), resp).ToBe(RTNCD_SUCCESS);
+                             ExpectWithContext(alloc_rtdd("alloc lrecl(80) recfm(f,b)", code, resp, sysin_dd, dds), resp).ToBe(RTNCD_SUCCESS);
+                             ExpectWithContext(alloc_rtdd("alloc lrecl(121) recfm(f,b,a)", code, resp, sysprint_dd, dds), resp).ToBe(RTNCD_SUCCESS);
+                             ExpectWithContext(alloc_rtdd("alloc new delete space(5,5) tracks recfm(f,b) lrecl(80)", code, resp, sysut3_dd, dds), resp).ToBe(RTNCD_SUCCESS);
+                             ExpectWithContext(alloc_rtdd("alloc new delete space(5,5) tracks recfm(f,b) lrecl(80)", code, resp, sysut4_dd, dds), resp).ToBe(RTNCD_SUCCESS);
+
+                             std::string ctrl = "  COPY OUTDD=" + sysut2_dd + ",INDD=" + sysut1_dd;
+                             zds_write(ZDSWriteOpts{.zds = &zds, .ddname = sysin_dd}, ctrl);
+
+                             ZDIAG diag{};
+                             DFSMSdfp_AltDDs alt_dds{
+                                 .sysin = sysin_dd,
+                                 .sysprint = sysprint_dd,
+                                 .sysut1 = sysut1_dd,
+                                 .sysut2 = sysut2_dd,
+                                 .sysut3 = sysut3_dd,
+                                 .sysut4 = sysut4_dd,
+                             };
+                             int rc = zut_iebcopy(diag, "", &alt_dds);
+
+                             ZDIAG free_diag{};
+                             zut_free_dynalloc_dds(free_diag, dds);
+
+                             ZDS cleanup{};
+                             zds_delete_dsn(&cleanup, src);
+
+                             ExpectWithContext(rc, diag.e_msg).ToBe(RTNCD_SUCCESS);
+
+                             std::string out;
+                             ZDS read_zds{};
+                             zds_read(ZDSReadOpts{.zds = &read_zds, .dsname = tgt + "(MBR)"}, out);
+                             Expect(out).ToContain("sysut3 sysut4 test data");
+
+                             zds_delete_dsn(&cleanup, tgt);
                            });
                       });
            });

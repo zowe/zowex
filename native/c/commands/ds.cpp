@@ -384,23 +384,18 @@ int handle_data_set_view(InvocationContext &context)
   if (has_pipe_path && !pipe_path.empty())
   {
     size_t content_len = 0;
-    rc = zds_read_streamed(read_opts, pipe_path, &content_len);
+    uint32_t etag_val = 0;
+    rc = zds_read_streamed(read_opts, pipe_path, &content_len, &etag_val);
 
     if (context.get<bool>("return-etag", false))
     {
-      std::string temp_content;
-      auto read_rc = zds_read(read_opts, temp_content);
-      if (read_rc == 0)
+      std::stringstream etag_stream;
+      etag_stream << std::hex << etag_val << std::dec;
+      if (!context.is_redirecting_output())
       {
-        const auto etag = zut_calc_adler32_checksum(temp_content);
-        std::stringstream etag_stream;
-        etag_stream << std::hex << etag << std::dec;
-        if (!context.is_redirecting_output())
-        {
-          context.output_stream() << "etag: " << etag_stream.str() << std::endl;
-        }
-        result->set("etag", str(etag_stream.str()));
+        context.output_stream() << "etag: " << etag_stream.str() << std::endl;
       }
+      result->set("etag", str(etag_stream.str()));
     }
 
     if (!context.is_redirecting_output())

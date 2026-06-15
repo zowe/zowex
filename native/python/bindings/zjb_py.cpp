@@ -113,7 +113,7 @@ string read_spool_file(string jobid, int key)
   ZJB zjb = {0};
 
   a2e_inplace(jobid);
-  int rc = zjb_read_jobs_output_by_key(&zjb, jobid, key, response);
+  int rc = zjb_read_job_content_by_key(&zjb, jobid, key, response);
 
   handle_zjb_error(zjb, rc);
   e2a_inplace(response);

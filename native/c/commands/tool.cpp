@@ -13,8 +13,15 @@
 #include "common_args.hpp"
 #include "../zut.hpp"
 #include "../zds.hpp"
+#include "../zjb.hpp"
 #include "../zuttype.h"
+#include "ihapsa.h"
+#include "ihaascb.h"
+#include "ihaassb.h"
+#include "iazjsab.h"
 #include <unistd.h>
+#include <map>
+#include "../zdbg.h"
 
 using namespace parser;
 using namespace commands::common;
@@ -132,7 +139,9 @@ int handle_tool_search(InvocationContext &context)
   zds_write(write_opts, data);
   if (0 != rc)
   {
-    context.error_stream() << "Error: could not write to dd: '" << "sysin" << "' rc: '" << rc << "'" << std::endl;
+    context.error_stream() << "Error: could not write to dd: '"
+                           << "sysin"
+                           << "' rc: '" << rc << "'" << std::endl;
     context.error_stream() << "  Details: " << zds.diag.e_msg << std::endl;
     return RTNCD_FAILURE;
   }
@@ -158,7 +167,9 @@ int handle_tool_search(InvocationContext &context)
   rc = zds_read(superc_read_opts, output);
   if (0 != rc)
   {
-    context.error_stream() << "Error: could not read from dd: '" << "OUTDD" << "' rc: '" << rc << "'" << std::endl;
+    context.error_stream() << "Error: could not read from dd: '"
+                           << "OUTDD"
+                           << "' rc: '" << rc << "'" << std::endl;
     context.error_stream() << "  Details: " << superc_zds.diag.e_msg << std::endl;
     zut_free_dynalloc_dds(diag, dds);
     return RTNCD_FAILURE;
@@ -202,7 +213,9 @@ int handle_tool_amblist(InvocationContext &context)
   zds_write(write_opts, statements);
   if (0 != rc)
   {
-    context.error_stream() << "Error: could not write to dd: '" << "sysin" << "' rc: '" << rc << "'" << std::endl;
+    context.error_stream() << "Error: could not write to dd: '"
+                           << "sysin"
+                           << "' rc: '" << rc << "'" << std::endl;
     context.error_stream() << "  Details: " << zds.diag.e_msg << std::endl;
     zut_free_dynalloc_dds(diag, dds);
     return RTNCD_FAILURE;
@@ -224,7 +237,9 @@ int handle_tool_amblist(InvocationContext &context)
   rc = zds_read(amblist_read_opts, output);
   if (0 != rc)
   {
-    context.error_stream() << "Error: could not read from dd: '" << "SYSPRINT" << "' rc: '" << rc << "'" << std::endl;
+    context.error_stream() << "Error: could not read from dd: '"
+                           << "SYSPRINT"
+                           << "' rc: '" << rc << "'" << std::endl;
     context.error_stream() << "  Details: " << amblist_zds.diag.e_msg << std::endl;
     zut_free_dynalloc_dds(diag, dds);
     return RTNCD_FAILURE;
@@ -290,11 +305,23 @@ int handle_tool_run(InvocationContext &context)
   std::string program = context.get<std::string>("program", "");
   std::string parms = context.get<std::string>("parms", "");
   std::vector<std::string> dds;
+  std::map<std::string, bool> dd_is_sysout;
+
+  struct psa *psa = (struct psa *)0;
+  struct ascb *ascb = (struct ascb *)psa->psaaold;
+  struct assb *assb = (struct assb *)ascb->ascbassb;
+  struct iazjsab *iezjsab = (struct iazjsab *)assb->assbjsab;
 
   const ArgumentMap &dynamic_args = context.dynamic_arguments();
   for (const auto &kv : dynamic_args)
   {
-    dds.push_back("alloc dd(" + kv.first + ") " + kv.second.get_string_value());
+    std::string dd_spec = kv.second.get_string_value();
+    dds.push_back("alloc dd(" + kv.first + ") " + dd_spec);
+
+    // Check if this DD allocation contains "sysout"
+    std::string dd_spec_lower = dd_spec;
+    std::transform(dd_spec_lower.begin(), dd_spec_lower.end(), dd_spec_lower.begin(), ::tolower);
+    dd_is_sysout[kv.first] = (dd_spec_lower.find("sysout") != std::string::npos);
   }
 
   ZDIAG diag{};
@@ -362,29 +389,80 @@ int handle_tool_run(InvocationContext &context)
   std::string outdd = context.get<std::string>("out-dd", "");
   if (outdd.length() > 0)
   {
-    std::string ddname = "DD:" + outdd;
-    std::ifstream in(ddname.c_str());
-    if (!in.is_open())
+    // Check if this DD was allocated as sysout
+    bool is_sysout = dd_is_sysout.find(outdd) != dd_is_sysout.end() && dd_is_sysout[outdd];
+
+    if (is_sysout)
     {
-      context.error_stream() << "Error: could not open output '" << ddname << "'" << std::endl;
-      if (dds.size() > 0)
+      ZJB zjb{};
+
+      std::string jobid = std::string((char *)iezjsab->jsabjbid, sizeof(iezjsab->jsabjbid));
+
+      // list all dsns on jobid
+      std::vector<ZJobDD> job_dds;
+      rc = zjb_list_dds(&zjb, jobid, job_dds);
+      if (0 != rc)
       {
-        context.error_stream() << "  Allocations: " << std::endl;
-        for (const auto &dd : dds)
+        return rc;
+      }
+
+      bool found = false;
+      std::string dsname;
+      memset(&zjb, 0, sizeof(ZJB));
+
+      for (const auto &dd : job_dds)
+      {
+        std::string dd_ddn_trimmed = dd.ddn;
+        std::string outdd_trimmed = outdd;
+        std::transform(dd_ddn_trimmed.begin(), dd_ddn_trimmed.end(), dd_ddn_trimmed.begin(), ::toupper);
+        std::transform(outdd_trimmed.begin(), outdd_trimmed.end(), outdd_trimmed.begin(), ::toupper);
+        if (zut_trim(dd_ddn_trimmed) == zut_trim(outdd_trimmed))
         {
-          context.error_stream() << "    " << dd << std::endl;
+          found = true;
+          dsname = dd.dsn;
+          memcpy(zjb.token, dd.token, sizeof(dd.token));
+          break;
         }
       }
-      zut_free_dynalloc_dds(diag, dds);
-      return RTNCD_FAILURE;
-    }
 
-    std::string line;
-    while (std::getline(in, line))
-    {
-      context.output_stream() << line << std::endl;
+      std::string output;
+      rc = zjb_read_job_content_by_dsn(&zjb, dsname, output);
+      if (0 != rc)
+      {
+        context.error_stream() << "Error: could not read from dd: '" << dsname << "' rc: '" << rc << "'" << std::endl;
+        context.error_stream() << "  Details: " << zjb.diag.e_msg << std::endl;
+        zut_free_dynalloc_dds(diag, dds);
+        return RTNCD_FAILURE;
+      }
+      context.output_stream() << output;
     }
-    in.close();
+    else
+    {
+      // Regular DD handling (existing logic)
+      std::string ddname = "DD:" + outdd;
+      std::ifstream in(ddname.c_str());
+      if (!in.is_open())
+      {
+        context.error_stream() << "Error: could not open output '" << ddname << "'" << std::endl;
+        if (dds.size() > 0)
+        {
+          context.error_stream() << "  Allocations: " << std::endl;
+          for (const auto &dd : dds)
+          {
+            context.error_stream() << "    " << dd << std::endl;
+          }
+        }
+        zut_free_dynalloc_dds(diag, dds);
+        return RTNCD_FAILURE;
+      }
+
+      std::string line;
+      while (std::getline(in, line))
+      {
+        context.output_stream() << line << std::endl;
+      }
+      in.close();
+    }
   }
 
   zut_free_dynalloc_dds(diag, dds);
@@ -461,7 +539,7 @@ void register_commands(parser::Command &root_command)
   tool_run_cmd->add_keyword_arg("out-dd",
                                 make_aliases("--out-dd", "--odd"),
                                 "output ddname", ArgType_Single, false);
-  tool_run_cmd->enable_dynamic_keywords(ArgType_Single, "dd", "ddname(s) to allocate, e.g. --sysprint \"sysout=*\" --sysut1 \"da(MY.DATA.SET) shr msg(2)\"");
+  tool_run_cmd->enable_dynamic_keywords(ArgType_Single, "dd", "ddname(s) to allocate, e.g. --sysprint \"sysout\" --sysut1 \"da(MY.DATA.SET) shr msg(2)\"");
   tool_run_cmd->set_handler(handle_tool_run);
   tool_cmd->add_command(tool_run_cmd);
 

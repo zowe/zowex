@@ -8,22 +8,84 @@
  * Copyright Contributors to the Zowe Project.
  *
  */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include "zmetal.h"
 #include "asasymbp.h"
 #include "zstorage.h"
+#include "ztype.h"
 #include "zutm.h"
 #include "ztime.h"
 #include "zutm31.h"
 #include "zam.h"
 #include "zuttype.h"
 #include "zssi.h"
+#include "csvapfaa.h"
 #include "zwto.h"
+#include "zdbg.h"
 
 #define ZUT_BPXWDYN_SERVICE_FAILURE -2
+
+typedef int (*DFSMSPGM)(
+    DFSMSdfp_OPT_LIST *PTR32,
+    DFSMSdfp_DD_LIST *PTR32) ATTRIBUTE(amode31);
+
+static const char *const zut_dfsmsdfp_names[] = {
+    [ZUTMSDFP_IEBCOPY] = "IEBCOPY",
+    [ZUTMSDFP_IEBGENER] = "IEBGENER",
+};
+
+#pragma prolog(ZUTMSDFP, " ZWEPROLG NEWDSA=(YES,4),LOC24=YES ")
+#pragma epilog(ZUTMSDFP, " ZWEEPILG ")
+int ZUTMSDFP(ZDIAG *diag, ZUTMSDFP_UTILITY *utility, DFSMSdfp_OPT_LIST *opts, DFSMSdfp_DD_LIST *ddlist)
+{
+  int rc = 0;
+
+  if ((size_t)*utility >= sizeof(zut_dfsmsdfp_names) / sizeof(zut_dfsmsdfp_names[0]))
+  {
+    ZDIAG_SET_MSG(diag, "Unknown DFSMSdfp utility index %d", (int)*utility);
+    diag->detail_rc = ZUT_RTNCD_LOAD_FAILURE;
+    return RTNCD_FAILURE;
+  }
+
+  const char *utility_name = zut_dfsmsdfp_names[*utility];
+
+  DFSMSPGM dyn_dfsms = (DFSMSPGM)load_module31(utility_name);
+
+  if (!dyn_dfsms)
+  {
+    ZDIAG_SET_MSG(diag, "Load failure for program '%.8s', not found", utility_name);
+    diag->detail_rc = ZUT_RTNCD_LOAD_FAILURE;
+    return RTNCD_FAILURE;
+  }
+
+  // below the bar
+  DFSMSdfp_OPT_LIST btb_opts = {0};
+  DFSMSdfp_DD_LIST btb_dd_list = {0};
+
+  if (opts)
+  {
+    memcpy(&btb_opts, opts, sizeof(DFSMSdfp_OPT_LIST));
+  }
+  if (ddlist)
+  {
+    memcpy(&btb_dd_list, ddlist, sizeof(DFSMSdfp_DD_LIST));
+  }
+
+  rc = dyn_dfsms(&btb_opts, (void *)((uintptr_t)&btb_dd_list.TotalLength | 0x80000000));
+
+  delete_module(utility_name);
+
+  if (0 != rc)
+  {
+    ZDIAG_SET_MSG(diag, "Execution failure for program '%.8s'", utility_name);
+    diag->detail_rc = ZUT_RTNCD_LOAD_FAILURE;
+    return RTNCD_FAILURE;
+  }
+
+  return RTNCD_SUCCESS;
+}
 
 // takes a conventional paramter list
 typedef int (*BPXWDYN)(
@@ -226,12 +288,21 @@ int ZUTSYMBP(SYMBOL_DATA *data)
 typedef int (*ISRSUPC)(void *) ATTRIBUTE(amode31);
 #pragma prolog(ZUTSRCH, " ZWEPROLG NEWDSA=(YES,4) ")
 #pragma epilog(ZUTSRCH, " ZWEEPILG ")
-
 typedef struct
 {
   short len;
   char parms[100];
 } PARMS;
+
+typedef struct
+{
+  unsigned int params[5];
+} PARAM_CHAIN31;
+
+typedef struct
+{
+  unsigned long params[5];
+} PARAM_CHAIN64;
 
 int ZUTSRCH(const char *parms)
 {
@@ -317,6 +388,29 @@ int ZUTEDSCT()
   p.len = sprintf(p.parms, "%.100s", "PPCOND,EQUATE(DEF),BITF0XL,HDRSKIP,UNIQ,LP64,LEGACY,SECT(ALL)");
   rc = convert(&p);
   delete_module("CCNEDSCT");
+  return rc;
+}
+
+#pragma prolog(ZUTMAPFQ, " ZWEPROLG NEWDSA=(YES,8) ")
+#pragma epilog(ZUTMAPFQ, " ZWEEPILG ")
+int ZUTMAPFQ(ZDIAG *diag, struct apfhdr *answer, int *answer_len, int *rsn) //, int *num_dsns, PARMLIB_DSNS *dsns)
+{
+  int rsn31 = 0;
+  int rc = 0;
+  int answer_len31 = *answer_len;
+
+  rc = zutm1apf(answer, &answer_len31, &rsn31);
+  *rsn = (rsn31 & 0x0000FFFF);
+
+  if (0 != rc)
+  {
+    ZDIAG_SET_MSG(diag, "CSVAPF failed with return code '%d' and reason code '%x'", rc, *rsn);
+    diag->detail_rc = ZUT_RTNCD_SERVICE_FAILURE;
+    diag->service_rc = rc;
+    diag->service_rsn = *rsn;
+    return RTNCD_FAILURE;
+  }
+
   return rc;
 }
 

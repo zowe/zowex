@@ -64,7 +64,7 @@ static int handle_dcb_abend(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc, const char *P
     {
       strcpy(diag->service_name, operation);
       ZDIAG_SET_MSG(diag, "DCB abend during %.16s for %8.8s data set: %44.44s",
-                                operation, ioc->ddname, ioc->jfcb.jfcbdsnm);
+                    operation, ioc->ddname, ioc->jfcb.jfcbdsnm);
       diag->detail_rc = ZDS_RTNCD_DCB_ABEND_ERROR;
     }
     return RTNCD_FAILURE;
@@ -99,7 +99,7 @@ static int enq_data_set(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
   int rc = 0;
   QNAME qname = {0};
   RNAME rname = {0};
-  strcpy(qname.value, "SPFEDIT");
+  memcpy(qname.value, "SPFEDIT ", sizeof(qname.value));
   rname.rlen = sprintf(rname.value, "%.*s%.*s", sizeof(ioc->jfcb.jfcbdsnm), ioc->jfcb.jfcbdsnm, sizeof(ioc->jfcb.jfcbelnm), ioc->jfcb.jfcbelnm);
   rc = enq(&qname, &rname);
 
@@ -160,7 +160,7 @@ static int reserve_data_set(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
   int rc = 0;
   QNAME qname_reserve = {0};
   RNAME rname_reserve = {0};
-  strcpy(qname_reserve.value, "SPFEDIT");
+  memcpy(qname_reserve.value, "SPFEDIT ", sizeof(qname_reserve.value));
   rname_reserve.rlen = sprintf(rname_reserve.value, "%.*s", sizeof(ioc->jfcb.jfcbdsnm), ioc->jfcb.jfcbdsnm);
   rc = reserve(&qname_reserve, &rname_reserve, (UCB * PTR32) ioc->ucb);
   if (0 != rc)
@@ -328,6 +328,8 @@ int open_input_vsam(ZDIAG *PTR32 diag, IO_CTRL *PTR32 *PTR32 ioc, const char *PT
 #define PREV_OCCURRENCE 0xFF02
 #define OFF_CURRENT_RECORD 0xFF03
 #define ABSOLUTE_RECORD 0xFF04
+
+// TODO(Kelosky): this should have accepted a etod_t instead of a TIME_STRUCT
 int point_input_vsam(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc, TIME_STRUCT *time_struct)
 {
   int rc = 0;
@@ -370,10 +372,9 @@ int read_input_vsam(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
 {
   int rc = 0;
 
-  DSINF dsinf = {0};
-  memcpy(dsinf.dsineye, "DSIN", sizeof(dsinf.dsineye));
+  memcpy(ioc->dsinf.dsineye, "DSIN", sizeof(ioc->dsinf.dsineye));
   IFGRPL *rplp = &ioc->rpl;
-  rplp->rplermsa = &dsinf;
+  rplp->rplermsa = &ioc->dsinf;
   rplp->rplemlen = dsinsiz1;
 
   GET(rplp, rc);
@@ -961,7 +962,7 @@ static int deq_reserve_data_set(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
   {
     QNAME qname_reserve = {0};
     RNAME rname_reserve = {0};
-    strcpy(qname_reserve.value, "SPFEDIT");
+    memcpy(qname_reserve.value, "SPFEDIT ", sizeof(qname_reserve.value));
     rname_reserve.rlen = sprintf(rname_reserve.value, "%.*s", sizeof(ioc->jfcb.jfcbdsnm), ioc->jfcb.jfcbdsnm);
     rc = deq_reserve(&qname_reserve, &rname_reserve, (UCB * PTR32) ioc->ucb);
     if (0 != rc)
@@ -987,7 +988,7 @@ static int deq_data_set(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
   {
     RNAME rname = {0};
     QNAME qname = {0};
-    strcpy(qname.value, "SPFEDIT");
+    memcpy(qname.value, "SPFEDIT ", sizeof(qname.value));
     rname.rlen = sprintf(rname.value, "%.*s%.*s", sizeof(ioc->jfcb.jfcbdsnm), ioc->jfcb.jfcbdsnm, sizeof(ioc->jfcb.jfcbelnm), ioc->jfcb.jfcbelnm);
     rc = deq(&qname, &rname);
     if (0 != rc)
