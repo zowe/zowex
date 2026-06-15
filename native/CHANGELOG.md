@@ -6,6 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- `c`: Fixed a parameter list linkage issue that caused U1120 user abends in IEBCOPY when called from AMODE64. [#1120](https://github.com/zowe/zowex/issues/1120)
 - `c`: Fixed an issue where the `zowex ds copy` command would fail to allocate DDs when copying PDS members in parallel. [#994](https://github.com/zowe/zowex/issues/994)
 - `c`: Added support for listing APF and PROCLIB data sets to JSON-RPC server.
 - `c`: Optimized Adler32 calculations to compute e-tags incrementally during streamed data set downloads. This significantly reduces memory footprint and resolves a failure when downloading large data sets. [#1016](https://github.com/zowe/zowex/issues/1016)

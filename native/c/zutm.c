@@ -8,6 +8,7 @@
  * Copyright Contributors to the Zowe Project.
  *
  */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -320,8 +321,8 @@ int ZUTSRCH(const char *parms)
 
 #pragma prolog(ZUTRUN, " ZWEPROLG NEWDSA=(YES,16),LOC24=YES ")
 #pragma epilog(ZUTRUN, " ZWEEPILG ")
-typedef int (*PGM31)(void *) ATTRIBUTE(amode31);
-typedef int (*PGM64)(void *) ATTRIBUTE(amode64);
+typedef int (*PGM31)(uintptr_t) ATTRIBUTE(amode31);
+typedef int (*PGM64)(uintptr_t) ATTRIBUTE(amode64);
 
 int ZUTRUN(ZDIAG *diag, const char *program, const char *parms)
 {
@@ -349,13 +350,41 @@ int ZUTRUN(ZDIAG *diag, const char *program, const char *parms)
     {
       ifunction &= 0xFFFFFFFFFFFFFFFEULL; // clear low bit
       PGM64 p64 = (PGM64)ifunction;
-      rc = p64(pptr);
+      rc = p64((uintptr_t)pptr | 0x8000000000000000ULL);
     }
     else
     {
       ifunction &= 0x000000007FFFFFFFULL; // clear high bit
+#if defined(__IBM_METAL__)
+      unsigned int save_area31[18] = {0};
+      unsigned int plist[1];
+      plist[0] = (unsigned int)(uintptr_t)pptr | 0x80000000U;
+      unsigned int p31_ep = (unsigned int)ifunction;
+      unsigned long long save_regs[12] = {0};
+
+      __asm(
+          " STMG  2,13,%1          Store R2-R13 for caller      \n"
+          " LGR   11,13            Save current R13 in R11      \n"
+          " LA    1,%2             R1 -> save_area31            \n"
+          " ST    11,4(,1)         Chain current R13 in Word 2  \n"
+          " LA    2,%3             R2 -> plist                  \n"
+          " L     15,%4            R15 = p31_ep                 \n"
+          " LGR   13,1             R13 -> save_area31           \n"
+          " LGR   1,2              R1 -> plist                  \n"
+          " SAM31 ,                Switch to AMODE 31           \n"
+          " LMH   2,15,=16F'0'     Clear high halves            \n"
+          " BASR  14,15            Call the program             \n"
+          " SAM64 ,                Switch back to AMODE 64      \n"
+          " LGR   13,11            Restore R13 from R11         \n"
+          " LR    %0,15            Get return code              \n"
+          " LMG   2,13,%1          Restore R2-R13               \n"
+          : "=r"(rc), "=m"(save_regs[0])
+          : "m"(save_area31), "m"(plist), "m"(p31_ep)
+          : "r0", "r1", "r14", "r15");
+#else
       PGM31 p31 = (PGM31)ifunction;
-      rc = p31(pptr);
+      rc = p31((uintptr_t)pptr | 0x80000000ULL);
+#endif
     }
   }
   else
