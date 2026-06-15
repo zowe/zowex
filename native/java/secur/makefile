@@ -11,33 +11,6 @@
 
 CXX=xlc++
 CC=xlc
-ASM=as
-
-MTL_OPTS=metal,\
- langlvl(extended),\
- sscom,\
- nolongname,\
- inline,\
- genasm,\
- inlrpt,\
- csect,\
- nose,\
- lp64,\
- list,\
- warn64,\
- optimize(2),\
- list,\
- showinc,\
- showmacro,\
- source,\
- aggregate
-
-MTL_FLAGS=-S -W "c,$(MTL_OPTS)"
-
-MACLIBS=-ISYS1.MACLIB \
- -ICBC.SCCNSAM
-
-MTL_HEADERS=-I/usr/include/metal
 
 JAVA_HOME=/usr/lpp/java/J8.0_64
 JAVA_SIDEDECK_DIR=bin/j9vm
@@ -51,8 +24,6 @@ DLL_CPP_FLAGS=-W "c,lp64,langlvl(extended),dll,xplink,exportall" \
 DLL_BND_FLAGS=-W "l,lp64,dll,dynam=dll,xplink,map,list" \
  -g \
  -qsource
-
-ASM_FLAGS=-mrent
 
 SIDEDECKPATH = $(JAVA_HOME)/$(JAVA_SIDEDECK_DIR)
 SIDEDECK = libjvm
@@ -83,5 +54,3 @@ clean:
 	rm *.lst
 	rm *.x
 	rm *.so
-	rm *.dbg
-	rm *.s
