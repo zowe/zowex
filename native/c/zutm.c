@@ -49,8 +49,7 @@ int ZUTMSDFP(ZDIAG *diag, ZUTMSDFP_UTILITY *utility, DFSMSdfp_OPT_LIST *opts, DF
 
   // Bring the utility into storage. LOAD keeps it resident across the call below and
   // yields its entry point with the module's AMODE bit set, which the trampoline uses
-  // to enter the utility in its own AMODE. A NULL result means the module was not
-  // found, so we return a clean error instead of failing downstream.
+  // to enter the utility in its own AMODE.
   void *PTR64 ep = load_module(utility_name);
   if (!ep)
   {
@@ -72,14 +71,6 @@ int ZUTMSDFP(ZDIAG *diag, ZUTMSDFP_UTILITY *utility, DFSMSdfp_OPT_LIST *opts, DF
     memcpy(&btl_dd_list, ddlist, sizeof(DFSMSdfp_DD_LIST));
   }
 
-  // Invoke the utility honoring its AMODE and returning correctly to this above-the-line
-  // (RMODE 31) caller. A plain AMODE 31 call cannot: forcing AMODE 31 entry hands the
-  // utility this program's above-the-line return address, and an AMODE 24 utility
-  // (IEBGENER) then returns with a 24-bit `BR 14` that truncates it and branches wild
-  // (S0C4). The active path (default) LOADs the module and BASSMs to it through a
-  // below-the-line trampoline so the return lands on a 24-bit address; the backup path
-  // (ZUT_DFSMS_USE_LINK) uses LINK (SVC 6) instead. Both set the parameter list's VL
-  // end-of-list bit, which the compiler would otherwise strip from a pointer argument.
   rc = zutm1sdfp((unsigned int)(uintptr_t)ep, &btl_opts, &btl_dd_list.TotalLength);
 
   delete_module(utility_name);
