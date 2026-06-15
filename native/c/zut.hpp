@@ -16,8 +16,10 @@
 #include <ostream>
 #include <iconv.h>
 #include <vector>
+#include <optional>
 #include <string>
 #include "ztype.h"
+#include "zutm.h"
 
 /**
  * @struct ZConvData
@@ -31,6 +33,37 @@ struct ZConvData
   char *output_buffer;    /**< Pointer to output buffer. */
   char *output_iter;      /**< Pointer to current position in output buffer. */
 };
+
+/**
+ * @brief Structure holding alternate DD names for DFSMSdfp utilities.
+ */
+struct DFSMSdfp_AltDDs
+{
+  const std::string &sysin;
+  const std::string &sysprint;
+  const std::string &sysut1;
+  const std::string &sysut2;
+  std::optional<std::string> sysut3;
+  std::optional<std::string> sysut4;
+};
+
+/**
+ * @brief Run IEBCOPY utility
+ * @param diag Reference to diagnostic information structure
+ * @param opts Options string
+ * @param options Pointer to DFSMSdfp_DD_Options structure
+ * @return Return code (0 for success, non-zero for error)
+ */
+int zut_iebcopy(ZDIAG &diag, const std::string &opts, const DFSMSdfp_AltDDs *options);
+
+/**
+ * @brief Run IEBGENER utility
+ * @param diag Reference to diagnostic information structure
+ * @param opts Options string
+ * @param options Pointer to DFSMSdfp_ALT_DDS structure
+ * @return Return code (0 for success, non-zero for error)
+ */
+int zut_iebgener(ZDIAG &diag, const std::string &opts, const DFSMSdfp_AltDDs *options);
 
 /**
  * @brief Strips the last character from input if it's a newline.
@@ -81,14 +114,23 @@ int zut_search(const std::string &input);
  * @param parms The parameters string to execute
  * @return Return code (0 for success, non-zero for error)
  */
-int zut_run(ZDIAG &diag, const std::string &input, const std::string &parms);
+int zut_run(const std::string &program);
 
 /**
  * @brief Run a specified command or operation
+ * @param diag Reference to diagnostic information structure
  * @param input The command string to execute
+ * @param parms The parameters string to execute
  * @return Return code (0 for success, non-zero for error)
  */
-int zut_run(const std::string &input);
+int zut_run(ZDIAG &diag, const std::string &input, const std::string &parms);
+
+/**
+ * @brief Set a DD name in char array with padded spaces, or binary zeros for null.
+ * @param arr The 8-byte character array to set
+ * @param ddname The DD name to set
+ */
+void zut_set_dd_with_padding(char arr[8], const char *ddname);
 
 /**
  * @brief Substitute a symbol in a string
