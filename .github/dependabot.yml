@@ -5,6 +5,7 @@ updates:
     schedule:
       interval: "daily"
     assignees:
+      - ATorrise
       - CBForZ
       - jace-roell
       - MarkAckert
