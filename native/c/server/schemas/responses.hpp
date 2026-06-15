@@ -172,7 +172,11 @@ ZJSON_SCHEMA(WriteDatasetResponse,
 
 struct CopyDatasetResponse {};
 ZJSON_SCHEMA(CopyDatasetResponse,
-    FIELD_REQUIRED(success, BOOL)
+    FIELD_REQUIRED(success, BOOL),
+    FIELD_OPTIONAL(targetCreated, BOOL),
+    FIELD_OPTIONAL(memberCreated, BOOL),
+    FIELD_OPTIONAL(overwrite, BOOL),
+    FIELD_OPTIONAL(replace, BOOL)
 );
 
 struct CancelJobResponse {};
@@ -267,6 +271,20 @@ ZJSON_SCHEMA(ViewSyslogResponse,
     FIELD_OPTIONAL(endTime, STRING),
     FIELD_OPTIONAL(returnedLines, NUMBER),
     FIELD_OPTIONAL(hasMore, BOOL)
+);
+
+struct ListProclibResponse {};
+ZJSON_SCHEMA(ListProclibResponse,
+    FIELD_REQUIRED(success, BOOL),
+    FIELD_REQUIRED_ARRAY(items, STRING),
+    FIELD_REQUIRED(returnedRows, NUMBER)
+);
+
+struct ListApfResponse {};
+ZJSON_SCHEMA(ListApfResponse,
+    FIELD_REQUIRED(success, BOOL),
+    FIELD_REQUIRED_ARRAY(items, ANY),
+    FIELD_REQUIRED(returnedRows, NUMBER)
 );
 
 struct ToolSearchResponse {};

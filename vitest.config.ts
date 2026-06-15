@@ -31,6 +31,7 @@ export default defineConfig({
                 "**/*.test.ts",
                 "**/node_modules/**",
                 "**/*.js",
+                "**/__mocks__/**",
             ],
         },
         include: ["tests/**/*.test.ts"],

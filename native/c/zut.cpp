@@ -11,7 +11,7 @@
 
 #ifndef _XOPEN_SOURCE
 #define _XOPEN_SOURCE
-#include "zdbg.h"
+#include "ztype.h"
 #endif
 
 #define _OPEN_SYS_EXT
@@ -39,7 +39,6 @@
 #include <_Nascii.h>
 #include "csvapfaa.h"
 #include "iefjsqry.h"
-#include "zdbg.h"
 
 void zut_strip_final_newline(std::string &input)
 {
@@ -382,6 +381,88 @@ int zut_run(const std::string &program)
 {
   ZDIAG diag{};
   return ZUTRUN(&diag, program.c_str(), nullptr);
+}
+
+/**
+ * @brief Build DFSMSdfp DD options for use with zutm utilities.
+ * @param dd_list Reference to DFSMSdfp DD list built by this function.
+ * @param alt_dds Reference to DFSMSdfp ALT DD options.
+ * @return void
+ */
+static void zut_build_dfsmsdfp_dds_options(DFSMSdfp_DD_LIST &dd_list, const DFSMSdfp_AltDDs &alt_dds)
+{
+  // represents length of the DD list in IEBCOPY_ALT_DDS
+  // see https://www.ibm.com/docs/en/SSLTBW_3.1.0/pdf/idau100_v3r1.pdf, "ddname List"
+  constexpr uint16_t DD_LEN_SYSUT2 = 72;
+  constexpr uint16_t DD_LEN_SYSUT3 = 80;
+  constexpr uint16_t DD_LEN_SYSUT4 = 88;
+
+  uint16_t len = DD_LEN_SYSUT2;
+  zut_set_dd_with_padding(dd_list.sysin, alt_dds.sysin.c_str());
+  zut_set_dd_with_padding(dd_list.sysprint, alt_dds.sysprint.c_str());
+  zut_set_dd_with_padding(dd_list.sysut1, alt_dds.sysut1.c_str());
+  zut_set_dd_with_padding(dd_list.sysut2, alt_dds.sysut2.c_str());
+  if (alt_dds.sysut3.has_value())
+  {
+    zut_set_dd_with_padding(dd_list.sysut3, alt_dds.sysut3.value().c_str());
+    len = DD_LEN_SYSUT3;
+  }
+  if (alt_dds.sysut4.has_value())
+  {
+    zut_set_dd_with_padding(dd_list.sysut4, alt_dds.sysut4.value().c_str());
+    len = DD_LEN_SYSUT4;
+  }
+  dd_list.TotalLength = len;
+}
+
+/**
+ * @brief Run zutm DFSMSdfp utility with the given options and DD list.
+ * @param diag Reference to diagnostic information structure.
+ * @param utility Which supported DFSMSdfp utility to run.
+ * @param opts Options string for the DFSMSdfp utility.
+ * @param alt_dds Alternate DD options for the DFSMSdfp utility.
+ * @return The return code from the service.
+ */
+static int zut_dfsmsdfp(ZDIAG &diag, ZUTMSDFP_UTILITY utility, const std::string &opts, const DFSMSdfp_AltDDs *alt_dds)
+{
+  DFSMSdfp_OPT_LIST opt_list = {0};
+  DFSMSdfp_DD_LIST dd_list = {0};
+
+  if (!opts.empty())
+  {
+    opt_list.len = snprintf(opt_list.str, sizeof(opt_list.str) - 1, "%s", opts.c_str());
+  }
+
+  if (alt_dds)
+  {
+    zut_build_dfsmsdfp_dds_options(dd_list, *alt_dds);
+  }
+
+  return ZUTMSDFP(&diag, &utility, &opt_list, &dd_list);
+}
+
+int zut_iebcopy(ZDIAG &diag, const std::string &opts, const DFSMSdfp_AltDDs *alt_dd_list)
+{
+  return zut_dfsmsdfp(diag, ZUTMSDFP_IEBCOPY, opts, alt_dd_list);
+}
+
+int zut_iebgener(ZDIAG &diag, const std::string &opts, const DFSMSdfp_AltDDs *alt_dd_list)
+{
+  return zut_dfsmsdfp(diag, ZUTMSDFP_IEBGENER, opts, alt_dd_list);
+}
+
+void zut_set_dd_with_padding(char arr[8], const char *ddname)
+{
+  if (ddname && ddname[0] != '\0')
+  {
+    memset(arr, ' ', 8); // Pad with spaces for standard DD format
+    size_t len = strlen(ddname);
+    memcpy(arr, ddname, len > 8 ? 8 : len);
+  }
+  else
+  {
+    memset(arr, 0, 8); // Binary zeros
+  }
 }
 
 unsigned char zut_get_key()
