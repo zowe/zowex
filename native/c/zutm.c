@@ -27,10 +27,6 @@
 
 #define ZUT_BPXWDYN_SERVICE_FAILURE -2
 
-typedef int (*DFSMSPGM)(
-    DFSMSdfp_OPT_LIST *PTR32,
-    DFSMSdfp_DD_LIST *PTR32) ATTRIBUTE(amode31);
-
 static const char *const zut_dfsmsdfp_names[] = {
     [ZUTMSDFP_IEBCOPY] = "IEBCOPY",
     [ZUTMSDFP_IEBGENER] = "IEBGENER",
@@ -51,29 +47,40 @@ int ZUTMSDFP(ZDIAG *diag, ZUTMSDFP_UTILITY *utility, DFSMSdfp_OPT_LIST *opts, DF
 
   const char *utility_name = zut_dfsmsdfp_names[*utility];
 
-  DFSMSPGM dyn_dfsms = (DFSMSPGM)load_module31(utility_name);
-
-  if (!dyn_dfsms)
+  // Bring the utility into storage. LOAD keeps it resident across the call below and
+  // yields its entry point with the module's AMODE bit set, which the trampoline uses
+  // to enter the utility in its own AMODE. A NULL result means the module was not
+  // found, so we return a clean error instead of failing downstream.
+  void *PTR64 ep = load_module(utility_name);
+  if (!ep)
   {
     ZDIAG_SET_MSG(diag, "Load failure for program '%.8s', not found", utility_name);
     diag->detail_rc = ZUT_RTNCD_LOAD_FAILURE;
     return RTNCD_FAILURE;
   }
 
-  // below the bar
-  DFSMSdfp_OPT_LIST btb_opts = {0};
-  DFSMSdfp_DD_LIST btb_dd_list = {0};
+  // Below the line: IEBCOPY is AMODE 31, IEBGENER is AMODE24
+  DFSMSdfp_OPT_LIST btl_opts = {0};
+  DFSMSdfp_DD_LIST btl_dd_list = {0};
 
   if (opts)
   {
-    memcpy(&btb_opts, opts, sizeof(DFSMSdfp_OPT_LIST));
+    memcpy(&btl_opts, opts, sizeof(DFSMSdfp_OPT_LIST));
   }
   if (ddlist)
   {
-    memcpy(&btb_dd_list, ddlist, sizeof(DFSMSdfp_DD_LIST));
+    memcpy(&btl_dd_list, ddlist, sizeof(DFSMSdfp_DD_LIST));
   }
 
-  rc = dyn_dfsms(&btb_opts, (void *)((uintptr_t)&btb_dd_list.TotalLength | 0x80000000));
+  // Invoke the utility honoring its AMODE and returning correctly to this above-the-line
+  // (RMODE 31) caller. A plain AMODE 31 call cannot: forcing AMODE 31 entry hands the
+  // utility this program's above-the-line return address, and an AMODE 24 utility
+  // (IEBGENER) then returns with a 24-bit `BR 14` that truncates it and branches wild
+  // (S0C4). The active path (default) LOADs the module and BASSMs to it through a
+  // below-the-line trampoline so the return lands on a 24-bit address; the backup path
+  // (ZUT_DFSMS_USE_LINK) uses LINK (SVC 6) instead. Both set the parameter list's VL
+  // end-of-list bit, which the compiler would otherwise strip from a pointer argument.
+  rc = zutm1sdfp((unsigned int)(uintptr_t)ep, &btl_opts, &btl_dd_list.TotalLength);
 
   delete_module(utility_name);
 

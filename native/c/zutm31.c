@@ -12,10 +12,19 @@
 #include "zutm31.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
+#include "zstorage.h"
 #include "zdbg.h"
 #include "zwto.h"
 #include "iefzpmap.h"
+
+// Below-the-line trampoline used to invoke the DFSMSdfp utilities (zutucall.s).
+// ZUTUCALL is position independent: we copy it into 24-bit storage and run the
+// copy. ZUTUCALQ returns its length in bytes (for the copy).
+int ZUTUCALL();
+int ZUTUCALQ();
+typedef int (*ZUTUCALL_FN)(unsigned int ep, void *PTR32 parm_list, void *PTR32 save_area) ATTRIBUTE(amode31);
 
 #if defined(__IBM_METAL__)
 #ifndef _IAZJSAB_DSECT
@@ -136,6 +145,43 @@ int zutm1apf(struct apfhdr *answer, int *answer_len, int *rsn)
   int rc = 0;
   CSVAPF_MODEL(csvapfm);
   CSVAPF(answer, answer_len, rc, *rsn, csvapfm);
+  return rc;
+}
+
+#pragma prolog(zutm1sdfp, " ZWEPROLG NEWDSA=(YES,4),LOC24=YES ")
+#pragma epilog(zutm1sdfp, " ZWEEPILG ")
+int zutm1sdfp(unsigned int ep, void *PTR32 opt_list, void *PTR32 ddname_list)
+{
+  int rc = 0;
+
+  // Problem-program parameter list (R1) passed to the utility: the option-list
+  // address followed by the ddname-list address, with the high-order (VL) bit set
+  // on the last entry to mark the end of the list. unsigned int to prevent metal c
+  // stripping away the high-order bit as part of pointer optimization.
+  unsigned int parm_list[2];
+  parm_list[0] = (unsigned int)(uintptr_t)opt_list;
+  parm_list[1] = (unsigned int)(uintptr_t)ddname_list | 0x80000000U;
+
+  // Copy the position-independent trampoline (zutucall.s) into 24-bit storage and
+  // run the copy, so AMODE 24 utilities with "BR 14" return lands below the line.
+  int tlen = ZUTUCALQ();
+  void *PTR32 tramp = storage_obtain24(tlen);
+  int (*src)() = ZUTUCALL;
+  memcpy(tramp, (void *)src, tlen);
+
+  // 18-word save area for the utility, below the line.
+  unsigned int save_area[18] = {0};
+
+  // Run the copy: R1 -> { entry point (with AMODE bit), parm list, save area }.
+  union
+  {
+    void *PTR32 addr;
+    ZUTUCALL_FN fn;
+  } call = {.addr = tramp};
+  rc = call.fn(ep, parm_list, save_area);
+
+  storage_release(tlen, tramp);
+
   return rc;
 }
 

@@ -20,4 +20,10 @@ int zutm1lpl(ZDIAG *, int *, PARMLIB_DSNS *) ATTRIBUTE(amode31);
 int zutm1gur(char[8]) ATTRIBUTE(amode31);
 int zutm1apf(struct apfhdr *, int *, int *) ATTRIBUTE(amode31);
 
+// Invoke a DFSMSdfp utility program (IEBCOPY/IEBGENER), passing the utility's
+// two-entry parameter list (option-list address + ddname-list address, VL-terminated).
+// This function honors AMODE 24 and return correctly to this above-the-line caller.
+// The parameter list itself is specific to the DFSMSdfp utilities.
+int zutm1sdfp(unsigned int ep, void *PTR32 opt_list, void *PTR32 ddname_list) ATTRIBUTE(amode31);
+
 #endif

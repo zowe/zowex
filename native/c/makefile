@@ -139,13 +139,13 @@ LIBZUT_LOGGER_OBJ=$(OUT_DIR)/zlogger_metal.o
 LIBZUT_LOGGER_OBJ=
 .END
 
-$(OUT_DIR)/libzut.so: $(OUT_DIR)/zut.o $(OUT_DIR)/zutm.o $(OUT_DIR)/zam.o $(OUT_DIR)/zam24.o $(OUT_DIR)/zutm31.o $(LIBZUT_LOGGER_OBJ)
+$(OUT_DIR)/libzut.so: $(OUT_DIR)/zut.o $(OUT_DIR)/zutm.o $(OUT_DIR)/zam.o $(OUT_DIR)/zam24.o $(OUT_DIR)/zutucall.o $(OUT_DIR)/zutm31.o $(LIBZUT_LOGGER_OBJ)
 	@echo 'Building $(OUT_DIR)/libzut.so'
 	$(CXX) $(DLL_BND_FLAGS) -o $@ $^
 
 libzut.so: $(OUT_DIR) $(OUT_DIR)/libzut.so
 
-$(OUT_DIR)/libzut.a: $(OUT_DIR)/zut.o $(OUT_DIR)/zutm.o $(OUT_DIR)/zam.o $(OUT_DIR)/zam24.o $(OUT_DIR)/zutm31.o $(LIBZUT_LOGGER_OBJ)
+$(OUT_DIR)/libzut.a: $(OUT_DIR)/zut.o $(OUT_DIR)/zutm.o $(OUT_DIR)/zam.o $(OUT_DIR)/zam24.o $(OUT_DIR)/zutucall.o $(OUT_DIR)/zutm31.o $(LIBZUT_LOGGER_OBJ)
 	@echo 'Building $(OUT_DIR)/libzut.a'
 	ar -rv $@ $^
 
@@ -333,6 +333,13 @@ $(OUT_DIR)/zjsonm.o: $(OUT_DIR)/zjsonm.s
 #
 $(OUT_DIR)/zam24.o: zam24.s
 	@echo 'Building $(OUT_DIR)/zam24.o'
+	$(ASM) $(ASM_FLAGS) -a=$*.s.lst $(MACLIBS) -o $@ $^
+
+#
+# ZUTUCALL (below-the-line trampoline for invoking DFSMSdfp utilities)
+#
+$(OUT_DIR)/zutucall.o: zutucall.s
+	@echo 'Building $(OUT_DIR)/zutucall.o'
 	$(ASM) $(ASM_FLAGS) -a=$*.s.lst $(MACLIBS) -o $@ $^
 
 #
