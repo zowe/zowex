@@ -58,7 +58,8 @@ int ZUTMSDFP(ZDIAG *diag, ZUTMSDFP_UTILITY *utility, DFSMSdfp_OPT_LIST *opts, DF
     return RTNCD_FAILURE;
   }
 
-  // Below the line: IEBCOPY is AMODE 31, IEBGENER is AMODE24
+  // Below the line: the option list, the ddname list, and the parameter list must all be
+  // 24-bit addressable. This function's DSA is LOC24, so these locals are below the line.
   DFSMSdfp_OPT_LIST btl_opts = {0};
   DFSMSdfp_DD_LIST btl_dd_list = {0};
 
@@ -71,7 +72,15 @@ int ZUTMSDFP(ZDIAG *diag, ZUTMSDFP_UTILITY *utility, DFSMSdfp_OPT_LIST *opts, DF
     memcpy(&btl_dd_list, ddlist, sizeof(DFSMSdfp_DD_LIST));
   }
 
-  rc = zutm1sdfp((unsigned int)(uintptr_t)ep, &btl_opts, &btl_dd_list.TotalLength);
+  // Problem-program parameter list (R1) for the utility: the option-list address followed
+  // by the ddname-list address, with the high-order (VL) end-of-list bit set on the last
+  // entry. Built as integer words so the compiler does not strip the VL bit while
+  // sanitizing a pointer argument for the AMODE 31 call.
+  unsigned int parm_list[2];
+  parm_list[0] = (unsigned int)(uintptr_t)&btl_opts;
+  parm_list[1] = (unsigned int)(uintptr_t)&btl_dd_list.TotalLength | 0x80000000U;
+
+  rc = zutm1call((unsigned int)(uintptr_t)ep, parm_list);
 
   delete_module(utility_name);
 
@@ -318,7 +327,6 @@ int ZUTSRCH(const char *parms)
 
 #pragma prolog(ZUTRUN, " ZWEPROLG NEWDSA=(YES,16),LOC24=YES ")
 #pragma epilog(ZUTRUN, " ZWEEPILG ")
-typedef int (*PGM31)(void *) ATTRIBUTE(amode31);
 typedef int (*PGM64)(void *) ATTRIBUTE(amode64);
 
 int ZUTRUN(ZDIAG *diag, const char *program, const char *parms)
@@ -345,15 +353,18 @@ int ZUTRUN(ZDIAG *diag, const char *program, const char *parms)
 
     if (ifunction & 0x00000000000000001ULL)
     {
-      ifunction &= 0xFFFFFFFFFFFFFFFEULL; // clear low bit
+      ifunction &= 0xFFFFFFFFFFFFFFFEULL; // clear low (AMODE-64) bit
       PGM64 p64 = (PGM64)ifunction;
       rc = p64(pptr);
     }
     else
     {
-      ifunction &= 0x000000007FFFFFFFULL; // clear high bit
-      PGM31 p31 = (PGM31)ifunction;
-      rc = p31(pptr);
+      // AMODE 31 or 24: route through the 24-bit trampoline, which enters the program in
+      // its own AMODE (from the entry-point bit) and returns correctly to this
+      // above-the-line caller.
+      unsigned int plist[1];
+      plist[0] = (unsigned int)(uintptr_t)pptr | 0x80000000U; // single parm + VL bit
+      rc = zutm1call((unsigned int)ifunction, plist);
     }
   }
   else

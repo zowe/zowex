@@ -148,28 +148,26 @@ int zutm1apf(struct apfhdr *answer, int *answer_len, int *rsn)
   return rc;
 }
 
-#pragma prolog(zutm1sdfp, " ZWEPROLG NEWDSA=(YES,4),LOC24=YES ")
-#pragma epilog(zutm1sdfp, " ZWEEPILG ")
-int zutm1sdfp(unsigned int ep, void *PTR32 opt_list, void *PTR32 ddname_list)
+// Invoke a dynamically loaded module through the below-the-line trampoline (zutucall.s),
+// honoring the module's AMODE so it returns correctly to this above-the-line (RMODE 31)
+// caller.
+//   ep   - entry point from load_module. May not work for `load_module31` (AMODE stripped)
+//   parm - the caller-built, VL-terminated R1 parameter list, below the 16 MB line
+#pragma prolog(zutm1call, " ZWEPROLG NEWDSA=(YES,4),LOC24=YES ")
+#pragma epilog(zutm1call, " ZWEEPILG ")
+int zutm1call(unsigned int ep, void *PTR32 parm)
 {
   int rc = 0;
 
-  // Problem-program parameter list (R1) passed to the utility: the option-list
-  // address followed by the ddname-list address, with the high-order (VL) bit set
-  // on the last entry to mark the end of the list. unsigned int to prevent metal c
-  // stripping away the high-order bit as part of pointer optimization.
-  unsigned int parm_list[2];
-  parm_list[0] = (unsigned int)(uintptr_t)opt_list;
-  parm_list[1] = (unsigned int)(uintptr_t)ddname_list | 0x80000000U;
-
-  // Copy the position-independent trampoline (zutucall.s) into 24-bit storage and
-  // run the copy, so AMODE 24 utilities with "BR 14" return lands below the line.
+  // Copy the position-independent trampoline into 24-bit storage and run the copy, so an
+  // AMODE 24 module's "BR 14" return lands on a below-the-line (24-bit) address.
   int tlen = ZUTUCALQ();
   void *PTR32 tramp = storage_obtain24(tlen);
   int (*src)() = ZUTUCALL;
   memcpy(tramp, (void *)src, tlen);
 
-  // 18-word save area for the utility, below the line.
+  // 18-word save area for the called module, below the line (this DSA is LOC24). Allocated
+  // per call, so the path is reentrant.
   unsigned int save_area[18] = {0};
 
   // Run the copy: R1 -> { entry point (with AMODE bit), parm list, save area }.
@@ -178,7 +176,7 @@ int zutm1sdfp(unsigned int ep, void *PTR32 opt_list, void *PTR32 ddname_list)
     void *PTR32 addr;
     ZUTUCALL_FN fn;
   } call = {.addr = tramp};
-  rc = call.fn(ep, parm_list, save_area);
+  rc = call.fn(ep, parm, save_area);
 
   storage_release(tlen, tramp);
 
