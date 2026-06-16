@@ -1114,13 +1114,6 @@ void zowex_ds_tests()
                        });
             // CA Disk archival/restore is tested manually via native/c/test/test.cadisk.sh.
             // See doc/ref/ds/ca-disk.md for instructions.
-            describe("archived (CA Disk)",
-                     [&]() -> void
-                     {
-                       xit("should archive a data set via DARCHIVE TSO command", []() -> void {});
-                       xit("should restore a CA Disk-archived data set", []() -> void {});
-                       xit("should fail to restore a non-existent archived data set", []() -> void {});
-                     });
             // Manual test for https://github.com/zowe/zowex/issues/1007
             // Bug: "data-set restore" returns success for a data set that was never archived.
             //
