@@ -747,8 +747,9 @@ void zds_tests()
                            {
                              ZDS zds = {};
                              ZDSCopyOptions opts{};
-                             std::string src = get_user() + ".TEST.PDS@#$";
-                             std::string tgt = get_user() + ".TEST.TGT#@$";
+                             std::string base = get_random_ds(3);
+                             std::string src = base + ".PDS@#$";
+                             std::string tgt = base + ".TGT#@$";
                              created_dsns.push_back(src);
                              created_dsns.push_back(tgt);
 
@@ -1290,6 +1291,17 @@ void zds_tests()
                                     cleanup_jcl += "/*\n";
                                     submit_and_wait(cleanup_jcl, 200);
 
+                                    // Volume is required for systems that are not SMS managed
+                                    ZDS zds = {0};
+                                    std::string temp_dsn = get_random_ds(3, user);
+                                    created_dsns.push_back(temp_dsn);
+                                    create_seq(&zds, temp_dsn);
+                                    std::vector<ZDSEntry> entries;
+                                    int rc = zds_list_data_sets(&zds, temp_dsn, entries, true);
+                                    if (rc != 0 || entries.empty())
+                                      throw std::runtime_error("Failed to list data sets: " + std::string(zds.diag.e_msg));
+                                    std::string vsam_vol = entries[0].volser;
+
                                     std::string setup_jcl;
                                     setup_jcl += "//VSAMSET$ JOB IZUACCT\n";
                                     setup_jcl += "//STEP1    EXEC PGM=IDCAMS\n";
@@ -1301,6 +1313,7 @@ void zds_tests()
                                     setup_jcl += "    KEYS(8 0) -\n";
                                     setup_jcl += "    RECORDSIZE(80 80) -\n";
                                     setup_jcl += "    TRACKS(5 5) -\n";
+                                    setup_jcl += "    VOLUMES(" + vsam_vol + ") -\n";
                                     setup_jcl += "    SHAREOPTIONS(2 3) )\n";
                                     setup_jcl += "  DEFINE AIX ( -\n";
                                     setup_jcl += "    NAME(" + ksds_aix_dsn + ") -\n";
@@ -1308,6 +1321,7 @@ void zds_tests()
                                     setup_jcl += "    KEYS(8 32) -\n";
                                     setup_jcl += "    RECORDSIZE(80 80) -\n";
                                     setup_jcl += "    TRACKS(5 5) -\n";
+                                    setup_jcl += "    VOLUMES(" + vsam_vol + ") -\n";
                                     setup_jcl += "    SHAREOPTIONS(2 3) -\n";
                                     setup_jcl += "    UPGRADE )\n";
                                     setup_jcl += "  DEFINE PATH ( -\n";
@@ -1319,6 +1333,7 @@ void zds_tests()
                                     setup_jcl += "    NONINDEXED -\n";
                                     setup_jcl += "    RECORDSIZE(80 80) -\n";
                                     setup_jcl += "    TRACKS(5 5) -\n";
+                                    setup_jcl += "    VOLUMES(" + vsam_vol + ") -\n";
                                     setup_jcl += "    SHAREOPTIONS(2 3) )\n";
                                     setup_jcl += "  DEFINE AIX ( -\n";
                                     setup_jcl += "    NAME(" + esds_aix_dsn + ") -\n";
@@ -1326,6 +1341,7 @@ void zds_tests()
                                     setup_jcl += "    KEYS(8 0) -\n";
                                     setup_jcl += "    RECORDSIZE(80 80) -\n";
                                     setup_jcl += "    TRACKS(5 5) -\n";
+                                    setup_jcl += "    VOLUMES(" + vsam_vol + ") -\n";
                                     setup_jcl += "    SHAREOPTIONS(2 3) -\n";
                                     setup_jcl += "    UPGRADE )\n";
                                     setup_jcl += "  DEFINE PATH ( -\n";

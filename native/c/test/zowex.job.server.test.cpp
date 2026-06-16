@@ -27,7 +27,8 @@ using namespace ztst;
 static std::string e2a_convert(const std::string &ebcdic_str)
 {
   std::string ascii_str = ebcdic_str;
-  if (!ascii_str.empty()) {
+  if (!ascii_str.empty())
+  {
     __e2a_s(&ascii_str[0]);
   }
   return ascii_str;
@@ -35,7 +36,8 @@ static std::string e2a_convert(const std::string &ebcdic_str)
 
 void zowex_job_server_tests()
 {
-  describe("jobs server tests", []() -> void {
+  describe("jobs server tests", []() -> void
+           {
     static ServerHandle server;
     static std::vector<std::string> clean_jobs;
     static std::vector<std::string> clean_ds;
@@ -279,6 +281,7 @@ void zowex_job_server_tests()
       int req_id;
       std::string request = make_rpc_request("holdJob", "{\"jobId\":\"" + held_jobid + "\"}", req_id);
       
+      std::this_thread::sleep_for(std::chrono::milliseconds(500));
       write_to_server(server, request);
       std::string response = read_rpc_response(server);
 
@@ -317,6 +320,5 @@ void zowex_job_server_tests()
 
       Expect(response).ToContain("\"success\":true");
       Expect(response).ToContain("\"id\":" + std::to_string(req_id));
-    });
-  });
+    }); });
 }
