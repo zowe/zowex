@@ -32,6 +32,7 @@ struct ZDSMem
   int mnorc;
   std::string user;
   bool sclm;
+  bool stats_valid;
 };
 
 struct ZDSEntry
