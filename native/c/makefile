@@ -19,7 +19,7 @@ MTL_HEADERS=$(MTL_HEADERS_BASE) -I./chdsect
 
 C_FLAGS=$(C_FLAGS_BASE) -I./chdsect
 CPP_FLAGS=$(CPP_FLAGS_BASE) -I./chdsect
-SWIG_FLAGS=$(SWIG_FLAGS_BASE) -I./chdsect -MMD -MP
+SWIG_FLAGS=$(SWIG_FLAGS_BASE) -I./chdsect -MP
 
 # make -DBuildType=DEBUG or -DBuildType=RELEASE
 .IF $(BuildType) == DEBUG

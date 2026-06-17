@@ -21,24 +21,27 @@ zusf_py_module = Extension("_zusf_py",
                            include_dirs=[chdsect],
                            libraries=["zut"],
                            library_dirs=[build_out_path],
+                           extra_compile_args=["-D_EXT", "-D_OPEN_SYS_FILE_EXT=1"],
                            )
 
 zds_py_module = Extension("_zds_py",
-                          sources=["zds_py_wrap.cxx", "zds_py.cpp"],
+                          sources=["zds_py_wrap.cxx", "zds_py.cpp",
+                                   f"{C_PATH}/zds.cpp", f"{C_PATH}/zut.cpp"],
                           language="c++",
                           extra_objects=[
                               f"{build_out_path}/zdsm.o",
                               f"{build_out_path}/zutm.o",
                               f"{build_out_path}/zam.o",
+                              f"{build_out_path}/zam24.o",
                               f"{build_out_path}/zutm31.o",
-                              f"{swig_build_path}/zds.o",
-                              f"{swig_build_path}/zut.o",
                           ],
                           include_dirs=[chdsect, ztype],
+                          extra_compile_args=["-D_EXT", "-D_OPEN_SYS_FILE_EXT=1"],
                           )
 
 zjb_py_module = Extension("_zjb_py",
-                          sources=["zjb_py_wrap.cxx", "zjb_py.cpp"],
+                          sources=["zjb_py_wrap.cxx", "zjb_py.cpp",
+                                   f"{C_PATH}/zjb.cpp", f"{C_PATH}/zut.cpp", f"{C_PATH}/zds.cpp"],
                           language="c++",
                           extra_objects=[
                               f"{build_out_path}/zjbm.o",
@@ -46,11 +49,10 @@ zjb_py_module = Extension("_zjb_py",
                               f"{build_out_path}/zutm31.o",
                               f"{build_out_path}/zam.o",
                               f"{build_out_path}/zdsm.o",
-                              f"{swig_build_path}/zjb.o",
-                              f"{swig_build_path}/zut.o",
-                              f"{swig_build_path}/zds.o",
+                              f"{build_out_path}/zam24.o",
                           ],
                           include_dirs=[chdsect, ztype],
+                          extra_compile_args=["-D_EXT", "-D_OPEN_SYS_FILE_EXT=1"],
                           )
 
 # Parse environment variable for selective building
