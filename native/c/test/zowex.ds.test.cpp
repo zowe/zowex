@@ -909,7 +909,7 @@ void zowex_ds_tests()
                       [&]() -> void
                       {
                         const std::string user = get_user();
-                        const std::string base = get_random_ds(2, user);
+                        const std::string base = get_random_ds(3, user);
                         const std::string gdg_base_dsn = base + ".GDG";
                         const std::string gdg_gen1_dsn = gdg_base_dsn + ".G0001V00";
                         const std::string gdg_gen2_dsn = gdg_base_dsn + ".G0002V00";
