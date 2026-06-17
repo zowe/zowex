@@ -27,7 +27,7 @@
 #include "zowex.test.hpp"
 #include "zowex.ds.test.hpp"
 #include "../zusf.hpp"
-
+#include "../zjb.hpp"
 using namespace ztst;
 
 // Generic helper function for creating data sets
@@ -905,6 +905,178 @@ void zowex_ds_tests()
                              Expect(response).ToContain("N");
                            });
                       });
+             describe("GDG",
+                      [&]() -> void
+                      {
+                        const std::string user = get_user();
+                        const std::string base = get_random_ds(3, user);
+                        const std::string gdg_base_dsn = base + ".GDG";
+                        const std::string gdg_gen1_dsn = gdg_base_dsn + ".G0001V00";
+                        const std::string gdg_gen2_dsn = gdg_base_dsn + ".G0002V00";
+
+                        auto submit_and_wait = [](const std::string &jcl, int max_polls = 600, bool check_rc = false)
+                        {
+                          ZJB zjb = {0};
+                          std::string jobid;
+                          const int rc = zjb_submit(&zjb, jcl, jobid);
+                          if (rc != 0)
+                            throw std::runtime_error("Failed to submit JCL: " + std::string(zjb.diag.e_msg));
+                          TestLog("Submitted job " + jobid + " (" + std::to_string(jcl.size()) + " bytes)");
+                          const std::string correlator(zjb.correlator, sizeof(zjb.correlator));
+                          ZJob final_job = {};
+                          for (int i = 0; i < max_polls; ++i)
+                          {
+                            ZJB zjb_v = {0};
+                            final_job = {};
+                            const int vrc = zjb_view(&zjb_v, correlator, final_job);
+                            if (vrc != 0)
+                              throw std::runtime_error("Failed to view job: " + std::string(zjb_v.diag.e_msg));
+                            if (!final_job.retcode.empty())
+                              break;
+                            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                          }
+                          TestLog("Job " + jobid + " retcode='" + final_job.retcode + "'");
+                          if (check_rc && final_job.retcode.find("CC 0000") == std::string::npos)
+                            throw std::runtime_error("Job failed with retcode='" + final_job.retcode + "'");
+                        };
+
+                        TEST_OPTIONS gdg_opts = {false, 60};
+
+                        beforeAll([&]() -> void
+                                  {
+                                    // Clean up any leftover data sets from previous test runs
+                                    std::string cleanup_jcl;
+                                    cleanup_jcl += "//GDGCLN$ JOB IZUACCT\n";
+                                    cleanup_jcl += "//STEP1    EXEC PGM=IDCAMS\n";
+                                    cleanup_jcl += "//SYSPRINT DD SYSOUT=*\n";
+                                    cleanup_jcl += "//SYSIN    DD *\n";
+                                    cleanup_jcl += "  DELETE " + gdg_gen2_dsn + " NONVSAM PURGE\n";
+                                    cleanup_jcl += "  DELETE " + gdg_gen1_dsn + " NONVSAM PURGE\n";
+                                    cleanup_jcl += "  DELETE " + gdg_base_dsn + " GDG PURGE\n";
+                                    cleanup_jcl += "  SET MAXCC = 0\n";
+                                    cleanup_jcl += "/*\n";
+                                    submit_and_wait(cleanup_jcl, 200);
+
+                                    // Define the GDG base via IDCAMS
+                                    std::string setup_jcl;
+                                    setup_jcl += "//GDGSET$ JOB IZUACCT\n";
+                                    setup_jcl += "//STEP1    EXEC PGM=IDCAMS\n";
+                                    setup_jcl += "//SYSPRINT DD SYSOUT=*\n";
+                                    setup_jcl += "//SYSIN    DD *\n";
+                                    setup_jcl += "  DEFINE GDG ( -\n";
+                                    setup_jcl += "    NAME(" + gdg_base_dsn + ") -\n";
+                                    setup_jcl += "    LIMIT(5) -\n";
+                                    setup_jcl += "    NOEMPTY -\n";
+                                    setup_jcl += "    NOSCRATCH )\n";
+                                    setup_jcl += "/*\n";
+                                    submit_and_wait(setup_jcl, 200, true);
+
+                                    // Create generation 1 via IEBGENER
+                                    std::string gen1_jcl;
+                                    gen1_jcl += "//GDGGEN1 JOB IZUACCT\n";
+                                    gen1_jcl += "//STEP1    EXEC PGM=IEBGENER\n";
+                                    gen1_jcl += "//SYSPRINT DD SYSOUT=*\n";
+                                    gen1_jcl += "//SYSIN    DD DUMMY\n";
+                                    gen1_jcl += "//SYSUT1   DD *\n";
+                                    gen1_jcl += "GENERATION ONE CONTENT\n";
+                                    gen1_jcl += "/*\n";
+                                    gen1_jcl += "//SYSUT2   DD DSN=" + gdg_base_dsn + "(+1),DISP=(NEW,CATLG),\n";
+                                    gen1_jcl += "//            UNIT=SYSALLDA,SPACE=(TRK,(1,1)),\n";
+                                    gen1_jcl += "//            RECFM=FB,LRECL=80,BLKSIZE=800\n";
+                                    submit_and_wait(gen1_jcl, 600, true);
+
+                                    // Create generation 2 via IEBGENER
+                                    std::string gen2_jcl;
+                                    gen2_jcl += "//GDGGEN2 JOB IZUACCT\n";
+                                    gen2_jcl += "//STEP1    EXEC PGM=IEBGENER\n";
+                                    gen2_jcl += "//SYSPRINT DD SYSOUT=*\n";
+                                    gen2_jcl += "//SYSIN    DD DUMMY\n";
+                                    gen2_jcl += "//SYSUT1   DD *\n";
+                                    gen2_jcl += "GENERATION TWO CONTENT\n";
+                                    gen2_jcl += "/*\n";
+                                    gen2_jcl += "//SYSUT2   DD DSN=" + gdg_base_dsn + "(+1),DISP=(NEW,CATLG),\n";
+                                    gen2_jcl += "//            UNIT=SYSALLDA,SPACE=(TRK,(1,1)),\n";
+                                    gen2_jcl += "//            RECFM=FB,LRECL=80,BLKSIZE=800\n";
+                                    submit_and_wait(gen2_jcl, 600, true); },
+                                  gdg_opts);
+
+                        afterAll([&]() -> void
+                                 {
+                                   std::string del_jcl;
+                                   del_jcl += "//GDGDEL$ JOB IZUACCT\n";
+                                   del_jcl += "//STEP1    EXEC PGM=IDCAMS\n";
+                                   del_jcl += "//SYSPRINT DD SYSOUT=*\n";
+                                   del_jcl += "//SYSIN    DD *\n";
+                                   del_jcl += "  DELETE " + gdg_gen2_dsn + " NONVSAM PURGE\n";
+                                   del_jcl += "  DELETE " + gdg_gen1_dsn + " NONVSAM PURGE\n";
+                                   del_jcl += "  DELETE " + gdg_base_dsn + " GDG PURGE\n";
+                                   del_jcl += "  SET MAXCC = 0\n";
+                                   del_jcl += "/*\n";
+                                   submit_and_wait(del_jcl, 200); },
+                                 gdg_opts);
+
+                        it("should list the GDG base in the catalog",
+                           [&]() -> void
+                           {
+                             std::string response;
+                             const std::string command = zowex_command + " data-set list " + gdg_base_dsn + " --no-warn";
+                             const int rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain(gdg_base_dsn);
+                           },
+                           gdg_opts);
+
+                        it("should report ?????? volser for GDG base when listing with attributes",
+                           [&]() -> void
+                           {
+                             std::string response;
+                             const std::string command = zowex_command + " data-set list " + gdg_base_dsn + " -a --rfc";
+                             const int rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain("??????");
+                           },
+                           gdg_opts);
+
+                        it("should list GDG generations using a wildcard pattern",
+                           [&]() -> void
+                           {
+                             std::string response;
+                             const std::string command = zowex_command + " data-set list '" + gdg_base_dsn + ".*' --no-warn";
+                             const int rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain(gdg_gen1_dsn);
+                             Expect(response).ToContain(gdg_gen2_dsn);
+                           },
+                           gdg_opts);
+
+                        it("should view the content of a GDG generation by absolute name",
+                           [&]() -> void
+                           {
+                             std::string response;
+                             const std::string command = zowex_command + " data-set view " + gdg_gen1_dsn;
+                             const int rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain("GENERATION ONE CONTENT");
+                           },
+                           gdg_opts);
+
+                        it("should view the most recent GDG generation via relative reference",
+                           [&]() -> void
+                           {
+                             std::string response;
+                             const std::string command = zowex_command + " data-set view '" + gdg_base_dsn + "(0)'";
+                             const int rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain("GENERATION TWO CONTENT");
+                           },
+                           gdg_opts);
+
+                        // TODO: https://github.com/zowe/zowex/issues/666
+                        xit("should delete a specific GDG generation", []() -> void {});
+                        xit("should delete a GDG base when it has no active generations", []() -> void {});
+                        xit("should delete a GDG base and all its generations", []() -> void {});
+                        xit("should error when deleting a GDG base with active generations without the PURGE option", []() -> void {});
+                      });
              // TODO: https://github.com/zowe/zowex/issues/380
              xdescribe("restore",
                        [&]() -> void
@@ -940,7 +1112,23 @@ void zowex_ds_tests()
                          // TODO: What do?
                          xit("should fail to restore if not authorized", [&]() -> void {});
                        });
-             describe("view",
+            // CA Disk archival/restore is tested manually via native/c/test/test.cadisk.sh.
+            // See doc/ref/ds/ca-disk.md for instructions.
+            // Manual test for https://github.com/zowe/zowex/issues/1007
+            // Bug: "data-set restore" returns success for a data set that was never archived.
+            //
+            // To verify manually once the fix is in place:
+            //   1. Create a plain data set (never archived):
+            //        zowex data-set create HLQ.UNARCHIVED --dsorg PS
+            //   2. Attempt to restore it:
+            //        zowex data-set restore HLQ.UNARCHIVED
+            //   3. Expected (after fix): non-zero RC and a message such as
+            //        "Error: data set 'HLQ.UNARCHIVED' is not archived"
+            //   4. Actual (current bug): RC 0 and "Data set 'HLQ.UNARCHIVED' restored"
+            //
+            // For the full end-to-end archival/restore flow, see test.cadisk.sh.
+            xit("should fail to restore a data set that was never archived", []() -> void {});
+            describe("view",
                       [&]() -> void
                       {
                         beforeEach(
@@ -1010,6 +1198,25 @@ void zowex_ds_tests()
                              ExpectWithContext(rc, response).ToBe(0);
                              Expect(response).ToContain("test!");
                            });
+                        it("should view multibyte-encoded content correctly",
+                           [&]() -> void
+                           {
+                             std::string ds = _ds.back();
+                             _create_ds(ds, "--dsorg PS");
+                             std::string response;
+                             // Write Japanese こんにちは encoded as DBCS EBCDIC (IBM-939)
+                             std::string command = "printf '\xe3\x81\x93\xe3\x82\x93\xe3\x81\xab\xe3\x81\xa1\xe3\x81\xaf' | " +
+                                                   zowex_command + " data-set write " + ds + " --encoding IBM-939";
+                             int rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain("Wrote data to '" + ds + "'");
+
+                             // View raw bytes to verify the stored DBCS EBCDIC encoding
+                             command = zowex_command + " data-set view " + ds + " --rfb";
+                             rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain("0e 44 8a 44 bd 44 97 44 92 44 9d 0f");
+                           });
                         it("should fail to view a non-existent data set",
                            [&]() -> void
                            {
@@ -1039,6 +1246,102 @@ void zowex_ds_tests()
                         xit("should view the content of a VSAM ESDS data set", []() -> void {});
                         xit("should view the content of a VSAM RRDS data set", []() -> void {});
                         xit("should view the content of a VSAM LDS data set", []() -> void {});
+
+                        // zds_read uses POSIX fopen("r") which allocates the data set with DISP=SHR.
+                        // SHR allocation allows multiple concurrent openers without ENQ or RESERVE,
+                        // making concurrent reads safe on both PDS and PDSE. These tests verify that
+                        // behavior by calling zds_read directly from threads (no fork/popen involved).
+                        describe("concurrent reads",
+                                 [&]() -> void
+                                 {
+                                   TEST_OPTIONS concurrent_opts = {false, 60};
+
+                                   it("should not block concurrent reads of different PDSE members: fopen(r) does not take an exclusive ENQ",
+                                      [&]() -> void
+                                      {
+                                        const std::string ds = get_random_ds();
+                                        _ds.push_back(ds);
+                                        _create_ds(ds, "--dsorg PO --dirblk 5 --dsntype LIBRARY");
+
+                                        const int thread_count = 4;
+                                        for (int i = 0; i < thread_count; ++i)
+                                        {
+                                          const std::string member = "MEM" + std::to_string(i);
+                                          const std::string data = "content for member " + std::to_string(i);
+                                          const std::string command = "echo '" + data + "' | " +
+                                                                      zowex_command + " data-set write '" + ds + "(" + member + ")'";
+                                          std::string response;
+                                          const int rc = execute_command_with_output(command, response);
+                                          ExpectWithContext(rc, response).ToBe(0);
+                                        }
+
+                                        std::vector<int> results(thread_count, -1);
+                                        std::vector<std::string> contents(thread_count);
+                                        std::vector<std::thread> threads;
+
+                                        for (int i = 0; i < thread_count; ++i)
+                                        {
+                                          threads.emplace_back([&, i]()
+                                                               {
+                                                                 ZDS zds = {};
+                                                                 const std::string member_path = ds + "(MEM" + std::to_string(i) + ")";
+                                                                 ZDSReadOpts read_opts{.zds = &zds, .dsname = member_path};
+                                                                 results[i] = zds_read(read_opts, contents[i]);
+                                                               });
+                                        }
+
+                                        for (auto &t : threads)
+                                          t.join();
+
+                                        for (int i = 0; i < thread_count; ++i)
+                                        {
+                                          ExpectWithContext(results[i], contents[i]).ToBe(0);
+                                          Expect(contents[i]).ToContain("content for member " + std::to_string(i));
+                                        }
+                                      },
+                                      concurrent_opts);
+
+                                   it("should not block concurrent reads of the same PDSE member: fopen(r) uses SHR not exclusive ENQ",
+                                      [&]() -> void
+                                      {
+                                        const std::string ds = get_random_ds();
+                                        _ds.push_back(ds);
+                                        _create_ds(ds, "--dsorg PO --dirblk 5 --dsntype LIBRARY");
+
+                                        const std::string expected = "shared member content";
+                                        const std::string write_cmd = "echo '" + expected + "' | " +
+                                                                      zowex_command + " data-set write '" + ds + "(SHARED)'";
+                                        std::string setup_response;
+                                        const int setup_rc = execute_command_with_output(write_cmd, setup_response);
+                                        ExpectWithContext(setup_rc, setup_response).ToBe(0);
+
+                                        const int thread_count = 4;
+                                        std::vector<int> results(thread_count, -1);
+                                        std::vector<std::string> contents(thread_count);
+                                        std::vector<std::thread> threads;
+
+                                        for (int i = 0; i < thread_count; ++i)
+                                        {
+                                          threads.emplace_back([&, i]()
+                                                               {
+                                                                 ZDS zds = {};
+                                                                 const std::string member_path = ds + "(SHARED)";
+                                                                 ZDSReadOpts read_opts{.zds = &zds, .dsname = member_path};
+                                                                 results[i] = zds_read(read_opts, contents[i]);
+                                                               });
+                                        }
+
+                                        for (auto &t : threads)
+                                          t.join();
+
+                                        for (int i = 0; i < thread_count; ++i)
+                                        {
+                                          ExpectWithContext(results[i], contents[i]).ToBe(0);
+                                          Expect(contents[i]).ToContain(expected);
+                                        }
+                                      },
+                                      concurrent_opts);
+                                 });
                       });
              describe("write",
                       [&]() -> void
@@ -1267,7 +1570,7 @@ void zowex_ds_tests()
                              std::string ds = _ds.back();
                              _create_ds(ds, "--dsorg PS");
                              std::string response;
-                             std::string command = "echo '\xe3\x81\x93\xe3\x82\x93\xe3\x81\xab\xe3\x81\xa1\xe3\x81\xaf' | " + zowex_command + " data-set write " + ds + " --encoding IBM-939";
+                             std::string command = "printf '\xe3\x81\x93\xe3\x82\x93\xe3\x81\xab\xe3\x81\xa1\xe3\x81\xaf' | " + zowex_command + " data-set write " + ds + " --encoding IBM-939";
                              int rc = execute_command_with_output(command, response);
                              ExpectWithContext(rc, response).ToBe(0);
                              Expect(response).ToContain("Wrote data to '" + ds + "'");
@@ -1626,6 +1929,114 @@ void zowex_ds_tests()
                         xit("should fail if the data set is deleted before the write operation is completed", []() -> void {});
                         // TODO: What do?
                         xit("should fail to write to a data set if not authorized", []() -> void {});
+
+                        describe("concurrent writes",
+                                 [&]() -> void
+                                 {
+                                   TEST_OPTIONS concurrent_opts = {false, 60};
+
+                                   // ENQ rname = DSNAME+MEMBER (member-level): different members don't conflict at ENQ.
+                                   // RESERVE rname = DSNAME (PDSE-level): all concurrent BPAM writes to the same PDSE
+                                   // compete for the same RESERVE regardless of member. EXCLUSIVE+RET=USE means the
+                                   // holder gets RC=0; concurrent requestors get RC=4 immediately. At least one write
+                                   // must succeed, and every member that was written must contain coherent data.
+                                   it("should serialize concurrent BPAM writes to the same PDSE via RESERVE: even across different members",
+                                      [&]() -> void
+                                      {
+                                        const std::string ds = get_random_ds();
+                                        _ds.push_back(ds);
+                                        _create_ds(ds, "--dsorg PO --dirblk 5 --dsntype LIBRARY");
+
+                                        const int thread_count = 4;
+                                        std::vector<std::thread> threads;
+                                        std::vector<int> results(thread_count, -1);
+                                        std::vector<std::string> errors(thread_count);
+
+                                        for (int i = 0; i < thread_count; ++i)
+                                        {
+                                          threads.emplace_back([&, i]()
+                                                               {
+                                                                 ZDS zds = {};
+                                                                 const std::string data = "thread " + std::to_string(i) + " data";
+                                                                 ZDSWriteOpts write_opts{.zds = &zds, .dsname = ds + "(MEM" + std::to_string(i) + ")"};
+                                                                 results[i] = zds_write(write_opts, data);
+                                                                 errors[i] = zds.diag.e_msg;
+                                                               });
+                                        }
+
+                                        for (auto &t : threads)
+                                          t.join();
+
+                                        // RESERVE (PDSE-level) serializes all BPAM writes: at least one must succeed
+                                        int successes = 0;
+                                        for (int i = 0; i < thread_count; ++i)
+                                          if (results[i] == 0)
+                                            ++successes;
+                                        Expect(successes).ToBeGreaterThan(0);
+
+                                        // Every member that was written must contain coherent data from its thread
+                                        for (int i = 0; i < thread_count; ++i)
+                                        {
+                                          if (results[i] != 0)
+                                            continue;
+                                          ZDS read_zds = {};
+                                          std::string content;
+                                          ZDSReadOpts read_opts{.zds = &read_zds, .dsname = ds + "(MEM" + std::to_string(i) + ")"};
+                                          ExpectWithContext(zds_read(read_opts, content), content).ToBe(0);
+                                          Expect(content).ToContain("thread " + std::to_string(i) + " data");
+                                        }
+                                      },
+                                      concurrent_opts);
+
+                                   // Same member = same ENQ rname. ENQ uses EXCLUSIVE+RET=USE: the holder gets RC=0,
+                                   // concurrent requestors get RC=4 immediately (no wait). At least one write must
+                                   // succeed, and the final content must come from exactly one write (no interleaving).
+                                   it("should serialize concurrent writes to the same PDSE member via exclusive ENQ",
+                                      [&]() -> void
+                                      {
+                                        const std::string ds = get_random_ds();
+                                        _ds.push_back(ds);
+                                        _create_ds(ds, "--dsorg PO --dirblk 5 --dsntype LIBRARY");
+
+                                        const int thread_count = 4;
+                                        std::vector<std::thread> threads;
+                                        std::vector<int> results(thread_count, -1);
+
+                                        for (int i = 0; i < thread_count; ++i)
+                                        {
+                                          threads.emplace_back([&, i]()
+                                                               {
+                                                                 ZDS zds = {};
+                                                                 const std::string data = "thread " + std::to_string(i) + " data";
+                                                                 ZDSWriteOpts write_opts{.zds = &zds, .dsname = ds + "(SHARED)"};
+                                                                 results[i] = zds_write(write_opts, data);
+                                                               });
+                                        }
+
+                                        for (auto &t : threads)
+                                          t.join();
+
+                                        // At least one write must succeed
+                                        int successes = 0;
+                                        for (int i = 0; i < thread_count; ++i)
+                                          if (results[i] == 0)
+                                            ++successes;
+                                        Expect(successes).ToBeGreaterThan(0);
+
+                                        // Content must be coherent: from exactly one thread, not interleaved
+                                        ZDS read_zds = {};
+                                        std::string content;
+                                        ZDSReadOpts read_opts{.zds = &read_zds, .dsname = ds + "(SHARED)"};
+                                        ExpectWithContext(zds_read(read_opts, content), content).ToBe(0);
+
+                                        int matching_threads = 0;
+                                        for (int i = 0; i < thread_count; ++i)
+                                          if (content.find("thread " + std::to_string(i) + " data") != std::string::npos)
+                                            ++matching_threads;
+                                        Expect(matching_threads).ToBe(1);
+                                      },
+                                      concurrent_opts);
+                                 });
                       });
            });
 }
