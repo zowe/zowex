@@ -232,9 +232,11 @@ private:
   std::vector<int> suite_stack;
   std::string znp_test_log = "";
   bool timeout_occurred = false;
+  pthread_t main_thread_id;
 
   Globals()
   {
+    main_thread_id = pthread_self();
   }
   ~Globals()
   {
@@ -440,6 +442,10 @@ public:
   bool get_timeout_occurred()
   {
     return timeout_occurred;
+  }
+  pthread_t get_main_thread_id() const
+  {
+    return main_thread_id;
   }
   void increment_nesting()
   {
@@ -872,14 +878,25 @@ public:
 inline void signal_handler(int code, siginfo_t *info, void *context)
 {
   Globals &g = Globals::get_instance();
-  longjmp(g.get_jmp_buf(), 1);
+  if (pthread_equal(pthread_self(), g.get_main_thread_id()))
+  {
+    longjmp(g.get_jmp_buf(), 1);
+  }
 }
 
 inline void timeout_handler(int sig)
 {
   Globals &g = Globals::get_instance();
-  g.set_timeout_occurred(true);
-  longjmp(g.get_jmp_buf(), 1);
+  if (pthread_equal(pthread_self(), g.get_main_thread_id()))
+  {
+    g.set_timeout_occurred(true);
+    longjmp(g.get_jmp_buf(), 1);
+  }
+  else
+  {
+    // If a worker thread somehow receives SIGALRM, forward it to the main thread.
+    pthread_kill(g.get_main_thread_id(), SIGALRM);
+  }
 }
 
 template <class T>
