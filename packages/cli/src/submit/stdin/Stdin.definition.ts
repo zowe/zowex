@@ -29,6 +29,13 @@ export const SubmitStdinDefinition: ICommandDefinition = {
         },
     ],
     options: [
+        {
+            name: "encoding",
+            aliases: ["ec"],
+            description: "The encoding of the JCL content being piped in. Defaults to UTF-8 if not specified.",
+            type: "string",
+            required: false,
+        },
         // {
         //     name: "wait",
         //     aliases: ["w"],

@@ -32,6 +32,15 @@ export const SubmitLocalFileDefinition: ICommandDefinition = {
             required: true,
         },
     ],
+    options: [
+        {
+            name: "encoding",
+            aliases: ["ec"],
+            description: "The encoding of the local JCL file. Defaults to UTF-8 if not specified.",
+            type: "string",
+            required: false,
+        },
+    ],
     profile: { optional: ["ssh"] },
     outputFormatOptions: true,
 };
