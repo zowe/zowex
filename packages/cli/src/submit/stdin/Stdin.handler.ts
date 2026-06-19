@@ -17,7 +17,7 @@ import { SshBaseHandler } from "../../SshBaseHandler";
 export default class SubmitJclHandler extends SshBaseHandler {
     public async processWithClient(params: IHandlerParameters, client: ZSshClient): Promise<jobs.DeleteJobResponse> {
         const jcl = B64String.encode(await buffer(params.stdin));
-        const response = await client.jobs.submitJcl({ jcl, localEncoding: params.arguments.encoding });
+        const response = await client.jobs.submitJcl({ jcl, encoding: params.arguments.encoding });
 
         const msg = `Job submitted: ${response.jobId}`;
         params.response.data.setMessage(msg);
