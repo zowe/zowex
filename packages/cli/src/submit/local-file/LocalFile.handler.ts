@@ -27,7 +27,10 @@ export default class SubmitLocalFileHandler extends SshBaseHandler {
                 causeErrors: err,
             });
         }
-        const response = await client.jobs.submitJcl({ jcl: B64String.encode(JclString), encoding: params.arguments.encoding });
+        const response = await client.jobs.submitJcl({
+            jcl: B64String.encode(JclString),
+            encoding: params.arguments.encoding,
+        });
 
         const msg = `Job submitted: ${response.jobId}`;
         params.response.data.setMessage(msg);
