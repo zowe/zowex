@@ -30,6 +30,7 @@ import { ZSshUtils } from "./ZSshUtils";
 
 export class ZSshClient extends RpcClientApi implements Disposable {
     public static readonly DEFAULT_SERVER_PATH = "~/.zowe-server";
+    public static readonly BIN_NAME = "zowex";
     private mErrHandler: ClientOptions["onError"];
     private mResponseTimeout: number;
     private mServerInfo: { checksums?: Record<string, string> };
@@ -64,7 +65,7 @@ export class ZSshClient extends RpcClientApi implements Disposable {
                 reject(err);
             });
             client.mSshClient.on("ready", async () => {
-                const zowexBin = posix.join(opts.serverPath ?? ZSshClient.DEFAULT_SERVER_PATH, "zowex");
+                const zowexBin = posix.join(opts.serverPath ?? ZSshClient.DEFAULT_SERVER_PATH, ZSshClient.BIN_NAME);
                 const serverArgs = ["server"];
                 if (opts.numWorkers != null) {
                     serverArgs.push("--num-workers", `${opts.numWorkers}`);

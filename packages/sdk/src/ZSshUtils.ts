@@ -18,12 +18,35 @@ import { isEqual } from "es-toolkit";
 import { NodeSSH, type Config as NodeSSHConfig } from "node-ssh";
 import type { ConnectConfig, SFTPWrapper } from "ssh2";
 import { PrivateKeyFailurePatterns, SshErrors } from "./SshErrors";
+import { ZSshClient } from "./ZSshClient";
+import { first } from "rxjs";
 
 export interface ISshCallbacks {
     onProgress?: (increment: number) => void; // Callback to report incremental progress
     onError?: (error: Error, context: string) => Promise<boolean>; // Callback to handle errors, returns true to continue/retry
 }
 
+export interface IServerOnPathDetails {
+    /**
+     * The absolute path of the zowex instance on the user's path, if any was detected.
+     */
+    serverPath?: string;
+    /**
+     * If serverPath is defined, this will be true if the authenticated user has write
+     * access to the parent directory of serverPath.
+     */
+    writeAccessToParent: boolean;
+    /**
+     * If serverPath is defined, this will be true if the user is able to execute the program
+     * found at serverPath.
+     */
+    hasExecutePermission: boolean;
+    /**
+     * If serverPath is defined, this will be the version reported by the output of the
+     * server binary's -v flag.
+     */
+    version?: string;
+}
 type SftpError = Error & { code?: number };
 
 // biome-ignore lint/complexity/noStaticOnlyClass: Utilities class has static methods
@@ -102,6 +125,104 @@ export class ZSshUtils {
         };
     }
 
+    /**
+     * Check the user's $PATH for our server binary.
+     * @param session Pre-established SSH session
+     * @returns object describing the details of any located zowex program
+     */
+    public static async detectServerOnPath(session: SshSession): Promise<IServerOnPathDetails> {
+        Logger.getAppLogger().debug(`[ZSshUtils] enter detectServerOnPath()`);
+        return ZSshUtils.sftp(session, async (_, ssh) => {
+            const details: IServerOnPathDetails = {
+                serverPath: undefined,
+                writeAccessToParent: false,
+                hasExecutePermission: false,
+                version: undefined,
+            };
+            const notFoundMessage = "Zowe binary not found";
+
+            let commandVOutput = "";
+
+            const findBinInOutput = () => {
+                let foundBin: string | undefined;
+                commandVOutput.split("\n").forEach((line: string) => {
+                    if (line.trim().endsWith(ZSshClient.BIN_NAME)) {
+                        // the output may be prefixed with unprintable characters such as \u001b,
+                        // so consider the bin path to start with the first '/'
+                        const firstSlashIndex = line.indexOf("/");
+                        if (firstSlashIndex >= 0) {
+                            foundBin = line.substring(firstSlashIndex).trim();
+                        }
+                    }
+                });
+                return foundBin;
+            };
+            const findNotFoundMessageInOutput = () => {
+                let foundMsg: string | undefined;
+                commandVOutput.split("\n").forEach((line: string) => {
+                    if (line.trim().endsWith(notFoundMessage)) {
+                        foundMsg = line.trim();
+                    }
+                });
+                return foundMsg;
+            };
+            await ssh.withShell((shellChannel) => {
+                return new Promise((resolve, reject) => {
+                    let shellExited = false;
+                    shellChannel.on("exit", () => {
+                        Logger.getAppLogger().debug(
+                            `[ZSshUtils] detectServerOnPath(): SSH shell exited. Checking shell stdout...`,
+                        );
+
+                        if (shellChannel.stdout.readableLength > 0) {
+                            commandVOutput += shellChannel.stdout.read().toString();
+                            Logger.getAppLogger().debug(`[ZSshUtils] Final output: '${commandVOutput}'..`);
+                        }
+                        shellExited = true;
+                        resolve();
+                    });
+                    shellChannel.on("data", (output: string | Buffer) => {
+                        commandVOutput += output.toString();
+                        Logger.getAppLogger().debug(`[ZSshUtils] Received command -v output: '${output}'..`);
+                        if (shellChannel.stdout.readableEnded || findBinInOutput() || findNotFoundMessageInOutput()) {
+                            resolve();
+                        }
+                    });
+                    shellChannel.write(`(command -v ${ZSshClient.BIN_NAME} || echo ${notFoundMessage}) && exit\n`);
+                    shellChannel.end();
+                });
+            });
+            Logger.getAppLogger().debug(
+                `[ZSshUtils] Returned from shell executing 'command -v ${ZSshClient.BIN_NAME}'`,
+            );
+
+            var foundBin = findBinInOutput();
+            if (foundBin) {
+                details.serverPath = foundBin;
+                Logger.getAppLogger().info(`[ZSshUtils] Found zowex executable at ${details.serverPath}`);
+                const noWriteAccessMsg = "No access";
+                // See https://linux.die.net/man/1/test
+                const binDirWritePermissionCmd = await ssh.execCommand(
+                    `test -w ${details.serverPath} || echo ${noWriteAccessMsg}`,
+                );
+                if (!binDirWritePermissionCmd.stdout.includes(noWriteAccessMsg)) {
+                    details.writeAccessToParent = true;
+                    Logger.getAppLogger().info(
+                        `[ZSshUtils] User has write access to the parent directory of the ${ZSshClient.BIN_NAME} program.`,
+                    );
+                }
+                const testExecuteCmd = await ssh.execCommand(`${details.serverPath} -v`);
+                details.hasExecutePermission = testExecuteCmd.code === 0;
+                details.version = details.hasExecutePermission ? testExecuteCmd.stdout.trim() : undefined;
+            } else {
+                Logger.getAppLogger().info(
+                    `[ZSshUtils] Did not detect any ${ZSshClient.BIN_NAME} program on the user's PATH.`,
+                );
+            }
+            return details;
+        });
+    }
+
     public static async installServer(
         session: SshSession,
         serverPath: string,
@@ -114,7 +235,7 @@ export class ZSshUtils {
         const remoteDir = serverPath.replace(/^~/, ".");
 
         return ZSshUtils.sftp(session, async (sftp, ssh) => {
-            Logger.getAppLogger().info(`[ZSshUtils] Step 1/4: Creating remote directory ${remoteDir}`);
+            Logger.getAppLogger().info(`[ZSshUtils] sekiro Step 1/4: Creating remote directory ${remoteDir}`);
             const execReturn = await ssh.execCommand(`mkdir -p ${remoteDir}`);
             if (await ZSshUtils.routeExpiredPasswordError(execReturn.stderr ?? "", "deploy", options)) return false;
             if (execReturn.code !== 0) {
