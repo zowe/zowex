@@ -6,6 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- Added `--encoding` flag to `zssh submit local-file` and `zssh submit stdin` commands to specify the encoding of the submitted JCL. [#1050](https://github.com/zowe/zowex/pull/1050)
 - Added `zssh copy data-set` command to copy data sets and members with optional `--replace` and `--overwrite` flags. Supports PDS-to-PDS, member-to-member, and sequential-to-sequential copies. [#995](https://github.com/zowe/zowex/pull/995)
 - Added the `zssh system view-syslog` command to the CLI.
 
