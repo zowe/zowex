@@ -36,7 +36,7 @@ export const SubmitLocalFileDefinition: ICommandDefinition = {
         {
             name: "encoding",
             aliases: ["ec"],
-            description: "The encoding of the local JCL file. Defaults to UTF-8 if not specified.",
+            description: "The remote encoding to use for the JCL content. Defaults to IBM-1047 if not specified.",
             type: "string",
             required: false,
         },
