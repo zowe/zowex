@@ -32,11 +32,6 @@ export interface IServerOnPathDetails {
      */
     serverPath?: string;
     /**
-     * If serverPath is defined, this will be true if the authenticated user has write
-     * access to the parent directory of serverPath.
-     */
-    writeAccessToParent: boolean;
-    /**
      * If serverPath is defined, this will be true if the user is able to execute the program
      * found at serverPath.
      */
@@ -135,7 +130,6 @@ export class ZSshUtils {
         return ZSshUtils.sftp(session, async (_, ssh) => {
             const details: IServerOnPathDetails = {
                 serverPath: undefined,
-                writeAccessToParent: false,
                 hasExecutePermission: false,
                 version: undefined,
             };
@@ -200,17 +194,6 @@ export class ZSshUtils {
             if (foundBin) {
                 details.serverPath = foundBin;
                 Logger.getAppLogger().info(`[ZSshUtils] Found zowex executable at ${details.serverPath}`);
-                const noWriteAccessMsg = "No access";
-                // See https://linux.die.net/man/1/test
-                const binDirWritePermissionCmd = await ssh.execCommand(
-                    `test -w ${details.serverPath} || echo ${noWriteAccessMsg}`,
-                );
-                if (!binDirWritePermissionCmd.stdout.includes(noWriteAccessMsg)) {
-                    details.writeAccessToParent = true;
-                    Logger.getAppLogger().info(
-                        `[ZSshUtils] User has write access to the parent directory of the ${ZSshClient.BIN_NAME} program.`,
-                    );
-                }
                 const testExecuteCmd = await ssh.execCommand(`${details.serverPath} -v`);
                 details.hasExecutePermission = testExecuteCmd.code === 0;
                 details.version = details.hasExecutePermission ? testExecuteCmd.stdout.trim() : undefined;
