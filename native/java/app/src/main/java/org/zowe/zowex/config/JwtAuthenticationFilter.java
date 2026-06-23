@@ -64,7 +64,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             // Set the response status according to the mapped returnCode
             response.setStatus(statusCode);
-            response.setContentType("application/json");
+            response.setContentType("application/json;charset=UTF-8");
 
             // Safely escape the message (basic escaping for JSON)
             String errorMessage = e.getMessage() != null ? e.getMessage().replace("\"", "\\\"")

@@ -2,10 +2,9 @@ package org.zowe.zowex.controllers;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
-import org.zowe.zowex.ffm.ZjbBindings;
 import org.zowe.zowex.ffm.ZjbBindings.ZJob;
-
 import org.zowe.zowex.ffm.ZjbBindings.ZJobDD;
+import org.zowe.zowex.ffm.ZjbService;
 
 import java.util.List;
 import java.util.Map;
@@ -16,43 +15,43 @@ import java.util.HashMap;
 @RequiredArgsConstructor
 public class ZjbController {
 
-    private final ZjbBindings zjbBindings;
+    private final ZjbService zjbService;
 
     @GetMapping
     public List<ZJob> listJobs(@RequestParam(value = "owner", defaultValue = "*") String owner,
                                @RequestParam(value = "prefix", defaultValue = "*") String prefix,
                                @RequestParam(value = "status", required = false) String status) throws Exception {
-        return zjbBindings.listJobsByOwner(owner, prefix, status != null ? status : "");
+        return zjbService.listJobsByOwner(owner, prefix, status != null ? status : "");
     }
 
     @GetMapping("/{jobid}")
     public ZJob getJobStatus(@PathVariable("jobid") String jobid) throws Exception {
-        return zjbBindings.getJobStatus(jobid);
+        return zjbService.getJobStatus(jobid);
     }
 
-    @PutMapping
+    @PutMapping(produces = "text/plain;charset=UTF-8")
     public String submitJob(@RequestBody String jclContent) throws Exception {
-        return zjbBindings.submitJob(jclContent);
+        return zjbService.submitJob(jclContent);
     }
 
     @GetMapping("/{jobid}/spool")
     public List<ZJobDD> listSpoolFiles(@PathVariable("jobid") String jobid) throws Exception {
-        return zjbBindings.listSpoolFiles(jobid);
+        return zjbService.listSpoolFiles(jobid);
     }
 
-    @GetMapping("/{jobid}/spool/{key}")
+    @GetMapping(value = "/{jobid}/spool/{key}", produces = "text/plain;charset=UTF-8")
     public String readSpoolFile(@PathVariable("jobid") String jobid, @PathVariable("key") int key) throws Exception {
-        return zjbBindings.readSpoolFile(jobid, key);
+        return zjbService.readSpoolFile(jobid, key);
     }
 
-    @GetMapping("/{jobid}/jcl")
+    @GetMapping(value = "/{jobid}/jcl", produces = "text/plain;charset=UTF-8")
     public String getJobJcl(@PathVariable("jobid") String jobid) throws Exception {
-        return zjbBindings.getJobJcl(jobid);
+        return zjbService.getJobJcl(jobid);
     }
 
     @DeleteMapping("/{jobid}")
     public Map<String, String> deleteJob(@PathVariable("jobid") String jobid) throws Exception {
-        zjbBindings.deleteJob(jobid);
+        zjbService.deleteJob(jobid);
         return Map.of("message", "Job deleted successfully");
     }
 }

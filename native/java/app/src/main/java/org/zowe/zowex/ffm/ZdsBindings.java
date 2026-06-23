@@ -14,7 +14,7 @@ import org.zowe.zowex.ffm.generated.ZDSStringResponse_C;
 import org.zowe.zowex.ffm.generated.ZdsCApi;
 
 @Service
-public class ZdsBindings {
+public class ZdsBindings implements ZdsService {
 
     static {
         // Force loading of the native library before any FFM calls are made

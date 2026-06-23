@@ -10,7 +10,7 @@ import org.zowe.zowex.ffm.generated.ZUSFStringResponse_C;
 import org.zowe.zowex.ffm.generated.ZUSFListOptions_C;
 
 @Service
-public class ZusfBindings {
+public class ZusfBindings implements ZusfService {
 
     static {
         // Force loading of the native library before any FFM calls are made

@@ -16,7 +16,7 @@ import org.zowe.zowex.ffm.generated.ZJob_C;
 import org.zowe.zowex.ffm.generated.ZJobDD_C;
 
 @Service
-public class ZjbBindings {
+public class ZjbBindings implements ZjbService {
 
     static {
         // Force loading of the native library before any FFM calls are made
@@ -37,7 +37,8 @@ public class ZjbBindings {
         public String correlator;
     }
 
-    public static List<ZJob> listJobsByOwner(String ownerName, String prefix, String status) throws Exception {
+    @Override
+    public List<ZJob> listJobsByOwner(String ownerName, String prefix, String status) throws Exception {
         try (Arena arena = Arena.ofConfined()) {
             MemorySegment ownerSeg = FfmUtils.allocateString(arena, ownerName);
             MemorySegment prefixSeg = FfmUtils.allocateString(arena, prefix);
