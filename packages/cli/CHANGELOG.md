@@ -4,6 +4,12 @@ All notable changes to the Client code for "zowex-for-zowe-cli" are documented i
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## Recent Changes
+
+- Added `--encoding` flag to `zssh submit local-file` and `zssh submit stdin` commands to specify the encoding of the submitted JCL. [#1050](https://github.com/zowe/zowex/pull/1050)
+- Added `zssh copy data-set` command to copy data sets and members with optional `--replace` and `--overwrite` flags. Supports PDS-to-PDS, member-to-member, and sequential-to-sequential copies. [#995](https://github.com/zowe/zowex/pull/995)
+- Added the `zssh system view-syslog` command to the CLI.
+
 ## `0.6.0`
 
 - Added `disableCreateNewProfile` option to the `promptForProfile` function to restrict profile creation during set-up operations. This allows selection from existing profiles only. [#971](https://github.com/zowe/zowex/pull/971)
@@ -81,3 +87,4 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## [Unreleased]
 
 - Initial release
+

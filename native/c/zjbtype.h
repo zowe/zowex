@@ -25,6 +25,12 @@
 #define ZJB_RTNCD_VERBOSE_INFO_NOT_FOUND -8
 #define ZJB_RTNCD_JOB_DSN_KEY_NOT_FOUND -9
 #define ZJB_RTNCD_CORRELATOR_NOT_FOUND -10
+#define ZJB_RTNCD_PARSE_ERROR_SIZE -11
+#define ZJB_RTNCD_PARSE_ERROR_MALFORMED -12
+#define ZJB_RTNCD_PARSE_ERROR_NUMBER_LEN -13
+#define ZJB_RTNCD_PARSE_ERROR_NUMBER_CHAR -14
+#define ZJB_RTNCD_PARSE_ERROR_NUMBER_CONVERSION -15
+#define ZJB_RTNCD_JOB_DSN_NOT_FOUND -16
 
 #define ZJB_RSNCD_MAX_JOBS_REACHED -1
 #define ZJB_RSNCD_JOBID_NOT_FOUND -2
@@ -59,6 +65,7 @@ typedef struct
   char owner_name[8];  // owner name used, upper cased/padded/truncated
   char prefix_name[8]; // prefix used, upper cased/padded/truncated
   char status_name[8]; // status used, upper cased/padded/truncated
+  char token[80];
 
   ZEncode encoding_opts; // User-specified, desired encoding options for spool contents
 

@@ -34,3 +34,4 @@ packages/sdk/logs/test.log
 *.tgz
 native/java/app/.gradle/*
 native/java/app/build
+*.env

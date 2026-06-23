@@ -1,4 +1,3 @@
-
 /**
  * This program and the accompanying materials are made available under the terms of the
  * Eclipse Public License v2.0 which accompanies this distribution, and is available at
@@ -210,6 +209,31 @@ static int zds_get_type_info(const std::string &dsn, ZDSTypeInfo &info)
 static int zds_write_sequential_streamed(ZDS *zds, const std::string &dsn, const std::string &pipe, size_t *content_len, const DscbAttributes &attrs);
 static int zds_write_member_bpam_streamed(ZDS *zds, const std::string &dsn, const std::string &pipe, size_t *content_len);
 
+/**
+ * Allocates a DD with a system-assigned name using bpxwdyn's RTDDN feature.
+ * On success, the DD name is returned via @p ddname and appended to @p dds.
+ * Use zut_free_dynalloc_dds() to release all DDs tracked in @p dds.
+ *
+ * @see https://www.ibm.com/docs/en/zos/3.1.0?topic=output-requesting-dynamic-allocation (RTDDN)
+ * @param diag   receives a diagnostic message on failure
+ * @param cmd    bpxwdyn allocation command string (e.g. "alloc da('MY.DSN') shr")
+ * @param dds    DD tracking list; the new DD is appended in "dd(<DDNAME>)" format on success
+ * @param ddname system-assigned DD name; only valid on RTNCD_SUCCESS
+ * @return RTNCD_SUCCESS on success, RTNCD_FAILURE on failure
+ */
+static int zds_alloc_rtdd(ZDIAG &diag, const std::string &cmd, std::vector<std::string> &dds, std::string &ddname)
+{
+  unsigned int code = 0;
+  std::string resp;
+  if (zut_bpxwdyn_rtdd(cmd, &code, resp, ddname) != RTNCD_SUCCESS)
+  {
+    ZDIAG_SET_MSG(&diag, "Failed to allocate DD for command '%s': %s", cmd.c_str(), resp.c_str());
+    return RTNCD_FAILURE;
+  }
+  dds.emplace_back("dd(" + ddname + ")");
+  return RTNCD_SUCCESS;
+}
+
 static int copy_sequential(ZDS *zds, const std::string &dsn1, const std::string &dsn2, ZDSCopyOptions *options)
 {
   int rc = 0;
@@ -217,60 +241,71 @@ static int copy_sequential(ZDS *zds, const std::string &dsn1, const std::string 
 
   if (options->overwrite)
   {
-    zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
-                                   "Cannot use --overwrite when a sequential data set is specified. Use --replace (-r) to replace the contents of target data set '%s'.",
-                                   dsn2.c_str());
+    ZDIAG_SET_MSG(&zds->diag,
+                  "Cannot set 'overwrite' option when a sequential data set is specified. Use the 'replace' option instead to replace the contents of target data set '%s'.",
+                  dsn2.c_str());
     return RTNCD_FAILURE;
   }
 
   if (options->target_exists && !options->replace)
   {
-    zds->diag.e_msg_len = snprintf(zds->diag.e_msg, (int)(sizeof(zds->diag.e_msg) - 1),
-                                   "Target data set '%s' already exists. Use --replace (-r) flag to replace the target's contents", dsn2.c_str());
+    ZDIAG_SET_MSG(&zds->diag,
+                  "Target data set '%s' already exists. Use the 'replace' option to replace the target's contents", dsn2.c_str());
     return RTNCD_FAILURE;
   }
 
-  dds.push_back("alloc dd(SYSUT1) da('" + dsn1 + "') shr");
-  dds.push_back("alloc dd(SYSUT2) da('" + dsn2 + "') shr");
-  dds.push_back("alloc dd(SYSPRINT) new delete space(1,1) tracks recfm(f,b,a) lrecl(121) reuse");
-  dds.push_back("alloc dd(SYSIN) dummy reuse");
+  std::string sysut1_ddname, sysut2_ddname, sysin_ddname, sysprint_ddname;
 
-  rc = zut_loop_dynalloc(zds->diag, dds);
-  if (rc != RTNCD_SUCCESS)
+  if (RTNCD_SUCCESS != zds_alloc_rtdd(zds->diag, "alloc da('" + dsn1 + "') shr", dds, sysut1_ddname))
+  {
+    return RTNCD_FAILURE;
+  }
+  if (RTNCD_SUCCESS != zds_alloc_rtdd(zds->diag, "alloc da('" + dsn2 + "') shr", dds, sysut2_ddname))
   {
     zut_free_dynalloc_dds(zds->diag, dds);
     return RTNCD_FAILURE;
   }
+  if (RTNCD_SUCCESS != zds_alloc_rtdd(zds->diag, "alloc lrecl(121) recfm(f,b,a) new delete space(1,1) tracks", dds, sysprint_ddname))
+  {
+    zut_free_dynalloc_dds(zds->diag, dds);
+    return RTNCD_FAILURE;
+  }
+  if (RTNCD_SUCCESS != zds_alloc_rtdd(zds->diag, "alloc dummy", dds, sysin_ddname))
+  {
+    zut_free_dynalloc_dds(zds->diag, dds);
+    return RTNCD_FAILURE;
+  }
+  DFSMSdfp_AltDDs alt_dds{
+      .sysin = sysin_ddname,
+      .sysprint = sysprint_ddname,
+      .sysut1 = sysut1_ddname,
+      .sysut2 = sysut2_ddname,
+  };
 
-  rc = zut_run("IEBGENER");
+  rc = zut_iebgener(zds->diag, "", &alt_dds);
 
-  if (rc != 0)
+  if (rc != RTNCD_SUCCESS)
   {
     std::string output;
-    ZDSReadOpts ropts{.zds = zds, .ddname = "SYSPRINT"};
+    ZDSReadOpts ropts{.zds = zds, .ddname = sysprint_ddname};
     zds_read(ropts, output);
 
-    char truncated_detail[128];
-    strncpy(truncated_detail, output.c_str(), sizeof(truncated_detail) - 1);
-    truncated_detail[sizeof(truncated_detail) - 1] = '\0';
-
-    zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
-                                   "IEBGENER failed with RC=%d. SYSPRINT: %s",
-                                   rc, truncated_detail);
-
-    if (zds->diag.e_msg_len >= sizeof(zds->diag.e_msg))
+    if (!output.empty() || zds->diag.e_msg_len == 0)
     {
-      zds->diag.e_msg_len = sizeof(zds->diag.e_msg) - 1;
+      char truncated_detail[128];
+      strncpy(truncated_detail, output.c_str(), sizeof(truncated_detail) - 1);
+      truncated_detail[sizeof(truncated_detail) - 1] = '\0';
+
+      ZDIAG_SET_MSG(&zds->diag,
+                    "IEBGENER failed with RC=%d. SYSPRINT: %s",
+                    rc, truncated_detail);
     }
-    rc = RTNCD_FAILURE;
-  }
-  else
-  {
-    rc = RTNCD_SUCCESS;
+    zut_free_dynalloc_dds(zds->diag, dds);
+    return RTNCD_FAILURE;
   }
 
   zut_free_dynalloc_dds(zds->diag, dds);
-  return rc;
+  return RTNCD_SUCCESS;
 }
 
 static int copy_partitioned(ZDS *zds, const ZDSTypeInfo &sourceInfo, const ZDSTypeInfo &targetInfo, ZDSCopyOptions *options)
@@ -280,9 +315,9 @@ static int copy_partitioned(ZDS *zds, const ZDSTypeInfo &sourceInfo, const ZDSTy
 
   if (options->overwrite && !targetIsPds)
   {
-    zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
-                                   "Cannot use --overwrite when a target member is specified. Use --replace (-r) to replace the contents of member '%s'.",
-                                   targetInfo.member_name.c_str());
+    ZDIAG_SET_MSG(&zds->diag,
+                  "Cannot set 'overwrite' option when a target member is specified. Use the 'replace' option to replace the contents of member '%s'.",
+                  targetInfo.member_name.c_str());
     return RTNCD_FAILURE;
   }
 
@@ -291,12 +326,12 @@ static int copy_partitioned(ZDS *zds, const ZDSTypeInfo &sourceInfo, const ZDSTy
     if (targetIsPds)
     {
       ZDIAG_SET_MSG(&zds->diag,
-                    "Target data set '%s' exists. Use --replace (-r) flag to replace like-named members or --overwrite to replace the entire partitioned data set", targetInfo.base_dsn.c_str());
+                    "Target data set '%s' exists. Use the 'replace' option to replace like-named members or the 'overwrite' option to replace the entire partitioned data set", targetInfo.base_dsn.c_str());
     }
     else
     {
       ZDIAG_SET_MSG(&zds->diag,
-                    "Target member '%s' exists. Use --replace (-r) flag to replace the member's contents", targetInfo.member_name.c_str());
+                    "Target member '%s' exists. Use the 'replace' option to replace the member's contents", targetInfo.member_name.c_str());
     }
     return RTNCD_FAILURE;
   }
@@ -312,30 +347,42 @@ static int copy_partitioned(ZDS *zds, const ZDSTypeInfo &sourceInfo, const ZDSTy
     int rc = zut_bpxwdyn("ALLOC DA('" + targetInfo.base_dsn + "') LIKE('" + sourceInfo.base_dsn + "') NEW CATALOG", &code, create_resp);
     if (rc != RTNCD_SUCCESS)
     {
-      zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
-                                     "Overwrite failed. Could not recreate '%s' using LIKE. Details: %s", targetInfo.base_dsn.c_str(), create_resp.c_str());
+      ZDIAG_SET_MSG(&zds->diag,
+                    "Overwrite failed. Could not recreate '%s' using LIKE. Details: %s", targetInfo.base_dsn.c_str(), create_resp.c_str());
       return RTNCD_FAILURE;
     }
     rc = zut_bpxwdyn("FREE DA('" + targetInfo.base_dsn + "')", &code, resp);
     if (rc != RTNCD_SUCCESS)
     {
-      zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
-                                     "Overwrite failed. Details: %s", create_resp.c_str());
+      ZDIAG_SET_MSG(&zds->diag,
+                    "Overwrite failed. Details: %s", create_resp.c_str());
       return RTNCD_FAILURE;
     }
   }
 
   int rc = 0;
-  std::vector<std::string> dds{};
+  std::vector<std::string> dds;
+  std::string src_ddname, tgt_ddname, sysin_ddname, sysprint_ddname;
 
-  dds.push_back("alloc dd(SYSUT1) da('" + sourceInfo.base_dsn + "') shr");
-  dds.push_back("alloc dd(SYSUT2) da('" + targetInfo.base_dsn + "') shr");
-  dds.push_back("alloc dd(sysin) lrecl(80) recfm(f,b)");
-  dds.push_back("alloc dd(sysprint) lrecl(121) recfm(f,b,a)");
-
-  rc = zut_loop_dynalloc(zds->diag, dds);
-  if (rc != RTNCD_SUCCESS)
+  if (RTNCD_SUCCESS != zds_alloc_rtdd(zds->diag, "alloc da('" + sourceInfo.base_dsn + "') shr", dds, src_ddname))
+  {
     return RTNCD_FAILURE;
+  }
+  if (RTNCD_SUCCESS != zds_alloc_rtdd(zds->diag, "alloc da('" + targetInfo.base_dsn + "') shr", dds, tgt_ddname))
+  {
+    zut_free_dynalloc_dds(zds->diag, dds);
+    return RTNCD_FAILURE;
+  }
+  if (RTNCD_SUCCESS != zds_alloc_rtdd(zds->diag, "alloc lrecl(80) recfm(f,b)", dds, sysin_ddname))
+  {
+    zut_free_dynalloc_dds(zds->diag, dds);
+    return RTNCD_FAILURE;
+  }
+  if (RTNCD_SUCCESS != zds_alloc_rtdd(zds->diag, "alloc lrecl(121) recfm(f,b,a)", dds, sysprint_ddname))
+  {
+    zut_free_dynalloc_dds(zds->diag, dds);
+    return RTNCD_FAILURE;
+  }
 
   std::string control_stmt;
   std::string replace_flag = options->replace ? ",R" : "";
@@ -346,25 +393,24 @@ static int copy_partitioned(ZDS *zds, const ZDSTypeInfo &sourceInfo, const ZDSTy
     {
       options->member_created = true;
     }
-    control_stmt = "  COPY OUTDD=SYSUT2,INDD=SYSUT1\n";
+    control_stmt = "  COPY OUTDD=" + tgt_ddname + ",INDD=" + src_ddname + "\n";
     control_stmt += "  SELECT MEMBER=((" + sourceInfo.member_name + "," + targetInfo.member_name + replace_flag + "))";
   }
   else
   {
     if (options->replace)
     {
-      control_stmt = "  COPY OUTDD=SYSUT2,INDD=((SYSUT1,R))";
+      control_stmt = "  COPY OUTDD=" + tgt_ddname + ",INDD=((" + src_ddname + ",R))";
     }
     else
     {
-      control_stmt = "  COPY OUTDD=SYSUT2,INDD=SYSUT1";
+      control_stmt = "  COPY OUTDD=" + tgt_ddname + ",INDD=" + src_ddname;
     }
   }
 
   ZDSWriteOpts wopts{};
   wopts.zds = zds;
-  wopts.ddname = "sysin";
-
+  wopts.ddname = sysin_ddname;
   rc = zds_write(wopts, control_stmt);
   if (rc != 0)
   {
@@ -372,26 +418,28 @@ static int copy_partitioned(ZDS *zds, const ZDSTypeInfo &sourceInfo, const ZDSTy
     return RTNCD_FAILURE;
   }
 
-  rc = zut_run("IEBCOPY");
+  DFSMSdfp_AltDDs alt_dds{
+      .sysin = sysin_ddname,
+      .sysprint = sysprint_ddname,
+      .sysut1 = src_ddname,
+      .sysut2 = tgt_ddname,
+  };
+  rc = zut_iebcopy(zds->diag, "", &alt_dds);
 
   if (rc != RTNCD_SUCCESS)
   {
     std::string output;
-    ZDSReadOpts ropts{.zds = zds, .ddname = "SYSPRINT"};
+    ZDSReadOpts ropts{.zds = zds, .ddname = sysprint_ddname};
     zds_read(ropts, output);
+    if (!output.empty() || zds->diag.e_msg_len == 0)
     {
       char truncated_detail[128];
       strncpy(truncated_detail, output.c_str(), sizeof(truncated_detail) - 1);
       truncated_detail[sizeof(truncated_detail) - 1] = '\0';
 
-      zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
-                                     "IEBCOPY failed with RC=%d. SYSPRINT: %s",
-                                     rc, truncated_detail);
-
-      if (zds->diag.e_msg_len >= sizeof(zds->diag.e_msg))
-      {
-        zds->diag.e_msg_len = sizeof(zds->diag.e_msg) - 1;
-      }
+      ZDIAG_SET_MSG(&zds->diag,
+                    "IEBCOPY failed with RC=%d. Reason=%d. SYSPRINT: %s",
+                    rc, zds->diag.detail_rc, truncated_detail);
     }
     zut_free_dynalloc_dds(zds->diag, dds);
     return RTNCD_FAILURE;
@@ -406,18 +454,18 @@ static int validate_attributes(ZDS *zds, const ZDSTypeInfo &src, const ZDSTypeIn
   // fail if mistaching recfm
   if (src.entry.recfm != tgt.entry.recfm)
   {
-    zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
-                                   "Expected target RECFM to match source (%s), but the destination RECFM is %s",
-                                   src.entry.recfm.c_str(), tgt.entry.recfm.c_str());
+    ZDIAG_SET_MSG(&zds->diag,
+                  "Expected target RECFM to match source (%s), but the destination RECFM is %s",
+                  src.entry.recfm.c_str(), tgt.entry.recfm.c_str());
     return RTNCD_FAILURE;
   }
 
   // fail if mismatching lrecl
   if (src.entry.lrecl != tgt.entry.lrecl)
   {
-    zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
-                                   "Expected target LRECL to match source (%d), but the destination LRECL is %d",
-                                   src.entry.lrecl, tgt.entry.lrecl);
+    ZDIAG_SET_MSG(&zds->diag,
+                  "Expected target LRECL to match source (%d), but the destination LRECL is %d",
+                  src.entry.lrecl, tgt.entry.lrecl);
     return RTNCD_FAILURE;
   }
 
@@ -427,9 +475,9 @@ static int validate_attributes(ZDS *zds, const ZDSTypeInfo &src, const ZDSTypeIn
     // fail if mismatching blcsize
     if (src.entry.blksize != tgt.entry.blksize)
     {
-      zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg),
-                                     "Expected target block size to match source (%d), but the destination block size is %d",
-                                     src.entry.blksize, tgt.entry.blksize);
+      ZDIAG_SET_MSG(&zds->diag,
+                    "Expected target block size to match source (%d), but the destination block size is %d",
+                    src.entry.blksize, tgt.entry.blksize);
       return RTNCD_FAILURE;
     }
   }
@@ -574,7 +622,7 @@ bool zds_member_exists(const std::string &dsn, const std::string &member_before)
 
 bool zds_is_valid_member_name(const std::string &name)
 {
-  if (name.length() > 8)
+  if (name.length() > 8 || name.empty())
     return false;
 
   char first = name[0];
@@ -893,6 +941,7 @@ int zds_read_vsam(ZDS *zds, std::string ddname, std::string &response)
   }
 
   int lines_read = 0;
+  zds->has_more = 0;
   while (true)
   {
     rc = ZDSRIVSM(zds, ioc);
@@ -901,6 +950,11 @@ int zds_read_vsam(ZDS *zds, std::string ddname, std::string &response)
       response.append(ioc->buffer, ioc->ifgacb.acblrecl);
       response.append(1, '\n');
       lines_read++;
+      if (lines_read >= zds->max_lines)
+      {
+        zds->has_more = 1;
+        break;
+      }
     }
     else if (rc == RTNCD_WARNING)
     {
@@ -911,19 +965,11 @@ int zds_read_vsam(ZDS *zds, std::string ddname, std::string &response)
       ZDSCIVSM(zds, ioc);
       return rc;
     }
-    if (lines_read >= zds->max_lines)
-    {
-      break;
-    }
   }
 
-  rc = ZDSCIVSM(zds, ioc);
-  if (rc != RTNCD_SUCCESS)
-  {
-    return rc;
-  }
+  zds->returned_lines = lines_read;
 
-  return RTNCD_SUCCESS;
+  return ZDSCIVSM(zds, ioc);
 }
 
 /**
@@ -1140,6 +1186,13 @@ static int flush_encoding_state(const EncodingSetup &setup, IconvGuard &iconv_gu
  * Encode a single line using the provided encoding setup.
  * Consolidates line encoding logic used in BPAM write functions.
  *
+ * Each line becomes its own data set record, so the shift state is flushed after
+ * every line. This keeps every record self-contained for stateful mixed
+ * SBCS/DBCS encodings (e.g. IBM-1399/IBM-939): the bytes start and end in
+ * single-byte state with balanced shift-out/shift-in. Without the per-line
+ * flush, the closing SI for a DBCS record would leak into the following record,
+ * producing malformed records that fail to convert on read-back.
+ *
  * @param line Line to encode (modified in place)
  * @param setup Encoding setup context
  * @param iconv_guard IconvGuard for encoding conversion
@@ -1155,7 +1208,7 @@ static int encode_line_if_needed(std::string &line, const EncodingSetup &setup, 
 
   try
   {
-    line = zut_encode(line, iconv_guard.get(), diag);
+    line = zut_encode(line, iconv_guard.get(), diag, /*flush_state=*/true);
     return RTNCD_SUCCESS;
   }
   catch (std::exception &e)
@@ -1599,27 +1652,8 @@ static int zds_write_member_bpam(ZDS *zds, const std::string &dsn, const std::st
     }
   }
 
-  // Flush encoding state and append to last line if needed
-  std::vector<char> flush_buffer;
-  rc = flush_encoding_state(encoding, iconv_guard, zds->diag, flush_buffer);
-  if (rc != RTNCD_SUCCESS)
-  {
-    zds_close_output_bpam(zds, ioc);
-    return rc;
-  }
-
-  // Append flush bytes to the last non-empty line
-  if (!flush_buffer.empty() && !lines_to_write.empty())
-  {
-    for (auto it = lines_to_write.rbegin(); it != lines_to_write.rend(); ++it)
-    {
-      if (!it->first.empty())
-      {
-        it->first.append(flush_buffer.begin(), flush_buffer.end());
-        break;
-      }
-    }
-  }
+  // Each line was encoded with its shift state flushed (see encode_line_if_needed),
+  // so every record is already self-contained; no end-of-member flush is needed.
 
   // Now write all the lines
   for (size_t i = 0; i < lines_to_write.size(); i++)
@@ -2382,6 +2416,37 @@ bool is_match(const char *s, const char *p)
   return *p == '\0';
 }
 
+/**
+ * @brief Validate if the provided user data is a valid ISPF statistics entry
+ * @param stats Pointer to the ISPF statistics structure
+ * @param user_data_len Length of the user data in bytes
+ * @return true if valid, false otherwise
+ */
+static bool is_valid_ispf_stats(const ISPF_STATS *stats, int user_data_len)
+{
+  // https://www.ibm.com/docs/en/zos/3.2.0?topic=di-ispf-statistics-entry-in-pds-directory
+  bool is_extended = (stats->flags & 0x20) != 0;
+  bool is_valid = false;
+
+  // 1. Must be 15 halfwords (30 bytes) with blanks at 29-30, OR 20 halfwords (40 bytes) with extended flag ON
+  if (!is_extended && user_data_len == 30 && memcmp(stats->extended, "  ", 2) == 0)
+  {
+    is_valid = true;
+  }
+  else if (is_extended && user_data_len == 40)
+  {
+    is_valid = true;
+  }
+
+  // 2. Century indicators must be valid (1900s - 0x00 or 2000s - 0x01)
+  if (stats->created_date_century > 0x01 || stats->modified_date_century > 0x01)
+  {
+    return false;
+  }
+
+  return is_valid;
+}
+
 int zds_list_members(ZDS *zds, std::string dsn, std::vector<ZDSMem> &members, const std::string &pattern, bool show_attributes)
 {
   // PO
@@ -2414,16 +2479,16 @@ int zds_list_members(ZDS *zds, std::string dsn, std::vector<ZDSMem> &members, co
       if (abend_code == 0x913)
       {
         // Insufficient permissions for this data set
-        zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg), "Insufficient permissions for opening data set '%s' (S913 abend)", dsn.c_str());
+        ZDIAG_SET_MSG(&zds->diag, "Insufficient permissions for opening data set '%s' (S913 abend)", dsn.c_str());
       }
       else
       {
-        zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg), "Could not list members for '%s': %s (errno %d) abend code S%03X", dsn.c_str(), strerror(errno), errno, save_amrc.__code.__abend.__syscode);
+        ZDIAG_SET_MSG(&zds->diag, "Could not list members for '%s': %s (errno %d) abend code S%03X", dsn.c_str(), strerror(errno), errno, save_amrc.__code.__abend.__syscode);
       }
     }
     else
     {
-      zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg), "Could not list members for '%s': %s (errno %d)", dsn.c_str(), strerror(errno), errno);
+      ZDIAG_SET_MSG(&zds->diag, "Could not list members for '%s': %s (errno %d)", dsn.c_str(), strerror(errno), errno);
     }
     return RTNCD_FAILURE;
   }
@@ -2476,7 +2541,7 @@ int zds_list_members(ZDS *zds, std::string dsn, std::vector<ZDSMem> &members, co
 
           if (total_entries > zds->max_entries)
           {
-            zds->diag.e_msg_len = snprintf(zds->diag.e_msg, sizeof(zds->diag.e_msg), "Reached maximum returned members requested %d", zds->max_entries);
+            ZDIAG_SET_MSG(&zds->diag, "Reached maximum returned members requested %d", zds->max_entries);
             zds->diag.detail_rc = ZDS_RSNCD_MAXED_ENTRIES_REACHED;
             fclose(fp);
             return RTNCD_WARNING;
@@ -2484,34 +2549,39 @@ int zds_list_members(ZDS *zds, std::string dsn, std::vector<ZDSMem> &members, co
 
           ZDSMem mem{};
           mem.name = std::string(name);
-          int user_data_len = info * 2;
+          int user_data_len = info * 2; // convert halfwords to bytes
 
           if (show_attributes && user_data_len >= sizeof(ISPF_STATS))
           {
             const ISPF_STATS *stats = reinterpret_cast<const ISPF_STATS *>(data + sizeof(entry));
-            mem.vers = stats->version;
-            mem.mod = stats->level;
+            mem.stats_valid = is_valid_ispf_stats(stats, user_data_len);
 
-            mem.sclm = (stats->flags & 0x80) != 0;
+            if (mem.stats_valid)
+            {
+              mem.vers = stats->version;
+              mem.mod = stats->level;
 
-            int rc = zut_convert_date(&stats->created_date_century, mem.c4date);
+              mem.sclm = (stats->flags & 0x80) != 0;
 
-            // Convert Modified Date
-            rc = zut_convert_date(&stats->modified_date_century, mem.m4date);
+              int rc = zut_convert_date(&stats->created_date_century, mem.c4date);
 
-            parse_packed_time(
-                stats->modified_time_hours,
-                stats->modified_time_minutes,
-                stats->modified_time_seconds,
-                &mem.mtime);
+              // Convert Modified Date
+              rc = zut_convert_date(&stats->modified_date_century, mem.m4date);
 
-            mem.cnorc = stats->current_number_of_lines;
-            mem.inorc = stats->initial_number_of_lines;
-            mem.mnorc = stats->modified_number_of_lines;
+              parse_packed_time(
+                  stats->modified_time_hours,
+                  stats->modified_time_minutes,
+                  stats->modified_time_seconds,
+                  &mem.mtime);
 
-            char user[9] = {0};
-            memcpy(user, stats->userid, 8);
-            mem.user = std::string(user);
+              mem.cnorc = stats->current_number_of_lines;
+              mem.inorc = stats->initial_number_of_lines;
+              mem.mnorc = stats->modified_number_of_lines;
+
+              char user[9] = {0};
+              memcpy(user, stats->userid, 8);
+              mem.user = std::string(user);
+            }
           }
           members.push_back(mem);
         }
@@ -2785,6 +2855,9 @@ static inline uint32_t parse_cchh_cylinder(const char *cchh)
   return (cyl_high << 16) | cyl_low;
 }
 
+// Tracks per cylinder - constant for supported mainframe DASD types
+static constexpr int TRACKS_PER_CYLINDER = 15;
+
 // Get bytes per track for a given device type
 static inline int get_bytes_per_track(const uint16_t &devtype)
 {
@@ -2811,8 +2884,7 @@ static inline int calculate_extent_tracks(const char *extent, const uint16_t &de
   if (upper_cyl < lower_cyl)
     return 0;
 
-  const auto tracks_per_cyl = 15;
-  return ((upper_cyl - lower_cyl) * tracks_per_cyl) + (upper_head - lower_head) + 1;
+  return ((upper_cyl - lower_cyl) * TRACKS_PER_CYLINDER) + (upper_head - lower_head) + 1;
 }
 
 // Load space unit (spacu) from DSCB
@@ -3085,16 +3157,8 @@ void load_used_attrs_from_dscb(const DSCBFormat1 *dscb, ZDSEntry &entry)
     return;
   }
 
-  // Store used space temporarily in tracks/cylinders (will convert to percentage later)
-  if (use_cylinders)
-  {
-    const auto tracks_per_cyl = 15;
-    entry.usedp = (last_used_track + 1 + tracks_per_cyl - 1) / tracks_per_cyl; // Round up to cylinders
-  }
-  else
-  {
-    entry.usedp = last_used_track + 1; // Tracks (0-based, so +1)
-  }
+  // Store temporary used space indicator (actual percentage calculated later)
+  entry.usedp = last_used_track + 1; // Tracks (0-based, so +1)
 
   // Calculate how many extents contain data (count of used extents)
   if (entry.usedp > 0)
@@ -3130,8 +3194,9 @@ void load_used_attrs_from_dscb(const DSCBFormat1 *dscb, ZDSEntry &entry)
 
   if (entry.usedp > 0 && entry.alloc > 0)
   {
-    int used_value = entry.usedp;
-    long long alloc_value = entry.alloc;
+    // Always use tracks for percentage calculation to ensure accuracy
+    int used_value = last_used_track + 1; // Precise track count
+    long long alloc_value = use_cylinders ? entry.alloc * TRACKS_PER_CYLINDER : entry.alloc;
 
     // For BYTES space unit, convert to track-based calculation for percentage
     if (entry.spacu == "BYTES" && entry.blksize > 0)
@@ -3203,6 +3268,11 @@ void load_volsers_from_catalog(const unsigned char *&data, const int field_len, 
     if (0 == rc)
     {
       entry.volser = value;
+      for (auto &vol : entry.volsers)
+      {
+        if (vol == IPL_VOLUME)
+          vol = value;
+      }
     }
   }
 
@@ -3333,7 +3403,7 @@ int zds_list_data_sets(ZDS *zds, std::string dsn, std::vector<ZDSEntry> &dataset
   // init blanks in query and set input DSN name
   memset(selection_criteria->csifiltk, ' ', sizeof(selection_criteria->csifiltk));
   std::transform(dsn.begin(), dsn.end(), dsn.begin(), ::toupper); // upper case
-  memcpy(selection_criteria->csifiltk, dsn.c_str(), dsn.size());
+  memcpy(selection_criteria->csifiltk, dsn.c_str(), std::min(dsn.size(), MAX_DS_LENGTH));
   memset(&selection_criteria->csicldi, 'Y', sizeof(selection_criteria->csicldi));
   memset(&selection_criteria->csiresum, ' ', sizeof(selection_criteria->csiresum));
   memset(&selection_criteria->csicatnm, ' ', sizeof(selection_criteria->csicatnm));
@@ -3592,7 +3662,7 @@ int zds_list_data_sets(ZDS *zds, std::string dsn, std::vector<ZDSEntry> &dataset
  *
  * @return RTNCD_SUCCESS on success, RTNCD_FAILURE on failure
  */
-int zds_read_streamed(const ZDSReadOpts &opts, const std::string &pipe, size_t *content_len)
+int zds_read_streamed(const ZDSReadOpts &opts, const std::string &pipe, size_t *content_len, uint32_t *etag_checksum)
 {
   const int vrc = zds_validate_read_opts(opts, "zds_read_streamed");
   if (vrc != RTNCD_SUCCESS)
@@ -3607,6 +3677,9 @@ int zds_read_streamed(const ZDSReadOpts &opts, const std::string &pipe, size_t *
     ZDIAG_SET_MSG(&zds->diag, "content_len must be a valid size_t pointer");
     return RTNCD_FAILURE;
   }
+
+  // Initialize incremental Adler32 state for etag computation
+  Adler32State adler_state;
 
   const std::string dsname = zds_resolve_dsname(opts);
   const auto is_dd = !opts.ddname.empty();
@@ -3708,6 +3781,8 @@ int zds_read_streamed(const ZDSReadOpts &opts, const std::string &pipe, size_t *
       }
 
       *content_len += chunk_len;
+      if (etag_checksum)
+        zut_adler32_update(adler_state, chunk, chunk_len);
       temp_encoded = zbase64::encode(chunk, chunk_len, &left_over);
       fwrite(&temp_encoded[0], 1, temp_encoded.size(), fout);
     }
@@ -3735,6 +3810,8 @@ int zds_read_streamed(const ZDSReadOpts &opts, const std::string &pipe, size_t *
       }
 
       *content_len += chunk_len;
+      if (etag_checksum)
+        zut_adler32_update(adler_state, chunk, chunk_len);
       temp_encoded = zbase64::encode(chunk, chunk_len, &left_over);
       fwrite(&temp_encoded[0], 1, temp_encoded.size(), fout);
     }
@@ -3767,6 +3844,8 @@ int zds_read_streamed(const ZDSReadOpts &opts, const std::string &pipe, size_t *
       }
 
       *content_len += chunk_len;
+      if (etag_checksum)
+        zut_adler32_update(adler_state, chunk, chunk_len);
       temp_encoded = zbase64::encode(chunk, chunk_len, &left_over);
       fwrite(&temp_encoded[0], 1, temp_encoded.size(), fout);
     }
@@ -3787,6 +3866,8 @@ int zds_read_streamed(const ZDSReadOpts &opts, const std::string &pipe, size_t *
       if (!flush_buffer.empty())
       {
         *content_len += flush_buffer.size();
+        if (etag_checksum)
+          zut_adler32_update(adler_state, &flush_buffer[0], flush_buffer.size());
         temp_encoded = zbase64::encode(&flush_buffer[0], flush_buffer.size(), &left_over);
         fwrite(&temp_encoded[0], 1, temp_encoded.size(), fout);
       }
@@ -3805,6 +3886,9 @@ int zds_read_streamed(const ZDSReadOpts &opts, const std::string &pipe, size_t *
   }
 
   fflush(fout);
+
+  if (etag_checksum)
+    *etag_checksum = zut_adler32_finalize(adler_state);
 
   return RTNCD_SUCCESS;
 }
@@ -4168,20 +4252,8 @@ static int zds_write_member_bpam_streamed(ZDS *zds, const std::string &dsn, cons
     }
   }
 
-  // Flush encoding state and append to the last line
-  std::vector<char> flush_buffer;
-  rc = flush_encoding_state(encoding, iconv_guard, zds->diag, flush_buffer);
-  if (rc != RTNCD_SUCCESS)
-  {
-    zds_close_output_bpam(zds, ioc);
-    return rc;
-  }
-
-  // Append flush bytes to the last line
-  if (!flush_buffer.empty() && has_prev_line)
-  {
-    prev_line.append(flush_buffer.begin(), flush_buffer.end());
-  }
+  // Each line was encoded with its shift state flushed (see encode_line_if_needed),
+  // so every record is already self-contained; no end-of-member flush is needed.
 
   // Write the last buffered line
   if (has_prev_line)

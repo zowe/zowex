@@ -16,8 +16,10 @@
 #include <ostream>
 #include <iconv.h>
 #include <vector>
+#include <optional>
 #include <string>
 #include "ztype.h"
+#include "zutm.h"
 
 /**
  * @struct ZConvData
@@ -31,6 +33,37 @@ struct ZConvData
   char *output_buffer;    /**< Pointer to output buffer. */
   char *output_iter;      /**< Pointer to current position in output buffer. */
 };
+
+/**
+ * @brief Structure holding alternate DD names for DFSMSdfp utilities.
+ */
+struct DFSMSdfp_AltDDs
+{
+  const std::string &sysin;
+  const std::string &sysprint;
+  const std::string &sysut1;
+  const std::string &sysut2;
+  std::optional<std::string> sysut3;
+  std::optional<std::string> sysut4;
+};
+
+/**
+ * @brief Run IEBCOPY utility
+ * @param diag Reference to diagnostic information structure
+ * @param opts Options string
+ * @param options Pointer to DFSMSdfp_DD_Options structure
+ * @return Return code (0 for success, non-zero for error)
+ */
+int zut_iebcopy(ZDIAG &diag, const std::string &opts, const DFSMSdfp_AltDDs *options);
+
+/**
+ * @brief Run IEBGENER utility
+ * @param diag Reference to diagnostic information structure
+ * @param opts Options string
+ * @param options Pointer to DFSMSdfp_ALT_DDS structure
+ * @return Return code (0 for success, non-zero for error)
+ */
+int zut_iebgener(ZDIAG &diag, const std::string &opts, const DFSMSdfp_AltDDs *options);
 
 /**
  * @brief Strips the last character from input if it's a newline.
@@ -81,14 +114,23 @@ int zut_search(const std::string &input);
  * @param parms The parameters string to execute
  * @return Return code (0 for success, non-zero for error)
  */
-int zut_run(ZDIAG &diag, const std::string &input, const std::string &parms);
+int zut_run(const std::string &program);
 
 /**
  * @brief Run a specified command or operation
+ * @param diag Reference to diagnostic information structure
  * @param input The command string to execute
+ * @param parms The parameters string to execute
  * @return Return code (0 for success, non-zero for error)
  */
-int zut_run(const std::string &input);
+int zut_run(ZDIAG &diag, const std::string &input, const std::string &parms);
+
+/**
+ * @brief Set a DD name in char array with padded spaces, or binary zeros for null.
+ * @param arr The 8-byte character array to set
+ * @param ddname The DD name to set
+ */
+void zut_set_dd_with_padding(char arr[8], const char *ddname);
 
 /**
  * @brief Substitute a symbol in a string
@@ -196,6 +238,30 @@ void zut_print_string_as_bytes(std::string &input, std::ostream *out_stream = nu
 std::vector<uint8_t> zut_get_contents_as_bytes(const std::string &hex_string);
 
 /**
+ * @brief State for incremental Adler-32 checksum computation
+ */
+struct Adler32State
+{
+  uint32_t a = 1u;
+  uint32_t b = 0u;
+};
+
+/**
+ * @brief Update Adler-32 state with new data incrementally
+ * @param state The current Adler-32 state
+ * @param data Pointer to the data
+ * @param len Length of the data
+ */
+void zut_adler32_update(Adler32State &state, const char *data, size_t len);
+
+/**
+ * @brief Finalize the Adler-32 checksum from the given state
+ * @param state The Adler-32 state
+ * @return The final Adler-32 checksum
+ */
+uint32_t zut_adler32_finalize(const Adler32State &state);
+
+/**
  * @brief Calculate the Adler-32 checksum of a string
  * @param input The input string
  * @return The Adler-32 checksum
@@ -245,11 +311,16 @@ std::vector<char> zut_encode(const char *input_str, const size_t input_size, con
  * @param input_str The input string
  * @param cd iconv descriptor (caller manages opening, flushing, and closing)
  * @param diag Reference to diagnostic information structure
+ * @param flush_state If true, flush the shift state after this input so the
+ *   returned bytes are self-contained (e.g. a stateful mixed SBCS/DBCS encoding
+ *   ends back in single-byte state). Use this when each call produces an
+ *   independent unit such as a single data set record. Defaults to false so the
+ *   shift state carries across successive calls on the same descriptor.
  * @return The encoded string
  */
-std::string zut_encode(const std::string &input_str, iconv_t cd, ZDIAG &diag);
+std::string zut_encode(const std::string &input_str, iconv_t cd, ZDIAG &diag, bool flush_state = false);
 
-std::vector<char> zut_encode(const char *input_str, const size_t input_size, iconv_t cd, ZDIAG &diag);
+std::vector<char> zut_encode(const char *input_str, const size_t input_size, iconv_t cd, ZDIAG &diag, bool flush_state = false);
 
 /**
  * @brief Format a vector of strings as a CSV line
@@ -338,6 +409,14 @@ int zut_loop_dynalloc(ZDIAG &diag, const std::vector<std::string> &list);
  * @return Return code (0 for success, non-zero for error)
  */
 int zut_free_dynalloc_dds(ZDIAG &diag, const std::vector<std::string> &list);
+
+/**
+ * @brief List APF using ZUTMAPFQ
+ * @param diag Reference to diagnostic information structure
+ * @param apf Reference to vector of APF names
+ * @return Return code (0 for success, non-zero for error)
+ */
+int zut_list_apf(ZDIAG &diag, std::vector<std::pair<std::string, std::string>> &apf);
 
 /**
  * @brief List a parmlib

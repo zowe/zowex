@@ -61,7 +61,7 @@ void zjb_tests()
 
                   memset(&zjb, 0, sizeof(zjb));
                   rc = zjb_delete(&zjb, correlator);
-                  ExpectWithContext(rc, zjb.diag.e_msg).ToBe(RTNCD_SUCCESS); 
+                  ExpectWithContext(rc, zjb.diag.e_msg).ToBe(RTNCD_SUCCESS);
                 });
 
              it("should be able to view a submitted job", [&]() -> void
@@ -86,7 +86,7 @@ void zjb_tests()
                   memset(&zjb, 0, sizeof(zjb));
                   rc = zjb_delete(&zjb, correlator);
 
-                  ExpectWithContext(rc, zjb.diag.e_msg).ToBe(RTNCD_SUCCESS); 
+                  ExpectWithContext(rc, zjb.diag.e_msg).ToBe(RTNCD_SUCCESS);
                 });
 
              it("should be able to delete a submitted job", [&]() -> void
@@ -104,7 +104,7 @@ void zjb_tests()
                   memset(&zjb, 0, sizeof(zjb));
                   rc = zjb_delete(&zjb, correlator);
 
-                  ExpectWithContext(rc, zjb.diag.e_msg).ToBe(RTNCD_SUCCESS); 
+                  ExpectWithContext(rc, zjb.diag.e_msg).ToBe(RTNCD_SUCCESS);
                 });
 
              it("should be able to read job JCL", [&]() -> void
@@ -123,9 +123,9 @@ void zjb_tests()
                   memset(&zjb, 0, sizeof(zjb));
                   rc = zjb_read_job_jcl(&zjb, correlator, returned_jcl);
 
-                  ExpectWithContext(rc, zjb.diag.e_msg).ToBe(RTNCD_SUCCESS); 
+                  ExpectWithContext(rc, zjb.diag.e_msg).ToBe(RTNCD_SUCCESS);
                 });
-              
+
               // https://github.com/zowe/zowex/issues/641
               xit("should be able to list and view SYSOUT files for INPUT jobs", [&]() -> void
                 {
@@ -148,13 +148,13 @@ void zjb_tests()
 
                   std::string content;
                   memset(&zjb, 0, sizeof(zjb));
-                  rc = zjb_read_jobs_output_by_key(&zjb, correlator, dds[0].key, content);
+                  rc = zjb_read_job_content_by_key(&zjb, correlator, dds[0].key, content);
                   ExpectWithContext(rc, zjb.diag.e_msg).ToBe(RTNCD_SUCCESS);
                   Expect(content).Not().ToBe(""); // expect some content returned
 
                   memset(&zjb, 0, sizeof(zjb));
                   rc = zjb_delete(&zjb, correlator);
-                  ExpectWithContext(rc, zjb.diag.e_msg).ToBe(RTNCD_SUCCESS); 
+                  ExpectWithContext(rc, zjb.diag.e_msg).ToBe(RTNCD_SUCCESS);
                 }); });
 }
 

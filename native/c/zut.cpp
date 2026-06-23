@@ -11,6 +11,7 @@
 
 #ifndef _XOPEN_SOURCE
 #define _XOPEN_SOURCE
+#include "ztype.h"
 #endif
 
 #define _OPEN_SYS_EXT
@@ -34,7 +35,9 @@
 #include <spawn.h>
 #include <sys/wait.h>
 #include <poll.h>
+#include <stdlib.h>
 #include <_Nascii.h>
+#include "csvapfaa.h"
 #include "iefjsqry.h"
 
 void zut_strip_final_newline(std::string &input)
@@ -380,6 +383,88 @@ int zut_run(const std::string &program)
   return ZUTRUN(&diag, program.c_str(), nullptr);
 }
 
+/**
+ * @brief Build DFSMSdfp DD options for use with zutm utilities.
+ * @param dd_list Reference to DFSMSdfp DD list built by this function.
+ * @param alt_dds Reference to DFSMSdfp ALT DD options.
+ * @return void
+ */
+static void zut_build_dfsmsdfp_dds_options(DFSMSdfp_DD_LIST &dd_list, const DFSMSdfp_AltDDs &alt_dds)
+{
+  // represents length of the DD list in IEBCOPY_ALT_DDS
+  // see https://www.ibm.com/docs/en/SSLTBW_3.1.0/pdf/idau100_v3r1.pdf, "ddname List"
+  constexpr uint16_t DD_LEN_SYSUT2 = 72;
+  constexpr uint16_t DD_LEN_SYSUT3 = 80;
+  constexpr uint16_t DD_LEN_SYSUT4 = 88;
+
+  uint16_t len = DD_LEN_SYSUT2;
+  zut_set_dd_with_padding(dd_list.sysin, alt_dds.sysin.c_str());
+  zut_set_dd_with_padding(dd_list.sysprint, alt_dds.sysprint.c_str());
+  zut_set_dd_with_padding(dd_list.sysut1, alt_dds.sysut1.c_str());
+  zut_set_dd_with_padding(dd_list.sysut2, alt_dds.sysut2.c_str());
+  if (alt_dds.sysut3.has_value())
+  {
+    zut_set_dd_with_padding(dd_list.sysut3, alt_dds.sysut3.value().c_str());
+    len = DD_LEN_SYSUT3;
+  }
+  if (alt_dds.sysut4.has_value())
+  {
+    zut_set_dd_with_padding(dd_list.sysut4, alt_dds.sysut4.value().c_str());
+    len = DD_LEN_SYSUT4;
+  }
+  dd_list.TotalLength = len;
+}
+
+/**
+ * @brief Run zutm DFSMSdfp utility with the given options and DD list.
+ * @param diag Reference to diagnostic information structure.
+ * @param utility Which supported DFSMSdfp utility to run.
+ * @param opts Options string for the DFSMSdfp utility.
+ * @param alt_dds Alternate DD options for the DFSMSdfp utility.
+ * @return The return code from the service.
+ */
+static int zut_dfsmsdfp(ZDIAG &diag, ZUTMSDFP_UTILITY utility, const std::string &opts, const DFSMSdfp_AltDDs *alt_dds)
+{
+  DFSMSdfp_OPT_LIST opt_list = {0};
+  DFSMSdfp_DD_LIST dd_list = {0};
+
+  if (!opts.empty())
+  {
+    opt_list.len = snprintf(opt_list.str, sizeof(opt_list.str) - 1, "%s", opts.c_str());
+  }
+
+  if (alt_dds)
+  {
+    zut_build_dfsmsdfp_dds_options(dd_list, *alt_dds);
+  }
+
+  return ZUTMSDFP(&diag, &utility, &opt_list, &dd_list);
+}
+
+int zut_iebcopy(ZDIAG &diag, const std::string &opts, const DFSMSdfp_AltDDs *alt_dd_list)
+{
+  return zut_dfsmsdfp(diag, ZUTMSDFP_IEBCOPY, opts, alt_dd_list);
+}
+
+int zut_iebgener(ZDIAG &diag, const std::string &opts, const DFSMSdfp_AltDDs *alt_dd_list)
+{
+  return zut_dfsmsdfp(diag, ZUTMSDFP_IEBGENER, opts, alt_dd_list);
+}
+
+void zut_set_dd_with_padding(char arr[8], const char *ddname)
+{
+  if (ddname && ddname[0] != '\0')
+  {
+    memset(arr, ' ', 8); // Pad with spaces for standard DD format
+    size_t len = strlen(ddname);
+    memcpy(arr, ddname, len > 8 ? 8 : len);
+  }
+  else
+  {
+    memset(arr, 0, 8); // Binary zeros
+  }
+}
+
 unsigned char zut_get_key()
 {
   return ZUTMGKEY();
@@ -587,6 +672,50 @@ int zut_list_subsystems(ZDIAG &diag, std::vector<std::string> &subsystems, std::
   return rc;
 }
 
+int zut_list_apf(ZDIAG &diag, std::vector<std::pair<std::string, std::string>> &apf)
+{
+  int rc = 0;
+  int size = sizeof(struct apfhdr);
+  struct apfhdr *answer_fixed = (struct apfhdr *)__malloc31(size);
+  int answer_len = size;
+  int rsn = 0;
+  rc = ZUTMAPFQ(&diag, answer_fixed, &answer_len, &rsn);
+  if (0 != rc)
+  {
+    if (csvapfrsnnotalldatareturned == rsn)
+    {
+      int needed_len = answer_fixed->apfhtlen;
+      struct apfhdr *answer_dynamic = (struct apfhdr *)__malloc31(needed_len);
+      rc = ZUTMAPFQ(&diag, answer_dynamic, &needed_len, &rsn);
+
+      if (0 != rc)
+      {
+        free(answer_fixed);
+        free(answer_dynamic);
+        return rc;
+      }
+
+      struct apfe *apfe = (struct apfe *)((unsigned char *)answer_dynamic + answer_dynamic->apfhoff);
+      for (int i = 0; i < answer_dynamic->apfh_n_rec; i++)
+      {
+        std::string dsn = std::string((char *)apfe->apfedsname, apfe->apfedslen);
+        std::string volume = std::string((char *)apfe->apfevolume, sizeof(apfe->apfevolume));
+        apf.push_back(std::make_pair(dsn, volume));
+        apfe = (struct apfe *)((unsigned char *)apfe + apfe->apfelen);
+      }
+      free(answer_dynamic);
+    }
+    else
+    {
+      free(answer_fixed);
+      return rc;
+    }
+  }
+
+  free(answer_fixed);
+  return rc;
+}
+
 int zut_list_parmlib(ZDIAG &diag, std::vector<std::string> &parmlibs)
 {
   int rc = 0;
@@ -622,15 +751,9 @@ char zut_get_hex_char(int num)
 }
 
 // built from pseudocode in https://en.wikipedia.org/wiki/Adler-32#Calculation
-// exploits SIMD for performance boosts on z13+
-uint32_t zut_calc_adler32_checksum(const std::string &input)
+void zut_adler32_update(Adler32State &state, const char *data, size_t len)
 {
   const uint32_t MOD_ADLER = 65521u;
-  uint32_t a = 1u;
-  uint32_t b = 0u;
-  const size_t len = input.length();
-  const char *data = input.data();
-
   const size_t block_size = 16;
   size_t i = 0;
 
@@ -639,31 +762,37 @@ uint32_t zut_calc_adler32_checksum(const std::string &input)
   {
     for (size_t j = 0; j < block_size; j++)
     {
-      // A_i = 1 + (D_i + D_(i+1) + ... + D_(i+n-1))
-      a += (uint8_t)data[i + j];
-      // B_i = A_i + B_(i-1)
-      b += a;
+      state.a += static_cast<uint8_t>(data[i + j]);
+      state.b += state.a;
     }
 
-    // Apply modulo to prevent overflow
-    a %= MOD_ADLER;
-    b %= MOD_ADLER;
+    state.a %= MOD_ADLER;
+    state.b %= MOD_ADLER;
     i += block_size;
   }
 
-  // Process remaining bytes in the input
+  // Process remaining bytes
   while (i < len)
   {
-    a += (uint8_t)data[i];
-    b += a;
+    state.a += static_cast<uint8_t>(data[i]);
+    state.b += state.a;
     i++;
   }
 
-  a %= MOD_ADLER;
-  b %= MOD_ADLER;
+  state.a %= MOD_ADLER;
+  state.b %= MOD_ADLER;
+}
 
-  // Adler-32(D) = B * 65536 + A
-  return (b << 16) | a;
+uint32_t zut_adler32_finalize(const Adler32State &state)
+{
+  return (state.b << 16) | state.a;
+}
+
+uint32_t zut_calc_adler32_checksum(const std::string &input)
+{
+  Adler32State state;
+  zut_adler32_update(state, input.data(), input.length());
+  return zut_adler32_finalize(state);
 }
 
 /**
@@ -883,9 +1012,9 @@ std::vector<char> zut_encode(const char *input_str, const size_t input_size, con
  * @param cd iconv descriptor (caller manages opening, flushing, and closing)
  * @param diag diagnostic structure to store error information
  */
-std::string zut_encode(const std::string &input_str, iconv_t cd, ZDIAG &diag)
+std::string zut_encode(const std::string &input_str, iconv_t cd, ZDIAG &diag, bool flush_state)
 {
-  std::vector<char> result = zut_encode(input_str.data(), input_str.size(), cd, diag);
+  std::vector<char> result = zut_encode(input_str.data(), input_str.size(), cd, diag, flush_state);
   return std::string(result.begin(), result.end());
 }
 
@@ -895,10 +1024,14 @@ std::string zut_encode(const std::string &input_str, iconv_t cd, ZDIAG &diag)
  * @param input_size size of the input data in bytes
  * @param cd iconv descriptor (caller manages opening, flushing, and closing)
  * @param diag diagnostic structure to store error information
+ * @param flush_state when true, flush the shift state after the input so the
+ *   returned bytes are a self-contained unit (ends back in single-byte state)
  */
-std::vector<char> zut_encode(const char *input_str, const size_t input_size, iconv_t cd, ZDIAG &diag)
+std::vector<char> zut_encode(const char *input_str, const size_t input_size, iconv_t cd, ZDIAG &diag, bool flush_state)
 {
-  const size_t max_output_size = input_size * 4;
+  // Headroom beyond the *4 worst case so the trailing shift sequence (e.g. SI)
+  // produced when flush_state is set always fits, even for an empty input.
+  const size_t max_output_size = input_size * 4 + 16;
   std::vector<char> output_buffer(max_output_size, 0);
 
   char *input = const_cast<char *>(input_str);
@@ -906,7 +1039,7 @@ std::vector<char> zut_encode(const char *input_str, const size_t input_size, ico
 
   ZConvData data = {input, input_size, max_output_size, &output_buffer[0], output_iter};
 
-  size_t iconv_rc = zut_iconv(cd, data, diag, false);
+  size_t iconv_rc = zut_iconv(cd, data, diag, flush_state);
   if (-1 == iconv_rc)
   {
     throw std::runtime_error(diag.e_msg);

@@ -6,10 +6,24 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- `c`: Fixed an issue where data set member write operations did not produce self-contained records for stateful mixed single-byte and double-byte character sets. Now, each record written to a data set member is self-contained to avoid code page conversion errors. [#1049](https://github.com/zowe/zowex/pull/1049)
+- `c`: Fixed an issue where the `zowex ds copy` command would fail to allocate DDs when copying PDS members in parallel. [#994](https://github.com/zowe/zowex/issues/994)
+- `c`: Added support for listing APF and PROCLIB data sets to JSON-RPC server.
+- `c`: Optimized Adler32 calculations to compute e-tags incrementally during streamed data set downloads. This significantly reduces memory footprint and resolves a failure when downloading large data sets. [#1016](https://github.com/zowe/zowex/issues/1016)
+- `c`: Fix regression on ENQ qname. [#1027](https://github.com/zowe/zowex/issues/1027)
+- `c`: Added z/OS recovery around JES operations in the `zowex` CLI binary to allow recovering from abends. [#1011](https://github.com/zowe/zowex/pull/1011)
+- **Breaking:** `c`: Renamed C function `zjb_read_jobs_output_by_key` in zjb.hpp to `zjb_read_job_content_by_key` to be consistent with `zjb_read_job_content_by_dsn.
+- `c`: Fixes issue where `zowex` failed to allocate `sysout` DDs that were dynamically allocated under z/OS UNIX. [#840](https://github.com/zowe/zowex/issues/840)
+- `c`: Add command `zowex system list-apf` to list APF authorized data sets.
+- `c`: Fixed several vulnerabilities in C++ and Metal C code to improve stability. [#997](https://github.com/zowe/zowex/pull/997)
+- `c`: Optimized USS file list operations by replacing CSV formatting and parsing with structured data transfer via the `ZusfListEntry` struct. This improves performance for `zowex uss list` and provides type-safe, programmatic access to file attributes for SDK consumers. [#990](https://github.com/zowe/zowex/pull/990)
+- `c`: Fixed parsing of file names containing commas in USS list API responses, which caused data misalignment for SDK consumers. [#989](https://github.com/zowe/zowex/issues/989)
 - `c`: Fixed an issue where the `zoweax` authorized CLI binary could run the `server` command or `plugin` command group as privileged. Now, `zoweax` disables privileges before commands are executed. Commands in the `console` group continue to run as privileged. [#958](https://github.com/zowe/zowex/issues/958)
 - `c`: Added support for pre-command hooks in the command-line parser utility. [#958](https://github.com/zowe/zowex/issues/958)
 - `c`: Fixes issue where ZWEPROLG could return to caller in an incorrect AMODE. [#951](https://github.com/zowe/zowex/issues/951)
 - `c`: Improved error message when deleting a member fails because its parent PDS is open in ISPF. [#916](https://github.com/zowe/zowe-native-proto/issues/916)
+- `c`: Fixed an issue where incorrect values could be returned for the `usedp` (Used Space) and `volsers` (Volumes) attributes when listing data sets. [#981](https://github.com/zowe/zowex/pull/981)
+- `c`: Fixed an issue where invalid data could be returned for attributes of PDS members. [#1009](https://github.com/zowe/zowex/issues/1009)
 
 ## `0.6.0`
 

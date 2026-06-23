@@ -192,7 +192,7 @@ int AMSMAIN(const char *ddname)
     return -1;
   }
 
-  strcpy(resources.qname.value, "SPFEDIT ");
+  memcpy(resources.qname.value, "SPFEDIT ", sizeof(resources.qname.value));
   resources.rname.rlen = sprintf(resources.rname.value, "%.*s%.*s", sizeof(resources.sysprint->jfcb.jfcbdsnm), resources.sysprint->jfcb.jfcbdsnm, sizeof(resources.sysprint->jfcb.jfcbelnm), resources.sysprint->jfcb.jfcbelnm);
 
   rc = enq(&resources.qname, &resources.rname); // TODO(Kelosky): before open? How is directory entry protected?

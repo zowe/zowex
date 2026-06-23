@@ -15,6 +15,7 @@
 #include "ztype.h"
 #include "zprmtype.h"
 #include "iefjsqry.h"
+#include "csvapfaa.h"
 
 #if defined(__cplusplus) && defined(__MVS__)
 extern "OS"
@@ -24,6 +25,7 @@ extern "C"
 {
 #endif
 
+#define DFSMSdfp_OPT_MAX_LEN 128
 #define RET_ARG_MAX_LEN 260
 #define MSG_ENTRIES 25
 
@@ -40,6 +42,42 @@ extern "C"
   typedef struct jqry___subsys___entry JQRY_SUBSYS_ENTRY;
   typedef struct jqry___vt___entry JQRY_VT_ENTRY;
 
+  typedef struct
+  {
+    short len;
+    char str[DFSMSdfp_OPT_MAX_LEN];
+  } DFSMSdfp_OPT_LIST;
+
+  // see https://www.ibm.com/docs/en/SSLTBW_3.1.0/pdf/idau100_v3r1.pdf "ddname List"
+  typedef struct
+  {
+
+    /* DWORD alignment */
+    char _padding[6];
+    /* 2 byte length: measures from start of dd section to end */
+    uint16_t TotalLength;
+
+    /* --- DD LIST --- */
+    /* Rows 1-4 explicitly show binary zeros */
+    char _unused1[8];
+    char _unused2[8];
+    char _unused3[8];
+    char _unused4[8];
+
+    /* Explicit DDNAME override labels */
+    char sysin[8];
+    char sysprint[8];
+
+    /* Row explicitly showing binary zeros */
+    char _unused5[8];
+
+    /* SYSUT datasets */
+    char sysut1[8];
+    char sysut2[8];
+    char sysut3[8];
+    char sysut4[8];
+
+  } DFSMSdfp_DD_LIST;
   typedef struct
   {
     short len;
@@ -89,6 +127,22 @@ extern "C"
    */
   int ZUTMGT64(void **PTR64, int *PTR64);
 
+  typedef enum
+  {
+    ZUTMSDFP_IEBCOPY = 0,
+    ZUTMSDFP_IEBGENER = 1,
+  } ZUTMSDFP_UTILITY;
+
+  /**
+   * @brief Run DFSMSdfp utilities
+   * @param zdiag Pointer to diagnostic structure
+   * @param utility The DFSMSdfp utility to run
+   * @param opt_list Pointer to DFSMSdfp option list
+   * @param dd_list Pointer to DFSMSdfp DD list
+   * @return The return code from the service
+   */
+  int ZUTMSDFP(ZDIAG *, ZUTMSDFP_UTILITY *, DFSMSdfp_OPT_LIST *, DFSMSdfp_DD_LIST *);
+
   int ZUTMGUSR(char[8]);
   int ZUTWDYN(BPXWDYN_PARM *, BPXWDYN_RESPONSE *);
   int ZUTEDSCT();
@@ -97,7 +151,26 @@ extern "C"
   int ZUTRUN(ZDIAG *, const char *, const char *);
   void ZUTDBGMG(const char *);
   unsigned char ZUTMGKEY();
+
+  /**
+   * @brief Query the APF list
+   * @param diag The diagnostic structure
+   * @param answer The answer structure
+   * @param answer_len The length of the answer
+   * @param rsn The reason code
+   * @return The return code from the service
+   */
+  int ZUTMAPFQ(ZDIAG *, struct apfhdr *, int *, int *);
+
+  /**
+   * @brief List the PLIB datasets
+   * @param diag The diagnostic structure
+   * @param num_dsns The number of datasets
+   * @param dsns The datasets
+   * @return The return code from the service
+   */
   int ZUTMLPLB(ZDIAG *, int *, PARMLIB_DSNS *);
+
   int ZUTSSIQ(ZDIAG *, JQRY_HEADER **, const char *filter);
   int ZUTCVTD(const char *ptr, char *time_out);
   int ZUTNOAUT();

@@ -4,6 +4,12 @@ All notable changes to the Client code for "@zowe/zowex-for-zowe-sdk" are docume
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## Recent Changes
+
+- Added support to list APF and PROCLIB data sets. [#1029](https://github.com/zowe/zowex/pull/1029)
+- Added support for viewing syslog.
+- Added response content for copy data sets and members operations. [#995](https://github.com/zowe/zowex/pull/995)
+
 ## `0.6.0`
 
 - Added `disableCreateNewProfile` option to `AbstractConfigManager.promptForProfile` function to prevent profile creation and migration, allowing selection only from existing SSH profiles. [#971](https://github.com/zowe/zowex/pull/971)

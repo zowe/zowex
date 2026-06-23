@@ -39,11 +39,45 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       - name: Watch z/OS build
-        if: ${{ matrix.os == 'ubuntu' }}
-        run: |
-          [ -z "$RUN_ID" ] || gh run watch $RUN_ID
-        env:
-          GH_TOKEN: ${{ github.token }}
+        if: ${{ matrix.os == 'ubuntu' && env.RUN_ID }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const artifactName = "zowe-server-bin";
+            const runId = process.env.RUN_ID;
+            const timeoutMs = 30 * 60 * 1000;
+            const intervalMs = 5 * 1000;
+            const deadline = Date.now() + timeoutMs;
+            let attempts = 0;
+            const hasArtifact = async () => {
+              const { data } = await github.rest.actions.listWorkflowRunArtifacts({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: runId,
+              });
+              return data.artifacts.some((a) => a.name === artifactName);
+            };
+            const isCompleted = async () => {
+              const { data: run } = await github.rest.actions.getWorkflowRun({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: runId,
+              });
+              return run.status === "completed";
+            };
+            while (Date.now() < deadline) {
+              core.info(`Checking for artifact "${artifactName}" (attempt ${++attempts} of ${Math.ceil(timeoutMs / intervalMs)})...`);
+              if (await hasArtifact()) {
+                core.info(`Artifact "${artifactName}" is available`);
+                return;
+              }
+              if (await isCompleted()) {
+                core.setFailed(`z/OS build run ${runId} completed without producing "${artifactName}"`);
+                return;
+              }
+              await new Promise((r) => setTimeout(r, intervalMs));
+            }
+            core.setFailed(`Timed out after ${Math.round(timeoutMs / 60000)} minutes waiting for "${artifactName}"`);
 
       - name: Download server PAX into SDK bin
         if: ${{ matrix.os == 'ubuntu' }}
@@ -62,13 +96,6 @@ jobs:
           path: dist/zowex-for-zowe-cli-*.tgz
 
       - uses: actions/upload-artifact@v4
-        id: vsce-artifact-upload
-        if: ${{ matrix.os == 'ubuntu' }}
-        with:
-          name: zowex-vsce
-          path: dist/*.vsix
-
-      - uses: actions/upload-artifact@v4
         id: sdk-artifact-upload
         if: ${{ matrix.os == 'ubuntu' }}
         with:
@@ -84,5 +111,4 @@ jobs:
           message: |
             Client artifacts:
              - CLI Plug-in: ${{ steps.cli-artifact-upload.outputs.artifact-url }}
-             - VSCode Extension: ${{ steps.vsce-artifact-upload.outputs.artifact-url }}
              - SDK: ${{ steps.sdk-artifact-upload.outputs.artifact-url }}
