@@ -48,6 +48,7 @@ OUR      USING SAVER,R2              Addressability to our save area
          SAM31 ,                     May have returned in AMODE 24
          L     R13,SAVPREV           R13 -> restore caller save area
          L     R14,SAVGRS14          Restore caller R14
+         LM    R2,R12,SAVGRS2        Restore caller R2-R12
          BR    R14                   Return to above-the-line caller
 *
 * Separate ENTRY to obtain the length of this routine for the copy.
