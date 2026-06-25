@@ -20,10 +20,10 @@ int zutm1lpl(ZDIAG *, int *, PARMLIB_DSNS *) ATTRIBUTE(amode31);
 int zutm1gur(char[8]) ATTRIBUTE(amode31);
 int zutm1apf(struct apfhdr *, int *, int *) ATTRIBUTE(amode31);
 
-// Invoke a dynamically loaded module through a below-the-line trampoline, honoring the
+// Invoke a dynamically loaded module through a below-the-line shim, honoring the
 // module's AMODE (24 or 31) so it returns correctly to this above-the-line caller.
 //   ep   - entry point from load_module (low 32 bits, AMODE bit preserved)
 //   parm - caller-built, VL-terminated R1 parameter list, below the 16 MB line
-int zutm1call(unsigned int ep, void *PTR32 parm) ATTRIBUTE(amode31);
+int zutm1call24(unsigned int ep, void *PTR32 parm) ATTRIBUTE(amode31);
 
 #endif

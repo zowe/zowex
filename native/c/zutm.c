@@ -48,7 +48,7 @@ int ZUTMSDFP(ZDIAG *diag, ZUTMSDFP_UTILITY *utility, DFSMSdfp_OPT_LIST *opts, DF
   const char *utility_name = zut_dfsmsdfp_names[*utility];
 
   // Bring the utility into storage. LOAD keeps it resident across the call below and
-  // yields its entry point with the module's AMODE bit set, which the trampoline uses
+  // yields its entry point with the module's AMODE bit set, which zutm1call24 uses
   // to enter the utility in its own AMODE.
   void *PTR64 ep = load_module(utility_name);
   if (!ep)
@@ -80,7 +80,7 @@ int ZUTMSDFP(ZDIAG *diag, ZUTMSDFP_UTILITY *utility, DFSMSdfp_OPT_LIST *opts, DF
   parm_list[0] = (unsigned int)(uintptr_t)&btl_opts;
   parm_list[1] = (unsigned int)(uintptr_t)&btl_dd_list.TotalLength | 0x80000000U;
 
-  rc = zutm1call((unsigned int)(uintptr_t)ep, parm_list);
+  rc = zutm1call24((unsigned int)(uintptr_t)ep, parm_list);
 
   delete_module(utility_name);
 
@@ -328,6 +328,7 @@ int ZUTSRCH(const char *parms)
 #pragma prolog(ZUTRUN, " ZWEPROLG NEWDSA=(YES,16),LOC24=YES ")
 #pragma epilog(ZUTRUN, " ZWEEPILG ")
 typedef int (*PGM64)(void *) ATTRIBUTE(amode64);
+typedef int (*PGM31)(void *) ATTRIBUTE(amode31);
 
 int ZUTRUN(ZDIAG *diag, const char *program, const char *parms)
 {
@@ -351,13 +352,13 @@ int ZUTRUN(ZDIAG *diag, const char *program, const char *parms)
 
     long long unsigned int ifunction = (long long unsigned int)p;
 
-    if (ifunction & 0x00000000000000001ULL)
+    if (ifunction & 0x00000000000000001ULL) // 64-bit
     {
       ifunction &= 0xFFFFFFFFFFFFFFFEULL; // clear low (AMODE-64) bit
       PGM64 p64 = (PGM64)ifunction;
       rc = p64(pptr);
     }
-    else
+    else if (ifunction & 0x0000000080000000ULL) // 31-bit
     {
       // AMODE 31 or 24: route through the 24-bit trampoline, which enters the program in
       // its own AMODE (from the entry-point bit) and returns correctly to this
@@ -365,6 +366,15 @@ int ZUTRUN(ZDIAG *diag, const char *program, const char *parms)
       unsigned int plist[1];
       plist[0] = (unsigned int)(uintptr_t)pptr | 0x80000000U; // single parm + VL bit
       rc = zutm1call((unsigned int)ifunction, plist);
+    }
+    else // 24-bit
+    {
+      // AMODE 24: route through the 24-bit shim, which enters the program in
+      // its own AMODE (from the entry-point bit) and returns correctly to this
+      // above-the-line caller.
+      unsigned int plist[1];
+      plist[0] = (unsigned int)(uintptr_t)pptr | 0x80000000U; // single parm + VL bit
+      rc = zutm1call24((unsigned int)ifunction, plist);
     }
   }
   else

@@ -18,3 +18,11 @@ profiles:
 
     # Command to run before building the native code
     # preBuildCmd: '. ~/entrypoint.sh'  # Run script to configure build environment
+
+    # Environment variables forwarded to the test runner on z/OS (npm run z:test).
+    # Use this to enable optional tests that depend on system-specific capabilities.
+    # Local ZNP_* env vars always override these values when both are set.
+    # testEnv:
+    #   # Archival mechanism available on this LPAR (uncomment one):
+    #   ZNP_CADISK: "1"      # CA Disk (Broadcom) — uses DARCHIVE / zowex data-set restore
+    #   ZNP_DFSMSHSM: "1"   # DFSMShsm (IBM)     — uses HMIGRATE / HRECALL

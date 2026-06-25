@@ -102,7 +102,7 @@ build-out/zut.test.o \
 build-out/zut.o \
 build-out/zutm.o \
 build-out/zutm31.o \
-build-out/zutucall.o \
+build-out/zutcall24.o \
 build-out/zds.test.o \
 build-out/zds.o \
 build-out/zdsm.o \
@@ -155,8 +155,8 @@ build-out/zutm.o:
 build-out/zutm31.o:
 	ln -sf ../../build-out/zutm31.o build-out/zutm31.o
 
-build-out/zutucall.o:
-	ln -sf ../../build-out/zutucall.o build-out/zutucall.o
+build-out/zutcall24.o:
+	ln -sf ../../build-out/zutcall24.o build-out/zutcall24.o
 
 build-out/zds.o:
 	ln -sf ../../build-out/zds.o build-out/zds.o

@@ -16,15 +16,12 @@
 #include <string.h>
 #include "zstorage.h"
 #include "zdbg.h"
+#include "ztype.h"
+#include "zutcall24.h"
 #include "zwto.h"
 #include "iefzpmap.h"
 
-// Below-the-line trampoline used to invoke the DFSMSdfp utilities (zutucall.s).
-// ZUTUCALL is position independent: we copy it into 24-bit storage and run the
-// copy. ZUTUCALQ returns its length in bytes (for the copy).
-int ZUTUCALL();
-int ZUTUCALQ();
-typedef int (*ZUTUCALL_FN)(unsigned int ep, void *PTR32 parm_list, void *PTR32 save_area) ATTRIBUTE(amode31);
+typedef int (*ZUTCALL24_FN)(unsigned int ep, void *PTR32 parm_list) ATTRIBUTE(amode31);
 
 #if defined(__IBM_METAL__)
 #ifndef _IAZJSAB_DSECT
@@ -148,37 +145,35 @@ int zutm1apf(struct apfhdr *answer, int *answer_len, int *rsn)
   return rc;
 }
 
-// Invoke a dynamically loaded module through the below-the-line trampoline (zutucall.s),
+// Invoke a dynamically loaded module through the below-the-line shim (zutcall24.s),
 // honoring the module's AMODE so it returns correctly to this above-the-line (RMODE 31)
 // caller.
 //   ep   - entry point from load_module. May not work for `load_module31` (AMODE stripped)
 //   parm - the caller-built, VL-terminated R1 parameter list, below the 16 MB line
-#pragma prolog(zutm1call, " ZWEPROLG NEWDSA=(YES,4),LOC24=YES ")
-#pragma epilog(zutm1call, " ZWEEPILG ")
-int zutm1call(unsigned int ep, void *PTR32 parm)
+#pragma prolog(zutm1call24, " ZWEPROLG NEWDSA=(YES,4),LOC24=YES ")
+#pragma epilog(zutm1call24, " ZWEEPILG ")
+int zutm1call24(unsigned int ep, void *PTR32 parm)
 {
   int rc = 0;
 
-  // Copy the position-independent trampoline into 24-bit storage and run the copy, so an
-  // AMODE 24 module's "BR 14" return lands on a below-the-line (24-bit) address.
-  int tlen = ZUTUCALQ();
-  void *PTR32 tramp = storage_obtain24(tlen);
-  int (*src)() = ZUTUCALL;
-  memcpy(tramp, (void *)src, tlen);
+  // Copy the position-independent shim into 24-bit storage and run the module.
+  unsigned int shim[64];
+  int tlen = ZUTCALQ();
+  if (tlen > (int)sizeof(shim))
+  {
+    // The shim grew past the buffer; refuse rather than overflow the stack. If this
+    // ever fires, enlarge shim[] to match ZUCALLEN.
+    return RTNCD_FAILURE;
+  }
+  int (*src)() = ZUTCAL24;
+  memcpy(shim, (void *)src, tlen);
 
-  // 18-word save area for the called module, below the line (this DSA is LOC24). Allocated
-  // per call, so the path is reentrant.
-  unsigned int save_area[18] = {0};
-
-  // Run the copy: R1 -> { entry point (with AMODE bit), parm list, save area }.
   union
   {
     void *PTR32 addr;
-    ZUTUCALL_FN fn;
-  } call = {.addr = tramp};
-  rc = call.fn(ep, parm, save_area);
-
-  storage_release(tlen, tramp);
+    ZUTCALL24_FN fn;
+  } call = {.addr = shim};
+  rc = call.fn(ep, parm);
 
   return rc;
 }

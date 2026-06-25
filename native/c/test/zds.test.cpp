@@ -621,6 +621,112 @@ void zds_tests()
                            });
                       });
 
+             // Regression tests for writing DBCS content to PDS members with a
+             // stateful mixed SBCS/DBCS target codepage (e.g. IBM-1399). Each
+             // record must be self-contained: it has to start and end in
+             // single-byte state with balanced shift-out/shift-in. The member
+             // (BPAM) write paths encode line-by-line, so a DBCS record that is
+             // not the last line previously had its closing SI dropped, which
+             // corrupted the record and made the read-back conversion fail.
+             describe("DBCS member encoding round-trip",
+                      [&]() -> void
+                      {
+                        // UTF-8 bytes for 日本語 (U+65E5 U+672C U+8A9E).
+                        const std::string japanese =
+                            std::string("\xE6\x97\xA5\xE6\x9C\xAC\xE8\xAA\x9E", 9);
+                        // ASCII markers built as raw bytes so they don't depend
+                        // on the (EBCDIC) compile-time charset of the test.
+                        const std::string marker_a = std::string("\x2F\x2F\x41", 3); // "//A"
+                        const std::string marker_b = std::string("\x2F\x2F\x42", 3); // "//B"
+
+                        // UTF-8 input where the DBCS record is in the middle, so
+                        // it is followed by another record: "//A\n日本語\n//B\n".
+                        const std::string utf8_input =
+                            marker_a + "\x0A" + japanese + "\x0A" + marker_b + "\x0A";
+
+                        it("should round-trip a non-final DBCS record written to a member (buffered)",
+                           [&]() -> void
+                           {
+                             ZDS zds = {0};
+                             std::string dsn = get_random_ds(3);
+                             created_dsns.push_back(dsn);
+                             create_pds(&zds, dsn); // FB/80 PDS, like a JCL library
+                             std::string member = dsn + "(JCL)";
+
+                             // Write UTF-8 -> IBM-1399 (stateful Japanese mixed codepage)
+                             strcpy(zds.encoding_opts.codepage, "IBM-1399");
+                             strcpy(zds.encoding_opts.source_codepage, "UTF-8");
+                             zds.encoding_opts.data_type = eDataTypeText;
+
+                             ZDSWriteOpts wopts{.zds = &zds, .dsname = member};
+                             int wrc = zds_write(wopts, utf8_input);
+                             // Pre-fix this failed: the post-write etag read-back
+                             // conversion (IBM-1399 -> UTF-8) hit a malformed record.
+                             ExpectWithContext(wrc, zds.diag.e_msg).ToBe(RTNCD_SUCCESS);
+
+                             // Read back with the same encoding and verify the
+                             // DBCS record and its neighbors survived intact.
+                             ZDS rzds = {0};
+                             strcpy(rzds.encoding_opts.codepage, "IBM-1399");
+                             strcpy(rzds.encoding_opts.source_codepage, "UTF-8");
+                             rzds.encoding_opts.data_type = eDataTypeText;
+
+                             std::string out;
+                             ZDSReadOpts ropts{.zds = &rzds, .dsname = member};
+                             int rrc = zds_read(ropts, out);
+                             ExpectWithContext(rrc, rzds.diag.e_msg).ToBe(RTNCD_SUCCESS);
+
+                             ExpectWithContext(out.find(japanese) != std::string::npos,
+                                               "DBCS record should round-trip intact")
+                                 .ToBe(true);
+                             Expect(out.find(marker_a) != std::string::npos).ToBe(true);
+                             Expect(out.find(marker_b) != std::string::npos).ToBe(true);
+                           });
+
+                        it("should round-trip a non-final DBCS record written to a member (streamed)",
+                           [&]() -> void
+                           {
+                             ZDS zds = {0};
+                             std::string dsn = get_random_ds(3);
+                             created_dsns.push_back(dsn);
+                             create_pds(&zds, dsn);
+                             std::string member = dsn + "(JCL)";
+
+                             // The streamed write path consumes base64 chunks from
+                             // a pipe/file, mirroring how the extension uploads.
+                             std::string temp_file = "/tmp/zds_dbcs_stream_" + std::to_string(getpid());
+                             std::ofstream temp_out(temp_file);
+                             temp_out << zbase64::encode(utf8_input);
+                             temp_out.close();
+
+                             strcpy(zds.encoding_opts.codepage, "IBM-1399");
+                             strcpy(zds.encoding_opts.source_codepage, "UTF-8");
+                             zds.encoding_opts.data_type = eDataTypeText;
+
+                             size_t content_len = 0;
+                             ZDSWriteOpts wopts{.zds = &zds, .dsname = member};
+                             int wrc = zds_write_streamed(wopts, temp_file, &content_len);
+                             unlink(temp_file.c_str());
+                             ExpectWithContext(wrc, zds.diag.e_msg).ToBe(RTNCD_SUCCESS);
+
+                             ZDS rzds = {0};
+                             strcpy(rzds.encoding_opts.codepage, "IBM-1399");
+                             strcpy(rzds.encoding_opts.source_codepage, "UTF-8");
+                             rzds.encoding_opts.data_type = eDataTypeText;
+
+                             std::string out;
+                             ZDSReadOpts ropts{.zds = &rzds, .dsname = member};
+                             int rrc = zds_read(ropts, out);
+                             ExpectWithContext(rrc, rzds.diag.e_msg).ToBe(RTNCD_SUCCESS);
+
+                             ExpectWithContext(out.find(japanese) != std::string::npos,
+                                               "DBCS record should round-trip intact")
+                                 .ToBe(true);
+                             Expect(out.find(marker_a) != std::string::npos).ToBe(true);
+                             Expect(out.find(marker_b) != std::string::npos).ToBe(true);
+                           });
+                      });
+
              describe("copy datasets",
                       [&]() -> void
                       {
@@ -1443,6 +1549,169 @@ void zds_tests()
                              Expect(found->volser).ToBe(std::string(ZDS_VOLSER_PATH));
                            });
                       });
+             describe("list GDG",
+                      [&]() -> void
+                      {
+                        const std::string user = get_user();
+                        const std::string base = get_random_ds(3, user);
+                        const std::string gdg_base_dsn = base + ".GDG";
+                        const std::string gdg_gen1_dsn = gdg_base_dsn + ".G0001V00";
+
+                        auto submit_and_wait = [](const std::string &jcl, int max_polls = 600, bool check_rc = false)
+                        {
+                          ZJB zjb = {0};
+                          std::string jobid;
+                          int rc = zjb_submit(&zjb, jcl, jobid);
+                          if (rc != 0)
+                            throw std::runtime_error("Failed to submit JCL: " + std::string(zjb.diag.e_msg));
+                          TestLog("Submitted job " + jobid + " (" + std::to_string(jcl.size()) + " bytes)");
+                          std::string correlator(zjb.correlator, sizeof(zjb.correlator));
+                          ZJob final_job = {};
+                          for (int i = 0; i < max_polls; ++i)
+                          {
+                            ZJB zjb_v = {0};
+                            final_job = {};
+                            int vrc = zjb_view(&zjb_v, correlator, final_job);
+                            if (vrc != 0)
+                              throw std::runtime_error("Failed to view job: " + std::string(zjb_v.diag.e_msg));
+                            if (!final_job.retcode.empty())
+                              break;
+                            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                          }
+                          TestLog("Job " + jobid + " retcode='" + final_job.retcode + "'");
+                          if (check_rc && final_job.retcode.find("CC 0000") == std::string::npos)
+                            throw std::runtime_error("Job failed with retcode='" + final_job.retcode + "'");
+                        };
+
+                        TEST_OPTIONS gdg_opts = {false, 60};
+
+                        beforeAll([&]() -> void
+                                  {
+                                    // Clean up any leftover data sets from previous test runs
+                                    std::string cleanup_jcl;
+                                    cleanup_jcl += "//GDGCLN$ JOB IZUACCT\n";
+                                    cleanup_jcl += "//STEP1    EXEC PGM=IDCAMS\n";
+                                    cleanup_jcl += "//SYSPRINT DD SYSOUT=*\n";
+                                    cleanup_jcl += "//SYSIN    DD *\n";
+                                    cleanup_jcl += "  DELETE " + gdg_gen1_dsn + " NONVSAM PURGE\n";
+                                    cleanup_jcl += "  DELETE " + gdg_base_dsn + " GDG PURGE\n";
+                                    cleanup_jcl += "  SET MAXCC = 0\n";
+                                    cleanup_jcl += "/*\n";
+                                    submit_and_wait(cleanup_jcl, 200);
+
+                                    // Define the GDG base via IDCAMS
+                                    std::string setup_jcl;
+                                    setup_jcl += "//GDGSET$ JOB IZUACCT\n";
+                                    setup_jcl += "//STEP1    EXEC PGM=IDCAMS\n";
+                                    setup_jcl += "//SYSPRINT DD SYSOUT=*\n";
+                                    setup_jcl += "//SYSIN    DD *\n";
+                                    setup_jcl += "  DEFINE GDG ( -\n";
+                                    setup_jcl += "    NAME(" + gdg_base_dsn + ") -\n";
+                                    setup_jcl += "    LIMIT(5) -\n";
+                                    setup_jcl += "    NOEMPTY -\n";
+                                    setup_jcl += "    NOSCRATCH )\n";
+                                    setup_jcl += "/*\n";
+                                    submit_and_wait(setup_jcl, 200, true);
+
+                                    // Create one generation via IEBGENER
+                                    std::string gen_jcl;
+                                    gen_jcl += "//GDGGEN$ JOB IZUACCT\n";
+                                    gen_jcl += "//STEP1    EXEC PGM=IEBGENER\n";
+                                    gen_jcl += "//SYSPRINT DD SYSOUT=*\n";
+                                    gen_jcl += "//SYSIN    DD DUMMY\n";
+                                    gen_jcl += "//SYSUT1   DD *\n";
+                                    gen_jcl += "GDG GENERATION ONE\n";
+                                    gen_jcl += "/*\n";
+                                    gen_jcl += "//SYSUT2   DD DSN=" + gdg_base_dsn + "(+1),DISP=(NEW,CATLG),\n";
+                                    gen_jcl += "//            UNIT=SYSALLDA,SPACE=(TRK,(1,1)),\n";
+                                    gen_jcl += "//            RECFM=FB,LRECL=80,BLKSIZE=800\n";
+                                    submit_and_wait(gen_jcl, 600, true); },
+                                  gdg_opts);
+
+                        afterAll([&]() -> void
+                                 {
+                                   std::string del_jcl;
+                                   del_jcl += "//GDGDEL$ JOB IZUACCT\n";
+                                   del_jcl += "//STEP1    EXEC PGM=IDCAMS\n";
+                                   del_jcl += "//SYSPRINT DD SYSOUT=*\n";
+                                   del_jcl += "//SYSIN    DD *\n";
+                                   del_jcl += "  DELETE " + gdg_gen1_dsn + " NONVSAM PURGE\n";
+                                   del_jcl += "  DELETE " + gdg_base_dsn + " GDG PURGE\n";
+                                   del_jcl += "  SET MAXCC = 0\n";
+                                   del_jcl += "/*\n";
+                                   submit_and_wait(del_jcl, 200); },
+                                 gdg_opts);
+
+                        it("should report ZDS_VOLSER_GDG (??????) for a GDG base",
+                           [&]() -> void
+                           {
+                             ZDS zds = {0};
+                             std::vector<ZDSEntry> entries;
+                             const int rc = zds_list_data_sets(&zds, gdg_base_dsn, entries, true);
+                             ExpectWithContext(rc, zds.diag.e_msg).ToBe(0);
+
+                             ZDSEntry *found = nullptr;
+                             for (auto &e : entries)
+                             {
+                               std::string trimmed = e.name;
+                               zut_rtrim(trimmed);
+                               if (trimmed == gdg_base_dsn)
+                               {
+                                 found = &e;
+                                 break;
+                               }
+                             }
+                             Expect(found != nullptr).ToBe(true);
+                             Expect(found->volser).ToBe(std::string(ZDS_VOLSER_GDG));
+                           },
+                           gdg_opts);
+
+                        it("should find GDG generations using a wildcard pattern",
+                           [&]() -> void
+                           {
+                             ZDS zds = {0};
+                             std::vector<ZDSEntry> entries;
+                             const std::string pattern = gdg_base_dsn + ".*";
+                             const int rc = zds_list_data_sets(&zds, pattern, entries);
+                             ExpectWithContext(rc, zds.diag.e_msg).ToBe(0);
+
+                             bool found_gen1 = false;
+                             for (const auto &e : entries)
+                             {
+                               std::string trimmed = e.name;
+                               zut_rtrim(trimmed);
+                               if (trimmed == gdg_gen1_dsn)
+                                 found_gen1 = true;
+                             }
+                             Expect(found_gen1).ToBe(true);
+                           },
+                           gdg_opts);
+
+                        it("should read content from a GDG generation by absolute name",
+                           [&]() -> void
+                           {
+                             ZDS read_zds{};
+                             ZDSReadOpts read_opts{.zds = &read_zds, .dsname = gdg_gen1_dsn};
+                             std::string content;
+                             const int rc = zds_read(read_opts, content);
+                             ExpectWithContext(rc, read_zds.diag.e_msg).ToBe(0);
+                             Expect(content.find("GDG GENERATION ONE") != std::string::npos).ToBe(true);
+                           },
+                           gdg_opts);
+
+                        it("should read content from the most recent GDG generation via relative reference",
+                           [&]() -> void
+                           {
+                             const std::string relative_ref = gdg_base_dsn + "(0)";
+                             ZDS read_zds{};
+                             ZDSReadOpts read_opts{.zds = &read_zds, .dsname = relative_ref};
+                             std::string content;
+                             const int rc = zds_read(read_opts, content);
+                             ExpectWithContext(rc, read_zds.diag.e_msg).ToBe(0);
+                             Expect(content.find("GDG GENERATION ONE") != std::string::npos).ToBe(true);
+                           },
+                           gdg_opts);
+                      });
              describe("read",
                       [&]() -> void
                       {
@@ -1574,6 +1843,36 @@ void zds_tests()
                              int rc = zds_read(read_opts, content);
                              ExpectWithContext(rc, read_zds.diag.e_msg).ToBe(0);
                              Expect(content.empty()).ToBe(false);
+                           });
+
+                        it("should write and read DBCS multi-byte encoded content (IBM-939)",
+                           [&]() -> void
+                           {
+                             const std::string dsn = get_random_ds(3);
+                             created_dsns.push_back(dsn);
+                             ZDS zds = {0};
+                             create_seq(&zds, dsn);
+
+                             // Japanese こんにちは encoded as UTF-8 bytes
+                             const std::string utf8_japanese = "\xe3\x81\x93\xe3\x82\x93\xe3\x81\xab\xe3\x81\xa1\xe3\x81\xaf";
+
+                             ZDS write_zds{};
+                             write_zds.encoding_opts.data_type = eDataTypeText;
+                             strcpy(write_zds.encoding_opts.codepage, "IBM-939");
+                             ZDSWriteOpts write_opts{.zds = &write_zds, .dsname = dsn};
+                             int rc = zds_write(write_opts, utf8_japanese);
+                             ExpectWithContext(rc, write_zds.diag.e_msg).ToBe(0);
+
+                             // Read back in binary mode to verify DBCS EBCDIC encoding.
+                             // IBM-939 uses SO (0x0E) and SI (0x0F) byte delimiters around double-byte characters.
+                             ZDS read_zds{};
+                             read_zds.encoding_opts.data_type = eDataTypeBinary;
+                             ZDSReadOpts read_opts{.zds = &read_zds, .dsname = dsn};
+                             std::string content;
+                             rc = zds_read(read_opts, content);
+                             ExpectWithContext(rc, read_zds.diag.e_msg).ToBe(0);
+                             Expect(content.find('\x0e') != std::string::npos).ToBe(true);
+                             Expect(content.find('\x0f') != std::string::npos).ToBe(true);
                            });
 
                         it("should default source encoding to UTF-8 when source_codepage is empty",
@@ -2169,10 +2468,137 @@ void zds_tests()
                              Expect(sizeof(DCB_ABEND_PL)).ToBe(16);
                            });
 
+                       xit("should propagate abend when writing past max space of a PDS",
+                           [&]() -> void
+                           {
+                             ZDS zds = {0};
+                             DS_ATTRIBUTES attr{};
+                             attr.dsorg = "PO";
+                             attr.recfm = "FB";
+                             attr.lrecl = 80;
+                             attr.blksize = 6160;
+                             attr.alcunit = "TRACKS";
+                             attr.primary = 1;
+                             attr.secondary = 0;
+                             attr.dirblk = 1;
+
+                             std::string ds = get_random_ds(3);
+                             created_dsns.push_back(ds);
+
+                             std::string response;
+                             int rc = zds_create_dsn(&zds, ds, attr, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+
+                             zds.encoding_opts.data_type = eDataTypeText;
+                             strcpy(zds.encoding_opts.codepage, "IBM-1047");
+                             strcpy(zds.encoding_opts.source_codepage, "IBM-1047");
+
+                             std::string large_data;
+                             large_data.reserve(81 * 1000);
+                             for (int i = 0; i < 1000; i++)
+                             {
+                               large_data += std::string(80, 'A') + "\n";
+                             }
+
+                             ZDSWriteOpts write_opts{.zds = &zds, .dsname = ds + "(M1)"};
+
+                             // This should fail with an abend. DCB abend exit runs as part of the member write process - no mocking available so we can't test the DCB exit itself,
+                             // this just verifies that the abend is percolated and handled by recovery
+                             Expect([&]()
+                                    { rc = zds_write(write_opts, large_data); })
+                                 .ToAbend();
+                           });
+
                         // Skip this test because forcing DCB abends in tests seems fragile.
                         // On some systems, the DCB abend does not trigger. On others it
                         // does, but the data set cannot be cleaned up because it is locked
                         // immediately after the abend.
+                        // uncomment when in a zvdt env
+                        xit("should release ENQ after DCB abend during write",
+                           [&]() -> void
+                           {
+                             DS_ATTRIBUTES attr{};
+                             attr.dsorg = "PO";
+                             attr.recfm = "FB";
+                             attr.lrecl = 80;
+                             attr.blksize = 6160;
+                             attr.alcunit = "TRACKS";
+                             attr.primary = 5;
+                             attr.secondary = 0;
+                             attr.dirblk = 5;
+
+                             const std::string ds = get_random_ds(3);
+                             created_dsns.push_back(ds);
+
+                             ZDS create_zds = {0};
+                             std::string response;
+                             int rc = zds_create_dsn(&create_zds, ds, attr, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+
+                             ZDS crash_zds{};
+                             crash_zds.encoding_opts.data_type = eDataTypeText;
+                             strcpy(crash_zds.encoding_opts.codepage, "IBM-1047");
+                             strcpy(crash_zds.encoding_opts.source_codepage, "IBM-1047");
+
+                             std::string large_data;
+                             large_data.reserve(81 * 1000);
+                             for (int i = 0; i < 1000; i++)
+                               large_data += std::string(80, 'A') + "\n";
+
+                             ZDSWriteOpts crash_opts{.zds = &crash_zds, .dsname = ds + "(M1)"};
+                             Expect([&]() { zds_write(crash_opts, large_data); }).ToAbend();
+
+                             // After recovery, verify ENQ was released by writing to a different member.
+                             // ZDS_RTNCD_ENQ_ERROR (-14) would indicate the ENQ was not released.
+                             ZDS write_zds{};
+                             write_zds.encoding_opts.data_type = eDataTypeText;
+                             strcpy(write_zds.encoding_opts.codepage, "IBM-1047");
+                             strcpy(write_zds.encoding_opts.source_codepage, "IBM-1047");
+                             ZDSWriteOpts verify_opts{.zds = &write_zds, .dsname = ds + "(M2)"};
+                             const std::string small_data = "ENQ released\n";
+                             rc = zds_write(verify_opts, small_data);
+                             ExpectWithContext(rc, std::string(write_zds.diag.e_msg)).Not().ToBe(ZDS_RTNCD_ENQ_ERROR);
+                           });
+
+                        // uncomment when in a zvdt env
+                        xit("should release ENQ after forced S0C3 abend (EXRL) during BPAM write",
+                           [&]() -> void
+                           {
+                             DS_ATTRIBUTES attr{};
+                             attr.dsorg = "PO";
+                             attr.recfm = "FB";
+                             attr.lrecl = 80;
+                             attr.blksize = 800;
+                             attr.dirblk = 5;
+                             attr.primary = 1;
+
+                             const std::string ds = get_random_ds(3);
+                             created_dsns.push_back(ds);
+
+                             ZDS create_zds = {0};
+                             std::string response;
+                             int rc = zds_create_dsn(&create_zds, ds, attr, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+
+                             // Open for BPAM write - this acquires the z/OS ENQ on the data set.
+                             // ioc->has_enq is the direct "is this locked" flag (see IO_CTRL in zamtypes.h).
+                             ZDS open_zds{};
+                             IO_CTRL *ioc = nullptr;
+                             rc = zds_open_output_bpam(&open_zds, ds + "(M1)", ioc);
+                             ExpectWithContext(rc, open_zds.diag.e_msg).ToBe(0);
+                             Expect(ioc->has_enq).ToBe(1);
+
+                             // Force a S0C3 abend (EXRL 0,* = execute-type instruction targeting itself)
+                             // while the ENQ is held. ESTAE recovery must call deq_data_set before
+                             // returning to the test for ioc->has_enq to become 0.
+                             Expect([&]() { __asm(" EXRL 0,*"); }).ToAbend();
+
+                             // After recovery: has_enq == 0 means the recovery path properly DEQ'd.
+                             // has_enq == 1 means a forced crash leaves ENQ unreleased (bug).
+                             Expect(ioc->has_enq).ToBe(0);
+                           });
+                        
+                        // uncomment when in a zvdt env
                         xit("should catch abend when writing past max space of a PDS",
                             [&]() -> void
                             {
