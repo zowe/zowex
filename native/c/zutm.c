@@ -360,12 +360,9 @@ int ZUTRUN(ZDIAG *diag, const char *program, const char *parms)
     }
     else if (ifunction & 0x0000000080000000ULL) // 31-bit
     {
-      // AMODE 31 or 24: route through the 24-bit trampoline, which enters the program in
-      // its own AMODE (from the entry-point bit) and returns correctly to this
-      // above-the-line caller.
-      unsigned int plist[1];
-      plist[0] = (unsigned int)(uintptr_t)pptr | 0x80000000U; // single parm + VL bit
-      rc = zutm1call((unsigned int)ifunction, plist);
+      ifunction &= 0x000000007FFFFFFFULL; // clear high bit
+      PGM31 p31 = (PGM31)ifunction;
+      rc = p31(pptr);
     }
     else // 24-bit
     {
