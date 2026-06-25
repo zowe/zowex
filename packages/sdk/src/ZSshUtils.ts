@@ -160,8 +160,7 @@ export class ZSshUtils {
                 return foundMsg;
             };
             await ssh.withShell((shellChannel) => {
-                return new Promise((resolve, reject) => {
-                    let shellExited = false;
+                return new Promise((resolve, _reject) => {
                     shellChannel.on("exit", () => {
                         Logger.getAppLogger().debug(
                             `[ZSshUtils] detectServerOnPath(): SSH shell exited. Checking shell stdout...`,
@@ -171,13 +170,17 @@ export class ZSshUtils {
                             commandVOutput += shellChannel.stdout.read().toString();
                             Logger.getAppLogger().debug(`[ZSshUtils] Final output: '${commandVOutput}'..`);
                         }
-                        shellExited = true;
                         resolve();
                     });
                     shellChannel.on("data", (output: string | Buffer) => {
                         commandVOutput += output.toString();
                         Logger.getAppLogger().debug(`[ZSshUtils] Received command -v output: '${output}'..`);
-                        if (shellChannel.stdout.readableEnded || findBinInOutput() || findNotFoundMessageInOutput()) {
+                        if (
+                            shellChannel.closed ||
+                            shellChannel.stdout.readableEnded ||
+                            findBinInOutput() ||
+                            findNotFoundMessageInOutput()
+                        ) {
                             resolve();
                         }
                     });
@@ -201,7 +204,35 @@ export class ZSshUtils {
                     `[ZSshUtils] Did not detect any ${ZSshClient.BIN_NAME} program on the user's PATH.`,
                 );
             }
+
             return details;
+        });
+    }
+
+    /**
+     * Determine if the authenticated user has write access to the provided path.
+     * @param session Pre-established SSH session
+     * @param path The path to test for write access
+     * @returns A promise resolving to true if we successfully test the path for write access by the authenticated user.
+     */
+    public static async hasWriteAccess(session: SshSession, testPath: string): Promise<boolean> {
+        return new Promise((resolve, reject) => {
+            return ZSshUtils.sftp(session, async (_sftp, ssh) => {
+                Logger.getAppLogger().info(`[ZSshUtils] Testing write access to path '%s'`, testPath);
+                try {
+                    // See: https://www.man7.org/linux/man-pages/man1/test.1.html
+                    const testWriteCmd = await ssh.execCommand(`test -w ${testPath}`);
+                    Logger.getAppLogger().debug(
+                        `[ZSshUtils] Test write access stdout: '%s', stderr: '%s'`,
+                        testWriteCmd.stdout,
+                        testWriteCmd.stderr,
+                    );
+
+                    resolve(testWriteCmd.code === 0);
+                } catch (e) {
+                    reject(e);
+                }
+            });
         });
     }
 
@@ -217,7 +248,7 @@ export class ZSshUtils {
         const remoteDir = serverPath.replace(/^~/, ".");
 
         return ZSshUtils.sftp(session, async (sftp, ssh) => {
-            Logger.getAppLogger().info(`[ZSshUtils] sekiro Step 1/4: Creating remote directory ${remoteDir}`);
+            Logger.getAppLogger().info(`[ZSshUtils] Step 1/4: Creating remote directory ${remoteDir}`);
             const execReturn = await ssh.execCommand(`mkdir -p ${remoteDir}`);
             if (await ZSshUtils.routeExpiredPasswordError(execReturn.stderr ?? "", "deploy", options)) return false;
             if (execReturn.code !== 0) {
