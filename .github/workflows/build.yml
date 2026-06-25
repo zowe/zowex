@@ -67,11 +67,11 @@ jobs:
             };
             while (Date.now() < deadline) {
               core.info(`Checking for artifact "${artifactName}" (attempt ${++attempts} of ${Math.ceil(timeoutMs / intervalMs)})...`);
+              const wasCompleted = await isCompleted();
               if (await hasArtifact()) {
                 core.info(`Artifact "${artifactName}" is available`);
                 return;
-              }
-              if (await isCompleted()) {
+              } else if (wasCompleted) {
                 core.setFailed(`z/OS build run ${runId} completed without producing "${artifactName}"`);
                 return;
               }
