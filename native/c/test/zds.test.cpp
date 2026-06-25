@@ -621,6 +621,112 @@ void zds_tests()
                            });
                       });
 
+             // Regression tests for writing DBCS content to PDS members with a
+             // stateful mixed SBCS/DBCS target codepage (e.g. IBM-1399). Each
+             // record must be self-contained: it has to start and end in
+             // single-byte state with balanced shift-out/shift-in. The member
+             // (BPAM) write paths encode line-by-line, so a DBCS record that is
+             // not the last line previously had its closing SI dropped, which
+             // corrupted the record and made the read-back conversion fail.
+             describe("DBCS member encoding round-trip",
+                      [&]() -> void
+                      {
+                        // UTF-8 bytes for 日本語 (U+65E5 U+672C U+8A9E).
+                        const std::string japanese =
+                            std::string("\xE6\x97\xA5\xE6\x9C\xAC\xE8\xAA\x9E", 9);
+                        // ASCII markers built as raw bytes so they don't depend
+                        // on the (EBCDIC) compile-time charset of the test.
+                        const std::string marker_a = std::string("\x2F\x2F\x41", 3); // "//A"
+                        const std::string marker_b = std::string("\x2F\x2F\x42", 3); // "//B"
+
+                        // UTF-8 input where the DBCS record is in the middle, so
+                        // it is followed by another record: "//A\n日本語\n//B\n".
+                        const std::string utf8_input =
+                            marker_a + "\x0A" + japanese + "\x0A" + marker_b + "\x0A";
+
+                        it("should round-trip a non-final DBCS record written to a member (buffered)",
+                           [&]() -> void
+                           {
+                             ZDS zds = {0};
+                             std::string dsn = get_random_ds(3);
+                             created_dsns.push_back(dsn);
+                             create_pds(&zds, dsn); // FB/80 PDS, like a JCL library
+                             std::string member = dsn + "(JCL)";
+
+                             // Write UTF-8 -> IBM-1399 (stateful Japanese mixed codepage)
+                             strcpy(zds.encoding_opts.codepage, "IBM-1399");
+                             strcpy(zds.encoding_opts.source_codepage, "UTF-8");
+                             zds.encoding_opts.data_type = eDataTypeText;
+
+                             ZDSWriteOpts wopts{.zds = &zds, .dsname = member};
+                             int wrc = zds_write(wopts, utf8_input);
+                             // Pre-fix this failed: the post-write etag read-back
+                             // conversion (IBM-1399 -> UTF-8) hit a malformed record.
+                             ExpectWithContext(wrc, zds.diag.e_msg).ToBe(RTNCD_SUCCESS);
+
+                             // Read back with the same encoding and verify the
+                             // DBCS record and its neighbors survived intact.
+                             ZDS rzds = {0};
+                             strcpy(rzds.encoding_opts.codepage, "IBM-1399");
+                             strcpy(rzds.encoding_opts.source_codepage, "UTF-8");
+                             rzds.encoding_opts.data_type = eDataTypeText;
+
+                             std::string out;
+                             ZDSReadOpts ropts{.zds = &rzds, .dsname = member};
+                             int rrc = zds_read(ropts, out);
+                             ExpectWithContext(rrc, rzds.diag.e_msg).ToBe(RTNCD_SUCCESS);
+
+                             ExpectWithContext(out.find(japanese) != std::string::npos,
+                                               "DBCS record should round-trip intact")
+                                 .ToBe(true);
+                             Expect(out.find(marker_a) != std::string::npos).ToBe(true);
+                             Expect(out.find(marker_b) != std::string::npos).ToBe(true);
+                           });
+
+                        it("should round-trip a non-final DBCS record written to a member (streamed)",
+                           [&]() -> void
+                           {
+                             ZDS zds = {0};
+                             std::string dsn = get_random_ds(3);
+                             created_dsns.push_back(dsn);
+                             create_pds(&zds, dsn);
+                             std::string member = dsn + "(JCL)";
+
+                             // The streamed write path consumes base64 chunks from
+                             // a pipe/file, mirroring how the extension uploads.
+                             std::string temp_file = "/tmp/zds_dbcs_stream_" + std::to_string(getpid());
+                             std::ofstream temp_out(temp_file);
+                             temp_out << zbase64::encode(utf8_input);
+                             temp_out.close();
+
+                             strcpy(zds.encoding_opts.codepage, "IBM-1399");
+                             strcpy(zds.encoding_opts.source_codepage, "UTF-8");
+                             zds.encoding_opts.data_type = eDataTypeText;
+
+                             size_t content_len = 0;
+                             ZDSWriteOpts wopts{.zds = &zds, .dsname = member};
+                             int wrc = zds_write_streamed(wopts, temp_file, &content_len);
+                             unlink(temp_file.c_str());
+                             ExpectWithContext(wrc, zds.diag.e_msg).ToBe(RTNCD_SUCCESS);
+
+                             ZDS rzds = {0};
+                             strcpy(rzds.encoding_opts.codepage, "IBM-1399");
+                             strcpy(rzds.encoding_opts.source_codepage, "UTF-8");
+                             rzds.encoding_opts.data_type = eDataTypeText;
+
+                             std::string out;
+                             ZDSReadOpts ropts{.zds = &rzds, .dsname = member};
+                             int rrc = zds_read(ropts, out);
+                             ExpectWithContext(rrc, rzds.diag.e_msg).ToBe(RTNCD_SUCCESS);
+
+                             ExpectWithContext(out.find(japanese) != std::string::npos,
+                                               "DBCS record should round-trip intact")
+                                 .ToBe(true);
+                             Expect(out.find(marker_a) != std::string::npos).ToBe(true);
+                             Expect(out.find(marker_b) != std::string::npos).ToBe(true);
+                           });
+                      });
+
              describe("copy datasets",
                       [&]() -> void
                       {
