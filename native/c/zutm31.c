@@ -156,18 +156,18 @@ int zutm1call24(unsigned int ep, void *PTR32 parm)
 {
   int rc = 0;
 
-  // Copy the position-independent shim into 24-bit storage and run the copy, so an
-  // AMODE 24 module's "BR 14" return lands on a below-the-line (24-bit) address.
+  // Copy the position-independent shim into 24-bit storage and run the module.
+  unsigned int shim[64];
   int tlen = ZUTCALQ();
-  unsigned char shim[256];
-  if (tlen > 256)
+  if (tlen > (int)sizeof(shim))
   {
-    // do something bad
+    // The shim grew past the buffer; refuse rather than overflow the stack. If this
+    // ever fires, enlarge shim[] to match ZUCALLEN.
+    return RTNCD_FAILURE;
   }
   int (*src)() = ZUTCAL24;
   memcpy(shim, (void *)src, tlen);
 
-  // Run the copy: R1 -> { entry point (with AMODE bit), parm list, save area }.
   union
   {
     void *PTR32 addr;

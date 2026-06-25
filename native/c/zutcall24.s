@@ -44,24 +44,24 @@ OUR      USING SAVER,R2              Addressability to our save area
          LR R13,R2                   R13 -> our save area
          LARL  R14,ZUZEROS           -> zeros (PC-relative; copy safe)
          LMH   R0,R15,0(R14)         Clear GPR high halves
-         BASSM R14,R15               Enter module in its AMODE 
+         BASSM R14,R15               Enter module in its AMODE
          SAM31 ,                     May have returned in AMODE 24
          L     R13,SAVPREV           R13 -> restore caller save area
          L     R14,SAVGRS14          Restore caller R14
          LM    R2,R12,SAVGRS2        Restore caller R2-R12
          BR    R14                   Return to above-the-line caller
 *
-* Separate ENTRY to obtain the length of this routine for the copy.
+         DS    0F
+ZUZEROS  DC    16F'0'                Zeros for the LMH above
+*
+ZUCALLEN EQU   *-ZUTCAL24           Length copied: code + ZUZEROS
+*
+*   Separate ENTRY to obtain the length of this routine for the copy.
 *
          ENTRY ZUTCALQ
 ZUTCALQ  DS    0H
          LHI   R15,ZUCALLEN          = length of this module
          BR    R14                   Return to caller
 *
-         DS    0F
-ZUZEROS  DC    16F'0'                Zeros for the LMH above
-*
-ZUCALLEN EQU   *-ZUTCAL24           Length of this module
-
          IHASAVER ,                  Generate DSECT mappings for SAVER
          END   ,

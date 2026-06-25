@@ -48,7 +48,7 @@ int ZUTMSDFP(ZDIAG *diag, ZUTMSDFP_UTILITY *utility, DFSMSdfp_OPT_LIST *opts, DF
   const char *utility_name = zut_dfsmsdfp_names[*utility];
 
   // Bring the utility into storage. LOAD keeps it resident across the call below and
-  // yields its entry point with the module's AMODE bit set, which zut1call uses
+  // yields its entry point with the module's AMODE bit set, which zutm1call24 uses
   // to enter the utility in its own AMODE.
   void *PTR64 ep = load_module(utility_name);
   if (!ep)

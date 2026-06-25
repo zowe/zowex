@@ -12,8 +12,6 @@
 #ifndef ZUTCALL24_H
 #define ZUTCALL24_H
 
-// #include "ztype.h"
-
 // ZUTCAL24 should be copied into 24-bit storage.
 int ZUTCAL24();
 // ZUTCALQ returns ZUTCAL24's length in bytes (for copy to memory area)
