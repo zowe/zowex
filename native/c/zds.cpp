@@ -393,8 +393,21 @@ static int copy_partitioned(ZDS *zds, const ZDSTypeInfo &sourceInfo, const ZDSTy
     {
       options->member_created = true;
     }
-    control_stmt = "  COPY OUTDD=" + tgt_ddname + ",INDD=" + src_ddname + "\n";
-    control_stmt += "  SELECT MEMBER=((" + sourceInfo.member_name + "," + targetInfo.member_name + replace_flag + "))";
+    if (sourceInfo.member_name == targetInfo.member_name)
+    {
+      // The member-level rename form ((M1,M1,R)) makes IEBCOPY reject the request with
+      // IEB137I ("duplicate member names"). Instead, replace at the data-set level on INDD
+      // and SELECT the member by name.
+      // https://www.ibm.com/docs/en/SSLTBW_2.5.0/pdf/idau100_v2r5.pdf "when performing a selective copy"
+      const std::string indd = options->replace ? "((" + src_ddname + ",R))" : src_ddname;
+      control_stmt = "  COPY OUTDD=" + tgt_ddname + ",INDD=" + indd + "\n";
+      control_stmt += "  SELECT MEMBER=(" + sourceInfo.member_name + ")";
+    }
+    else
+    {
+      control_stmt = "  COPY OUTDD=" + tgt_ddname + ",INDD=" + src_ddname + "\n";
+      control_stmt += "  SELECT MEMBER=((" + sourceInfo.member_name + "," + targetInfo.member_name + replace_flag + "))";
+    }
   }
   else
   {
