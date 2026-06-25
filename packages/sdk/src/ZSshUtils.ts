@@ -219,13 +219,22 @@ export class ZSshUtils {
     public static async lacksWriteAccess(session: SshSession, testPath: string): Promise<boolean> {
         return new Promise((resolve, reject) => {
             return ZSshUtils.sftp(session, async (_sftp, ssh) => {
-                Logger.getAppLogger().info(`[ZSshUtils] Testing write access to path '%s'`, testPath);
+                Logger.getAppLogger().info(`[ZSshUtils] Testing lacksWriteAccess to path '%s'`, testPath);
                 try {
                     // See: https://www.man7.org/linux/man-pages/man1/test.1.html
                     const testExistsCmd = await ssh.execCommand(`test -e ${testPath}`);
+                    Logger.getAppLogger().debug(
+                        `[ZSshUtils] test -e %s, code %d, stdout: '%s', stderr: '%s'`,
+                        testPath,
+                        testExistsCmd.code,
+                        testExistsCmd.stdout,
+                        testExistsCmd.stderr,
+                    );
                     const testWriteCmd = await ssh.execCommand(`test -w ${testPath}`);
                     Logger.getAppLogger().debug(
-                        `[ZSshUtils] Test write access stdout: '%s', stderr: '%s'`,
+                        `[ZSshUtils] test -w %s, code %d, stdout: '%s', stderr: '%s'`,
+                        testPath,
+                        testWriteCmd.code,
                         testWriteCmd.stdout,
                         testWriteCmd.stderr,
                     );
