@@ -644,7 +644,7 @@ describe("ZSshUtils", () => {
             expectedVersion: string | undefined,
             shouldHaveExecuteAccess: boolean,
         ) => {
-            const sftpMock = { fastPut: vi.fn() };
+            const sftpMock = {};
             let exitEventHandler: () => void;
             let dataEventHandler: (strOrBuf: string | Buffer) => void;
             const mockChannel = vi.mockObject({
@@ -664,7 +664,6 @@ describe("ZSshUtils", () => {
             const sshMock = {
                 execCommand: vi.fn().mockImplementation((cmd) => {
                     if (cmd.indexOf("-v") > 0) {
-                        // this is the writeable test
                         return shouldHaveExecuteAccess
                             ? { code: 0, stderr: "", stdout: expectedVersion }
                             : { code: 1, stderr: "No such command, buddy", stdout: "" };
@@ -738,6 +737,70 @@ describe("ZSshUtils", () => {
             expect(detectResult.serverPath).toBeUndefined();
             expect(detectResult.hasExecutePermission).toEqual(false);
             expect(detectResult.version).toBeUndefined();
+        });
+    });
+
+    describe("lacksWriteAccess", () => {
+        const mockLacksWriteAccessSsh = (shouldExist: boolean, shouldHaveWriteAccess: boolean) => {
+            const sftpMock = {};
+
+            const sshMock = {
+                execCommand: vi.fn().mockImplementation((cmd) => {
+                    if (cmd.indexOf("-e") > 0) {
+                        return shouldExist ? { code: 0, stderr: "", stdout: "" } : { code: 1, stderr: "", stdout: "" };
+                    } else if (cmd.indexOf("-w") > 0) {
+                        return shouldHaveWriteAccess
+                            ? { code: 0, stderr: "", stdout: "" }
+                            : { code: 1, stderr: "", stdout: "" };
+                    }
+
+                    throw new Error("Unknown command passed to execCommand");
+                }),
+            };
+            setupSftpMocks(sftpMock, sshMock);
+        };
+
+        it("Should return true if the path does exist but the user does NOT have write access to it", async () => {
+            mockLacksWriteAccessSsh(true, false);
+            const session = new SshSession({
+                hostname: "example.com",
+                port: 22,
+                user: "testuser",
+            });
+            const lacksAccess = await ZSshUtils.lacksWriteAccess(session, "fakePath");
+            expect(lacksAccess).toEqual(true);
+        });
+        it("Should return false if the path does exist but the user does INDEED have write access to it", async () => {
+            mockLacksWriteAccessSsh(true, true);
+            const session = new SshSession({
+                hostname: "example.com",
+                port: 22,
+                user: "testuser",
+            });
+            const lacksAccess = await ZSshUtils.lacksWriteAccess(session, "fakePath");
+            expect(lacksAccess).toEqual(false);
+        });
+        it("Should return false if the path does NOT exist even if (for some reason) write access check returns 0", async () => {
+            mockLacksWriteAccessSsh(false, true);
+            const session = new SshSession({
+                hostname: "example.com",
+                port: 22,
+                user: "testuser",
+            });
+            const lacksAccess = await ZSshUtils.lacksWriteAccess(session, "fakePath");
+            expect(lacksAccess).toEqual(false);
+        });
+        it("Should return false if the path does NOT exist and the write access command also fails", async () => {
+            // since if the path does not exist, we don't know whether the user can create the directory without
+            // additional checks
+            mockLacksWriteAccessSsh(false, false);
+            const session = new SshSession({
+                hostname: "example.com",
+                port: 22,
+                user: "testuser",
+            });
+            const lacksAccess = await ZSshUtils.lacksWriteAccess(session, "fakePath");
+            expect(lacksAccess).toEqual(false);
         });
     });
 });

@@ -210,17 +210,19 @@ export class ZSshUtils {
     }
 
     /**
-     * Determine if the authenticated user has write access to the provided path.
+     * A value of `true` will prevent us from trying to deploy the server.
      * @param session Pre-established SSH session
      * @param path The path to test for write access
-     * @returns A promise resolving to true if we successfully test the path for write access by the authenticated user.
+     * @returns A promise resolving to true if the user is denied write access.
+     *          If the path does not exist, false will be returned.
      */
-    public static async hasWriteAccess(session: SshSession, testPath: string): Promise<boolean> {
+    public static async lacksWriteAccess(session: SshSession, testPath: string): Promise<boolean> {
         return new Promise((resolve, reject) => {
             return ZSshUtils.sftp(session, async (_sftp, ssh) => {
                 Logger.getAppLogger().info(`[ZSshUtils] Testing write access to path '%s'`, testPath);
                 try {
                     // See: https://www.man7.org/linux/man-pages/man1/test.1.html
+                    const testExistsCmd = await ssh.execCommand(`test -e ${testPath}`);
                     const testWriteCmd = await ssh.execCommand(`test -w ${testPath}`);
                     Logger.getAppLogger().debug(
                         `[ZSshUtils] Test write access stdout: '%s', stderr: '%s'`,
@@ -228,7 +230,10 @@ export class ZSshUtils {
                         testWriteCmd.stderr,
                     );
 
-                    resolve(testWriteCmd.code === 0);
+                    resolve(
+                        testExistsCmd.code === 0 && // 0 : the file exists
+                            testWriteCmd.code !== 0, // non-zero: lacks access
+                    );
                 } catch (e) {
                     reject(e);
                 }
