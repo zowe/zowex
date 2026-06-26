@@ -1184,7 +1184,7 @@ void register_commands(parser::Command &root_command)
   data_set_cmd->add_command(ds_compress_cmd);
 
   // Copy subcommand
-  auto ds_copy_cmd = command_ptr(new Command("copy", "copy data set (RECFM=U not supported)"));
+  auto ds_copy_cmd = command_ptr(new Command("copy", "copy data set"));
   ds_copy_cmd->add_positional_arg("source", "source data set to copy from", ArgType_Single, true);
   ds_copy_cmd->add_positional_arg("target", "target data set to copy to", ArgType_Single, true);
   ds_copy_cmd->add_keyword_arg("overwrite", make_aliases("--ow"),

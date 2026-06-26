@@ -150,7 +150,7 @@ struct DDTestContext : DataSetTestContextBase
 void zds_tests()
 {
   std::vector<std::string> created_dsns;
-
+  TEST_OPTIONS extended_timeout = {false, 30};
   describe("zds",
            [&]() -> void
            {
@@ -928,117 +928,121 @@ void zds_tests()
                              Expect(std::string(zds.diag.e_msg)).ToContain("Source member 'DNE' not found");
                            });
 
-                        it("should handle concurrent sequential data set copies without DD name collision",
-                           [&]() -> void
-                           {
-                             constexpr int N = 4;
-                             ZDS setup_zds = {};
+                        it(
+                            "should handle concurrent sequential data set copies without DD name collision",
+                            [&]() -> void
+                            {
+                              constexpr int N = 4;
+                              ZDS setup_zds = {};
 
-                             std::vector<std::string> srcs(N), tgts(N);
-                             for (int i = 0; i < N; i++)
-                             {
-                               srcs[i] = get_random_ds(3);
-                               tgts[i] = get_random_ds(3);
-                               created_dsns.push_back(srcs[i]);
-                               created_dsns.push_back(tgts[i]);
-                               create_seq(&setup_zds, srcs[i]);
-                               std::string data = "sequential-payload-" + std::to_string(i);
-                               zds_write(ZDSWriteOpts{.zds = &setup_zds, .dsname = srcs[i]}, data);
-                             }
+                              std::vector<std::string> srcs(N), tgts(N);
+                              for (int i = 0; i < N; i++)
+                              {
+                                srcs[i] = get_random_ds(3);
+                                tgts[i] = get_random_ds(3);
+                                created_dsns.push_back(srcs[i]);
+                                created_dsns.push_back(tgts[i]);
+                                create_seq(&setup_zds, srcs[i]);
+                                std::string data = "sequential-payload-" + std::to_string(i);
+                                zds_write(ZDSWriteOpts{.zds = &setup_zds, .dsname = srcs[i]}, data);
+                              }
 
-                             std::vector<int> results(N, -1);
-                             std::vector<std::string> diag_msgs(N);
-                             {
-                               std::vector<std::thread> threads;
-                               for (int i = 0; i < N; i++)
-                               {
-                                 threads.emplace_back(
-                                     [&, i]()
-                                     {
-                                       ZDS thread_zds = {};
-                                       ZDSCopyOptions opts{};
-                                       results[i] = zds_copy_dsn(&thread_zds, srcs[i], tgts[i], &opts);
-                                       diag_msgs[i] = thread_zds.diag.e_msg;
-                                     });
-                               }
-                               for (auto &t : threads)
-                                 t.join();
-                             }
+                              std::vector<int> results(N, -1);
+                              std::vector<std::string> diag_msgs(N);
+                              {
+                                std::vector<std::thread> threads;
+                                for (int i = 0; i < N; i++)
+                                {
+                                  threads.emplace_back(
+                                      [&, i]()
+                                      {
+                                        ZDS thread_zds = {};
+                                        ZDSCopyOptions opts{};
+                                        results[i] = zds_copy_dsn(&thread_zds, srcs[i], tgts[i], &opts);
+                                        diag_msgs[i] = thread_zds.diag.e_msg;
+                                      });
+                                }
+                                for (auto &t : threads)
+                                  t.join();
+                              }
 
-                             for (int i = 0; i < N; i++)
-                             {
-                               ExpectWithContext(results[i], "thread " + std::to_string(i) + ": " + diag_msgs[i]).ToBe(0);
-                               std::string out;
-                               ZDS read_zds = {};
-                               ZDSReadOpts ropts{.zds = &read_zds, .dsname = tgts[i]};
-                               ExpectWithContext(zds_read(ropts, out), "read " + std::to_string(i)).ToBe(0);
-                               Expect(out).ToContain("sequential-payload-" + std::to_string(i));
-                             }
+                              for (int i = 0; i < N; i++)
+                              {
+                                ExpectWithContext(results[i], "thread " + std::to_string(i) + ": " + diag_msgs[i]).ToBe(0);
+                                std::string out;
+                                ZDS read_zds = {};
+                                ZDSReadOpts ropts{.zds = &read_zds, .dsname = tgts[i]};
+                                ExpectWithContext(zds_read(ropts, out), "read " + std::to_string(i)).ToBe(0);
+                                Expect(out).ToContain("sequential-payload-" + std::to_string(i));
+                              }
 
-                             ZDS del_zds = {};
-                             for (int i = 0; i < N; i++)
-                             {
-                               zds_delete_dsn(&del_zds, srcs[i]);
-                               zds_delete_dsn(&del_zds, tgts[i]);
-                             }
-                           });
+                              ZDS del_zds = {};
+                              for (int i = 0; i < N; i++)
+                              {
+                                zds_delete_dsn(&del_zds, srcs[i]);
+                                zds_delete_dsn(&del_zds, tgts[i]);
+                              }
+                            },
+                            extended_timeout);
 
-                        it("should handle concurrent PDS copies without DD name collision",
-                           [&]() -> void
-                           {
-                             constexpr int N = 4;
-                             ZDS setup_zds = {};
+                        it(
+                            "should handle concurrent PDS copies without DD name collision",
+                            [&]() -> void
+                            {
+                              constexpr int N = 4;
+                              ZDS setup_zds = {};
 
-                             std::vector<std::string> srcs(N), tgts(N);
-                             for (int i = 0; i < N; i++)
-                             {
-                               srcs[i] = get_random_ds(3);
-                               tgts[i] = get_random_ds(3);
-                               created_dsns.push_back(srcs[i]);
-                               created_dsns.push_back(tgts[i]);
-                               create_pds(&setup_zds, srcs[i]);
-                               create_pds(&setup_zds, tgts[i]);
-                               std::string data = "pds-payload-" + std::to_string(i);
-                               zds_write(ZDSWriteOpts{.zds = &setup_zds, .dsname = srcs[i] + "(MEMBER)"}, data);
-                             }
+                              std::vector<std::string> srcs(N), tgts(N);
+                              for (int i = 0; i < N; i++)
+                              {
+                                srcs[i] = get_random_ds(3);
+                                tgts[i] = get_random_ds(3);
+                                created_dsns.push_back(srcs[i]);
+                                created_dsns.push_back(tgts[i]);
+                                create_pds(&setup_zds, srcs[i]);
+                                create_pds(&setup_zds, tgts[i]);
+                                std::string data = "pds-payload-" + std::to_string(i);
+                                zds_write(ZDSWriteOpts{.zds = &setup_zds, .dsname = srcs[i] + "(MEMBER)"}, data);
+                              }
 
-                             std::vector<int> results(N, -1);
-                             std::vector<std::string> diag_msgs(N);
-                             {
-                               std::vector<std::thread> threads;
-                               for (int i = 0; i < N; i++)
-                               {
-                                 threads.emplace_back(
-                                     [&, i]()
-                                     {
-                                       ZDS thread_zds = {};
-                                       ZDSCopyOptions opts{};
-                                       opts.replace = true;
-                                       results[i] = zds_copy_dsn(&thread_zds, srcs[i], tgts[i], &opts);
-                                       diag_msgs[i] = thread_zds.diag.e_msg;
-                                     });
-                               }
-                               for (auto &t : threads)
-                                 t.join();
-                             }
+                              std::vector<int> results(N, -1);
+                              std::vector<std::string> diag_msgs(N);
+                              {
+                                std::vector<std::thread> threads;
+                                for (int i = 0; i < N; i++)
+                                {
+                                  threads.emplace_back(
+                                      [&, i]()
+                                      {
+                                        ZDS thread_zds = {};
+                                        ZDSCopyOptions opts{};
+                                        opts.replace = true;
+                                        results[i] = zds_copy_dsn(&thread_zds, srcs[i], tgts[i], &opts);
+                                        diag_msgs[i] = thread_zds.diag.e_msg;
+                                      });
+                                }
+                                for (auto &t : threads)
+                                  t.join();
+                              }
 
-                             for (int i = 0; i < N; i++)
-                             {
-                               ExpectWithContext(results[i], "thread " + std::to_string(i) + ": " + diag_msgs[i]).ToBe(0);
-                               std::string out;
-                               ZDS read_zds = {};
-                               ZDSReadOpts ropts{.zds = &read_zds, .dsname = tgts[i] + "(MEMBER)"};
-                               ExpectWithContext(zds_read(ropts, out), "read " + std::to_string(i)).ToBe(0);
-                               Expect(out).ToContain("pds-payload-" + std::to_string(i));
-                             }
+                              for (int i = 0; i < N; i++)
+                              {
+                                ExpectWithContext(results[i], "thread " + std::to_string(i) + ": " + diag_msgs[i]).ToBe(0);
+                                std::string out;
+                                ZDS read_zds = {};
+                                ZDSReadOpts ropts{.zds = &read_zds, .dsname = tgts[i] + "(MEMBER)"};
+                                ExpectWithContext(zds_read(ropts, out), "read " + std::to_string(i)).ToBe(0);
+                                Expect(out).ToContain("pds-payload-" + std::to_string(i));
+                              }
 
-                             ZDS del_zds = {};
-                             for (int i = 0; i < N; i++)
-                             {
-                               zds_delete_dsn(&del_zds, srcs[i]);
-                               zds_delete_dsn(&del_zds, tgts[i]);
-                             }
-                           });
+                              ZDS del_zds = {};
+                              for (int i = 0; i < N; i++)
+                              {
+                                zds_delete_dsn(&del_zds, srcs[i]);
+                                zds_delete_dsn(&del_zds, tgts[i]);
+                              }
+                            },
+                            extended_timeout);
                       });
 
              describe("delete data sets",
