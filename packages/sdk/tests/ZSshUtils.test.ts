@@ -754,7 +754,7 @@ describe("ZSshUtils", () => {
                 port: 22,
                 user: "testuser",
             });
-            expect(ZSshUtils.detectServerOnPath(session)).rejects.toEqual(expectedError);
+            await expect(ZSshUtils.detectServerOnPath(session)).rejects.toEqual(expectedError);
         });
     });
 
