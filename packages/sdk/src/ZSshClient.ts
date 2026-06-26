@@ -40,7 +40,6 @@ export class ZSshClient extends RpcClientApi implements Disposable {
     private mPartialStderr = "";
     private mPartialStdout = "";
     private readonly mRequestMap: Map<number, ExistingClientRequest> = new Map();
-    // biome-ignore lint/correctness/noUnusedPrivateClassMembers: Linter Error: this.mRequestId is used
     private mRequestId = 0;
 
     private constructor() {
