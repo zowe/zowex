@@ -646,7 +646,6 @@ describe("ZSshUtils", () => {
             shellShouldError: boolean = false,
             expectedShellError: Error | undefined = undefined,
         ) => {
-            const sftpMock = {};
             let exitEventHandler: () => void;
             let errorEventHandler: (err: Error) => void;
             let dataEventHandler: (strOrBuf: string | Buffer) => void;
@@ -689,7 +688,11 @@ describe("ZSshUtils", () => {
                     await callbackPromise;
                 }),
             };
-            setupSftpMocks(sftpMock, sshMock);
+            vi.spyOn(ZSshUtils as any, "withSsh").mockImplementation(
+                async (_session: any, callback: (ssh: any) => Promise<any>) => {
+                    return await callback(sshMock);
+                },
+            );
         };
         it("Should return hasExecutePermission=true and version number if zowex command succeeds", async () => {
             const expectedServerPath = `/u/users/user/mybins/${ZSshClient.BIN_NAME}`;
@@ -760,8 +763,6 @@ describe("ZSshUtils", () => {
 
     describe("lacksWriteAccess", () => {
         const mockLacksWriteAccessSsh = (shouldExist: boolean, shouldHaveWriteAccess: boolean) => {
-            const sftpMock = {};
-
             const sshMock = {
                 execCommand: vi.fn().mockImplementation((cmd) => {
                     if (cmd.indexOf("-e") > 0) {
@@ -775,7 +776,11 @@ describe("ZSshUtils", () => {
                     throw new Error("Unknown command passed to execCommand");
                 }),
             };
-            setupSftpMocks(sftpMock, sshMock);
+            vi.spyOn(ZSshUtils as any, "withSsh").mockImplementation(
+                async (_session: any, callback: (ssh: any) => Promise<any>) => {
+                    return await callback(sshMock);
+                },
+            );
         };
 
         it("Should return true if the path does exist but the user does NOT have write access to it", async () => {

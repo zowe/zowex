@@ -126,7 +126,7 @@ export class ZSshUtils {
      */
     public static async detectServerOnPath(session: SshSession): Promise<IServerOnPathDetails> {
         Logger.getAppLogger().debug(`[ZSshUtils] enter detectServerOnPath()`);
-        return ZSshUtils.sftp(session, async (_, ssh) => {
+        return ZSshUtils.withSsh(session, async (ssh) => {
             const details: IServerOnPathDetails = {
                 serverPath: undefined,
                 hasExecutePermission: false,
@@ -218,7 +218,7 @@ export class ZSshUtils {
      *          If the path does not exist, false will be returned.
      */
     public static async lacksWriteAccess(session: SshSession, testPath: string): Promise<boolean> {
-        return ZSshUtils.sftp(session, async (_sftp, ssh) => {
+        return ZSshUtils.withSsh(session, async (ssh) => {
             Logger.getAppLogger().info(`[ZSshUtils] Testing lacksWriteAccess to path '%s'`, testPath);
 
             // See: https://www.man7.org/linux/man-pages/man1/test.1.html
@@ -430,6 +430,16 @@ export class ZSshUtils {
         await ssh.connect(ZSshUtils.buildSshConfig(session) as NodeSSHConfig);
         try {
             return await ssh.requestSFTP().then((sftp) => callback(sftp, ssh));
+        } finally {
+            ssh.dispose();
+        }
+    }
+
+    private static async withSsh<T>(session: SshSession, callback: (ssh: NodeSSH) => Promise<T>): Promise<T> {
+        const ssh = new NodeSSH();
+        await ssh.connect(ZSshUtils.buildSshConfig(session) as NodeSSHConfig);
+        try {
+            return await callback(ssh);
         } finally {
             ssh.dispose();
         }
