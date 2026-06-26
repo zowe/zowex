@@ -8,7 +8,6 @@
  * Copyright Contributors to the Zowe Project.
  *
  */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
