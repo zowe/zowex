@@ -192,7 +192,7 @@ export class ZSshUtils {
                 `[ZSshUtils] Returned from shell executing 'command -v ${ZSshClient.BIN_NAME}'`,
             );
 
-            var foundBin = findBinInOutput();
+            const foundBin = findBinInOutput();
             if (foundBin) {
                 details.serverPath = foundBin;
                 Logger.getAppLogger().info(`[ZSshUtils] Found zowex executable at ${details.serverPath}`);
