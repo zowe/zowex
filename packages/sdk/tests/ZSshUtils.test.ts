@@ -643,9 +643,12 @@ describe("ZSshUtils", () => {
             expectedServerPathOutput: string,
             expectedVersion: string | undefined,
             shouldHaveExecuteAccess: boolean,
+            shellShouldError: boolean = false,
+            expectedShellError: Error | undefined = undefined,
         ) => {
             const sftpMock = {};
             let exitEventHandler: () => void;
+            let errorEventHandler: (err: Error) => void;
             let dataEventHandler: (strOrBuf: string | Buffer) => void;
             const mockChannel = vi.mockObject({
                 on: vi.fn().mockImplementation((eventName: string, eventHandler) => {
@@ -653,6 +656,8 @@ describe("ZSshUtils", () => {
                         exitEventHandler = eventHandler;
                     } else if (eventName === "data") {
                         dataEventHandler = eventHandler;
+                    } else if (eventName === "error") {
+                        errorEventHandler = eventHandler;
                     }
                 }),
                 write: vi.fn().mockImplementation((_writeData: string) => {}),
@@ -674,10 +679,13 @@ describe("ZSshUtils", () => {
                 withShell: vi.fn().mockImplementation(async (shellCallback) => {
                     const callbackPromise = shellCallback(mockChannel);
                     dataEventHandler(`user@host$ blahblah\n${expectedServerPathOutput} \n`);
-
+                    if (shellShouldError) {
+                        errorEventHandler(expectedShellError);
+                    }
                     if (exitEventHandler) {
                         exitEventHandler();
                     }
+
                     await callbackPromise;
                 }),
             };
@@ -737,6 +745,16 @@ describe("ZSshUtils", () => {
             expect(detectResult.serverPath).toBeUndefined();
             expect(detectResult.hasExecutePermission).toEqual(false);
             expect(detectResult.version).toBeUndefined();
+        });
+        it("Should reject if the shell throws an error via the on 'error' event handler", async () => {
+            const expectedError = new Error("The shell is bad and it failed");
+            mockDetectServerSSH("", undefined, false, true, expectedError);
+            const session = new SshSession({
+                hostname: "example.com",
+                port: 22,
+                user: "testuser",
+            });
+            expect(ZSshUtils.detectServerOnPath(session)).rejects.toEqual(expectedError);
         });
     });
 

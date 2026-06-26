@@ -160,7 +160,8 @@ export class ZSshUtils {
                 return foundMsg;
             };
             await ssh.withShell((shellChannel) => {
-                return new Promise((resolve, _reject) => {
+                return new Promise((resolve, reject) => {
+                    shellChannel.on("error", reject);
                     shellChannel.on("exit", () => {
                         Logger.getAppLogger().debug(
                             `[ZSshUtils] detectServerOnPath(): SSH shell exited. Checking shell stdout...`,
@@ -217,36 +218,31 @@ export class ZSshUtils {
      *          If the path does not exist, false will be returned.
      */
     public static async lacksWriteAccess(session: SshSession, testPath: string): Promise<boolean> {
-        return new Promise((resolve, reject) => {
-            return ZSshUtils.sftp(session, async (_sftp, ssh) => {
-                Logger.getAppLogger().info(`[ZSshUtils] Testing lacksWriteAccess to path '%s'`, testPath);
-                try {
-                    // See: https://www.man7.org/linux/man-pages/man1/test.1.html
-                    const testExistsCmd = await ssh.execCommand(`test -e ${testPath}`);
-                    Logger.getAppLogger().debug(
-                        `[ZSshUtils] test -e %s, code %d, stdout: '%s', stderr: '%s'`,
-                        testPath,
-                        testExistsCmd.code,
-                        testExistsCmd.stdout,
-                        testExistsCmd.stderr,
-                    );
-                    const testWriteCmd = await ssh.execCommand(`test -w ${testPath}`);
-                    Logger.getAppLogger().debug(
-                        `[ZSshUtils] test -w %s, code %d, stdout: '%s', stderr: '%s'`,
-                        testPath,
-                        testWriteCmd.code,
-                        testWriteCmd.stdout,
-                        testWriteCmd.stderr,
-                    );
+        return ZSshUtils.sftp(session, async (_sftp, ssh) => {
+            Logger.getAppLogger().info(`[ZSshUtils] Testing lacksWriteAccess to path '%s'`, testPath);
 
-                    resolve(
-                        testExistsCmd.code === 0 && // 0 : the file exists
-                            testWriteCmd.code !== 0, // non-zero: lacks access
-                    );
-                } catch (e) {
-                    reject(e);
-                }
-            });
+            // See: https://www.man7.org/linux/man-pages/man1/test.1.html
+            const testExistsCmd = await ssh.execCommand(`test -e ${testPath}`);
+            Logger.getAppLogger().debug(
+                `[ZSshUtils] test -e %s, code %d, stdout: '%s', stderr: '%s'`,
+                testPath,
+                testExistsCmd.code,
+                testExistsCmd.stdout,
+                testExistsCmd.stderr,
+            );
+            const testWriteCmd = await ssh.execCommand(`test -w ${testPath}`);
+            Logger.getAppLogger().debug(
+                `[ZSshUtils] test -w %s, code %d, stdout: '%s', stderr: '%s'`,
+                testPath,
+                testWriteCmd.code,
+                testWriteCmd.stdout,
+                testWriteCmd.stderr,
+            );
+
+            return (
+                testExistsCmd.code === 0 && // 0 : the file exists
+                testWriteCmd.code !== 0
+            ); // non-zero: lacks access
         });
     }
 
