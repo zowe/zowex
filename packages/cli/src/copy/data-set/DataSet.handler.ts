@@ -22,8 +22,8 @@ export default class CopyDatasetOrMemberHandler extends SshBaseHandler {
             const response = await client.ds.copyDatasetOrMember({
                 source: fromDataset,
                 target: toDataset,
-                replace: params.arguments?.replace,
-                overwrite: params.arguments?.overwrite,
+                replace: params.arguments.replace,
+                overwrite: params.arguments.overwrite,
             });
 
             if (response.success) {

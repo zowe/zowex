@@ -66,10 +66,10 @@ export class RpcStreamManager {
         const pendingStream = this.mPendingStreamMap.get(params.id)!;
         const readStream = pendingStream.streamFn();
         const callbackInfo = pendingStream.callbackInfo;
-        readStream.on("keepAlive", () => pendingStream.timeoutId?.refresh());
         if (readStream == null || !(readStream instanceof Readable)) {
             throw new Error(`No stream found for request ID: ${params.id}`);
         }
+        readStream.on("keepAlive", () => pendingStream.timeoutId?.refresh());
         this.mPendingStreamMap.delete(params.id);
 
         const sshStream = await new Promise<ClientChannel>((resolve, reject) => {
@@ -84,11 +84,11 @@ export class RpcStreamManager {
     private async downloadStream(params: { id: number; pipePath: string; contentLen?: number }): Promise<number> {
         const pendingStream = this.mPendingStreamMap.get(params.id)!;
         const writeStream = pendingStream.streamFn();
-        writeStream.on("keepAlive", () => pendingStream.timeoutId?.refresh());
         const callbackInfo = pendingStream.callbackInfo;
         if (writeStream == null || !(writeStream instanceof Writable)) {
             throw new Error(`No stream found for request ID: ${params.id}`);
         }
+        writeStream.on("keepAlive", () => pendingStream.timeoutId?.refresh());
         this.mPendingStreamMap.delete(params.id);
         if (callbackInfo != null && params.contentLen != null) {
             callbackInfo.totalBytes = params.contentLen;

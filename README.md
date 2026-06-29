@@ -121,6 +121,7 @@ graph LR
   subgraph Client
   sdk[Node.js SDK Package]
   cli[Zowe CLI Plug-in]-->sdk
+  vsce[Zowe Explorer<br>VS Code Extension]-->sdk
   other[&lt;My Custom App&gt;]-->sdk
   end
   subgraph z/OS Server

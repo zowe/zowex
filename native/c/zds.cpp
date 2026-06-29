@@ -393,8 +393,21 @@ static int copy_partitioned(ZDS *zds, const ZDSTypeInfo &sourceInfo, const ZDSTy
     {
       options->member_created = true;
     }
-    control_stmt = "  COPY OUTDD=" + tgt_ddname + ",INDD=" + src_ddname + "\n";
-    control_stmt += "  SELECT MEMBER=((" + sourceInfo.member_name + "," + targetInfo.member_name + replace_flag + "))";
+    if (sourceInfo.member_name == targetInfo.member_name)
+    {
+      // The member-level rename form ((M1,M1,R)) makes IEBCOPY reject the request with
+      // IEB137I ("duplicate member names"). Instead, replace at the data-set level on INDD
+      // and SELECT the member by name.
+      // https://www.ibm.com/docs/en/SSLTBW_2.5.0/pdf/idau100_v2r5.pdf "when performing a selective copy"
+      const std::string indd = options->replace ? "((" + src_ddname + ",R))" : src_ddname;
+      control_stmt = "  COPY OUTDD=" + tgt_ddname + ",INDD=" + indd + "\n";
+      control_stmt += "  SELECT MEMBER=(" + sourceInfo.member_name + ")";
+    }
+    else
+    {
+      control_stmt = "  COPY OUTDD=" + tgt_ddname + ",INDD=" + src_ddname + "\n";
+      control_stmt += "  SELECT MEMBER=((" + sourceInfo.member_name + "," + targetInfo.member_name + replace_flag + "))";
+    }
   }
   else
   {
@@ -1186,6 +1199,13 @@ static int flush_encoding_state(const EncodingSetup &setup, IconvGuard &iconv_gu
  * Encode a single line using the provided encoding setup.
  * Consolidates line encoding logic used in BPAM write functions.
  *
+ * Each line becomes its own data set record, so the shift state is flushed after
+ * every line. This keeps every record self-contained for stateful mixed
+ * SBCS/DBCS encodings (e.g. IBM-1399/IBM-939): the bytes start and end in
+ * single-byte state with balanced shift-out/shift-in. Without the per-line
+ * flush, the closing SI for a DBCS record would leak into the following record,
+ * producing malformed records that fail to convert on read-back.
+ *
  * @param line Line to encode (modified in place)
  * @param setup Encoding setup context
  * @param iconv_guard IconvGuard for encoding conversion
@@ -1201,7 +1221,7 @@ static int encode_line_if_needed(std::string &line, const EncodingSetup &setup, 
 
   try
   {
-    line = zut_encode(line, iconv_guard.get(), diag);
+    line = zut_encode(line, iconv_guard.get(), diag, /*flush_state=*/true);
     return RTNCD_SUCCESS;
   }
   catch (std::exception &e)
@@ -1645,27 +1665,8 @@ static int zds_write_member_bpam(ZDS *zds, const std::string &dsn, const std::st
     }
   }
 
-  // Flush encoding state and append to last line if needed
-  std::vector<char> flush_buffer;
-  rc = flush_encoding_state(encoding, iconv_guard, zds->diag, flush_buffer);
-  if (rc != RTNCD_SUCCESS)
-  {
-    zds_close_output_bpam(zds, ioc);
-    return rc;
-  }
-
-  // Append flush bytes to the last non-empty line
-  if (!flush_buffer.empty() && !lines_to_write.empty())
-  {
-    for (auto it = lines_to_write.rbegin(); it != lines_to_write.rend(); ++it)
-    {
-      if (!it->first.empty())
-      {
-        it->first.append(flush_buffer.begin(), flush_buffer.end());
-        break;
-      }
-    }
-  }
+  // Each line was encoded with its shift state flushed (see encode_line_if_needed),
+  // so every record is already self-contained; no end-of-member flush is needed.
 
   // Now write all the lines
   for (size_t i = 0; i < lines_to_write.size(); i++)
@@ -2428,6 +2429,37 @@ bool is_match(const char *s, const char *p)
   return *p == '\0';
 }
 
+/**
+ * @brief Validate if the provided user data is a valid ISPF statistics entry
+ * @param stats Pointer to the ISPF statistics structure
+ * @param user_data_len Length of the user data in bytes
+ * @return true if valid, false otherwise
+ */
+static bool is_valid_ispf_stats(const ISPF_STATS *stats, int user_data_len)
+{
+  // https://www.ibm.com/docs/en/zos/3.2.0?topic=di-ispf-statistics-entry-in-pds-directory
+  bool is_extended = (stats->flags & 0x20) != 0;
+  bool is_valid = false;
+
+  // 1. Must be 15 halfwords (30 bytes) with blanks at 29-30, OR 20 halfwords (40 bytes) with extended flag ON
+  if (!is_extended && user_data_len == 30 && memcmp(stats->extended, "  ", 2) == 0)
+  {
+    is_valid = true;
+  }
+  else if (is_extended && user_data_len == 40)
+  {
+    is_valid = true;
+  }
+
+  // 2. Century indicators must be valid (1900s - 0x00 or 2000s - 0x01)
+  if (stats->created_date_century > 0x01 || stats->modified_date_century > 0x01)
+  {
+    return false;
+  }
+
+  return is_valid;
+}
+
 int zds_list_members(ZDS *zds, std::string dsn, std::vector<ZDSMem> &members, const std::string &pattern, bool show_attributes)
 {
   // PO
@@ -2530,34 +2562,39 @@ int zds_list_members(ZDS *zds, std::string dsn, std::vector<ZDSMem> &members, co
 
           ZDSMem mem{};
           mem.name = std::string(name);
-          int user_data_len = info * 2;
+          int user_data_len = info * 2; // convert halfwords to bytes
 
           if (show_attributes && user_data_len >= sizeof(ISPF_STATS))
           {
             const ISPF_STATS *stats = reinterpret_cast<const ISPF_STATS *>(data + sizeof(entry));
-            mem.vers = stats->version;
-            mem.mod = stats->level;
+            mem.stats_valid = is_valid_ispf_stats(stats, user_data_len);
 
-            mem.sclm = (stats->flags & 0x80) != 0;
+            if (mem.stats_valid)
+            {
+              mem.vers = stats->version;
+              mem.mod = stats->level;
 
-            int rc = zut_convert_date(&stats->created_date_century, mem.c4date);
+              mem.sclm = (stats->flags & 0x80) != 0;
 
-            // Convert Modified Date
-            rc = zut_convert_date(&stats->modified_date_century, mem.m4date);
+              int rc = zut_convert_date(&stats->created_date_century, mem.c4date);
 
-            parse_packed_time(
-                stats->modified_time_hours,
-                stats->modified_time_minutes,
-                stats->modified_time_seconds,
-                &mem.mtime);
+              // Convert Modified Date
+              rc = zut_convert_date(&stats->modified_date_century, mem.m4date);
 
-            mem.cnorc = stats->current_number_of_lines;
-            mem.inorc = stats->initial_number_of_lines;
-            mem.mnorc = stats->modified_number_of_lines;
+              parse_packed_time(
+                  stats->modified_time_hours,
+                  stats->modified_time_minutes,
+                  stats->modified_time_seconds,
+                  &mem.mtime);
 
-            char user[9] = {0};
-            memcpy(user, stats->userid, 8);
-            mem.user = std::string(user);
+              mem.cnorc = stats->current_number_of_lines;
+              mem.inorc = stats->initial_number_of_lines;
+              mem.mnorc = stats->modified_number_of_lines;
+
+              char user[9] = {0};
+              memcpy(user, stats->userid, 8);
+              mem.user = std::string(user);
+            }
           }
           members.push_back(mem);
         }
@@ -4228,20 +4265,8 @@ static int zds_write_member_bpam_streamed(ZDS *zds, const std::string &dsn, cons
     }
   }
 
-  // Flush encoding state and append to the last line
-  std::vector<char> flush_buffer;
-  rc = flush_encoding_state(encoding, iconv_guard, zds->diag, flush_buffer);
-  if (rc != RTNCD_SUCCESS)
-  {
-    zds_close_output_bpam(zds, ioc);
-    return rc;
-  }
-
-  // Append flush bytes to the last line
-  if (!flush_buffer.empty() && has_prev_line)
-  {
-    prev_line.append(flush_buffer.begin(), flush_buffer.end());
-  }
+  // Each line was encoded with its shift state flushed (see encode_line_if_needed),
+  // so every record is already self-contained; no end-of-member flush is needed.
 
   // Write the last buffered line
   if (has_prev_line)
