@@ -51,6 +51,7 @@ for filename in py_files:
         print(f"Packaged Python wrapper: {filename}")
     else:
         print(f"Error: Python wrapper not found: {filename}")
+        sys.exit(1)
 
 # 4. Create an __init__.py to allow importing as a standard python package
 init_content = """# Zowe Remote SSH Python Bindings (Precompiled)

@@ -93,6 +93,7 @@ for filename in object_files:
         print(f"Copied object file: {filename}")
     else:
         print(f"Error: precompiled object file not found: {filename}")
+        sys.exit(1)
 
 # 7. Write setup.py for the flat layout distribution
 setup_py_content = """#!/usr/bin/env python3

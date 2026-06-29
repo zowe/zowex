@@ -24,8 +24,6 @@ std::string list_uss_dir(const std::string &path, ListOptions options = ListOpti
 
 void move_uss_file_or_dir(const std::string &source, const std::string &destination);
 
-void move_uss_file_or_dir(const std::string &source, const std::string &destination);
-
 std::string read_uss_file(const std::string &file, const std::string &codepage = "");
 
 void read_uss_file_streamed(const std::string &file, const std::string &pipe, const std::string &codepage = "", size_t *content_len = nullptr);
