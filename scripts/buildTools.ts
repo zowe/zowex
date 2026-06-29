@@ -1139,6 +1139,78 @@ async function packPrecompiled(connection: Client) {
     console.log("Precompiled bindings downloaded to dist/zbind_bin_dist.tar.gz");
 }
 
+/**
+ * Checks whether `swig` is available on the remote system using the same PATH
+ * the build uses (preBuildCmd is prepended by runCommandInShell). Sets a
+ * non-zero exit code when swig is absent so callers can branch on it, e.g.
+ * `if npm run -s z:has:swig; then ...`.
+ */
+async function hasSwig(connection: Client) {
+    const out = await runCommandInShell(connection, "command -v swig\n", {
+        stepName: "Checking for swig on remote",
+        suppressError: true,
+    });
+    const found = out.trim().length > 0 && !out.includes("not found");
+    if (found) {
+        console.log(`swig found: ${out.trim()}`);
+    } else {
+        console.log("swig not found on remote system");
+    }
+    // Override any exit code set by the suppressed command so the result is explicit.
+    process.exitCode = found ? 0 : 1;
+}
+
+/**
+ * Applies a previously downloaded precompiled bindings bundle
+ * (dist/zbind_bin_dist.tar.gz) to the remote bindings directory: uploads the
+ * archive as binary, extracts it on z/OS, and copies the compiled `.so`
+ * libraries and Python wrapper modules into the bindings dir so the test step
+ * can import them without building. Used when swig is unavailable on z/OS.
+ */
+async function applyPrecompiled(connection: Client) {
+    const localTarball = path.resolve(__dirname, "./../dist/zbind_bin_dist.tar.gz");
+    if (!fs.existsSync(localTarball)) {
+        throw new Error(`Precompiled bundle not found at ${localTarball}. Run "npm run z:fetch:python" first.`);
+    }
+    const remoteTarball = `${deployDirs.pythonDir}/zbind_bin_dist.tar.gz`;
+
+    // Upload the archive without EBCDIC conversion to preserve its binary contents.
+    await new Promise<void>((resolve, reject) => {
+        connection.sftp(async (err, sftpcon) => {
+            if (err) {
+                reject(err);
+                return;
+            }
+            try {
+                await uploadFile(sftpcon, localTarball, remoteTarball, false);
+                sftpcon.end();
+                resolve();
+            } catch (uploadErr) {
+                reject(uploadErr);
+            }
+        });
+    });
+
+    await runCommandInShell(
+        connection,
+        [
+            `cd ${deployDirs.pythonDir}`,
+            "rm -rf zbind_bin_dist zbind_bin_dist.tar",
+            // Decompress with Python (always present here) to avoid depending on a gzip binary.
+            "python -c \"import gzip, shutil; dst=open('zbind_bin_dist.tar','wb'); shutil.copyfileobj(gzip.open('zbind_bin_dist.tar.gz','rb'), dst); dst.close()\"",
+            "chtag -b zbind_bin_dist.tar",
+            "pax -r -f zbind_bin_dist.tar",
+            "cp zbind_bin_dist/_*.so zbind_bin_dist/z*_py.py .",
+            // USTAR does not carry z/OS file tags, so re-apply them by file type.
+            "chtag -b _*.so",
+            "chtag -tc ISO8859-1 z*_py.py",
+            "rm -f zbind_bin_dist.tar",
+        ].join("\n"),
+        { stepName: "Applying precompiled bindings", streamOutput: true },
+    );
+    console.log("Applied precompiled bindings to the z/OS bindings directory.");
+}
+
 interface RunCommandOpts {
     streamOutput?: boolean;
     stepName?: string;
@@ -1589,6 +1661,12 @@ async function main() {
                 break;
             case "make":
                 await make(sshClient);
+                break;
+            case "apply:python":
+                await applyPrecompiled(sshClient);
+                break;
+            case "has:swig":
+                await hasSwig(sshClient);
                 break;
             case "pack:python":
                 await packPrecompiled(sshClient);
