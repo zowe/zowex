@@ -17,7 +17,7 @@ import { promisify } from "node:util";
 import { DeferredPromise, DeferredPromiseStatus, type IProfile, ProfileInfo } from "@zowe/imperative";
 import * as chokidar from "chokidar";
 import * as yaml from "js-yaml";
-import { Client, type ClientCallback, type SFTPWrapper } from "ssh2";
+import { Client, PseudoTtyOptions, type ClientCallback, type SFTPWrapper } from "ssh2";
 
 interface IConfig {
     sshProfile: string | IProfile;
@@ -1206,7 +1206,7 @@ async function applyPrecompiled(connection: Client) {
             "chtag -tc ISO8859-1 z*_py.py",
             "rm -f zbind_bin_dist.tar",
         ].join("\n"),
-        { stepName: "Applying precompiled bindings", streamOutput: true },
+        { stepName: "Applying precompiled bindings", streamOutput: true, suppressTty: {} },
     );
     console.log("Applied precompiled bindings to the z/OS bindings directory.");
 }
@@ -1215,6 +1215,7 @@ interface RunCommandOpts {
     streamOutput?: boolean;
     stepName?: string;
     suppressError?: boolean;
+    suppressTty?: PseudoTtyOptions;
 }
 
 async function runCommandInShell(connection: Client, command: string, opts?: RunCommandOpts) {
@@ -1277,7 +1278,7 @@ async function runCommandInShell(connection: Client, command: string, opts?: Run
             });
             stream.end(`${command}\nexit $?\n`);
         };
-        connection.shell(false, cb);
+        connection.shell(opts?.suppressTty ?? false, cb);
     });
 }
 
