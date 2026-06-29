@@ -1206,7 +1206,7 @@ async function applyPrecompiled(connection: Client) {
             "chtag -tc ISO8859-1 z*_py.py",
             "rm -f zbind_bin_dist.tar",
         ].join("\n"),
-        { stepName: "Applying precompiled bindings", streamOutput: true, suppressTty: {} },
+        { stepName: "Applying precompiled bindings", streamOutput: true },
     );
     console.log("Applied precompiled bindings to the z/OS bindings directory.");
 }
