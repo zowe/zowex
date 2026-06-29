@@ -1170,7 +1170,7 @@ async function hasSwig(connection: Client) {
 async function applyPrecompiled(connection: Client) {
     const localTarball = path.resolve(__dirname, "./../dist/zbind_bin_dist.tar.gz");
     if (!fs.existsSync(localTarball)) {
-        throw new Error(`Precompiled bundle not found at ${localTarball}. Run "npm run z:fetch:python" first.`);
+        throw new Error(`Precompiled bundle not found at ${localTarball}. Run "npm run z:python:fetch" first.`);
     }
     const remoteTarball = `${deployDirs.pythonDir}/zbind_bin_dist.tar.gz`;
 
@@ -1650,7 +1650,7 @@ async function main() {
             case "build:chdsect":
                 await chdsect(sshClient);
                 break;
-            case "build:python":
+            case "python:build":
                 await make(sshClient, deployDirs.pythonDir);
                 break;
             case "clean":
@@ -1662,13 +1662,13 @@ async function main() {
             case "make":
                 await make(sshClient);
                 break;
-            case "apply:python":
-                await applyPrecompiled(sshClient);
-                break;
             case "has:swig":
                 await hasSwig(sshClient);
                 break;
-            case "pack:python":
+            case "python:apply":
+                await applyPrecompiled(sshClient);
+                break;
+            case "python:pack":
                 await packPrecompiled(sshClient);
                 break;
             case "package":
@@ -1681,7 +1681,7 @@ async function main() {
             case "test":
                 await test(sshClient);
                 break;
-            case "test:python":
+            case "python:test":
                 await make(sshClient, deployDirs.pythonTestDir);
                 break;
             case "upload":

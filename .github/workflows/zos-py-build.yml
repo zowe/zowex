@@ -75,7 +75,7 @@ jobs:
       # Path A: SWIG present -> build the bindings from source as usual.
       - name: Build Python Bindings
         if: steps.swig.outputs.present == 'true'
-        run: npm run z:build:python
+        run: npm run z:python:build
 
       # Path B: SWIG absent -> fetch the latest precompiled bundle posted to this
       # PR (any author) and apply it so the tests can run without building.
@@ -84,11 +84,11 @@ jobs:
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
-        run: npm run z:fetch:python -- ${{ github.event.pull_request.number }}
+        run: npm run z:python:fetch -- ${{ github.event.pull_request.number }}
 
       - name: Apply precompiled Python bindings
         if: steps.swig.outputs.present != 'true' && hashFiles('dist/zbind_bin_dist.tar.gz') != ''
-        run: npm run z:apply:python
+        run: npm run z:python:apply
 
       - name: Warn if no bindings available
         if: steps.swig.outputs.present != 'true' && hashFiles('dist/zbind_bin_dist.tar.gz') == ''
@@ -98,7 +98,7 @@ jobs:
       # downloaded precompiled bundle.
       - name: Test Python Bindings
         if: steps.swig.outputs.present == 'true' || hashFiles('dist/zbind_bin_dist.tar.gz') != ''
-        run: npm run z:test:python
+        run: npm run z:python:test
 
       - name: Clean up on z/OS
         if: always()

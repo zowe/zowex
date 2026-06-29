@@ -68,7 +68,7 @@ function gh(args: string[]): string {
 function main() {
     const prNumber = process.argv[2];
     if (!prNumber || !/^\d+$/.test(prNumber)) {
-        console.error("Usage: npm run z:fetch:python -- <PR_NUMBER>");
+        console.error("Usage: npm run z:python:fetch -- <PR_NUMBER>");
         process.exit(1);
     }
 

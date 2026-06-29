@@ -15,7 +15,7 @@ import * as path from "node:path";
 
 /**
  * Posts the precompiled Python bindings tarball (built on z/OS via
- * `npm run z:pack:python`) to a pull request as a downloadable link.
+ * `npm run z:python:pack`) to a pull request as a downloadable link.
  *
  * GitHub does not allow attaching binaries directly to PR comments, and gists
  * corrupt binary archives, so the tarball is hosted as an asset on a single
@@ -121,12 +121,12 @@ function findStickyCommentId(prNumber: string): number | null {
 function main() {
     const prNumber = process.argv[2];
     if (!prNumber || !/^\d+$/.test(prNumber)) {
-        console.error("Usage: npm run z:post:python -- <PR_NUMBER>");
+        console.error("Usage: npm run z:python:post -- <PR_NUMBER>");
         process.exit(1);
     }
 
     if (!fs.existsSync(TARBALL)) {
-        console.error(`Tarball not found: ${TARBALL}\nRun "npm run z:pack:python" first to build it on z/OS.`);
+        console.error(`Tarball not found: ${TARBALL}\nRun "npm run z:python:pack" first to build it on z/OS.`);
         process.exit(1);
     }
 
