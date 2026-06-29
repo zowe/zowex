@@ -697,7 +697,6 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
   memset(&zenv, 0, sizeof(ZRCVY_ENV));
 
   statjqp = (STATJQ * PTR32) stat.statjobf;
-  statvop = (STATVO * PTR32) statjqp->stjqsvrb;
 
   if (NULL == statjqp)
   {
@@ -740,6 +739,7 @@ int ZJBMLSDS(ZJB *PTR64 zjb, STATSEVB **PTR64 sysoutInfo, int *entries)
 
   while (statjqp)
   {
+    statvop = (STATVO * PTR32) statjqp->stjqsvrb;
     statjqhdp = (STATJQHD * PTR32)((unsigned char *PTR32)statjqp + statjqp->stjqohdr);
     statjqtrp = (STATJQTR * PTR32)((unsigned char *PTR32)statjqhdp + sizeof(STATJQHD));
 

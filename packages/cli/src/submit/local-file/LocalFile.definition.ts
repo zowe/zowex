@@ -32,6 +32,15 @@ export const SubmitLocalFileDefinition: ICommandDefinition = {
             required: true,
         },
     ],
+    options: [
+        {
+            name: "encoding",
+            aliases: ["ec"],
+            description: "The remote encoding to use for the JCL content. Defaults to IBM-1047 if not specified.",
+            type: "string",
+            required: false,
+        },
+    ],
     profile: { optional: ["ssh"] },
     outputFormatOptions: true,
 };
