@@ -1124,6 +1124,21 @@ async function artifacts(connection: Client, packageAll: boolean) {
     }
 }
 
+/**
+ * Runs the precompiled Python bindings packaging script on z/OS and downloads
+ * the resulting binary tarball to the local `dist/` directory. The tarball is
+ * retrieved without ASCII conversion (binary-safe) to preserve the archive.
+ */
+async function packPrecompiled(connection: Client) {
+    await runCommandInShell(connection, `cd ${deployDirs.pythonDir} && python package_precompiled.py`, {
+        streamOutput: true,
+        stepName: "Packaging precompiled Python bindings",
+    });
+    fs.mkdirSync(path.resolve(__dirname, "./../dist"), { recursive: true });
+    await retrieve(connection, ["python/bindings/zbind_bin_dist.tar.gz"], "dist", true);
+    console.log("Precompiled bindings downloaded to dist/zbind_bin_dist.tar.gz");
+}
+
 interface RunCommandOpts {
     streamOutput?: boolean;
     stepName?: string;
@@ -1574,6 +1589,9 @@ async function main() {
                 break;
             case "make":
                 await make(sshClient);
+                break;
+            case "pack:python":
+                await packPrecompiled(sshClient);
                 break;
             case "package":
                 await artifacts(sshClient, true);
