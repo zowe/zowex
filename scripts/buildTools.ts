@@ -1215,7 +1215,7 @@ interface RunCommandOpts {
     streamOutput?: boolean;
     stepName?: string;
     suppressError?: boolean;
-    suppressTty?: PseudoTtyOptions;
+    ttyOptions?: PseudoTtyOptions;
 }
 
 async function runCommandInShell(connection: Client, command: string, opts?: RunCommandOpts) {
@@ -1278,7 +1278,7 @@ async function runCommandInShell(connection: Client, command: string, opts?: Run
             });
             stream.end(`${command}\nexit $?\n`);
         };
-        connection.shell(opts?.suppressTty ?? false, cb);
+        connection.shell(opts?.ttyOptions ?? false, cb);
     });
 }
 

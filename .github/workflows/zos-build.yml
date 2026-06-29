@@ -42,7 +42,7 @@ jobs:
 
       - name: Set up Credentials
         run: |
-          cat << EOF > config.yaml
+          cat << 'EOF' > config.yaml
           activeProfile: default
 
           profiles:
