@@ -38,15 +38,57 @@ const RELEASE_NOTES =
 
 const TARBALL = path.resolve(__dirname, "../dist/zbind_bin_dist.tar.gz");
 
+/**
+ * Resolves an executable to an absolute path within a fixed set of trusted,
+ * system-owned directories. Spawning by bare name lets the OS search a possibly
+ * attacker-controlled PATH; resolving against a hardcoded directory list keeps
+ * execution restricted to fixed, unwriteable locations.
+ */
+function resolveExecutable(name: string): string | null {
+    const trustedDirs =
+        process.platform === "win32"
+            ? [path.join(process.env.SystemRoot ?? "C:\\Windows", "System32")]
+            : ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"];
+    const candidates = process.platform === "win32" ? [`${name}.exe`, `${name}.cmd`] : [name];
+    for (const dir of trustedDirs) {
+        for (const file of candidates) {
+            const full = path.join(dir, file);
+            if (fs.existsSync(full)) {
+                return full;
+            }
+        }
+    }
+    return null;
+}
+
+/** Resolves a required executable to an absolute path, exiting if it is missing. */
+function requireExecutable(name: string): string {
+    const bin = resolveExecutable(name);
+    if (bin == null) {
+        console.error(`Required executable "${name}" was not found in a trusted system directory.`);
+        process.exit(1);
+    }
+    return bin;
+}
+
+// Resolve tooling once, to absolute paths, so no spawn below relies on PATH.
+const GH_BIN = requireExecutable("gh");
+
 /** Runs `gh` with the given args, returning trimmed stdout. */
 function gh(args: string[]): string {
-    return childProcess.execFileSync("gh", args, { encoding: "utf-8" }).trim();
+    return childProcess.execFileSync(GH_BIN, args, { encoding: "utf-8" }).trim();
 }
 
 /** Returns the short git commit hash, or "local" if it cannot be determined. */
 function getShortHash(): string {
+    const gitBin = resolveExecutable("git");
+    if (gitBin == null) {
+        return "local";
+    }
     try {
-        return childProcess.execFileSync("git", ["rev-parse", "--short", "HEAD"], { encoding: "utf-8" }).trim();
+        const hash = childProcess.execFileSync(gitBin, ["rev-parse", "--short", "HEAD"], { encoding: "utf-8" }).trim();
+        // Only accept a real short hash; anything else falls back to a safe literal.
+        return /^[0-9a-f]{4,40}$/i.test(hash) ? hash : "local";
     } catch {
         return "local";
     }
@@ -90,7 +132,16 @@ function main() {
 
     const hash = getShortHash();
     const assetName = `zbind_bin_dist-pr${prNumber}-${hash}.tar.gz`;
-    const stagedPath = path.join(path.dirname(TARBALL), assetName);
+
+    // Defense-in-depth: prNumber and hash are validated above, but re-check that the
+    // resolved staging path stays directly inside dist/ before any filesystem access,
+    // so a crafted argument can never escape the intended directory.
+    const distDir = path.resolve(path.dirname(TARBALL));
+    const stagedPath = path.resolve(distDir, assetName);
+    if (path.dirname(stagedPath) !== distDir) {
+        console.error(`Refusing to stage outside the dist directory: ${stagedPath}`);
+        process.exit(1);
+    }
     fs.copyFileSync(TARBALL, stagedPath);
 
     try {
@@ -99,7 +150,7 @@ function main() {
         // Ensure the shared prerelease exists; create it only the first time.
         let releaseExists = true;
         try {
-            childProcess.execFileSync("gh", ["release", "view", RELEASE_TAG], { stdio: "ignore" });
+            childProcess.execFileSync(GH_BIN, ["release", "view", RELEASE_TAG], { stdio: "ignore" });
         } catch {
             releaseExists = false;
         }
