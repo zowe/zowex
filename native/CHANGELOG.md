@@ -27,6 +27,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 - `c`: Improved error message when deleting a member fails because its parent PDS is open in ISPF. [#916](https://github.com/zowe/zowe-native-proto/issues/916)
 - `c`: Fixed an issue where incorrect values could be returned for the `usedp` (Used Space) and `volsers` (Volumes) attributes when listing data sets. [#981](https://github.com/zowe/zowex/pull/981)
 - `c`: Fixed an issue where invalid data could be returned for attributes of PDS members. [#1009](https://github.com/zowe/zowex/issues/1009)
+- `c`: Fixed an issue where `zowex system view-syslog` could display invalid end time. [#1017](https://github.com/zowe/zowex/issues/1017)
 
 ## `0.6.0`
 
