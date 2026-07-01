@@ -49,6 +49,9 @@ SSHCM=(-o ControlMaster=auto -o ControlPath="$ZX_STATE/cm-%C" -o ControlPersist=
 
 die(){ echo "zx: $*" >&2; exit 1; }
 need(){ command -v "$1" >/dev/null || die "need '$1' on PATH"; }
+# JSON-escape a raw value into a quoted JSON string (quotes included in output).
+# Use this instead of interpolating user input directly between literal \"...\" in RPC params.
+_j(){ need jq; jq -Rn --arg v "$1" '$v'; }
 _ssh(){ ssh "${SSHCM[@]}" -T "$@"; }
 _sftpb(){ sftp "${SSHCM[@]}" -b - "$@"; }
 
@@ -188,7 +191,8 @@ _pp_table(){
   printf "$fmt\n" "${hdr[@]}"
   local US=$'\x1f'
   jq -r --argjson f "$(printf '%s\n' "${fields[@]}" | jq -R . | jq -s .)" \
-        '.result.items[]? | [ .[$f[]] // "" | tostring ] | join("")' \
+        --arg us "$US" \
+        '.result.items[]? | [ .[$f[]] // "" | tostring ] | join($us)' \
   | while IFS="$US" read -r -a row; do printf "$fmt\n" "${row[@]}"; done
 }
 
@@ -351,7 +355,7 @@ check)
   done
   if command -v curl >/dev/null; then echo "  ok   curl  ($(command -v curl))"
   elif command -v wget >/dev/null; then echo "  ok   wget  ($(command -v wget))  [curl preferred]"
-  else echo "  MISS curl/wget  (needed for auto-download — brew install curl)"; ok=0; fi
+  else echo "  MISS curl/wget  (needed for auto-download — install curl or wget via your package manager)"; ok=0; fi
   echo "  bash ${BASH_VERSION}"
   if [[ -f "$ZX_PAX" ]]; then echo "  ok   bundle  $ZX_PAX"
   else echo "  miss bundle  not found at $ZX_PAX — run 'zx deploy <host>' to auto-download from https://github.com/zowe/zowex/releases, or set ZX_PAX=/path/to/server.pax.Z"; fi
@@ -367,23 +371,23 @@ rpc)
 ds)
   sub="${1-}"; shift || true
   case "$sub" in
-    list)    [[ $# -eq 1 ]]||die "zx ds list <pattern>";   _rpc listDatasets  "{\"pattern\":\"$1\"}" | _out _pp_table ;;
-    members) [[ $# -eq 1 ]]||die "zx ds members <dsn>";    _rpc listDsMembers "{\"dsname\":\"$1\"}"  | _out _pp_table ;;
-    read)    [[ $# -eq 1 ]]||die "zx ds read <dsn>";       _rpc readDataset   "{\"dsname\":\"$1\"}"  | _out _pp_data_b64;;
+    list)    [[ $# -eq 1 ]]||die "zx ds list <pattern>";   _rpc listDatasets  "{\"pattern\":$(_j "$1")}" | _out _pp_table ;;
+    members) [[ $# -eq 1 ]]||die "zx ds members <dsn>";    _rpc listDsMembers "{\"dsname\":$(_j "$1")}"  | _out _pp_table ;;
+    read)    [[ $# -eq 1 ]]||die "zx ds read <dsn>";       _rpc readDataset   "{\"dsname\":$(_j "$1")}"  | _out _pp_data_b64;;
     write)   [[ $# -eq 2 ]]||die "zx ds write <dsn> <file>"; need base64
-             b=$(base64 < "$2"|tr -d '\n'); _rpc writeDataset "{\"dsname\":\"$1\",\"data\":\"$b\"}" | _out _pp_kv;;
+             b=$(base64 < "$2"|tr -d '\n'); _rpc writeDataset "{\"dsname\":$(_j "$1"),\"data\":\"$b\"}" | _out _pp_kv;;
     get)     [[ $# -eq 2 ]]||die "zx ds get <dsn[(member)]> <localdir-or-file>"; need jq; need base64
              dsn="$1"; dst="$2"
              if [[ "$dsn" == *"("*")"* ]]; then
-               _rpc readDataset "{\"dsname\":\"$dsn\"}" | jq -r '.result.data' | base64 -d > "$dst"
+               _rpc readDataset "{\"dsname\":$(_j "$dsn")}" | jq -r '.result.data' | base64 -d > "$dst"
                echo "zx: $dsn -> $dst"
              else
                mkdir -p "$dst"
-               mbrs=$(_rpc listDsMembers "{\"dsname\":\"$dsn\"}" | jq -r '.result.items[].name')
+               mbrs=$(_rpc listDsMembers "{\"dsname\":$(_j "$dsn")}" | jq -r '.result.items[].name')
                n=0
                while IFS= read -r m; do
                  [[ -z "$m" ]] && continue
-                 _rpc readDataset "{\"dsname\":\"$dsn($m)\"}" | jq -r '.result.data' | base64 -d > "$dst/$m"
+                 _rpc readDataset "{\"dsname\":$(_j "$dsn($m)")}" | jq -r '.result.data' | base64 -d > "$dst/$m"
                  n=$((n+1)); echo "zx: $dsn($m) -> $dst/$m"
                done <<< "$mbrs"
                echo "zx: $n member(s)"
@@ -393,7 +397,7 @@ ds)
              _putone(){
                local f="$1" tgt="$2" b r
                b=$(base64 < "$f"|tr -d '\n')
-               r=$(_rpc writeDataset "{\"dsname\":\"$tgt\",\"data\":\"$b\"}")
+               r=$(_rpc writeDataset "{\"dsname\":$(_j "$tgt"),\"data\":\"$b\"}")
                if printf '%s' "$r" | jq -e '.error' >/dev/null 2>&1; then
                  echo "zx: $f -> $tgt  FAILED: $(printf '%s' "$r" | jq -r '.error.message')" >&2; return 1
                fi
@@ -416,10 +420,10 @@ ds)
                die "source not found: $src"
              fi;;
     create)  [[ $# -ge 1 ]]||die "zx ds create <dsn> ['<attrs-json>']"
-             a="${2-}"; [[ -n "$a" ]]||a='{}'; _rpc createDataset "{\"dsname\":\"$1\",\"attributes\":$a}" | _out _pp_kv;;
-    delete)  [[ $# -eq 1 ]]||die "zx ds delete <dsn>";     _rpc deleteDataset "{\"dsname\":\"$1\"}"  | _out _pp_kv;;
-    copy)    [[ $# -eq 2 ]]||die "zx ds copy <src> <dst>"; _rpc copyDataset   "{\"source\":\"$1\",\"target\":\"$2\"}" | _out _pp_kv;;
-    rename)  [[ $# -eq 2 ]]||die "zx ds rename <a> <b>";   _rpc renameDataset "{\"dsnameBefore\":\"$1\",\"dsnameAfter\":\"$2\"}" | _out _pp_kv;;
+             a="${2-}"; [[ -n "$a" ]]||a='{}'; _rpc createDataset "{\"dsname\":$(_j "$1"),\"attributes\":$a}" | _out _pp_kv;;
+    delete)  [[ $# -eq 1 ]]||die "zx ds delete <dsn>";     _rpc deleteDataset "{\"dsname\":$(_j "$1")}"  | _out _pp_kv;;
+    copy)    [[ $# -eq 2 ]]||die "zx ds copy <src> <dst>"; _rpc copyDataset   "{\"source\":$(_j "$1"),\"target\":$(_j "$2")}" | _out _pp_kv;;
+    rename)  [[ $# -eq 2 ]]||die "zx ds rename <a> <b>";   _rpc renameDataset "{\"dsnameBefore\":$(_j "$1"),\"dsnameAfter\":$(_j "$2")}" | _out _pp_kv;;
     *) die "zx ds {list|members|read|write|get|put|create|delete|copy|rename}";;
   esac;;
 
@@ -427,32 +431,34 @@ job)
   sub="${1-}"; shift || true
   case "$sub" in
     list)    o="${1-}"; p="${2-}"; pj='{}'
-             [[ -n "$o" ]] && pj="{\"owner\":\"$o\"${p:+,\"prefix\":\"$p\"}}"
+             [[ -n "$o" ]] && pj="{\"owner\":$(_j "$o")${p:+,\"prefix\":$(_j "$p")}}"
              _rpc listJobs "$pj" | _out _pp_table id:-8 name:-8 owner:-8 status:-8 retcode:-10 class:-3 ;;
     submit)  [[ $# -eq 1 ]]||die "zx job submit <file|uss-path|dsn[(member)]>"
              case "$1" in
-               /*)  _rpc submitUss "{\"fspath\":\"$1\"}" | _out _pp_kv;;
+               /*)  _rpc submitUss "{\"fspath\":$(_j "$1")}" | _out _pp_kv;;
                */*)  # local path (contains / but not leading)
                     need base64; b=$(base64 < "$1"|tr -d '\n'); _rpc submitJcl "{\"jcl\":\"$b\"}" | _out _pp_kv;;
                *)   if [[ -f "$1" ]]; then
                       need base64; b=$(base64 < "$1"|tr -d '\n'); _rpc submitJcl "{\"jcl\":\"$b\"}" | _out _pp_kv
                     else
-                      _rpc submitJob "{\"dsname\":\"$1\"}" | _out _pp_kv
+                      _rpc submitJob "{\"dsname\":$(_j "$1")}" | _out _pp_kv
                     fi;;
              esac;;
-    status)  [[ $# -eq 1 ]]||die "zx job status <id>";  _rpc getJobStatus "{\"jobId\":\"$1\"}" | _out _pp_kv;;
-    spools)  [[ $# -eq 1 ]]||die "zx job spools <id>";  _rpc listSpools   "{\"jobId\":\"$1\"}" | _out _pp_table id:4 ddname:-8 stepname:-8 procstep:-8 dsname:-44 ;;
-    spool)   [[ $# -eq 2 ]]||die "zx job spool <id> <n>"; _rpc readSpool  "{\"jobId\":\"$1\",\"spoolId\":$2}" | _out _pp_data_b64;;
-    jcl)     [[ $# -eq 1 ]]||die "zx job jcl <id>";     _rpc getJcl       "{\"jobId\":\"$1\"}" | _out _pp_data_b64;;
+    status)  [[ $# -eq 1 ]]||die "zx job status <id>";  _rpc getJobStatus "{\"jobId\":$(_j "$1")}" | _out _pp_kv;;
+    spools)  [[ $# -eq 1 ]]||die "zx job spools <id>";  _rpc listSpools   "{\"jobId\":$(_j "$1")}" | _out _pp_table id:4 ddname:-8 stepname:-8 procstep:-8 dsname:-44 ;;
+    spool)   [[ $# -eq 2 ]]||die "zx job spool <id> <n>"
+             [[ "$2" =~ ^[0-9]+$ ]]||die "zx job spool <id> <n> — <n> must be numeric"
+             _rpc readSpool  "{\"jobId\":$(_j "$1"),\"spoolId\":$2}" | _out _pp_data_b64;;
+    jcl)     [[ $# -eq 1 ]]||die "zx job jcl <id>";     _rpc getJcl       "{\"jobId\":$(_j "$1")}" | _out _pp_data_b64;;
     cancel|delete|hold|release)
-             [[ $# -eq 1 ]]||die "zx job $sub <id>";    _rpc "${sub}Job"  "{\"jobId\":\"$1\"}" | _out _pp_kv;;
+             [[ $# -eq 1 ]]||die "zx job $sub <id>";    _rpc "${sub}Job"  "{\"jobId\":$(_j "$1")}" | _out _pp_kv;;
     *) die "zx job {list|submit|status|spools|spool|jcl|cancel|delete|hold|release}";;
   esac;;
 
 uss)
   sub="${1-}"; shift || true
   case "$sub" in
-    ls)    [[ $# -eq 1 ]]||die "zx uss ls <path>";    _rpc listFiles  "{\"fspath\":\"$1\"}" | _out _pp_table ;;
+    ls)    [[ $# -eq 1 ]]||die "zx uss ls <path>";    _rpc listFiles  "{\"fspath\":$(_j "$1")}" | _out _pp_table ;;
     get)   [[ $# -ge 1 ]]||die "zx uss get <remote-path> [<local>]"
            remote="$1"; localf="${2:-$(basename "$1")}"
            _sftp "get $(printf '%q' "$remote") $(printf '%q' "$localf")"
@@ -461,16 +467,16 @@ uss)
            [[ -f "$1" ]] || die "local file not found: $1"
            _sftp "put $(printf '%q' "$1") $(printf '%q' "$2")"
            echo "zx: $1 -> $2";;
-    read)  [[ $# -eq 1 ]]||die "zx uss read <path>";  _rpc readFile   "{\"fspath\":\"$1\"}" | _out _pp_data_b64;;
+    read)  [[ $# -eq 1 ]]||die "zx uss read <path>";  _rpc readFile   "{\"fspath\":$(_j "$1")}" | _out _pp_data_b64;;
     write) [[ $# -eq 2 ]]||die "zx uss write <path> <file>"; need base64
-           b=$(base64 < "$2"|tr -d '\n'); _rpc writeFile "{\"fspath\":\"$1\",\"data\":\"$b\"}" | _out _pp_kv;;
-    rm)    [[ $# -eq 1 ]]||die "zx uss rm <path>";    _rpc deleteFile "{\"fspath\":\"$1\"}" | _out _pp_kv;;
-    mkdir) [[ $# -eq 1 ]]||die "zx uss mkdir <path>"; _rpc createFile "{\"fspath\":\"$1\",\"isDir\":true}" | _out _pp_kv;;
-    mv)    [[ $# -eq 2 ]]||die "zx uss mv <a> <b>";   _rpc moveFile   "{\"source\":\"$1\",\"target\":\"$2\"}" | _out _pp_kv;;
-    cp)    [[ $# -eq 2 ]]||die "zx uss cp <a> <b>";   _rpc copyUss    "{\"srcFsPath\":\"$1\",\"dstFsPath\":\"$2\"}" | _out _pp_kv;;
-    chmod) [[ $# -eq 2 ]]||die "zx uss chmod <mode> <p>"; _rpc chmodFile "{\"fspath\":\"$2\",\"mode\":\"$1\"}" | _out _pp_kv;;
-    chown) [[ $# -eq 2 ]]||die "zx uss chown <owner> <p>"; _rpc chownFile "{\"fspath\":\"$2\",\"owner\":\"$1\"}" | _out _pp_kv;;
-    chtag) [[ $# -eq 2 ]]||die "zx uss chtag <tag> <p>";   _rpc chtagFile "{\"fspath\":\"$2\",\"tag\":\"$1\"}" | _out _pp_kv;;
+           b=$(base64 < "$2"|tr -d '\n'); _rpc writeFile "{\"fspath\":$(_j "$1"),\"data\":\"$b\"}" | _out _pp_kv;;
+    rm)    [[ $# -eq 1 ]]||die "zx uss rm <path>";    _rpc deleteFile "{\"fspath\":$(_j "$1")}" | _out _pp_kv;;
+    mkdir) [[ $# -eq 1 ]]||die "zx uss mkdir <path>"; _rpc createFile "{\"fspath\":$(_j "$1"),\"isDir\":true}" | _out _pp_kv;;
+    mv)    [[ $# -eq 2 ]]||die "zx uss mv <a> <b>";   _rpc moveFile   "{\"source\":$(_j "$1"),\"target\":$(_j "$2")}" | _out _pp_kv;;
+    cp)    [[ $# -eq 2 ]]||die "zx uss cp <a> <b>";   _rpc copyUss    "{\"srcFsPath\":$(_j "$1"),\"dstFsPath\":$(_j "$2")}" | _out _pp_kv;;
+    chmod) [[ $# -eq 2 ]]||die "zx uss chmod <mode> <p>"; _rpc chmodFile "{\"fspath\":$(_j "$2"),\"mode\":$(_j "$1")}" | _out _pp_kv;;
+    chown) [[ $# -eq 2 ]]||die "zx uss chown <owner> <p>"; _rpc chownFile "{\"fspath\":$(_j "$2"),\"owner\":$(_j "$1")}" | _out _pp_kv;;
+    chtag) [[ $# -eq 2 ]]||die "zx uss chtag <tag> <p>";   _rpc chtagFile "{\"fspath\":$(_j "$2"),\"tag\":$(_j "$1")}" | _out _pp_kv;;
     sh)    [[ $# -ge 1 ]]||die "zx uss sh '<cmd>'"; need jq
            t=$(printf '%s' "$*"|jq -Rs .); _rpc unixCommand "{\"commandText\":$t}" | _out _pp_data_text;;
     *) die "zx uss {ls|get|put|read|write|rm|mkdir|mv|cp|chmod|chown|chtag|sh}";;
