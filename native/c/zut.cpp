@@ -1012,9 +1012,9 @@ std::vector<char> zut_encode(const char *input_str, const size_t input_size, con
  * @param cd iconv descriptor (caller manages opening, flushing, and closing)
  * @param diag diagnostic structure to store error information
  */
-std::string zut_encode(const std::string &input_str, iconv_t cd, ZDIAG &diag)
+std::string zut_encode(const std::string &input_str, iconv_t cd, ZDIAG &diag, bool flush_state)
 {
-  std::vector<char> result = zut_encode(input_str.data(), input_str.size(), cd, diag);
+  std::vector<char> result = zut_encode(input_str.data(), input_str.size(), cd, diag, flush_state);
   return std::string(result.begin(), result.end());
 }
 
@@ -1024,10 +1024,14 @@ std::string zut_encode(const std::string &input_str, iconv_t cd, ZDIAG &diag)
  * @param input_size size of the input data in bytes
  * @param cd iconv descriptor (caller manages opening, flushing, and closing)
  * @param diag diagnostic structure to store error information
+ * @param flush_state when true, flush the shift state after the input so the
+ *   returned bytes are a self-contained unit (ends back in single-byte state)
  */
-std::vector<char> zut_encode(const char *input_str, const size_t input_size, iconv_t cd, ZDIAG &diag)
+std::vector<char> zut_encode(const char *input_str, const size_t input_size, iconv_t cd, ZDIAG &diag, bool flush_state)
 {
-  const size_t max_output_size = input_size * 4;
+  // Headroom beyond the *4 worst case so the trailing shift sequence (e.g. SI)
+  // produced when flush_state is set always fits, even for an empty input.
+  const size_t max_output_size = input_size * 4 + 16;
   std::vector<char> output_buffer(max_output_size, 0);
 
   char *input = const_cast<char *>(input_str);
@@ -1035,7 +1039,7 @@ std::vector<char> zut_encode(const char *input_str, const size_t input_size, ico
 
   ZConvData data = {input, input_size, max_output_size, &output_buffer[0], output_iter};
 
-  size_t iconv_rc = zut_iconv(cd, data, diag, false);
+  size_t iconv_rc = zut_iconv(cd, data, diag, flush_state);
   if (-1 == iconv_rc)
   {
     throw std::runtime_error(diag.e_msg);

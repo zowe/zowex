@@ -311,11 +311,16 @@ std::vector<char> zut_encode(const char *input_str, const size_t input_size, con
  * @param input_str The input string
  * @param cd iconv descriptor (caller manages opening, flushing, and closing)
  * @param diag Reference to diagnostic information structure
+ * @param flush_state If true, flush the shift state after this input so the
+ *   returned bytes are self-contained (e.g. a stateful mixed SBCS/DBCS encoding
+ *   ends back in single-byte state). Use this when each call produces an
+ *   independent unit such as a single data set record. Defaults to false so the
+ *   shift state carries across successive calls on the same descriptor.
  * @return The encoded string
  */
-std::string zut_encode(const std::string &input_str, iconv_t cd, ZDIAG &diag);
+std::string zut_encode(const std::string &input_str, iconv_t cd, ZDIAG &diag, bool flush_state = false);
 
-std::vector<char> zut_encode(const char *input_str, const size_t input_size, iconv_t cd, ZDIAG &diag);
+std::vector<char> zut_encode(const char *input_str, const size_t input_size, iconv_t cd, ZDIAG &diag, bool flush_state = false);
 
 /**
  * @brief Format a vector of strings as a CSV line
