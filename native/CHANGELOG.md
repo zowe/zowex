@@ -6,6 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- `c`: Changed `zowex` and `zowex server` to write log files to the current user's home directory (`~/.zowex/logs`) instead of a location shared by all users of a shared installation. `zowex server` now rolls its log over in FIFO order across up to 10 files capped at 100KB each (~1MB total) instead of truncating a single file. Added support for the `ZOWEX_LOGS_DIR` environment variable to customize the log directory. [#1003](https://github.com/zowe/zowex/issues/1003)
 - `c`: Fixed an issue where the `zowex ds copy` command would fail to allocate DDs when copying PDS members in parallel. [#994](https://github.com/zowe/zowex/issues/994)
 - `c`: Added support for listing APF and PROCLIB data sets to JSON-RPC server.
 - `c`: Optimized Adler32 calculations to compute e-tags incrementally during streamed data set downloads. This significantly reduces memory footprint and resolves a failure when downloading large data sets. [#1016](https://github.com/zowe/zowex/issues/1016)
