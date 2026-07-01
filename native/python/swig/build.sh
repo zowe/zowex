@@ -30,4 +30,4 @@ echo "Building swig..."
 gmake
 
 echo "Packaging swig..."
-cd dist && pax -wvz -f ../swig-${swigVersion}.pax.Z Lib swig
+pax -wvz -f ../swig-${swigVersion}.pax.Z Lib swig

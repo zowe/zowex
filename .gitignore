@@ -4,7 +4,6 @@
 compile_commands.json
 artifacts
 bin
-build
 coverage
 dist
 dumps

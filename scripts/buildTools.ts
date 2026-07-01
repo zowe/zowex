@@ -1223,11 +1223,11 @@ function getLatestTag(repoName: string) {
 }
 
 async function buildSwig(connection: Client) {
-    const buildDir = path.resolve(__dirname, "./../build");
-    fs.mkdirSync(buildDir, { recursive: true });
+    const cacheDir = path.resolve(__dirname, "./../.cache");
+    fs.mkdirSync(cacheDir, { recursive: true });
 
     const swigVersion = getLatestTag("swig/swig").slice(1);
-    const swigTgz = path.join(buildDir, `swig-${swigVersion}.tar.gz`);
+    const swigTgz = path.join(cacheDir, `swig-${swigVersion}.tar.gz`);
     if (!fs.existsSync(swigTgz)) {
         console.log("Downloading SWIG tarball...");
         const response = await fetch(`http://prdownloads.sourceforge.net/swig/swig-${swigVersion}.tar.gz`);
@@ -1235,7 +1235,7 @@ async function buildSwig(connection: Client) {
     }
 
     const pcreVersion = getLatestTag("PCRE2Project/pcre2").split("-").pop();
-    const pcreTgz = path.join(buildDir, `pcre2-${pcreVersion}.tar.gz`);
+    const pcreTgz = path.join(cacheDir, `pcre2-${pcreVersion}.tar.gz`);
     if (!fs.existsSync(pcreTgz)) {
         console.log("Downloading PCRE2 tarball...");
         const response = await fetch(
@@ -1271,8 +1271,8 @@ async function buildSwig(connection: Client) {
         },
     );
     const filename = `swig-${swigVersion}.pax.Z`;
-    await retrieve(connection, [`python/swig/${filename}`], "build", true);
-    console.log(`SWIG package downloaded to build/${filename}`);
+    await retrieve(connection, [`python/swig/${filename}`], "dist", true);
+    console.log(`SWIG package downloaded to dist/${filename}`);
 }
 
 /**
