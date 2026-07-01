@@ -126,6 +126,7 @@ let deployDirs: {
     cTestDir: string;
     pythonDir: string;
     pythonTestDir: string;
+    pythonSwigDir: string;
 };
 
 // python3 -c "import sys; sys.stdout.buffer.write(bytes(range(256)))" \
@@ -1211,6 +1212,69 @@ async function packPrecompiled(connection: Client) {
     console.log("Precompiled bindings downloaded to dist/zbind_bin_dist.tar.gz");
 }
 
+function getLatestTag(repoName: string) {
+    const out = childProcess.execSync(`git ls-remote --tags --refs https://github.com/${repoName}.git`);
+    const tags = [];
+    for (const line of out.toString().trim().split(/\r?\n/)) {
+        const lastSlashIdx = line.lastIndexOf("/");
+        tags.push(line.slice(lastSlashIdx + 1));
+    }
+    return tags.filter((tag) => !tag.includes("beta")).pop();
+}
+
+async function buildSwig(connection: Client) {
+    const cacheDir = path.resolve(__dirname, "./../.cache");
+    fs.mkdirSync(cacheDir, { recursive: true });
+
+    const swigVersion = getLatestTag("swig/swig").slice(1);
+    const swigTgz = path.join(cacheDir, `swig-${swigVersion}.tar.gz`);
+    if (!fs.existsSync(swigTgz)) {
+        console.log("Downloading SWIG tarball...");
+        const response = await fetch(`http://prdownloads.sourceforge.net/swig/swig-${swigVersion}.tar.gz`);
+        fs.writeFileSync(swigTgz, Buffer.from(await response.arrayBuffer()));
+    }
+
+    const pcreVersion = getLatestTag("PCRE2Project/pcre2").split("-").pop();
+    const pcreTgz = path.join(cacheDir, `pcre2-${pcreVersion}.tar.gz`);
+    if (!fs.existsSync(pcreTgz)) {
+        console.log("Downloading PCRE2 tarball...");
+        const response = await fetch(
+            `https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${pcreVersion}/pcre2-${pcreVersion}.tar.gz`,
+        );
+        fs.writeFileSync(pcreTgz, Buffer.from(await response.arrayBuffer()));
+    }
+
+    console.log("Uploading source tarballs...");
+    await new Promise<void>((resolve, reject) => {
+        connection.sftp(async (err, sftpcon) => {
+            if (err) {
+                reject(err);
+                return;
+            }
+            try {
+                await uploadFile(sftpcon, swigTgz, `${deployDirs.pythonSwigDir}/swig-${swigVersion}.tar.gz`, false);
+                await uploadFile(sftpcon, pcreTgz, `${deployDirs.pythonSwigDir}/pcre2-${pcreVersion}.tar.gz`, false);
+                sftpcon.end();
+                resolve();
+            } catch (uploadErr) {
+                reject(uploadErr);
+            }
+        });
+    });
+
+    await runCommandInShell(
+        connection,
+        `cd ${deployDirs.pythonSwigDir} && LDFLAGS='' . build.sh "${swigVersion}" "${pcreVersion}"`,
+        {
+            streamOutput: true,
+            stepName: "Building SWIG for z/OS",
+        },
+    );
+    const filename = `swig-${swigVersion}.pax.Z`;
+    await retrieve(connection, [`python/swig/${filename}`], "dist", true);
+    console.log(`SWIG package downloaded to dist/${filename}`);
+}
+
 /**
  * Checks whether `swig` is available on the remote system using the same PATH
  * the build uses (preBuildCmd is prepended by runCommandInShell). Sets a
@@ -1932,6 +1996,7 @@ async function main() {
         cTestDir: `${config.deployDir}/c/test`,
         pythonDir: `${config.deployDir}/python/bindings`,
         pythonTestDir: `${config.deployDir}/python/bindings/test`,
+        pythonSwigDir: `${config.deployDir}/python/swig`,
     };
     const sshClient = await buildSshClient(config.sshProfile as IProfile);
     await testConnection(sshClient);
@@ -1957,6 +2022,9 @@ async function main() {
                 break;
             case "make":
                 await make(sshClient);
+                break;
+            case "build:swig":
+                await buildSwig(sshClient);
                 break;
             case "has:swig":
                 await hasSwig(sshClient);
