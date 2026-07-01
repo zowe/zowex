@@ -27,10 +27,6 @@
 
 #define ZUT_BPXWDYN_SERVICE_FAILURE -2
 
-typedef int (*DFSMSPGM)(
-    DFSMSdfp_OPT_LIST *PTR32,
-    DFSMSdfp_DD_LIST *PTR32) ATTRIBUTE(amode31);
-
 static const char *const zut_dfsmsdfp_names[] = {
     [ZUTMSDFP_IEBCOPY] = "IEBCOPY",
     [ZUTMSDFP_IEBGENER] = "IEBGENER",
@@ -51,29 +47,40 @@ int ZUTMSDFP(ZDIAG *diag, ZUTMSDFP_UTILITY *utility, DFSMSdfp_OPT_LIST *opts, DF
 
   const char *utility_name = zut_dfsmsdfp_names[*utility];
 
-  DFSMSPGM dyn_dfsms = (DFSMSPGM)load_module31(utility_name);
-
-  if (!dyn_dfsms)
+  // Bring the utility into storage. LOAD keeps it resident across the call below and
+  // yields its entry point with the module's AMODE bit set, which zutm1call24 uses
+  // to enter the utility in its own AMODE.
+  void *PTR64 ep = load_module(utility_name);
+  if (!ep)
   {
     ZDIAG_SET_MSG(diag, "Load failure for program '%.8s', not found", utility_name);
     diag->detail_rc = ZUT_RTNCD_LOAD_FAILURE;
     return RTNCD_FAILURE;
   }
 
-  // below the bar
-  DFSMSdfp_OPT_LIST btb_opts = {0};
-  DFSMSdfp_DD_LIST btb_dd_list = {0};
+  // Below the line: the option list, the ddname list, and the parameter list must all be
+  // 24-bit addressable. This function's DSA is LOC24, so these locals are below the line.
+  DFSMSdfp_OPT_LIST btl_opts = {0};
+  DFSMSdfp_DD_LIST btl_dd_list = {0};
 
   if (opts)
   {
-    memcpy(&btb_opts, opts, sizeof(DFSMSdfp_OPT_LIST));
+    memcpy(&btl_opts, opts, sizeof(DFSMSdfp_OPT_LIST));
   }
   if (ddlist)
   {
-    memcpy(&btb_dd_list, ddlist, sizeof(DFSMSdfp_DD_LIST));
+    memcpy(&btl_dd_list, ddlist, sizeof(DFSMSdfp_DD_LIST));
   }
 
-  rc = dyn_dfsms(&btb_opts, (void *)((uintptr_t)&btb_dd_list.TotalLength | 0x80000000));
+  // Problem-program parameter list (R1) for the utility: the option-list address followed
+  // by the ddname-list address, with the high-order (VL) end-of-list bit set on the last
+  // entry. Built as integer words so the compiler does not strip the VL bit while
+  // sanitizing a pointer argument for the AMODE 31 call.
+  unsigned int parm_list[2];
+  parm_list[0] = (unsigned int)(uintptr_t)&btl_opts;
+  parm_list[1] = (unsigned int)(uintptr_t)&btl_dd_list.TotalLength | 0x80000000U;
+
+  rc = zutm1call24((unsigned int)(uintptr_t)ep, parm_list);
 
   delete_module(utility_name);
 
@@ -320,8 +327,8 @@ int ZUTSRCH(const char *parms)
 
 #pragma prolog(ZUTRUN, " ZWEPROLG NEWDSA=(YES,16),LOC24=YES ")
 #pragma epilog(ZUTRUN, " ZWEEPILG ")
-typedef int (*PGM31)(void *) ATTRIBUTE(amode31);
 typedef int (*PGM64)(void *) ATTRIBUTE(amode64);
+typedef int (*PGM31)(void *) ATTRIBUTE(amode31);
 
 int ZUTRUN(ZDIAG *diag, const char *program, const char *parms)
 {
@@ -345,17 +352,26 @@ int ZUTRUN(ZDIAG *diag, const char *program, const char *parms)
 
     long long unsigned int ifunction = (long long unsigned int)p;
 
-    if (ifunction & 0x00000000000000001ULL)
+    if (ifunction & 0x00000000000000001ULL) // 64-bit
     {
-      ifunction &= 0xFFFFFFFFFFFFFFFEULL; // clear low bit
+      ifunction &= 0xFFFFFFFFFFFFFFFEULL; // clear low (AMODE-64) bit
       PGM64 p64 = (PGM64)ifunction;
       rc = p64(pptr);
     }
-    else
+    else if (ifunction & 0x0000000080000000ULL) // 31-bit
     {
       ifunction &= 0x000000007FFFFFFFULL; // clear high bit
       PGM31 p31 = (PGM31)ifunction;
       rc = p31(pptr);
+    }
+    else // 24-bit
+    {
+      // AMODE 24: route through the 24-bit shim, which enters the program in
+      // its own AMODE (from the entry-point bit) and returns correctly to this
+      // above-the-line caller.
+      unsigned int plist[1];
+      plist[0] = (unsigned int)(uintptr_t)pptr | 0x80000000U; // single parm + VL bit
+      rc = zutm1call24((unsigned int)ifunction, plist);
     }
   }
   else

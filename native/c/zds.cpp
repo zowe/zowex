@@ -393,8 +393,21 @@ static int copy_partitioned(ZDS *zds, const ZDSTypeInfo &sourceInfo, const ZDSTy
     {
       options->member_created = true;
     }
-    control_stmt = "  COPY OUTDD=" + tgt_ddname + ",INDD=" + src_ddname + "\n";
-    control_stmt += "  SELECT MEMBER=((" + sourceInfo.member_name + "," + targetInfo.member_name + replace_flag + "))";
+    if (sourceInfo.member_name == targetInfo.member_name)
+    {
+      // The member-level rename form ((M1,M1,R)) makes IEBCOPY reject the request with
+      // IEB137I ("duplicate member names"). Instead, replace at the data-set level on INDD
+      // and SELECT the member by name.
+      // https://www.ibm.com/docs/en/SSLTBW_2.5.0/pdf/idau100_v2r5.pdf "when performing a selective copy"
+      const std::string indd = options->replace ? "((" + src_ddname + ",R))" : src_ddname;
+      control_stmt = "  COPY OUTDD=" + tgt_ddname + ",INDD=" + indd + "\n";
+      control_stmt += "  SELECT MEMBER=(" + sourceInfo.member_name + ")";
+    }
+    else
+    {
+      control_stmt = "  COPY OUTDD=" + tgt_ddname + ",INDD=" + src_ddname + "\n";
+      control_stmt += "  SELECT MEMBER=((" + sourceInfo.member_name + "," + targetInfo.member_name + replace_flag + "))";
+    }
   }
   else
   {
@@ -1186,6 +1199,13 @@ static int flush_encoding_state(const EncodingSetup &setup, IconvGuard &iconv_gu
  * Encode a single line using the provided encoding setup.
  * Consolidates line encoding logic used in BPAM write functions.
  *
+ * Each line becomes its own data set record, so the shift state is flushed after
+ * every line. This keeps every record self-contained for stateful mixed
+ * SBCS/DBCS encodings (e.g. IBM-1399/IBM-939): the bytes start and end in
+ * single-byte state with balanced shift-out/shift-in. Without the per-line
+ * flush, the closing SI for a DBCS record would leak into the following record,
+ * producing malformed records that fail to convert on read-back.
+ *
  * @param line Line to encode (modified in place)
  * @param setup Encoding setup context
  * @param iconv_guard IconvGuard for encoding conversion
@@ -1201,7 +1221,7 @@ static int encode_line_if_needed(std::string &line, const EncodingSetup &setup, 
 
   try
   {
-    line = zut_encode(line, iconv_guard.get(), diag);
+    line = zut_encode(line, iconv_guard.get(), diag, /*flush_state=*/true);
     return RTNCD_SUCCESS;
   }
   catch (std::exception &e)
@@ -1645,27 +1665,8 @@ static int zds_write_member_bpam(ZDS *zds, const std::string &dsn, const std::st
     }
   }
 
-  // Flush encoding state and append to last line if needed
-  std::vector<char> flush_buffer;
-  rc = flush_encoding_state(encoding, iconv_guard, zds->diag, flush_buffer);
-  if (rc != RTNCD_SUCCESS)
-  {
-    zds_close_output_bpam(zds, ioc);
-    return rc;
-  }
-
-  // Append flush bytes to the last non-empty line
-  if (!flush_buffer.empty() && !lines_to_write.empty())
-  {
-    for (auto it = lines_to_write.rbegin(); it != lines_to_write.rend(); ++it)
-    {
-      if (!it->first.empty())
-      {
-        it->first.append(flush_buffer.begin(), flush_buffer.end());
-        break;
-      }
-    }
-  }
+  // Each line was encoded with its shift state flushed (see encode_line_if_needed),
+  // so every record is already self-contained; no end-of-member flush is needed.
 
   // Now write all the lines
   for (size_t i = 0; i < lines_to_write.size(); i++)
@@ -4264,20 +4265,8 @@ static int zds_write_member_bpam_streamed(ZDS *zds, const std::string &dsn, cons
     }
   }
 
-  // Flush encoding state and append to the last line
-  std::vector<char> flush_buffer;
-  rc = flush_encoding_state(encoding, iconv_guard, zds->diag, flush_buffer);
-  if (rc != RTNCD_SUCCESS)
-  {
-    zds_close_output_bpam(zds, ioc);
-    return rc;
-  }
-
-  // Append flush bytes to the last line
-  if (!flush_buffer.empty() && has_prev_line)
-  {
-    prev_line.append(flush_buffer.begin(), flush_buffer.end());
-  }
+  // Each line was encoded with its shift state flushed (see encode_line_if_needed),
+  // so every record is already self-contained; no end-of-member flush is needed.
 
   // Write the last buffered line
   if (has_prev_line)

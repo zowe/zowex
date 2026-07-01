@@ -13,6 +13,7 @@ import * as fs from "node:fs";
 import { Logger } from "@zowe/imperative";
 import { type ISshSession, SshSession } from "@zowe/zos-uss-for-zowe-sdk";
 import { NodeSSH } from "node-ssh";
+import { ZSshClient } from "../src";
 import { SshErrors } from "../src/SshErrors";
 import { ZSshUtils } from "../src/ZSshUtils";
 
@@ -20,7 +21,7 @@ vi.mock("node:fs", { spy: true });
 
 function setupSftpMocks(
     sftpMock: object,
-    sshMock: { execCommand: ReturnType<typeof vi.fn> },
+    sshMock: { execCommand: ReturnType<typeof vi.fn>; withShell?: ReturnType<typeof vi.fn> },
     options?: { mockGetBinDir?: boolean; mockExistsSync?: boolean },
 ): void {
     vi.spyOn(ZSshUtils as any, "sftp").mockImplementation(
@@ -634,6 +635,195 @@ describe("ZSshUtils", () => {
         it("should throw error when bin directory is not found", () => {
             vi.spyOn(fs, "existsSync").mockReturnValue(false);
             expect(() => (ZSshUtils as any).getBinDir("/")).toThrow("Failed to find bin directory in path");
+        });
+    });
+
+    describe("detectServerOnPath", () => {
+        const mockDetectServerSSH = (
+            expectedServerPathOutput: string,
+            expectedVersion: string | undefined,
+            shouldHaveExecuteAccess: boolean,
+            shellShouldError: boolean = false,
+            expectedShellError: Error | undefined = undefined,
+        ) => {
+            let exitEventHandler: () => void;
+            let errorEventHandler: (err: Error) => void;
+            let dataEventHandler: (strOrBuf: string | Buffer) => void;
+            const mockChannel = vi.mockObject({
+                on: vi.fn().mockImplementation((eventName: string, eventHandler) => {
+                    if (eventName === "exit") {
+                        exitEventHandler = eventHandler;
+                    } else if (eventName === "data") {
+                        dataEventHandler = eventHandler;
+                    } else if (eventName === "error") {
+                        errorEventHandler = eventHandler;
+                    }
+                }),
+                write: vi.fn().mockImplementation((_writeData: string) => {}),
+                end: vi.fn(),
+                closed: false,
+                stdout: { readableEnded: false },
+            });
+
+            const sshMock = {
+                execCommand: vi.fn().mockImplementation((cmd) => {
+                    if (cmd.indexOf("-v") > 0) {
+                        return shouldHaveExecuteAccess
+                            ? { code: 0, stderr: "", stdout: expectedVersion }
+                            : { code: 1, stderr: "No such command, buddy", stdout: "" };
+                    }
+
+                    throw new Error("Unknown command passed to execCommand");
+                }),
+                withShell: vi.fn().mockImplementation(async (shellCallback) => {
+                    const callbackPromise = shellCallback(mockChannel);
+                    dataEventHandler(`user@host$ blahblah\n${expectedServerPathOutput} \n`);
+                    if (shellShouldError) {
+                        errorEventHandler(expectedShellError);
+                    }
+                    if (exitEventHandler) {
+                        exitEventHandler();
+                    }
+
+                    await callbackPromise;
+                }),
+            };
+            vi.spyOn(ZSshUtils as any, "withSsh").mockImplementation(
+                async (_session: any, callback: (ssh: any) => Promise<any>) => {
+                    return await callback(sshMock);
+                },
+            );
+        };
+        it("Should return hasExecutePermission=true and version number if zowex command succeeds", async () => {
+            const expectedServerPath = `/u/users/user/mybins/${ZSshClient.BIN_NAME}`;
+            const expectedVersion = "1.0.0-aefbab";
+            mockDetectServerSSH(expectedServerPath, expectedVersion, true);
+            const session = new SshSession({
+                hostname: "example.com",
+                port: 22,
+                user: "testuser",
+            });
+            const detectResult = await ZSshUtils.detectServerOnPath(session);
+            expect(detectResult).toBeDefined();
+            expect(detectResult.serverPath).toEqual(expectedServerPath);
+            expect(detectResult.hasExecutePermission).toEqual(true);
+            expect(detectResult.version).toEqual(expectedVersion);
+        });
+        it("Should return hasExecutePermission=false if zowex command fails", async () => {
+            const expectedServerPath = `/u/users/user/mybins/${ZSshClient.BIN_NAME}`;
+            mockDetectServerSSH(expectedServerPath, undefined, false);
+            const session = new SshSession({
+                hostname: "example.com",
+                port: 22,
+                user: "testuser",
+            });
+            const detectResult = await ZSshUtils.detectServerOnPath(session);
+            expect(detectResult).toBeDefined();
+            expect(detectResult.serverPath).toEqual(expectedServerPath);
+            expect(detectResult.hasExecutePermission).toEqual(false);
+            expect(detectResult.version).toBeUndefined();
+        });
+        it("Should detect binary not found in output of shell command", async () => {
+            mockDetectServerSSH("Zowe binary not found", undefined, false);
+            const session = new SshSession({
+                hostname: "example.com",
+                port: 22,
+                user: "testuser",
+            });
+            const detectResult = await ZSshUtils.detectServerOnPath(session);
+            expect(detectResult).toBeDefined();
+            expect(detectResult.serverPath).toBeUndefined();
+            expect(detectResult.hasExecutePermission).toEqual(false);
+            expect(detectResult.version).toBeUndefined();
+        });
+        it("Should handle unexpected error message in output of shell command", async () => {
+            mockDetectServerSSH("Eek! Some kinda error that's unexpected", undefined, false);
+            const session = new SshSession({
+                hostname: "example.com",
+                port: 22,
+                user: "testuser",
+            });
+            const detectResult = await ZSshUtils.detectServerOnPath(session);
+            expect(detectResult).toBeDefined();
+            expect(detectResult.serverPath).toBeUndefined();
+            expect(detectResult.hasExecutePermission).toEqual(false);
+            expect(detectResult.version).toBeUndefined();
+        });
+        it("Should reject if the shell throws an error via the on 'error' event handler", async () => {
+            const expectedError = new Error("The shell is bad and it failed");
+            mockDetectServerSSH("", undefined, false, true, expectedError);
+            const session = new SshSession({
+                hostname: "example.com",
+                port: 22,
+                user: "testuser",
+            });
+            await expect(ZSshUtils.detectServerOnPath(session)).rejects.toEqual(expectedError);
+        });
+    });
+
+    describe("lacksWriteAccess", () => {
+        const mockLacksWriteAccessSsh = (shouldExist: boolean, shouldHaveWriteAccess: boolean) => {
+            const sshMock = {
+                execCommand: vi.fn().mockImplementation((cmd) => {
+                    if (cmd.indexOf("-e") > 0) {
+                        return shouldExist ? { code: 0, stderr: "", stdout: "" } : { code: 1, stderr: "", stdout: "" };
+                    } else if (cmd.indexOf("-w") > 0) {
+                        return shouldHaveWriteAccess
+                            ? { code: 0, stderr: "", stdout: "" }
+                            : { code: 1, stderr: "", stdout: "" };
+                    }
+
+                    throw new Error("Unknown command passed to execCommand");
+                }),
+            };
+            vi.spyOn(ZSshUtils as any, "withSsh").mockImplementation(
+                async (_session: any, callback: (ssh: any) => Promise<any>) => {
+                    return await callback(sshMock);
+                },
+            );
+        };
+
+        it("Should return true if the path does exist but the user does NOT have write access to it", async () => {
+            mockLacksWriteAccessSsh(true, false);
+            const session = new SshSession({
+                hostname: "example.com",
+                port: 22,
+                user: "testuser",
+            });
+            const lacksAccess = await ZSshUtils.lacksWriteAccess(session, "fakePath");
+            expect(lacksAccess).toEqual(true);
+        });
+        it("Should return false if the path does exist but the user does INDEED have write access to it", async () => {
+            mockLacksWriteAccessSsh(true, true);
+            const session = new SshSession({
+                hostname: "example.com",
+                port: 22,
+                user: "testuser",
+            });
+            const lacksAccess = await ZSshUtils.lacksWriteAccess(session, "fakePath");
+            expect(lacksAccess).toEqual(false);
+        });
+        it("Should return false if the path does NOT exist even if (for some reason) write access check returns 0", async () => {
+            mockLacksWriteAccessSsh(false, true);
+            const session = new SshSession({
+                hostname: "example.com",
+                port: 22,
+                user: "testuser",
+            });
+            const lacksAccess = await ZSshUtils.lacksWriteAccess(session, "fakePath");
+            expect(lacksAccess).toEqual(false);
+        });
+        it("Should return false if the path does NOT exist and the write access command also fails", async () => {
+            // since if the path does not exist, we don't know whether the user can create the directory without
+            // additional checks
+            mockLacksWriteAccessSsh(false, false);
+            const session = new SshSession({
+                hostname: "example.com",
+                port: 22,
+                user: "testuser",
+            });
+            const lacksAccess = await ZSshUtils.lacksWriteAccess(session, "fakePath");
+            expect(lacksAccess).toEqual(false);
         });
     });
 });
