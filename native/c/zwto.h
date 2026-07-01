@@ -113,12 +113,14 @@ static int wto(WTO_BUF *buf)
   return rc;
 }
 
-#define zwto_debug(...)                                 \
-  {                                                     \
-    WTO_BUF buf = {0};                                  \
-    buf.len = sprintf(buf.msg, "%.*s", 10, "ZWEX0001I ");     \
-    buf.len += sprintf(buf.msg + buf.len, __VA_ARGS__); \
-    wto(&buf);                                          \
+#define zwto_debug(...)                                                        \
+  {                                                                            \
+    WTO_BUF buf = {0};                                                         \
+    buf.len = sprintf(buf.msg, "%.*s", 10, "ZWEX0001I ");                      \
+    buf.len += snprintf(buf.msg + buf.len, sizeof(buf.msg) - buf.len, __VA_ARGS__); \
+    if (buf.len >= (int)sizeof(buf.msg))                                       \
+      buf.len = sizeof(buf.msg) - 1; /* clamp on truncation */                 \
+    wto(&buf);                                                                 \
   }
 
 typedef struct
