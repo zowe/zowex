@@ -54,6 +54,26 @@ inline std::string strip_trailing_slashes(std::string path)
   return path;
 }
 
+// Resolves `path` to an absolute path (relative to the current working
+// directory) if it isn't one already. Some z/OS dynamic allocation services
+// (e.g. the BPXWDYN-based path used by the Metal C logger) require an
+// absolute path to succeed.
+inline std::string to_absolute_path(const std::string &path)
+{
+  if (path.empty() || path[0] == '/')
+  {
+    return path;
+  }
+
+  char cwd[1024] = {0};
+  if (getcwd(cwd, sizeof(cwd)) != nullptr)
+  {
+    return std::string(cwd) + "/" + path;
+  }
+
+  return path;
+}
+
 // Creates each missing directory component of `path`, similar to `mkdir -p`.
 inline bool make_dirs(const std::string &path)
 {
@@ -93,13 +113,14 @@ inline bool make_dirs(const std::string &path)
 }
 
 // Resolves the directory zowex should write log files to. Honors
-// `ZOWEX_LOGS_DIR` if set, otherwise defaults to `<home>/.zowex/logs`.
+// `ZOWEX_LOGS_DIR` if set, otherwise defaults to `<home>/.zowex/logs`
+// Always returns an absolute path
 inline std::string resolve_logs_dir()
 {
   const char *override_dir = std::getenv("ZOWEX_LOGS_DIR");
   if (override_dir && *override_dir)
   {
-    return strip_trailing_slashes(std::string(override_dir));
+    return to_absolute_path(strip_trailing_slashes(std::string(override_dir)));
   }
 
   const std::string home = get_home_dir();
@@ -109,7 +130,7 @@ inline std::string resolve_logs_dir()
   }
 
   // Last resort if the home directory cannot be determined
-  return "logs";
+  return to_absolute_path("logs");
 }
 
 } // namespace zlog_util
