@@ -419,6 +419,14 @@ int zut_free_dynalloc_dds(ZDIAG &diag, const std::vector<std::string> &list);
 int zut_list_apf(ZDIAG &diag, std::vector<std::pair<std::string, std::string>> &apf);
 
 /**
+ * @brief List link list (LNKLST) data sets using ZUTMDYNLQ (CSVDYNL REQUEST=LIST)
+ * @param diag Reference to diagnostic information structure
+ * @param linklist Reference to vector of (dsname, volume) pairs
+ * @return Return code (0 for success, non-zero for error)
+ */
+int zut_list_linklist(ZDIAG &diag, std::vector<std::pair<std::string, std::string>> &linklist);
+
+/**
  * @brief List a parmlib
  * @param diag Reference to diagnostic information structure
  * @param parmlibs Reference to vector of parmlib names

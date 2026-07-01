@@ -227,6 +227,8 @@ void register_system_commands(CommandDispatcher &dispatcher)
                               CommandBuilder(sys::handle_system_list_proclib));
   dispatcher.register_command("listApf",
                               CommandBuilder(sys::handle_system_list_apf));
+  dispatcher.register_command("listLinklist",
+                              CommandBuilder(sys::handle_system_list_linklist));
 }
 
 void register_all_commands(CommandDispatcher &dispatcher)

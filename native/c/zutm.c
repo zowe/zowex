@@ -22,6 +22,7 @@
 #include "zuttype.h"
 #include "zssi.h"
 #include "csvapfaa.h"
+#include "csvdynlst.h"
 #include "zwto.h"
 #include "zdbg.h"
 
@@ -424,6 +425,36 @@ int ZUTMAPFQ(ZDIAG *diag, struct apfhdr *answer, int *answer_len, int *rsn) //, 
     diag->detail_rc = ZUT_RTNCD_SERVICE_FAILURE;
     diag->service_rc = rc;
     diag->service_rsn = *rsn;
+    return RTNCD_FAILURE;
+  }
+
+  return rc;
+}
+
+#pragma prolog(ZUTMDYNQ, " ZWEPROLG NEWDSA=(YES,8) ")
+#pragma epilog(ZUTMDYNQ, " ZWEEPILG ")
+int ZUTMDYNQ(ZDIAG *diag, struct csvdynlst *answer, int *answer_len, int *rsn)
+{
+  int rsn31 = 0;
+  int rc = 0;
+  int answer_len31 = *answer_len;
+
+  rc = zutm1dynl(answer, &answer_len31, &rsn31);
+  *rsn = (rsn31 & 0x0000FFFF);
+
+  if (0 != rc)
+  {
+    if (csvdynlrc___warn == rc)
+    {
+      *rsn = csvdynlrsnnotalldatareturned;
+    }
+    else
+    {
+      ZDIAG_SET_MSG(diag, "CSVDYNL failed with return code '%d' and reason code '%x'", rc, *rsn);
+      diag->detail_rc = ZUT_RTNCD_SERVICE_FAILURE;
+      diag->service_rc = rc;
+      diag->service_rsn = *rsn;
+    }
     return RTNCD_FAILURE;
   }
 

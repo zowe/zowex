@@ -16,6 +16,7 @@
 #include "zprmtype.h"
 #include "iefjsqry.h"
 #include "csvapfaa.h"
+#include "csvdynlst.h"
 
 #if defined(__cplusplus) && defined(__MVS__)
 extern "OS"
@@ -161,6 +162,16 @@ extern "C"
    * @return The return code from the service
    */
   int ZUTMAPFQ(ZDIAG *, struct apfhdr *, int *, int *);
+
+  /**
+   * @brief Query the link list (LNKLST) via CSVDYNL REQUEST=LIST
+   * @param diag The diagnostic structure
+   * @param answer The answer area
+   * @param answer_len The length of the answer area
+   * @param rsn The reason code (csvdynlrsnnotalldatareturned when buffer too small)
+   * @return 0 on success, RTNCD_FAILURE otherwise
+   */
+  int ZUTMDYNQ(ZDIAG *, struct csvdynlst *, int *, int *);
 
   /**
    * @brief List the PLIB datasets

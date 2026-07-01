@@ -716,6 +716,61 @@ int zut_list_apf(ZDIAG &diag, std::vector<std::pair<std::string, std::string>> &
   return rc;
 }
 
+int zut_list_linklist(ZDIAG &diag, std::vector<std::pair<std::string, std::string>> &linklist)
+{
+  int rc = 0;
+  int size = sizeof(struct csvdynlst);
+  struct csvdynlst *answer_fixed = (struct csvdynlst *)__malloc31(size);
+  int answer_len = size;
+  int rsn = 0;
+  rc = ZUTMDYNQ(&diag, answer_fixed, &answer_len, &rsn);
+  if (0 != rc)
+  {
+    if (csvdynlrsnnotalldatareturned == rsn)
+    {
+      int needed_len = answer_fixed->csvdynlsttlen;
+      struct csvdynlst *answer_dynamic = (struct csvdynlst *)__malloc31(needed_len);
+      rc = ZUTMDYNQ(&diag, answer_dynamic, &needed_len, &rsn);
+
+      if (0 != rc)
+      {
+        free(answer_fixed);
+        free(answer_dynamic);
+        return rc;
+      }
+
+      struct csvdynlste *entry = (struct csvdynlste *)((unsigned char *)answer_dynamic + answer_dynamic->csvdynlstofst);
+      for (int i = 0; i < answer_dynamic->csvdynlstnrec; i++)
+      {
+        std::string dsn = std::string((char *)entry->csvdynlstedsn, entry->csvdynlstedsl);
+        std::string volume = std::string((char *)entry->csvdynlstevol, sizeof(entry->csvdynlstevol));
+        linklist.push_back(std::make_pair(dsn, volume));
+        entry = (struct csvdynlste *)((unsigned char *)entry + entry->csvdynlstelen);
+      }
+      free(answer_dynamic);
+    }
+    else
+    {
+      free(answer_fixed);
+      return rc;
+    }
+  }
+  else
+  {
+    struct csvdynlste *entry = (struct csvdynlste *)((unsigned char *)answer_fixed + answer_fixed->csvdynlstofst);
+    for (int i = 0; i < answer_fixed->csvdynlstnrec; i++)
+    {
+      std::string dsn = std::string((char *)entry->csvdynlstedsn, entry->csvdynlstedsl);
+      std::string volume = std::string((char *)entry->csvdynlstevol, sizeof(entry->csvdynlstevol));
+      linklist.push_back(std::make_pair(dsn, volume));
+      entry = (struct csvdynlste *)((unsigned char *)entry + entry->csvdynlstelen);
+    }
+  }
+
+  free(answer_fixed);
+  return rc;
+}
+
 int zut_list_parmlib(ZDIAG &diag, std::vector<std::string> &parmlibs)
 {
   int rc = 0;

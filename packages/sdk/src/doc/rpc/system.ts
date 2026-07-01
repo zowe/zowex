@@ -99,3 +99,27 @@ export interface ListApfResponse extends common.CommandResponse {
      */
     returnedRows: number;
 }
+
+export interface ListLinklstRequest extends common.CommandRequest<"listLinklist"> {}
+
+export interface LinklstDataset {
+    /**
+     * Data set name.
+     */
+    dsname: string;
+    /**
+     * Volume serial.
+     */
+    volume: string;
+}
+
+export interface ListLinklstResponse extends common.CommandResponse {
+    /**
+     * List of link list data sets.
+     */
+    items: LinklstDataset[];
+    /**
+     * Number of rows returned.
+     */
+    returnedRows: number;
+}
