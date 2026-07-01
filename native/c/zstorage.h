@@ -188,8 +188,7 @@ static void *PTR64 storage_get64(int size)
  */
 static void storage_free64(void *PTR64 storage)
 {
-  void *PTR64 temp = storage;
-  IARST64_FREE(storage, temp);
+  IARST64_FREE(storage, storage);
 }
 
 #endif // ZSTORAGE_H

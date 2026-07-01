@@ -263,6 +263,16 @@ void zlogger_tests()
             }
         }); });
 
+  // Note: ZOWEX_LOGS_DIR is only ever read once, when the ZLogger singleton
+  // first constructs (see ZLogger::ZLogger()), so it isn't meaningful to test
+  // re-pointing an already-initialized instance at a new log path here - the
+  // underlying Metal C logger allocates the ZWXLOGDD DD once via ZLGINIT and
+  // never frees it, so a second ZLGINIT call with a different path fails.
+  // ZOWEX_LOGS_DIR coverage lives in server_logger.test.cpp (server::Logger
+  // doesn't have this constraint), and is implicitly exercised here too:
+  // every test above only finds logs/zowex.log because ZOWEX_LOGS_DIR=logs
+  // (set in ztest_runner.cpp) is honored correctly.
+
   // Clean up after all tests
   cleanup_test_files();
 }

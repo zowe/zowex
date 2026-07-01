@@ -24,6 +24,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <iostream>
+#include "../zlog_util.hpp"
 
 namespace server
 {
@@ -32,8 +33,11 @@ class Logger
 private:
   // Buffer size for log messages
   static constexpr size_t LOG_BUFFER_SIZE = 4096;
-  // Maximum log file size before truncation (10MB)
-  static constexpr size_t MAX_LOG_SIZE = 10 * 1024 * 1024;
+  // Maximum size of a single log file before it is rolled over (100KB)
+  static constexpr size_t MAX_LOG_FILE_SIZE = 100 * 1024;
+  // Number of log files retained via FIFO rotation (1 active + up to 9 backups),
+  // bounding total disk usage per user to roughly MAX_LOG_FILES * MAX_LOG_FILE_SIZE (1MB)
+  static constexpr int MAX_LOG_FILES = 10;
 
   static std::ofstream &get_log_file()
   {
@@ -80,9 +84,36 @@ private:
   }
 
   /**
-   * Check log file size and truncate if necessary
+   * Shift existing backup log files (log.1 -> log.2, log.2 -> log.3, ...),
+   * dropping the oldest backup, then move the active log into the log.1 slot.
    */
-  static void check_and_truncate_log_file()
+  static void rotate_log_files()
+  {
+    const auto &log_file_path = get_log_file_path();
+
+    // Drop the oldest backup, if it exists
+    const std::string oldest = log_file_path + "." + std::to_string(MAX_LOG_FILES - 1);
+    unlink(oldest.c_str());
+
+    // Shift remaining backups up by one slot
+    for (int i = MAX_LOG_FILES - 2; i >= 1; i--)
+    {
+      const std::string from = log_file_path + "." + std::to_string(i);
+      const std::string to = log_file_path + "." + std::to_string(i + 1);
+      rename(from.c_str(), to.c_str());
+    }
+
+    // Move the active log into the first backup slot
+    const std::string first_backup = log_file_path + ".1";
+    rename(log_file_path.c_str(), first_backup.c_str());
+  }
+
+  /**
+   * Check log file size and roll over to a new file if necessary, retaining
+   * up to MAX_LOG_FILES generations in FIFO order (oldest backup is dropped
+   * to make room for the newest).
+   */
+  static void check_and_rotate_log_file()
   {
     const auto &log_file_path = get_log_file_path();
     std::ofstream &log_file = get_log_file();
@@ -95,19 +126,30 @@ private:
     struct stat st;
     if (stat(log_file_path.c_str(), &st) == 0)
     {
-      if (static_cast<size_t>(st.st_size) > MAX_LOG_SIZE)
+      if (static_cast<size_t>(st.st_size) > MAX_LOG_FILE_SIZE)
       {
         log_file.close();
 
-        // Reopen the file in truncate mode
+        rotate_log_files();
+
+        // Create/open a fresh active log file with restricted permissions (0600)
+        // 0600 = read/write for the owning user only, no access for anyone else
+        int fd = open(log_file_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0600);
+        if (fd == -1)
+        {
+          std::cerr << "Failed to create log file after rotation: " << log_file_path << std::endl;
+          return;
+        }
+        close(fd);
+
         log_file.open(log_file_path.c_str(), std::ios::out | std::ios::trunc);
         if (!log_file.is_open())
         {
-          std::cerr << "Failed to truncate log file: " << log_file_path << std::endl;
+          std::cerr << "Failed to reopen log file after rotation: " << log_file_path << std::endl;
           return;
         }
 
-        log_file << get_current_timestamp() << " [INFO] Log file truncated due to size limit\n";
+        log_file << get_current_timestamp() << " [INFO] Log file rolled over due to size limit\n";
         log_file.flush();
       }
     }
@@ -127,17 +169,16 @@ private:
 
     log_file << get_current_timestamp() << " [" << level << "] " << buffer << std::endl;
 
-    check_and_truncate_log_file();
+    check_and_rotate_log_file();
   }
 
 public:
   /**
    * Initialize the logger with specified options
-   * @param exec_dir Executable directory (must be provided)
    * @param verbose Whether to enable verbose logging
    * @param truncate Whether to truncate existing log file
    */
-  static void init_logger(const char *exec_dir, bool verbose = false, bool truncate = false)
+  static void init_logger(bool verbose = false, bool truncate = false)
   {
     std::mutex &log_mutex = get_log_mutex();
     std::ofstream &log_file = get_log_file();
@@ -150,10 +191,10 @@ public:
 
       verbose_logging = verbose;
 
-      // Create logs directory
-      const std::string logs_dir = std::string(exec_dir) + "/logs";
+      // Resolve and create the per-user logs directory (honors ZOWEX_LOGS_DIR)
+      const std::string logs_dir = zlog_util::resolve_logs_dir();
 
-      if (mkdir(logs_dir.c_str(), 0700) != 0 && errno != EEXIST)
+      if (!zlog_util::make_dirs(logs_dir))
       {
         std::cerr << "Failed to create logs directory: " << logs_dir << std::endl;
         return;

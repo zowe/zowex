@@ -30,13 +30,19 @@
 #include "zowex.job.server.test.hpp"
 #include "server/worker.test.hpp"
 #include "server/validator.test.hpp"
+#include "server_logger.test.hpp"
 #include "ztest.hpp"
+#include <cstdlib>
 
 using namespace ztst;
 
 #pragma runopts("TRAP(ON,NOSPIE)")
 int main(int argc, char *argv[])
 {
+  // Keep test log output confined to the test working directory rather than
+  // the real user's home directory (the default when ZOWEX_LOGS_DIR is unset)
+  setenv("ZOWEX_LOGS_DIR", "logs", 1);
+
   int rc = tests(
       argc, argv,
       []() -> void
@@ -62,6 +68,7 @@ int main(int argc, char *argv[])
         zowex_job_server_tests();
         server_worker_tests();
         server_validator_tests();
+        server_logger_tests();
       });
 
   return rc;
