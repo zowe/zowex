@@ -13,30 +13,36 @@ CC=xlc
 CXX=xlclang++
 ASM=as
 
-CCMODE_ENV=_CC_CCMODE=1 _CXX_CCMODE=1 _C89_CCMODE=1 _CC_EXTRA_ARGS=1 _CXX_EXTRA_ARGS=1 _C89_EXTRA_ARGS=1
+_CC_CCMODE=1
+_CXX_CCMODE=1
+_C89_CCMODE=1
+_CC_EXTRA_ARGS=1
+_CXX_EXTRA_ARGS=1
+_C89_EXTRA_ARGS=1
+.EXPORT: _CC_CCMODE _CXX_CCMODE _C89_CCMODE _CC_EXTRA_ARGS _CXX_EXTRA_ARGS _C89_EXTRA_ARGS
 
 CC_OPTS=metal,langlvl(extended),sscom,nolongname,inline,genasm,inlrpt,csect,nose,lp64,list,warn64,optimize(2),list,showinc,showmacro,source,aggregate
 CXX_OPTS=lp64,langlvl(extended0x),dll,xplink,exportall
 
-all: run
+all: build-ext
 
 #
 # Metal C
 #
 zmetal.s: zmetal.c zmetal.h
 	@echo 'Building zmetal.s'
-	$(CCMODE_ENV) $(CC) -S -W"c,$(CC_OPTS)" -qlist=zmetal.c.lst -I/usr/include/metal -o $@ $<
+	$(CC) -S -W"c,$(CC_OPTS)" -qlist=zmetal.c.lst -I/usr/include/metal -o $@ zmetal.c
 
 zmetal.o: zmetal.s
 	@echo 'Building zmetal.o'
-	$(CCMODE_ENV) $(ASM) -mrent -a=zmetal.s.lst -ISYS1.MACLIB -ICBC.SCCNSAM -o $@ $<
+	$(ASM) -mrent -a=zmetal.s.lst -ISYS1.MACLIB -ICBC.SCCNSAM -o $@ zmetal.s
 
 #
 # C++ wrapper around the Metal C function
 #
 hello.o: hello.cpp hello.h zmetal.h
 	@echo 'Building hello.o'
-	$(CCMODE_ENV) $(CXX) -W "c,$(CXX_OPTS)" -c -qlist=hello.cpp.lst -o $@ hello.cpp
+	$(CXX) -W "c,$(CXX_OPTS)" -c -qlist=hello.cpp.lst -o $@ hello.cpp
 
 #
 # SWIG wrapper generation
@@ -52,10 +58,6 @@ build-ext: example_wrap.cxx example.cpp example.h setup.py zmetal.o hello.o
 	@echo 'Building Python extension'
 	python setup.py build_ext --inplace
 
-run: build-ext
-	@echo 'Running example'
-	python -c "import example; print(example.hello_ascii('Zowe'))"
-
 clean:
 	rm -f *.o
 	rm -f *.s
@@ -66,4 +68,4 @@ clean:
 	rm -f _example*.so
 	rm -rf build
 
-.PHONY: all build-ext run clean
+.PHONY: all build-ext clean
