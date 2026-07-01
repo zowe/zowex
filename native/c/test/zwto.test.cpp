@@ -59,7 +59,10 @@ void zwto_tests()
              it("clamps oversized text to the buffer and keeps it NUL-terminated",
                 []() -> void
                 {
-                  std::string big(300, 'A');
+                  // Larger than MAX_WTO_TEXT but well within the macro's
+                  // internal scratch buffer (see zwto.h) to isolate the
+                  // buf.msg clamp being tested here.
+                  std::string big(200, 'A');
                   char msg[MAX_WTO_TEXT] = {0};
                   int len = run_debug(big.c_str(), msg);
 
