@@ -24,7 +24,7 @@ _C89_EXTRA_ARGS=1
 CC_OPTS=metal,langlvl(extended),sscom,nolongname,inline,genasm,inlrpt,csect,nose,lp64,list,warn64,optimize(2),list,showinc,showmacro,source,aggregate
 CXX_OPTS=lp64,langlvl(extended0x),dll,xplink,exportall
 
-all: build-ext
+all: test
 
 #
 # Metal C
@@ -49,6 +49,10 @@ hello.o: hello.cpp hello.h zmetal.h
 #
 example_wrap.cxx: example.i example.h
 	@echo 'Generating SWIG wrapper'
+	SWIG_LIB_DIR=$$(swig -swiglib); \
+	if [ ! -d "$$SWIG_LIB_DIR" ]; then \
+		export SWIG_LIB="$$(dirname "$$(command -v swig)")/Lib"; \
+	fi; \
 	swig -c++ -python example.i
 
 #
@@ -57,6 +61,10 @@ example_wrap.cxx: example.i example.h
 build-ext: example_wrap.cxx example.cpp example.h setup.py zmetal.o hello.o
 	@echo 'Building Python extension'
 	python setup.py build_ext --inplace
+
+test: build-ext
+	@echo 'Running example'
+	python -c "import example; print(example.hello_ascii('Zowe'))"
 
 clean:
 	rm -f *.o
@@ -68,4 +76,4 @@ clean:
 	rm -f _example*.so
 	rm -rf build
 
-.PHONY: all build-ext clean
+.PHONY: all build-ext test clean

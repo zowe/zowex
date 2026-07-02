@@ -42,7 +42,5 @@ pax -wvz -f ../swig-${swigVersion}.pax.Z Lib swig
 
 echo "Testing swig..."
 export PATH=$PWD:$PATH
-export SWIG_LIB=$PWD/Lib
 cd ../sample
 make
-python -c "import example; print(example.hello_ascii('Zowe'))"
