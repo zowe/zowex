@@ -6,6 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- `c`: Implemented bounds checking and truncation for strings logged with the `zwto_debug` macro. [#1059](https://github.com/zowe/zowex/pull/1059)
 - `c`: Fixed an issue where data set member write operations did not produce self-contained records for stateful mixed single-byte and double-byte character sets. Now, each record written to a data set member is self-contained to avoid code page conversion errors. [#1049](https://github.com/zowe/zowex/pull/1049)
 - `c`: Fixed an issue where the `zowex ds copy` command would fail to allocate DDs when copying PDS members in parallel. [#994](https://github.com/zowe/zowex/issues/994)
 - `c`: Added support for listing APF and PROCLIB data sets to JSON-RPC server.
