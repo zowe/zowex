@@ -51,7 +51,7 @@ void zut_strip_final_newline(std::string &input)
 static void zut_private_drain_fd(struct pollfd &pfd, std::string &output, pid_t pid);
 static void zut_private_drain_pipes(std::array<struct pollfd, 2> &fds, std::string &stdout_response, std::string &stderr_response, pid_t pid);
 static std::vector<const char *> zut_private_build_env(const std::string &command);
-static void zut_private_extract_linklist_entries(DLAAHDR *answer, std::vector<std::pair<std::string, std::string>> &linklist);
+static void zut_extract_linklist_entries(DLAAHDR *answer, std::vector<std::pair<std::string, std::string>> &linklist);
 
 int zut_private_run_program(const std::string &program, const std::vector<std::string> &args, std::string &stdout_response, std::string &stderr_response, bool merge_streams)
 {
@@ -717,11 +717,7 @@ int zut_list_apf(ZDIAG &diag, std::vector<std::pair<std::string, std::string>> &
   return rc;
 }
 
-// Walks the DLAAHDR answer area returned by ZUTMDYNQ (CSVDYNL REQUEST=LIST): a DLAALS
-// entry per LNKLST set, each pointing to its own chain of DLAADS (data set) entries.
-// Unlike CSVAPF's flat APFHDR/APFE answer area, CSVDLAA links entries via real addresses
-// within the answer area rather than offsets, so no offset arithmetic is needed here.
-static void zut_private_extract_linklist_entries(DLAAHDR *answer, std::vector<std::pair<std::string, std::string>> &linklist)
+static void zut_extract_linklist_entries(DLAAHDR *answer, std::vector<std::pair<std::string, std::string>> &linklist)
 {
   DLAALS *ls = (DLAALS *)answer->dlaahfirstlsaddr;
   for (int i = 0; i < answer->dlaahnumls; i++)
@@ -761,7 +757,7 @@ int zut_list_linklist(ZDIAG &diag, std::vector<std::pair<std::string, std::strin
         return rc;
       }
 
-      zut_private_extract_linklist_entries(answer_dynamic, linklist);
+      zut_extract_linklist_entries(answer_dynamic, linklist);
       free(answer_dynamic);
     }
     else
@@ -772,7 +768,7 @@ int zut_list_linklist(ZDIAG &diag, std::vector<std::pair<std::string, std::strin
   }
   else
   {
-    zut_private_extract_linklist_entries(answer_fixed, linklist);
+    zut_extract_linklist_entries(answer_fixed, linklist);
   }
 
   free(answer_fixed);
