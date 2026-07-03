@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# zx — zowex-over-SSH client.
+# zx — zowex-over-SSH client
 #
 #   zx install [<dir>]                       symlink zx into <dir> (default ~/.local/bin)
 #   zx uninstall [<dir>]                     remove the symlink
