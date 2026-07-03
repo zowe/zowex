@@ -22,7 +22,7 @@
 #include "zuttype.h"
 #include "zssi.h"
 #include "csvapfaa.h"
-#include "csvdynlst.h"
+#include "csvdlaa.h"
 #include "zwto.h"
 #include "zdbg.h"
 
@@ -433,13 +433,13 @@ int ZUTMAPFQ(ZDIAG *diag, struct apfhdr *answer, int *answer_len, int *rsn) //, 
 
 #pragma prolog(ZUTMDYNQ, " ZWEPROLG NEWDSA=(YES,8) ")
 #pragma epilog(ZUTMDYNQ, " ZWEEPILG ")
-int ZUTMDYNQ(ZDIAG *diag, struct csvdynlst *answer, int *answer_len, int *rsn)
+int ZUTMDYNQ(ZDIAG *diag, DLAAHDR *answer, int *answer_len, int *rsn)
 {
   int rsn31 = 0;
   int rc = 0;
   int answer_len31 = *answer_len;
 
-  rc = zutm1dynl(answer, &answer_len31, &rsn31);
+  rc = zutm1dyn(answer, &answer_len31, &rsn31);
   *rsn = (rsn31 & 0x0000FFFF);
 
   if (0 != rc)

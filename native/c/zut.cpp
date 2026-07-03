@@ -51,6 +51,7 @@ void zut_strip_final_newline(std::string &input)
 static void zut_private_drain_fd(struct pollfd &pfd, std::string &output, pid_t pid);
 static void zut_private_drain_pipes(std::array<struct pollfd, 2> &fds, std::string &stdout_response, std::string &stderr_response, pid_t pid);
 static std::vector<const char *> zut_private_build_env(const std::string &command);
+static void zut_private_extract_linklist_entries(DLAAHDR *answer, std::vector<std::pair<std::string, std::string>> &linklist);
 
 int zut_private_run_program(const std::string &program, const std::vector<std::string> &args, std::string &stdout_response, std::string &stderr_response, bool merge_streams)
 {
@@ -716,11 +717,32 @@ int zut_list_apf(ZDIAG &diag, std::vector<std::pair<std::string, std::string>> &
   return rc;
 }
 
+// Walks the DLAAHDR answer area returned by ZUTMDYNQ (CSVDYNL REQUEST=LIST): a DLAALS
+// entry per LNKLST set, each pointing to its own chain of DLAADS (data set) entries.
+// Unlike CSVAPF's flat APFHDR/APFE answer area, CSVDLAA links entries via real addresses
+// within the answer area rather than offsets, so no offset arithmetic is needed here.
+static void zut_private_extract_linklist_entries(DLAAHDR *answer, std::vector<std::pair<std::string, std::string>> &linklist)
+{
+  DLAALS *ls = (DLAALS *)answer->dlaahfirstlsaddr;
+  for (int i = 0; i < answer->dlaahnumls; i++)
+  {
+    DLAADS *ds = (DLAADS *)ls->dlaalsfirstdsaddr;
+    for (int j = 0; j < ls->dlaalsnumds; j++)
+    {
+      std::string dsn = std::string((char *)ds->dlaadsname, ds->dlaadsnamelen);
+      std::string volume = std::string((char *)ds->dlaadsvolid, sizeof(ds->dlaadsvolid));
+      linklist.push_back(std::make_pair(dsn, volume));
+      ds = (DLAADS *)ds->dlaadsnextaddr;
+    }
+    ls = (DLAALS *)ls->dlaalsnextaddr;
+  }
+}
+
 int zut_list_linklist(ZDIAG &diag, std::vector<std::pair<std::string, std::string>> &linklist)
 {
   int rc = 0;
-  int size = sizeof(struct csvdynlst);
-  struct csvdynlst *answer_fixed = (struct csvdynlst *)__malloc31(size);
+  int size = sizeof(DLAAHDR);
+  DLAAHDR *answer_fixed = (DLAAHDR *)__malloc31(size);
   int answer_len = size;
   int rsn = 0;
   rc = ZUTMDYNQ(&diag, answer_fixed, &answer_len, &rsn);
@@ -728,8 +750,8 @@ int zut_list_linklist(ZDIAG &diag, std::vector<std::pair<std::string, std::strin
   {
     if (csvdynlrsnnotalldatareturned == rsn)
     {
-      int needed_len = answer_fixed->csvdynlsttlen;
-      struct csvdynlst *answer_dynamic = (struct csvdynlst *)__malloc31(needed_len);
+      int needed_len = answer_fixed->dlaahtlen;
+      DLAAHDR *answer_dynamic = (DLAAHDR *)__malloc31(needed_len);
       rc = ZUTMDYNQ(&diag, answer_dynamic, &needed_len, &rsn);
 
       if (0 != rc)
@@ -739,14 +761,7 @@ int zut_list_linklist(ZDIAG &diag, std::vector<std::pair<std::string, std::strin
         return rc;
       }
 
-      struct csvdynlste *entry = (struct csvdynlste *)((unsigned char *)answer_dynamic + answer_dynamic->csvdynlstofst);
-      for (int i = 0; i < answer_dynamic->csvdynlstnrec; i++)
-      {
-        std::string dsn = std::string((char *)entry->csvdynlstedsn, entry->csvdynlstedsl);
-        std::string volume = std::string((char *)entry->csvdynlstevol, sizeof(entry->csvdynlstevol));
-        linklist.push_back(std::make_pair(dsn, volume));
-        entry = (struct csvdynlste *)((unsigned char *)entry + entry->csvdynlstelen);
-      }
+      zut_private_extract_linklist_entries(answer_dynamic, linklist);
       free(answer_dynamic);
     }
     else
@@ -757,14 +772,7 @@ int zut_list_linklist(ZDIAG &diag, std::vector<std::pair<std::string, std::strin
   }
   else
   {
-    struct csvdynlste *entry = (struct csvdynlste *)((unsigned char *)answer_fixed + answer_fixed->csvdynlstofst);
-    for (int i = 0; i < answer_fixed->csvdynlstnrec; i++)
-    {
-      std::string dsn = std::string((char *)entry->csvdynlstedsn, entry->csvdynlstedsl);
-      std::string volume = std::string((char *)entry->csvdynlstevol, sizeof(entry->csvdynlstevol));
-      linklist.push_back(std::make_pair(dsn, volume));
-      entry = (struct csvdynlste *)((unsigned char *)entry + entry->csvdynlstelen);
-    }
+    zut_private_extract_linklist_entries(answer_fixed, linklist);
   }
 
   free(answer_fixed);

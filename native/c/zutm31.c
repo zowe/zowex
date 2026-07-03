@@ -20,7 +20,7 @@
 #include "zutcall24.h"
 #include "zwto.h"
 #include "iefzpmap.h"
-#include "csvdynlst.h"
+#include "csvdlaa.h"
 
 typedef int (*ZUTCALL24_FN)(unsigned int ep, void *PTR32 parm_list) ATTRIBUTE(amode31);
 
@@ -158,31 +158,37 @@ int zutm1apf(struct apfhdr *answer, int *answer_len, int *rsn)
 #endif
 
 #if defined(__IBM_METAL__)
-#define CSVDYNL(answer, answer_len, rc, rsn, plist)           \
-  __asm(                                                      \
-      "*                                                  \n" \
-      " LLGT  2,%0                                        \n" \
-      "*                                                  \n" \
-      " CSVDYNL REQUEST=LIST,"                                \
-      "ANSAREA=(2),"                                          \
-      "ANSLEN=(%3),"                                          \
-      "MF=(E,%4)                                          \n" \
-      "*                                                  \n" \
-      " ST 15,%1                                          \n" \
-      " ST 0,%2                                           \n" \
-      "*                                                    " \
-      : "=m"(answer), "=m"(rc), "=m"(rsn)                     \
-      : "r"(answer_len), "m"(plist)                           \
+#define CSVDYNL(answer, answer_len, rc, rsn, plist, listlnkname)   \
+  __asm(                                                          \
+      "*                                                  \n"     \
+      " LLGT  2,%0                                        \n"     \
+      "*                                                  \n"     \
+      " CSVDYNL REQUEST=LIST,"                                    \
+      "ANSAREA=(2),"                                              \
+      "ANSLEN=(%3),"                                              \
+      "LISTLNKNAME=%5,"                                           \
+      "MF=(E,%4)                                          \n"     \
+      "*                                                  \n"     \
+      " ST 15,%1                                          \n"     \
+      " ST 0,%2                                           \n"     \
+      "*                                                    "     \
+      : "=m"(answer), "=m"(rc), "=m"(rsn)                         \
+      : "r"(answer_len), "m"(plist), "m"(listlnkname)             \
       : "r0", "r1", "r2", "r14", "r15");
 #else
-#define CSVDYNL(answer, answer_len, rc, rsn, plist)
+#define CSVDYNL(answer, answer_len, rc, rsn, plist, listlnkname)
 #endif
 
-int zutm1dyn(struct csvdynlst *answer, int *answer_len, int *rsn)
+#pragma prolog(zutm1dyn, " ZWEPROLG NEWDSA=(YES,8) ")
+#pragma epilog(zutm1dyn, " ZWEEPILG ")
+int zutm1dyn(DLAAHDR *answer, int *answer_len, int *rsn)
 {
   int rc = 0;
+  // 16-character field per CSVDYNL's LISTLNKNAME parameter; restricts REQUEST=LIST
+  // to the currently active LNKLST set instead of the default of all defined sets.
+  char *listlnkname = "CURRENT         ";
   CSVDYNL_MODEL(csvdynlm);
-  CSVDYNL(answer, answer_len, rc, *rsn, csvdynlm);
+  CSVDYNL(answer, answer_len, rc, *rsn, csvdynlm, listlnkname);
   return rc;
 }
 

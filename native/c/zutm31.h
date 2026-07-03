@@ -15,12 +15,14 @@
 #include "ztype.h"
 #include "zprmtype.h"
 #include "csvapfaa.h"
-#include "csvdynlst.h"
+#include "csvdlaa.h"
+
+typedef struct dlaahdr DLAAHDR;
 
 int zutm1lpl(ZDIAG *, int *, PARMLIB_DSNS *) ATTRIBUTE(amode31);
 int zutm1gur(char[8]) ATTRIBUTE(amode31);
 int zutm1apf(struct apfhdr *, int *, int *) ATTRIBUTE(amode31);
-int zutm1dyn(struct csvdynlst *, int *, int *) ATTRIBUTE(amode31);
+int zutm1dyn(DLAAHDR *, int *, int *) ATTRIBUTE(amode31);
 
 // Invoke a dynamically loaded module through a below-the-line shim, honoring the
 // module's AMODE (24 or 31) so it returns correctly to this above-the-line caller.
