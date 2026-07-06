@@ -325,7 +325,7 @@ int handle_system_list_linklist(InvocationContext &context)
 {
   int rc = 0;
   ZDIAG diag = {};
-  std::vector<std::pair<std::string, std::string>> linklist;
+  std::vector<ZLinklstEntry> linklist;
   rc = zut_list_linklist(diag, linklist);
   if (0 != rc)
   {
@@ -339,11 +339,17 @@ int handle_system_list_linklist(InvocationContext &context)
 
   for (const auto &entry : linklist)
   {
-    context.output_stream() << setw(44) << left << entry.first << " " << setw(6) << right << entry.second << endl;
+    context.output_stream() << setw(44) << left << entry.dsname << " " << setw(6) << right << entry.volume;
+    if (entry.apf)
+    {
+      context.output_stream() << " APF";
+    }
+    context.output_stream() << endl;
 
     const auto item = obj();
-    item->set("dsname", str(entry.first));
-    item->set("volume", str(entry.second));
+    item->set("dsname", str(entry.dsname));
+    item->set("volume", str(entry.volume));
+    item->set("apf", boolean(entry.apf));
     items->push(item);
   }
 

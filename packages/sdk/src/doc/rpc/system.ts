@@ -100,9 +100,9 @@ export interface ListApfResponse extends common.CommandResponse {
     returnedRows: number;
 }
 
-export interface ListLinklstRequest extends common.CommandRequest<"listLinklist"> {}
+export interface ListLinklistRequest extends common.CommandRequest<"listLinklist"> {}
 
-export interface LinklstDataset {
+export interface LinklistDataSet {
     /**
      * Data set name.
      */
@@ -111,13 +111,17 @@ export interface LinklstDataset {
      * Volume serial.
      */
     volume: string;
+    /**
+     * Whether the data set is APF-authorized.
+     */
+    apf: boolean;
 }
 
-export interface ListLinklstResponse extends common.CommandResponse {
+export interface ListLinklistResponse extends common.CommandResponse {
     /**
      * List of link list data sets.
      */
-    items: LinklstDataset[];
+    items: LinklistDataSet[];
     /**
      * Number of rows returned.
      */

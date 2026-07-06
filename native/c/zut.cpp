@@ -51,7 +51,7 @@ void zut_strip_final_newline(std::string &input)
 static void zut_private_drain_fd(struct pollfd &pfd, std::string &output, pid_t pid);
 static void zut_private_drain_pipes(std::array<struct pollfd, 2> &fds, std::string &stdout_response, std::string &stderr_response, pid_t pid);
 static std::vector<const char *> zut_private_build_env(const std::string &command);
-static void zut_extract_linklist_entries(DLAAHDR *answer, std::vector<std::pair<std::string, std::string>> &linklist);
+static void zut_extract_linklist_entries(DLAAHDR *answer, std::vector<ZLinklstEntry> &linklist);
 
 int zut_private_run_program(const std::string &program, const std::vector<std::string> &args, std::string &stdout_response, std::string &stderr_response, bool merge_streams)
 {
@@ -717,7 +717,7 @@ int zut_list_apf(ZDIAG &diag, std::vector<std::pair<std::string, std::string>> &
   return rc;
 }
 
-static void zut_extract_linklist_entries(DLAAHDR *answer, std::vector<std::pair<std::string, std::string>> &linklist)
+static void zut_extract_linklist_entries(DLAAHDR *answer, std::vector<ZLinklstEntry> &linklist)
 {
   DLAALS *ls = (DLAALS *)answer->dlaahfirstlsaddr;
   for (int i = 0; i < answer->dlaahnumls; i++)
@@ -725,16 +725,18 @@ static void zut_extract_linklist_entries(DLAAHDR *answer, std::vector<std::pair<
     DLAADS *ds = (DLAADS *)ls->dlaalsfirstdsaddr;
     for (int j = 0; j < ls->dlaalsnumds; j++)
     {
-      std::string dsn = std::string((char *)ds->dlaadsname, ds->dlaadsnamelen);
-      std::string volume = std::string((char *)ds->dlaadsvolid, sizeof(ds->dlaadsvolid));
-      linklist.push_back(std::make_pair(dsn, volume));
+      ZLinklstEntry entry;
+      entry.dsname = std::string((char *)ds->dlaadsname, ds->dlaadsnamelen);
+      entry.volume = std::string((char *)ds->dlaadsvolid, sizeof(ds->dlaadsvolid));
+      entry.apf = (ds->dlaadsflags & dlaadsapf) != 0;
+      linklist.push_back(entry);
       ds = (DLAADS *)ds->dlaadsnextaddr;
     }
     ls = (DLAALS *)ls->dlaalsnextaddr;
   }
 }
 
-int zut_list_linklist(ZDIAG &diag, std::vector<std::pair<std::string, std::string>> &linklist)
+int zut_list_linklist(ZDIAG &diag, std::vector<ZLinklstEntry> &linklist)
 {
   int rc = 0;
   int size = sizeof(DLAAHDR);

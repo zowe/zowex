@@ -208,6 +208,8 @@ struct ListProclibRequest {};
 
 struct ListApfRequest {};
 
+struct ListLinklistRequest {};
+
 struct ToolSearchRequest {};
 ZJSON_SCHEMA(ToolSearchRequest,
     FIELD_REQUIRED(dsname, STRING),

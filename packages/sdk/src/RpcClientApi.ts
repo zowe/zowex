@@ -60,7 +60,7 @@ export abstract class RpcClientApi implements IRpcClient {
         viewSyslog: this.rpc<system.ViewSyslogRequest, system.ViewSyslogResponse>("viewSyslog"),
         listProclib: this.rpc<system.ListProclibRequest, system.ListProclibResponse>("listProclib"),
         listApf: this.rpc<system.ListApfRequest, system.ListApfResponse>("listApf"),
-        listLinklist: this.rpc<system.ListLinklstRequest, system.ListLinklstResponse>("listLinklist"),
+        listLinklist: this.rpc<system.ListLinklistRequest, system.ListLinklistResponse>("listLinklist"),
     };
 
     public tool = {
