@@ -1,11 +1,11 @@
 ---
 name: zowex-ssh
-description: Deploy and use the zowex JSON-RPC server on a z/OS host over SSH when z/OSMF is unavailable. Use when the user asks to "connect to <host> over ssh", "deploy zowex", "use zowex on <lpar>", or wants dataset/job/USS operations on a system without a working `zowe` CLI / z/OSMF endpoint.
+description: Deploy and operate the zowex JSON-RPC server on a *remote* z/OS host over SSH, for end-user dataset/job/USS operations when that host has no working z/OSMF endpoint. Use when the user asks to "connect to <host> over ssh", "deploy zowex to <lpar>", or "use zowex on <lpar>" to work with a remote system's datasets, jobs, or USS files. Not for building/testing this repo's own native code — that uses `npm run z:rebuild` / `npm run z:test`.
 ---
 
 # zowex over SSH — deploy and operate
 
-This skill replaces the `zowe` CLI (z/OSMF REST) with the **zowex** native backend driven over SSH stdio. Use it when the target z/OS system has SSH but no z/OSMF.
+This skill is an alternative to the `zowe` CLI (z/OSMF REST): it uses the **zowex** native backend driven over SSH stdio instead. Use it when the target z/OS system has SSH but no z/OSMF. It's for operating on a remote target host's datasets/jobs/USS — unrelated to building or testing this repo's own native code, which uses `npm run z:rebuild` / `npm run z:test`.
 
 Everything below uses two shell variables you should set once per target:
 
@@ -16,7 +16,7 @@ ZX_DIR=/u/$USER/zowex      # remote deploy dir; pick anything the user can write
 
 If the user gives only a hostname, ask for (or infer) the SSH user and a writable USS directory.
 
-**Local prereqs:** `ssh`, `sftp`, `jq`, `base64`, bash ≥3.2, and `curl` or `wget`. Run `.claude/skills/zowex-ssh/zx check` to verify. (`jq` is the only one not stock on macOS — `brew install jq`.)
+**Local prereqs:** `ssh`, `sftp`, `jq`, `base64`, bash ≥3.2, and `curl` or `wget`. Run `.agents/skills/zowex-ssh/zx check` to verify. (`jq` is the only one not stock on macOS — if it's missing, ask the user to install it via their package manager, e.g. Homebrew on macOS, before continuing.)
 **Remote prereqs:** SSH login + a writable USS directory. The `zowex` binary is self-contained.
 **Bundle:** `zx deploy` will auto-download the latest `server.pax.Z` from [github.com/zowe/zowex/releases](https://github.com/zowe/zowex/releases) if it isn't found locally. Default save path is `~/.local/share/zx/server.pax.Z` (always user-writable, works whether `zx` is run directly or via a PATH symlink). Downloads automatically without prompting. To pin a specific version or path, set `ZX_PAX=/path/to/the.pax.Z`. Set `GITHUB_TOKEN` if the API is rate-limited on a shared corporate IP.
 
@@ -27,8 +27,8 @@ If the user gives only a hostname, ask for (or infer) the SSH user and a writabl
 Run once to symlink the helper into `~/.local/bin` (created if absent):
 
 ```bash
-.claude/skills/zowex-ssh/zx install          # -> ~/.local/bin/zx  (default)
-.claude/skills/zowex-ssh/zx install ~/bin    # -> ~/bin/zx          (custom dir)
+.agents/skills/zowex-ssh/zx install          # -> ~/.local/bin/zx  (default)
+.agents/skills/zowex-ssh/zx install ~/bin    # -> ~/bin/zx          (custom dir)
 ```
 
 `zx install` prints an `export PATH=...` line if the target directory isn't already on your PATH — paste it into your shell profile (`~/.zshrc`, `~/.bashrc`, etc.).
@@ -98,7 +98,7 @@ The CLI also exposes `console` / `tso` / `system` / `tool` subcommands — run `
 ### 2a · The `zx` helper (preferred)
 
 ```bash
-zx=.claude/skills/zowex-ssh/zx     # or alias/symlink it onto PATH
+zx=.agents/skills/zowex-ssh/zx     # or alias/symlink it onto PATH
 
 $zx deploy user@host [/remote/dir]   # one-time per host (idempotent); also saves config
 $zx ds list "SYS1.*"                 # works immediately — auto one-shot
