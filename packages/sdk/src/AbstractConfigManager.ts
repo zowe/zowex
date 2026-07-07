@@ -318,6 +318,9 @@ export abstract class AbstractConfigManager {
             secure.push("password");
         }
 
+        // Ensure the global config layer (and its schema) exists before persisting to it; no-ops if it already does
+        await this.createZoweSchema(true);
+
         const teamConfig = this.mProfilesCache.getTeamConfig();
         const configApi = teamConfig.api;
         const previousLayer = teamConfig.layerActive();
@@ -466,10 +469,9 @@ export abstract class AbstractConfigManager {
             config.setSchema(ConfigSchema.buildSchema(profSchemas));
 
             // Note: IConfigBuilderOpts not exported
-            // const opts: IConfigBuilderOpts = {
             const opts: IConfigBuilderOpts = {
                 // getSecureValue: this.promptForProp.bind(this),
-                populateProperties: true,
+                populateProperties: false,
             };
             // Build new config and merge with existing layer
             const baseProfSchema = profSchemas.find((schema) => schema.type === "base");

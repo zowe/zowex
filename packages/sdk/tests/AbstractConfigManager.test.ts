@@ -1741,6 +1741,26 @@ describe("AbstractConfigManager", async () => {
             };
             testManager = new TestAbstractConfigManager(profCache);
             vi.spyOn((testManager as any).mProfilesCache, "getTeamConfig").mockReturnValue(mockTeamConfig);
+            vi.spyOn(testManager as any, "createZoweSchema").mockImplementation(() => {});
+        });
+
+        it("ensures the global config schema exists before persisting the profile", async () => {
+            vi.spyOn(SshConfigUtils, "findPrivateKeys").mockResolvedValueOnce([]);
+            vi.spyOn(testManager as any, "validateConfig").mockResolvedValueOnce({});
+            const createZoweSchemaSpy = (testManager as any).createZoweSchema;
+            const host: ISshConfigExt = {
+                name: "myhost",
+                hostname: "example.com",
+                privateKey: "/home/user/.ssh/id_myhost",
+            };
+
+            await (testManager as any).createProfileFromSshConfigHost(host);
+
+            expect(createZoweSchemaSpy).toHaveBeenCalledWith(true);
+            // Schema must be ensured before the profile is persisted
+            expect(createZoweSchemaSpy.mock.invocationCallOrder[0]).toBeLessThan(
+                mockProfiles.set.mock.invocationCallOrder[0],
+            );
         });
 
         it("stores only sshLink when the IdentityFile authenticates successfully", async () => {
