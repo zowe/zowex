@@ -17,6 +17,7 @@
 #include <cctype>
 #include <iomanip>
 #include <cstdio>
+#include <ctime>
 #include <unistd.h>
 #include <stdio.h>
 #include "iazbtokp.h"
@@ -448,19 +449,48 @@ int zjb_read_syslog(ZJB *zjb, ZJBSyslogOptions &opts, ZJBSyslogResponse &respons
 
   if (rc == 0 && !response.data.empty())
   {
-    char ebcdic_date_formatted[8 + 1 + 1 + 1] = {}; // date + hypens + null
-    snprintf(&ebcdic_date_formatted[0], sizeof(ebcdic_date_formatted), "%.4s-%.2s-%.2s", zds.ebcdic_date, 4 + zds.ebcdic_date, 6 + zds.ebcdic_date);
-    response.end_date = std::string(ebcdic_date_formatted);
-
-    //
-    // Inverse of the ts_binary pack above: read the same 4 bytes, then undo local→UTC (uint32 wrap).
-    //
+    // Undo UTC->local in signed arithmetic; uint32 wraparound doesn't align to a day boundary.
+    const int32_t CS_PER_DAY = 24 * 360000;
     uint32_t utc_cs = 0;
     memcpy(&utc_cs, &zds.ts_binary, sizeof(utc_cs));
-    uint32_t local_cs = utc_cs + (uint32_t)tz_offset_cs;
-    unsigned end_hh = local_cs / 360000U;
-    unsigned end_mm = (local_cs / 6000U) % 60U;
-    unsigned end_ss = (local_cs / 100U) % 60U;
+    int32_t local_cs = (int32_t)utc_cs + tz_offset_cs;
+
+    // Normalize into [0, CS_PER_DAY) and track midnight crossings for the date adjustment.
+    int day_shift = 0;
+    while (local_cs < 0)
+    {
+      local_cs += CS_PER_DAY;
+      day_shift--;
+    }
+    while (local_cs >= CS_PER_DAY)
+    {
+      local_cs -= CS_PER_DAY;
+      day_shift++;
+    }
+
+    unsigned end_hh = local_cs / 360000;
+    unsigned end_mm = (local_cs / 6000) % 60;
+    unsigned end_ss = (local_cs / 100) % 60;
+
+    char ebcdic_date_formatted[8 + 1 + 1 + 1] = {}; // date + hyphens + null
+    if (day_shift != 0)
+    {
+      // mktime normalizes the out-of-range day across month/year/leap-year boundaries.
+      int year = 0, month = 0, day = 0;
+      sscanf((const char *)zds.ebcdic_date, "%4d%2d%2d", &year, &month, &day);
+      struct tm t = {};
+      t.tm_year = year - 1900;
+      t.tm_mon = month - 1;
+      t.tm_mday = day + day_shift;
+      t.tm_hour = 12; // noon keeps any DST/boundary effects away from the date
+      mktime(&t);
+      snprintf(ebcdic_date_formatted, sizeof(ebcdic_date_formatted), "%04d-%02d-%02d", t.tm_year + 1900, t.tm_mon + 1, t.tm_mday);
+    }
+    else
+    {
+      snprintf(ebcdic_date_formatted, sizeof(ebcdic_date_formatted), "%.4s-%.2s-%.2s", zds.ebcdic_date, 4 + zds.ebcdic_date, 6 + zds.ebcdic_date);
+    }
+    response.end_date = std::string(ebcdic_date_formatted);
     // NOTE(Kelosky): centiseconds is not used for the end time because it cannot be used for input
     // unsigned end_cs = local_cs % 100U;
     char end_time_buf[16] = {};

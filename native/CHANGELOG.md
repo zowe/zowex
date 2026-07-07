@@ -6,6 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- `c`: Implemented bounds checking and truncation for strings logged with the `zwto_debug` macro. [#1059](https://github.com/zowe/zowex/pull/1059)
 - `c`: Fixed an issue where data set member write operations did not produce self-contained records for stateful mixed single-byte and double-byte character sets. Now, each record written to a data set member is self-contained to avoid code page conversion errors. [#1049](https://github.com/zowe/zowex/pull/1049)
 - `c`: Fixed an issue where the `zowex ds copy` command would fail to allocate DDs when copying PDS members in parallel. [#994](https://github.com/zowe/zowex/issues/994)
 - `c`: Added support for listing APF and PROCLIB data sets to JSON-RPC server.
@@ -24,6 +25,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 - `c`: Improved error message when deleting a member fails because its parent PDS is open in ISPF. [#916](https://github.com/zowe/zowe-native-proto/issues/916)
 - `c`: Fixed an issue where incorrect values could be returned for the `usedp` (Used Space) and `volsers` (Volumes) attributes when listing data sets. [#981](https://github.com/zowe/zowex/pull/981)
 - `c`: Fixed an issue where invalid data could be returned for attributes of PDS members. [#1009](https://github.com/zowe/zowex/issues/1009)
+- `c`: Fixed an issue where `zowex system view-syslog` could display invalid end time. [#1017](https://github.com/zowe/zowex/issues/1017)
 
 ## `0.6.0`
 
