@@ -251,11 +251,10 @@ export abstract class AbstractConfigManager {
     }
 
     /**
-     * Creates a new "ssh-config" profile in team config that points at a migrated `~/.ssh/config` host,
-     * naming the profile after the host so it can be resolved back to that `~/.ssh/config` entry by name,
-     * and handling the three possible authentication scenarios:
+     * Creates a new "ssh-config" profile in team config that points at a migrated `~/.ssh/config` host via
+     * the `sshLink` property, and handling the three possible authentication scenarios:
      *  1. The host declares `IdentityFile` in `~/.ssh/config` (`host.privateKey` is set) and it authenticates
-     *     successfully — no extra profile properties are needed, since the profile name alone resolves the
+     *     successfully — no extra profile properties beyond `sshLink` are needed, since it alone resolves the
      *     identity file at connection time.
      *  2. `IdentityFile` is missing or fails to authenticate, but a private key found under `~/.ssh/` does —
      *     its path is stored as `privateKey`.
@@ -270,8 +269,12 @@ export abstract class AbstractConfigManager {
      * @returns The newly created profile, or `undefined` if the user cancelled the password prompt
      */
     public async createProfileFromSshConfigHost(host: ISshConfigExt): Promise<IProfileLoaded | undefined> {
-        const profileName = host.name!;
-        const properties: { privateKey?: string; keyPassphrase?: string; password?: string } = {};
+        // The profile name can't contain dots (they're the team config JSON path separator), but sshLink
+        // must retain the original ~/.ssh/config Host alias verbatim so it can be looked up later.
+        const profileName = host.name!.replace(/\./g, "_");
+        const properties: { sshLink: string; privateKey?: string; keyPassphrase?: string; password?: string } = {
+            sshLink: host.name!,
+        };
         const secure: string[] = [];
 
         const privateKeyCandidates = Array.from(
