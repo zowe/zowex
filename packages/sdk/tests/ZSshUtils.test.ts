@@ -14,6 +14,7 @@ import { Logger } from "@zowe/imperative";
 import { type ISshSession, SshSession } from "@zowe/zos-uss-for-zowe-sdk";
 import { NodeSSH } from "node-ssh";
 import { ZSshClient } from "../src";
+import { SshConfigUtils } from "../src/SshConfigUtils";
 import { SshErrors } from "../src/SshErrors";
 import { ZSshUtils } from "../src/ZSshUtils";
 
@@ -551,6 +552,85 @@ describe("ZSshUtils", () => {
             expect(session.ISshSession.privateKey).toBe("/path/to/key");
             expect(session.ISshSession.keyPassphrase).toBe("passphrase");
             expect(session.ISshSession.password).toBeUndefined();
+        });
+
+        it("should build session from ~/.ssh/config when sshConfig is provided", () => {
+            const findSshConfigHostSpy = vi.spyOn(SshConfigUtils, "findSshConfigHost").mockReturnValue({
+                name: "myhost",
+                hostname: "example.com",
+                port: 2222,
+                user: "configuser",
+                privateKey: "/path/to/config/key",
+                handshakeTimeout: 5000,
+            });
+
+            const profile = {
+                sshConfig: "myhost",
+                password: "mypassword",
+            };
+            const session = ZSshUtils.buildSession(profile, "myhost");
+            expect(findSshConfigHostSpy).toHaveBeenCalledWith("myhost");
+            expect(session.ISshSession.hostname).toBe("example.com");
+            expect(session.ISshSession.port).toBe(2222);
+            expect(session.ISshSession.user).toBe("configuser");
+            expect(session.ISshSession.privateKey).toBe("/path/to/config/key");
+            expect(session.ISshSession.handshakeTimeout).toBe(5000);
+            // Secrets are not stored in ~/.ssh/config, so they still come from the profile
+            expect(session.ISshSession.password).toBeUndefined(); // privateKey takes precedence
+        });
+
+        it("should fall back to ~/.ssh/config fields not defined on the profile", () => {
+            vi.spyOn(SshConfigUtils, "findSshConfigHost").mockReturnValue({
+                name: "myhost",
+                hostname: "example.com",
+            });
+
+            const profile = {
+                sshConfig: "myhost",
+                port: 2200,
+                user: "fallbackuser",
+                password: "mypassword",
+            };
+            const session = ZSshUtils.buildSession(profile, "myhost");
+            expect(session.ISshSession.hostname).toBe("example.com");
+            expect(session.ISshSession.port).toBe(2200);
+            expect(session.ISshSession.user).toBe("fallbackuser");
+            expect(session.ISshSession.password).toBe("mypassword");
+        });
+
+        it("should let team config properties override the matched ~/.ssh/config host on conflict", () => {
+            vi.spyOn(SshConfigUtils, "findSshConfigHost").mockReturnValue({
+                name: "myhost",
+                hostname: "sshconfig-host.com",
+                port: 2222,
+                user: "sshconfiguser",
+                privateKey: "/path/to/sshconfig/key",
+                handshakeTimeout: 5000,
+            });
+
+            const profile = {
+                sshConfig: "myhost",
+                host: "teamconfig-host.com",
+                port: 2299,
+                user: "teamconfiguser",
+                privateKey: "/path/to/teamconfig/key",
+                handshakeTimeout: 9999,
+            };
+            const session = ZSshUtils.buildSession(profile, "myhost");
+            expect(session.ISshSession.hostname).toBe("teamconfig-host.com");
+            expect(session.ISshSession.port).toBe(2299);
+            expect(session.ISshSession.user).toBe("teamconfiguser");
+            expect(session.ISshSession.privateKey).toBe("/path/to/teamconfig/key");
+            expect(session.ISshSession.handshakeTimeout).toBe(9999);
+        });
+
+        it("should throw when sshConfig is provided but no matching Host entry is found", () => {
+            vi.spyOn(SshConfigUtils, "findSshConfigHost").mockReturnValue(undefined);
+
+            const profile = {
+                sshConfig: "missinghost",
+            };
+            expect(() => ZSshUtils.buildSession(profile, "missinghost")).toThrow(/missinghost/);
         });
     });
 

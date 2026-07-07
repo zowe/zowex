@@ -240,3 +240,68 @@ Host server
         expect(result[0].privateKey).toBe(normalize("/var/lib/ssh/key"));
     });
 });
+
+describe("findSshConfigHost", () => {
+    const mockReadFileSync = readFileSync as ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it("should return undefined when config file does not exist", () => {
+        mockReadFileSync.mockImplementation(() => {
+            throw new Error("File not found");
+        });
+
+        expect(SshConfigUtils.findSshConfigHost("myserver")).toBeUndefined();
+    });
+
+    it("should return undefined when no Host entry matches", () => {
+        const configContent = `
+Host myserver
+    HostName example.com
+`;
+        mockReadFileSync.mockReturnValue(configContent);
+
+        expect(SshConfigUtils.findSshConfigHost("otherserver")).toBeUndefined();
+    });
+
+    it("should find and parse the matching Host entry", () => {
+        const configContent = `
+Host server1
+    HostName host1.example.com
+    User user1
+
+Host server2
+    HostName host2.example.com
+    Port 2222
+    User user2
+    IdentityFile ~/.ssh/id_server2
+    ConnectTimeout 15
+`;
+        mockReadFileSync.mockReturnValue(configContent);
+
+        const result = SshConfigUtils.findSshConfigHost("server2");
+        expect(result).toMatchObject({
+            name: "server2",
+            hostname: "host2.example.com",
+            port: 2222,
+            user: "user2",
+            privateKey: normalize(join("/home/dir", ".ssh", "id_server2")),
+            handshakeTimeout: 15000,
+        });
+    });
+
+    it("should match a Host entry with multiple aliases", () => {
+        const configContent = `
+Host alias1 alias2 alias3
+    HostName example.com
+`;
+        mockReadFileSync.mockReturnValue(configContent);
+
+        expect(SshConfigUtils.findSshConfigHost("alias2")).toMatchObject({
+            name: "alias2",
+            hostname: "example.com",
+        });
+    });
+});

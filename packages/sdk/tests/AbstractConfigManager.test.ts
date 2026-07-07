@@ -1723,6 +1723,183 @@ describe("AbstractConfigManager", async () => {
             );
         });
     });
+    describe("createProfileFromSshConfigHost", () => {
+        let testManager: TestAbstractConfigManager;
+        let mockTeamConfig: any;
+        let mockConfigApi: any;
+        let mockLayers: any;
+        let mockProfiles: any;
+
+        beforeEach(async () => {
+            mockLayers = { write: vi.fn(), activate: vi.fn() };
+            mockProfiles = { set: vi.fn() };
+            mockConfigApi = { layers: mockLayers, profiles: mockProfiles };
+            mockTeamConfig = {
+                api: mockConfigApi,
+                save: vi.fn(),
+                layerActive: vi.fn().mockReturnValue({ user: false, global: false }),
+            };
+            testManager = new TestAbstractConfigManager(profCache);
+            vi.spyOn((testManager as any).mProfilesCache, "getTeamConfig").mockReturnValue(mockTeamConfig);
+        });
+
+        it("stores no extra properties when the IdentityFile authenticates successfully", async () => {
+            vi.spyOn(SshConfigUtils, "findPrivateKeys").mockResolvedValueOnce([]);
+            const validateConfigSpy = vi.spyOn(testManager as any, "validateConfig").mockResolvedValueOnce({});
+            const host: ISshConfigExt = {
+                name: "myhost",
+                hostname: "example.com",
+                privateKey: "/home/user/.ssh/id_myhost",
+            };
+
+            const result = await (testManager as any).createProfileFromSshConfigHost(host);
+
+            expect(validateConfigSpy).toHaveBeenCalledWith({ ...host, privateKey: "/home/user/.ssh/id_myhost" }, false);
+            expect(mockProfiles.set).toHaveBeenCalledWith("myhost", {
+                type: "ssh-config",
+                properties: {},
+                secure: [],
+            });
+            expect(mockLayers.write).toHaveBeenCalled();
+            expect(mockTeamConfig.save).not.toHaveBeenCalled();
+            expect(result).toEqual({
+                name: "myhost",
+                message: "",
+                failNotFound: false,
+                type: "ssh-config",
+                profile: {},
+            });
+        });
+
+        it("activates the global layer before persisting and restores the previously active layer afterward", async () => {
+            vi.spyOn(SshConfigUtils, "findPrivateKeys").mockResolvedValueOnce([]);
+            vi.spyOn(testManager as any, "validateConfig").mockResolvedValueOnce({});
+            mockTeamConfig.layerActive.mockReturnValue({ user: true, global: false });
+            const host: ISshConfigExt = {
+                name: "myhost",
+                hostname: "example.com",
+                privateKey: "/home/user/.ssh/id_myhost",
+            };
+
+            await (testManager as any).createProfileFromSshConfigHost(host);
+
+            expect(mockLayers.activate).toHaveBeenNthCalledWith(1, false, true);
+            expect(mockLayers.activate).toHaveBeenNthCalledWith(2, true, false);
+            // The profile must be written while the global layer is active, before it's restored
+            expect(mockProfiles.set.mock.invocationCallOrder[0]).toBeLessThan(
+                mockLayers.activate.mock.invocationCallOrder[1],
+            );
+        });
+
+        it("falls back to a private key found on disk when the IdentityFile fails to authenticate", async () => {
+            vi.spyOn(SshConfigUtils, "findPrivateKeys").mockResolvedValueOnce(["/home/user/.ssh/id_rsa"]);
+            const validateConfigSpy = vi
+                .spyOn(testManager as any, "validateConfig")
+                .mockResolvedValueOnce(undefined) // IdentityFile candidate fails
+                .mockResolvedValueOnce({}); // found key on disk succeeds
+            const host: ISshConfigExt = {
+                name: "myhost",
+                hostname: "example.com",
+                privateKey: "/home/user/.ssh/id_myhost",
+            };
+
+            await (testManager as any).createProfileFromSshConfigHost(host);
+
+            expect(validateConfigSpy).toHaveBeenNthCalledWith(
+                1,
+                { ...host, privateKey: "/home/user/.ssh/id_myhost" },
+                false,
+            );
+            expect(validateConfigSpy).toHaveBeenNthCalledWith(
+                2,
+                { ...host, privateKey: "/home/user/.ssh/id_rsa" },
+                false,
+            );
+            // The non-working IdentityFile key must never be persisted alongside the working one
+            expect(mockProfiles.set).toHaveBeenCalledWith("myhost", {
+                type: "ssh-config",
+                properties: { privateKey: "/home/user/.ssh/id_rsa" },
+                secure: [],
+            });
+        });
+
+        it("stores privateKey when no IdentityFile is set but a key found on disk authenticates", async () => {
+            vi.spyOn(SshConfigUtils, "findPrivateKeys").mockResolvedValueOnce(["/home/user/.ssh/id_rsa"]);
+            vi.spyOn(testManager as any, "validateConfig").mockResolvedValueOnce({});
+            const host: ISshConfigExt = { name: "myhost", hostname: "example.com" };
+
+            await (testManager as any).createProfileFromSshConfigHost(host);
+
+            expect(mockProfiles.set).toHaveBeenCalledWith("myhost", {
+                type: "ssh-config",
+                properties: { privateKey: "/home/user/.ssh/id_rsa" },
+                secure: [],
+            });
+            expect(mockLayers.write).toHaveBeenCalled();
+        });
+
+        it("stores a discovered keyPassphrase securely when the working key needs one", async () => {
+            vi.spyOn(SshConfigUtils, "findPrivateKeys").mockResolvedValueOnce(["/home/user/.ssh/id_rsa"]);
+            vi.spyOn(testManager as any, "validateConfig").mockResolvedValueOnce({ keyPassphrase: "secretPass" });
+            const host: ISshConfigExt = { name: "myhost", hostname: "example.com" };
+
+            await (testManager as any).createProfileFromSshConfigHost(host);
+
+            expect(mockProfiles.set).toHaveBeenCalledWith("myhost", {
+                type: "ssh-config",
+                properties: { privateKey: "/home/user/.ssh/id_rsa", keyPassphrase: "secretPass" },
+                secure: ["keyPassphrase"],
+            });
+            expect(mockTeamConfig.save).toHaveBeenCalled();
+        });
+
+        it("prompts for a password when a found private key fails to authenticate", async () => {
+            vi.spyOn(SshConfigUtils, "findPrivateKeys").mockResolvedValueOnce(["/home/user/.ssh/id_rsa"]);
+            vi.spyOn(testManager as any, "validateConfig").mockResolvedValueOnce(undefined);
+            vi.spyOn(testManager as any, "promptForPassword").mockResolvedValueOnce({ password: "secretPW" });
+            const host: ISshConfigExt = { name: "myhost", hostname: "example.com" };
+
+            const result = await (testManager as any).createProfileFromSshConfigHost(host);
+
+            // The private key that failed to authenticate must never be persisted
+            expect(mockProfiles.set).toHaveBeenCalledWith("myhost", {
+                type: "ssh-config",
+                properties: { password: "secretPW" },
+                secure: ["password"],
+            });
+            expect(result?.profile.password).toBe("secretPW");
+            expect(result?.profile.privateKey).toBeUndefined();
+        });
+
+        it("prompts for a password and stores it as secure when no private key is found", async () => {
+            vi.spyOn(SshConfigUtils, "findPrivateKeys").mockResolvedValueOnce([]);
+            vi.spyOn(testManager as any, "promptForPassword").mockResolvedValueOnce({ password: "secretPW" });
+            const host: ISshConfigExt = { name: "myhost", hostname: "example.com" };
+
+            const result = await (testManager as any).createProfileFromSshConfigHost(host);
+
+            expect(mockProfiles.set).toHaveBeenCalledWith("myhost", {
+                type: "ssh-config",
+                properties: { password: "secretPW" },
+                secure: ["password"],
+            });
+            expect(mockTeamConfig.save).toHaveBeenCalled();
+            expect(mockLayers.write).not.toHaveBeenCalled();
+            expect(result?.profile.password).toBe("secretPW");
+        });
+
+        it("returns undefined and does not persist a profile when the password prompt is cancelled", async () => {
+            vi.spyOn(SshConfigUtils, "findPrivateKeys").mockResolvedValueOnce([]);
+            vi.spyOn(testManager as any, "promptForPassword").mockResolvedValueOnce(undefined);
+            const host: ISshConfigExt = { name: "myhost", hostname: "example.com" };
+
+            const result = await (testManager as any).createProfileFromSshConfigHost(host);
+
+            expect(result).toBeUndefined();
+            expect(mockProfiles.set).not.toHaveBeenCalled();
+            expect((testManager as any).showMessage).toHaveBeenCalledWith("SSH setup cancelled.", MESSAGE_TYPE.WARNING);
+        });
+    });
     describe("getNewProfileName", async () => {
         let testManager: TestAbstractConfigManager;
         let mockTeamConfig: any;

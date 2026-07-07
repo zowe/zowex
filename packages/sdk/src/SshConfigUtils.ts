@@ -38,58 +38,92 @@ export class SshConfigUtils {
 
     public static async migrateSshConfig(): Promise<ISshConfigExt[]> {
         const homeDir = homedir();
-        const filePath = path.join(homeDir, ".ssh", "config");
-        let fileContent: string;
-        try {
-            fileContent = readFileSync(filePath, "utf-8");
-        } catch {
+        const parsedConfig = SshConfigUtils.readSshConfig(homeDir);
+        if (parsedConfig == null) {
             return [];
         }
 
-        const parsedConfig = sshConfig.parse(fileContent);
         const SSHConfigs: ISshConfigExt[] = [];
-
         for (const config of parsedConfig) {
             if (config.type === sshConfig.LineType.DIRECTIVE && config.param === "Host") {
-                const session: ISshConfigExt = {};
                 // If it has multiple names, take the first
-                session.name = typeof config.value === "object" ? config.value[0].val : (config.value as string);
+                const name = typeof config.value === "object" ? config.value[0].val : (config.value as string);
                 // Skip host names that contain wildcard characters
-                if (session.name.includes("*") || session.name.includes("?")) continue;
+                if (name.includes("*") || name.includes("?")) continue;
 
-                if (Array.isArray((config as sshConfig.Section).config)) {
-                    for (const subConfig of (config as sshConfig.Section).config) {
-                        if (typeof subConfig === "object" && "param" in subConfig && "value" in subConfig) {
-                            const param = (subConfig as sshConfig.Directive).param.toLowerCase();
-                            const value = subConfig.value as string;
-
-                            switch (param) {
-                                case "hostname":
-                                    session.hostname = value;
-                                    break;
-                                case "port":
-                                    session.port = Number.parseInt(value, 10);
-                                    break;
-                                case "user":
-                                    session.user = value;
-                                    break;
-                                case "identityfile":
-                                    session.privateKey = path.normalize(
-                                        value.startsWith("~") ? path.join(homeDir, value.slice(2)) : value,
-                                    );
-                                    break;
-                                case "connecttimeout":
-                                    session.handshakeTimeout = Number.parseInt(value, 10) * 1000;
-                                    break;
-                                default:
-                                    break;
-                            }
-                        }
-                    }
-                }
-                SSHConfigs.push(session);
+                SSHConfigs.push({ name, ...SshConfigUtils.parseHostSection(config as sshConfig.Section, homeDir) });
             }
         }
         return SSHConfigs;
+    }
+
+    /**
+     * Looks up a single `Host` entry by name in the user's `~/.ssh/config` file, mirroring the
+     * field mapping used by {@link migrateSshConfig}.
+     * @param hostAlias The exact name following the `Host` keyword to search for
+     * @returns The matching session properties, or `undefined` if the host was not found
+     */
+    public static findSshConfigHost(hostAlias: string): ISshConfigExt | undefined {
+        const homeDir = homedir();
+        const parsedConfig = SshConfigUtils.readSshConfig(homeDir);
+        if (parsedConfig == null) {
+            return undefined;
+        }
+
+        for (const config of parsedConfig) {
+            if (config.type !== sshConfig.LineType.DIRECTIVE || config.param !== "Host") continue;
+
+            const names = typeof config.value === "object" ? config.value.map((val) => val.val) : [config.value];
+            if (!names.includes(hostAlias)) continue;
+
+            return { name: hostAlias, ...SshConfigUtils.parseHostSection(config as sshConfig.Section, homeDir) };
+        }
+        return undefined;
+    }
+
+    private static readSshConfig(homeDir: string): sshConfig.default | undefined {
+        const filePath = path.join(homeDir, ".ssh", "config");
+        try {
+            return sshConfig.parse(readFileSync(filePath, "utf-8"));
+        } catch {
+            return undefined;
+        }
+    }
+
+    private static parseHostSection(section: sshConfig.Section, homeDir: string): Omit<ISshConfigExt, "name"> {
+        const session: Omit<ISshConfigExt, "name"> = {};
+        if (!Array.isArray(section.config)) {
+            return session;
+        }
+
+        for (const subConfig of section.config) {
+            if (typeof subConfig === "object" && "param" in subConfig && "value" in subConfig) {
+                const param = (subConfig as sshConfig.Directive).param.toLowerCase();
+                const value = subConfig.value as string;
+
+                switch (param) {
+                    case "hostname":
+                        session.hostname = value;
+                        break;
+                    case "port":
+                        session.port = Number.parseInt(value, 10);
+                        break;
+                    case "user":
+                        session.user = value;
+                        break;
+                    case "identityfile":
+                        session.privateKey = path.normalize(
+                            value.startsWith("~") ? path.join(homeDir, value.slice(2)) : value,
+                        );
+                        break;
+                    case "connecttimeout":
+                        session.handshakeTimeout = Number.parseInt(value, 10) * 1000;
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+        return session;
     }
 }

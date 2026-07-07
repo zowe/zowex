@@ -143,6 +143,9 @@ export abstract class AbstractConfigManager {
         this.selectedProfile = this.filteredMigratedConfigs.find(
             ({ name, hostname }) => result?.label === name && result?.description === hostname,
         );
+        if (this.selectedProfile?.name != null) {
+            this.selectedProfile.name = this.selectedProfile.name!.replace(/\./g, "_");
+        }
 
         if (result.description === "Custom SSH Host") {
             const createNewConfig = await this.createNewProfile(result.label);
@@ -245,6 +248,91 @@ export abstract class AbstractConfigManager {
                 keyPassphrase: this.selectedProfile.keyPassphrase,
             },
         };
+    }
+
+    /**
+     * Creates a new "ssh-config" profile in team config that points at a migrated `~/.ssh/config` host,
+     * naming the profile after the host so it can be resolved back to that `~/.ssh/config` entry by name,
+     * and handling the three possible authentication scenarios:
+     *  1. The host declares `IdentityFile` in `~/.ssh/config` (`host.privateKey` is set) and it authenticates
+     *     successfully — no extra profile properties are needed, since the profile name alone resolves the
+     *     identity file at connection time.
+     *  2. `IdentityFile` is missing or fails to authenticate, but a private key found under `~/.ssh/` does —
+     *     its path is stored as `privateKey`.
+     *  3. No private key (from `IdentityFile` or `~/.ssh/`) authenticates successfully — the user is prompted
+     *     for a password, validated against a live connection (with retries via {@link promptForPassword}),
+     *     and stored as a secure property.
+     * Every private key candidate is validated with a live connection attempt via {@link validateConfig} before
+     * being persisted, so a non-working key is never stored — the flow falls through to the next candidate,
+     * and ultimately to the password prompt, instead.
+     * The profile is always written to the global config layer, regardless of which layer was active beforehand.
+     * @param host A migrated `~/.ssh/config` host, as returned by {@link SshConfigUtils.migrateSshConfig}
+     * @returns The newly created profile, or `undefined` if the user cancelled the password prompt
+     */
+    public async createProfileFromSshConfigHost(host: ISshConfigExt): Promise<IProfileLoaded | undefined> {
+        const profileName = host.name!;
+        const properties: { privateKey?: string; keyPassphrase?: string; password?: string } = {};
+        const secure: string[] = [];
+
+        const privateKeyCandidates = Array.from(
+            new Set(
+                [host.privateKey, ...(await SshConfigUtils.findPrivateKeys())].filter((key): key is string => !!key),
+            ),
+        );
+
+        let validation: ISshConfigExt | undefined;
+        let validatedPrivateKey: string | undefined;
+        if (privateKeyCandidates.length > 0) {
+            await this.withProgress("Validating Private Keys...", async (progress) => {
+                for (const privateKey of privateKeyCandidates) {
+                    const result = await this.validateConfig({ ...host, privateKey }, false);
+                    progress(100 / privateKeyCandidates.length);
+                    if (result) {
+                        validation = result;
+                        validatedPrivateKey = privateKey;
+                        return;
+                    }
+                }
+            });
+        }
+
+        if (validation) {
+            // Only persist privateKey explicitly when it wasn't already resolvable via the ~/.ssh/config IdentityFile
+            if (validatedPrivateKey !== host.privateKey) {
+                properties.privateKey = validatedPrivateKey;
+            }
+            if (validation.keyPassphrase) {
+                properties.keyPassphrase = validation.keyPassphrase;
+                secure.push("keyPassphrase");
+            }
+        } else {
+            const passwordResult = await this.promptForPassword(host, {});
+            if (!passwordResult?.password) {
+                this.showMessage("SSH setup cancelled.", MESSAGE_TYPE.WARNING);
+                return undefined;
+            }
+            properties.password = passwordResult.password;
+            secure.push("password");
+        }
+
+        const teamConfig = this.mProfilesCache.getTeamConfig();
+        const configApi = teamConfig.api;
+        const previousLayer = teamConfig.layerActive();
+        // Always persist to the global layer, never the project-level config
+        configApi.layers.activate(false, true);
+        try {
+            const config: IConfigProfile = { type: "ssh-config", properties, secure };
+            configApi.profiles.set(profileName, config);
+            if (secure.length > 0) {
+                await teamConfig.save();
+            } else {
+                configApi.layers.write();
+            }
+        } finally {
+            configApi.layers.activate(previousLayer.user, previousLayer.global);
+        }
+
+        return { name: profileName, message: "", failNotFound: false, type: "ssh-config", profile: properties };
     }
 
     protected abstract storeServerPath(host: string, path: string): void;
@@ -402,7 +490,9 @@ export abstract class AbstractConfigManager {
                 const userModification = await this.showInputBox({
                     title: `Enter user for host: '${newConfig.hostname}'`,
                     placeHolder: "Enter the user for the target host",
+                    value: require("node:os").userInfo().username,
                 });
+                if (!userModification) return undefined;
                 configModifications.user = userModification;
             }
 

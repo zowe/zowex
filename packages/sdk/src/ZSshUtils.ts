@@ -17,6 +17,7 @@ import { type ISshSession, SshSession } from "@zowe/zos-uss-for-zowe-sdk";
 import { isEqual } from "es-toolkit";
 import { NodeSSH, type Config as NodeSSHConfig } from "node-ssh";
 import type { ConnectConfig, SFTPWrapper } from "ssh2";
+import { type ISshConfigExt, SshConfigUtils } from "./SshConfigUtils";
 import { PrivateKeyFailurePatterns, SshErrors } from "./SshErrors";
 import { ZSshClient } from "./ZSshClient";
 
@@ -89,15 +90,28 @@ export class ZSshUtils {
         return PrivateKeyFailurePatterns.some((pattern) => errorMessage.includes(pattern));
     }
 
-    public static buildSession(args: IProfile): SshSession {
+    public static buildSession(args: IProfile, sshConfigHost?: string): SshSession {
+        let sshConfig: ISshConfigExt | undefined;
+        if (sshConfigHost != null) {
+            sshConfig = SshConfigUtils.findSshConfigHost(sshConfigHost);
+            if (sshConfig == null) {
+                throw new ImperativeError({
+                    msg: `Could not find Host "${args.sshConfig}" in ~/.ssh/config`,
+                    errorCode: "ESSHCONFIGNOTFOUND",
+                });
+            }
+        }
+
+        // Team config properties always take precedence; ~/.ssh/config only fills in what the profile omits.
+        const privateKey = args.privateKey ?? sshConfig?.privateKey;
         const sshSessCfg: ISshSession = {
-            hostname: args.host,
-            port: args.port ?? 22,
-            user: args.user,
-            privateKey: args.privateKey,
-            keyPassphrase: args.privateKey ? args.keyPassphrase : undefined,
-            password: args.privateKey ? undefined : args.password,
-            handshakeTimeout: args.handshakeTimeout,
+            hostname: args.host ?? sshConfig?.hostname,
+            port: args.port ?? sshConfig?.port ?? 22,
+            user: args.user ?? sshConfig?.user ?? require("node:os").userInfo().username,
+            privateKey,
+            keyPassphrase: privateKey ? (args.keyPassphrase ?? sshConfig?.keyPassphrase) : undefined,
+            password: privateKey ? undefined : (args.password ?? sshConfig?.password),
+            handshakeTimeout: args.handshakeTimeout ?? sshConfig?.handshakeTimeout,
         };
         return new SshSession(sshSessCfg);
     }
