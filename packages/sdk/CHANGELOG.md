@@ -4,7 +4,7 @@ All notable changes to the Client code for "@zowe/zowex-for-zowe-sdk" are docume
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## Recent Changes
+## `0.6.1`
 
 - Added new functions to the `ZSshUtils` class called `detectServerOnPath()` and `lacksWriteAccess()`. [#1055](https://github.com/zowe/zowex/pull/1055)
 - Added support to list APF and PROCLIB data sets. [#1029](https://github.com/zowe/zowex/pull/1029)
