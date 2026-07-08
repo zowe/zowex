@@ -1763,7 +1763,7 @@ describe("AbstractConfigManager", async () => {
             );
         });
 
-        it("stores only sshLink when the IdentityFile authenticates successfully", async () => {
+        it("stores only extends when the IdentityFile authenticates successfully", async () => {
             vi.spyOn(SshConfigUtils, "findPrivateKeys").mockResolvedValueOnce([]);
             const validateConfigSpy = vi.spyOn(testManager as any, "validateConfig").mockResolvedValueOnce({});
             const host: ISshConfigExt = {
@@ -1777,7 +1777,7 @@ describe("AbstractConfigManager", async () => {
             expect(validateConfigSpy).toHaveBeenCalledWith({ ...host, privateKey: "/home/user/.ssh/id_myhost" }, false);
             expect(mockProfiles.set).toHaveBeenCalledWith("myhost", {
                 type: "ssh-config",
-                properties: { sshLink: "myhost" },
+                properties: { extends: "myhost" },
                 secure: [],
             });
             expect(mockLayers.write).toHaveBeenCalled();
@@ -1787,11 +1787,11 @@ describe("AbstractConfigManager", async () => {
                 message: "",
                 failNotFound: false,
                 type: "ssh-config",
-                profile: { sshLink: "myhost" },
+                profile: { extends: "myhost" },
             });
         });
 
-        it("sanitizes dots out of the profile name but keeps them in sshLink", async () => {
+        it("sanitizes dots out of the profile name but keeps them in extends", async () => {
             vi.spyOn(SshConfigUtils, "findPrivateKeys").mockResolvedValueOnce([]);
             vi.spyOn(testManager as any, "validateConfig").mockResolvedValueOnce({});
             const host: ISshConfigExt = {
@@ -1804,11 +1804,11 @@ describe("AbstractConfigManager", async () => {
 
             expect(mockProfiles.set).toHaveBeenCalledWith("my_host_example_com", {
                 type: "ssh-config",
-                properties: { sshLink: "my.host.example.com" },
+                properties: { extends: "my.host.example.com" },
                 secure: [],
             });
             expect(result?.name).toBe("my_host_example_com");
-            expect(result?.profile.sshLink).toBe("my.host.example.com");
+            expect(result?.profile.extends).toBe("my.host.example.com");
         });
 
         it("activates the global layer before persisting and restores the previously active layer afterward", async () => {
@@ -1858,7 +1858,7 @@ describe("AbstractConfigManager", async () => {
             // The non-working IdentityFile key must never be persisted alongside the working one
             expect(mockProfiles.set).toHaveBeenCalledWith("myhost", {
                 type: "ssh-config",
-                properties: { sshLink: "myhost", privateKey: "/home/user/.ssh/id_rsa" },
+                properties: { extends: "myhost", privateKey: "/home/user/.ssh/id_rsa" },
                 secure: [],
             });
         });
@@ -1872,7 +1872,7 @@ describe("AbstractConfigManager", async () => {
 
             expect(mockProfiles.set).toHaveBeenCalledWith("myhost", {
                 type: "ssh-config",
-                properties: { sshLink: "myhost", privateKey: "/home/user/.ssh/id_rsa" },
+                properties: { extends: "myhost", privateKey: "/home/user/.ssh/id_rsa" },
                 secure: [],
             });
             expect(mockLayers.write).toHaveBeenCalled();
@@ -1887,7 +1887,7 @@ describe("AbstractConfigManager", async () => {
 
             expect(mockProfiles.set).toHaveBeenCalledWith("myhost", {
                 type: "ssh-config",
-                properties: { sshLink: "myhost", privateKey: "/home/user/.ssh/id_rsa", keyPassphrase: "secretPass" },
+                properties: { extends: "myhost", privateKey: "/home/user/.ssh/id_rsa", keyPassphrase: "secretPass" },
                 secure: ["keyPassphrase"],
             });
             expect(mockTeamConfig.save).toHaveBeenCalled();
@@ -1904,7 +1904,7 @@ describe("AbstractConfigManager", async () => {
             // The private key that failed to authenticate must never be persisted
             expect(mockProfiles.set).toHaveBeenCalledWith("myhost", {
                 type: "ssh-config",
-                properties: { sshLink: "myhost", password: "secretPW" },
+                properties: { extends: "myhost", password: "secretPW" },
                 secure: ["password"],
             });
             expect(result?.profile.password).toBe("secretPW");
@@ -1920,7 +1920,7 @@ describe("AbstractConfigManager", async () => {
 
             expect(mockProfiles.set).toHaveBeenCalledWith("myhost", {
                 type: "ssh-config",
-                properties: { sshLink: "myhost", password: "secretPW" },
+                properties: { extends: "myhost", password: "secretPW" },
                 secure: ["password"],
             });
             expect(mockTeamConfig.save).toHaveBeenCalled();
