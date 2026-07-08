@@ -205,16 +205,14 @@ void server_logger_tests()
         it("should preserve the active log if archiving it during rotation fails", []() {
             const std::string test_dir = "logs/server_logger_rotate_failure_test";
             const std::string log_path = test_dir + "/zowex_server.log";
-            const std::string first_backup_path = log_path + ".1";
 
             ScopedLogsDirOverride override_dir(test_dir);
 
             server::Logger::init_logger(false, true);
 
-            // Force the archival rename() to fail: it refuses to replace a
-            // directory with a regular file, so pre-creating a directory at
-            // the .1 slot guarantees rotation can't complete.
-            mkdir(first_backup_path.c_str(), 0700);
+            // Revoking write on the directory makes rename() fail
+            // while still allowing reads/opens on the existing log file
+            chmod(test_dir.c_str(), 0500);
 
             const std::string padding(1024, 'x');
             for (int i = 0; i < 150; i++)
@@ -224,6 +222,9 @@ void server_logger_tests()
 
             server::Logger::shutdown();
 
+            // Restore write permission so cleanup can remove the directory
+            chmod(test_dir.c_str(), 0700);
+
             // The active log must survive intact rather than being wiped
             // out just because the archival step failed.
             Expect(file_exists(log_path)).ToBe(true);
@@ -232,7 +233,6 @@ void server_logger_tests()
             Expect(contents).ToContain("Simulated failure #149:");
 
             unlink(log_path.c_str());
-            rmdir(first_backup_path.c_str());
             rmdir(test_dir.c_str());
         }); });
 }

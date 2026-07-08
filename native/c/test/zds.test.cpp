@@ -1642,7 +1642,7 @@ void zds_tests()
                                    submit_and_wait(del_jcl, 200); },
                                  gdg_opts);
 
-                        it("should report ZDS_VOLSER_GDG (??????) for a GDG base",
+                        it("should report ZDS_VOLSER_GDG (?????\?) for a GDG base",
                            [&]() -> void
                            {
                              ZDS zds = {0};
