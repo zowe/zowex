@@ -16,6 +16,7 @@
 #include "zprmtype.h"
 #include "iefjsqry.h"
 #include "csvapfaa.h"
+#include "csvdlaa.h"
 
 #if defined(__cplusplus) && defined(__MVS__)
 extern "OS"
@@ -41,6 +42,10 @@ extern "C"
   typedef struct jqry___header JQRY_HEADER;
   typedef struct jqry___subsys___entry JQRY_SUBSYS_ENTRY;
   typedef struct jqry___vt___entry JQRY_VT_ENTRY;
+
+  typedef struct dlaahdr DLAAHDR;
+  typedef struct dlaals DLAALS;
+  typedef struct dlaads DLAADS;
 
   typedef struct
   {
@@ -161,6 +166,16 @@ extern "C"
    * @return The return code from the service
    */
   int ZUTMAPFQ(ZDIAG *, struct apfhdr *, int *, int *);
+
+  /**
+   * @brief Query the currently active link list (LNKLST) set via CSVDYNL REQUEST=LIST
+   * @param diag The diagnostic structure
+   * @param answer The answer area, mapped by the CSVDLAA macro (DLAAHDR)
+   * @param answer_len The length of the answer area
+   * @param rsn The reason code (csvdynlrsnnotalldatareturned when buffer too small)
+   * @return 0 on success, RTNCD_FAILURE otherwise
+   */
+  int ZUTMDYNQ(ZDIAG *, DLAAHDR *, int *, int *);
 
   /**
    * @brief List the PLIB datasets

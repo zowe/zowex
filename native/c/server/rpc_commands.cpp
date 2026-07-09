@@ -224,9 +224,14 @@ void register_system_commands(CommandDispatcher &dispatcher)
                                   .rename_arg("maxLines", "max-lines")
                                   .read_stdout("data", false));
   dispatcher.register_command("listProclib",
-                              CommandBuilder(sys::handle_system_list_proclib));
+                              CommandBuilder(sys::handle_system_list_proclib)
+                                  .validate<ListProclibRequest, ListProclibResponse>());
   dispatcher.register_command("listApf",
-                              CommandBuilder(sys::handle_system_list_apf));
+                              CommandBuilder(sys::handle_system_list_apf)
+                                  .validate<ListApfRequest, ListApfResponse>());
+  dispatcher.register_command("listLinklist",
+                              CommandBuilder(sys::handle_system_list_linklist)
+                                  .validate<ListLinklistRequest, ListLinklistResponse>());
 }
 
 void register_all_commands(CommandDispatcher &dispatcher)
