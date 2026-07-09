@@ -81,7 +81,7 @@ ssh "$ZX_HOST" "$ZX_BIN --help"
 
 If `pax -rvf` fails on the `.Z`, do `uncompress server.pax.Z && pax -rvf server.pax`.
 
-The CLI also exposes `console` / `tso` / `system` / `tool` subcommands — run `$ZX_BIN <cmd> --help` if you need one of those interactively. Only a subset is exposed via JSON-RPC (see §3).
+The CLI also exposes `console` / `tso` / `system` / `tool` subcommands — run `$ZX_BIN <cmd> --help` if you need one of those interactively. Only a subset is exposed via JSON-RPC (see §3). This CLI-only gap isn't limited to those four groups: `data-set copy` is CLI-only too (no `copyDataset` RPC — see §3's Datasets table). When in doubt whether a `zowex data-set`/`job`/`uss` verb has an RPC equivalent, check `$ZX_BIN data-set --help` against §3 rather than assuming parity.
 
 ---
 
@@ -118,7 +118,7 @@ $zx stop
 | `zx job` | `list [<owner> [<prefix>]]` · `submit <file>` · `status <id>` · `spools <id>` · `spool <id> <n>` · `jcl <id>` · `cancel`/`delete`/`hold`/`release <id>` |
 | `zx uss` | `ls` · **`get`/`put`** (sftp, binary-safe) · `read`/`write` (RPC, text) · `rm` · `mkdir` · `mv` · `cp` · `chmod` · `chown` · `chtag` · `sh '<cmd>'` |
 | `zx tso` | `'<cmd>'` |
-| `zx system` | `apf` · `proclib` · `syslog` (RPC) · `parmlib` · `subsystems` · `symbol <s>` (CLI) |
+| `zx system` | `apf` · `linklist` · `proclib` · `syslog` (RPC) · `parmlib` · `subsystems` · `symbol <s>` (CLI) |
 | `zx tool` | `amblist <dsn> --cs '<stmts>'` · `run <pgm> [opts]` · `search <dsn> <str>` · `dynalloc` · `dsect` (all CLI) |
 | `zx console` | `'<cmd>' [--cn <n>] [--timeout <s>] [--no-wait]` (CLI; needs APF — fails `Not authorized - 4` from a plain USS dir) |
 | `zx rpc` | `<method> ['<params>']` — raw escape hatch |
@@ -161,7 +161,8 @@ printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"listJobs","params":{"owner":"*"
 | `createDataset` | `{"dsname":"HLQ.NEW","attributes":{"primary":10,"lrecl":80}}` |
 | `deleteDataset` | `{"dsname":"HLQ.OLD"}` |
 | `renameDataset` | `{"dsnameBefore":"A","dsnameAfter":"B"}` |
-| `copyDataset` | `{"source":"A","target":"B"}` |
+
+**No `copyDataset` RPC** — at least as of server v0.6.0, `copyDataset` isn't wired over JSON-RPC (returns `-32601 Unrecognized command`) even though it exists as a CLI verb. `zx ds copy` calls the CLI directly instead (`zowex data-set copy <src> <dst> [--ow|-r]`, via SSH passthrough — see §2's CLI-vs-RPC note). If you're issuing raw RPC via `zx rpc` or `zx -j ds copy`-style JSON, don't rely on `copyDataset` — shell out to the CLI form instead.
 
 ### Jobs
 

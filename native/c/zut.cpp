@@ -51,6 +51,7 @@ void zut_strip_final_newline(std::string &input)
 static void zut_private_drain_fd(struct pollfd &pfd, std::string &output, pid_t pid);
 static void zut_private_drain_pipes(std::array<struct pollfd, 2> &fds, std::string &stdout_response, std::string &stderr_response, pid_t pid);
 static std::vector<const char *> zut_private_build_env(const std::string &command);
+static void zut_extract_linklist_entries(DLAAHDR *answer, std::vector<ZLinklstEntry> &linklist);
 
 int zut_private_run_program(const std::string &program, const std::vector<std::string> &args, std::string &stdout_response, std::string &stderr_response, bool merge_streams)
 {
@@ -710,6 +711,66 @@ int zut_list_apf(ZDIAG &diag, std::vector<std::pair<std::string, std::string>> &
       free(answer_fixed);
       return rc;
     }
+  }
+
+  free(answer_fixed);
+  return rc;
+}
+
+static void zut_extract_linklist_entries(DLAAHDR *answer, std::vector<ZLinklstEntry> &linklist)
+{
+  DLAALS *ls = (DLAALS *)answer->dlaahfirstlsaddr;
+  for (int i = 0; i < answer->dlaahnumls; i++)
+  {
+    DLAADS *ds = (DLAADS *)ls->dlaalsfirstdsaddr;
+    for (int j = 0; j < ls->dlaalsnumds; j++)
+    {
+      ZLinklstEntry entry;
+      entry.dsname = std::string((char *)ds->dlaadsname, ds->dlaadsnamelen);
+      entry.volume = std::string((char *)ds->dlaadsvolid, sizeof(ds->dlaadsvolid));
+      entry.apf = (ds->dlaadsflags & dlaadsapf) != 0;
+      linklist.push_back(entry);
+      ds = (DLAADS *)ds->dlaadsnextaddr;
+    }
+    ls = (DLAALS *)ls->dlaalsnextaddr;
+  }
+}
+
+int zut_list_linklist(ZDIAG &diag, std::vector<ZLinklstEntry> &linklist)
+{
+  int rc = 0;
+  int size = sizeof(DLAAHDR);
+  DLAAHDR *answer_fixed = (DLAAHDR *)__malloc31(size);
+  int answer_len = size;
+  int rsn = 0;
+  rc = ZUTMDYNQ(&diag, answer_fixed, &answer_len, &rsn);
+  if (0 != rc)
+  {
+    if (csvdynlrsnnotalldatareturned == rsn)
+    {
+      int needed_len = answer_fixed->dlaahtlen;
+      DLAAHDR *answer_dynamic = (DLAAHDR *)__malloc31(needed_len);
+      rc = ZUTMDYNQ(&diag, answer_dynamic, &needed_len, &rsn);
+
+      if (0 != rc)
+      {
+        free(answer_fixed);
+        free(answer_dynamic);
+        return rc;
+      }
+
+      zut_extract_linklist_entries(answer_dynamic, linklist);
+      free(answer_dynamic);
+    }
+    else
+    {
+      free(answer_fixed);
+      return rc;
+    }
+  }
+  else
+  {
+    zut_extract_linklist_entries(answer_fixed, linklist);
   }
 
   free(answer_fixed);

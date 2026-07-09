@@ -4,6 +4,10 @@ All notable changes to the native code for "zowex" are documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## Recent Changes
+
+- `c`: Added support to return information for current linklist. [#1061](https://github.com/zowe/zowex/pull/1061)
+
 ## `0.6.1`
 
 - `c`: Implemented bounds checking and truncation for strings logged with the `zwto_debug` macro. [#1059](https://github.com/zowe/zowex/pull/1059)

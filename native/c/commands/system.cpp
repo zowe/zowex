@@ -303,21 +303,60 @@ int handle_system_list_apf(InvocationContext &context)
 
   const auto result = obj();
   const auto items = arr();
-  
+
   for (const auto &entry : apf)
   {
     context.output_stream() << setw(44) << left << entry.first << " " << setw(6) << right << entry.second << endl;
-    
+
     const auto item = obj();
     item->set("dsname", str(entry.first));
     item->set("volume", str(entry.second));
     items->push(item);
   }
-  
+
   result->set("items", items);
   result->set("returnedRows", i64(apf.size()));
   context.set_object(result);
-  
+
+  return RTNCD_SUCCESS;
+}
+
+int handle_system_list_linklist(InvocationContext &context)
+{
+  int rc = 0;
+  ZDIAG diag = {};
+  std::vector<ZLinklstEntry> linklist;
+  rc = zut_list_linklist(diag, linklist);
+  if (0 != rc)
+  {
+    context.error_stream() << "Error: could not list linklist, rc: '" << rc << "'" << endl;
+    context.error_stream() << "  Details: " << diag.e_msg << endl;
+    return RTNCD_FAILURE;
+  }
+
+  const auto result = obj();
+  const auto items = arr();
+
+  for (const auto &entry : linklist)
+  {
+    context.output_stream() << setw(44) << left << entry.dsname << " " << setw(6) << right << entry.volume;
+    if (entry.apf)
+    {
+      context.output_stream() << " APF";
+    }
+    context.output_stream() << endl;
+
+    const auto item = obj();
+    item->set("dsname", str(entry.dsname));
+    item->set("volume", str(entry.volume));
+    item->set("apf", boolean(entry.apf));
+    items->push(item);
+  }
+
+  result->set("items", items);
+  result->set("returnedRows", i64(linklist.size()));
+  context.set_object(result);
+
   return RTNCD_SUCCESS;
 }
 
@@ -352,6 +391,11 @@ void register_commands(parser::Command &root_command)
   auto system_list_apf_cmd = command_ptr(new Command("list-apf", "list apf data sets"));
   system_list_apf_cmd->set_handler(handle_system_list_apf);
   system_cmd->add_command(system_list_apf_cmd);
+
+  // List-linklist subcommand
+  auto system_list_linklist_cmd = command_ptr(new Command("list-linklist", "list link list data sets"));
+  system_list_linklist_cmd->set_handler(handle_system_list_linklist);
+  system_cmd->add_command(system_list_linklist_cmd);
 
   // View-syslog subcommand
   auto system_view_syslog_cmd = command_ptr(new Command("view-syslog", "view syslog"));
