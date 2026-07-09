@@ -256,33 +256,6 @@ zx uss get /tmp/iefbr14.bin
 
 For whole-PDS `ds get`, run `zx start` first — one persistent session is much faster than N one-shot SSH connects. `ds put` of a directory may hit zowex DEQ contention on rapid same-PDS writes; failures are reported per-member and the command exits non-zero if any failed.
 
-### Relocating a PDS to a different volume/pool
-
-There's no "move to volume" verb — `data-set copy` (§3's CLI-only note) can't take `--vol`, and its own auto-create picks whatever SMS/ACS gives it (which is how datasets end up on scratch pools like `WRK*` in the first place). The reliable pattern is delete + explicit pre-create + `-r` copy:
-
-```bash
-# 1. Get the source's real DCB attrs — do NOT assume blksize from a previous auto-created copy;
-#    auto-create's blksize (often a large system-determined value) can differ from the true source.
-zx tso "LISTDS '<source-dsn>'"                    # shows RECFM/LRECL/BLKSIZE/DSORG
-
-# 2. Pre-create the target with those EXACT attrs (blksize must match the source
-#    for step 3's -r to succeed) plus --vol as a *hint*:
-ssh "$ZX_HOST" "$ZX_BIN data-set create '<target-dsn>' \
-  --dsorg PO --recfm FB --lrecl 80 --blksize <source-blksize> \
-  --primary <N> --secondary <M> --dirblk <D> --vol <VOLSER>"
-
-# 3. Fill it from the source (requires exact blksize match to succeed):
-ssh "$ZX_HOST" "$ZX_BIN data-set copy '<source-dsn>' '<target-dsn>' -r"
-```
-
-Sizing gotchas learned the hard way:
-- **`--vol` is a hint, not a guarantee** — in an SMS-managed environment the ACS routines can still land the dataset on a different VOLSER in the same storage pool/group (e.g. asking for `TSU063` landing on `TSU034`). That's normal; confirm with the user whether "same pool" is good enough before chasing an exact VOLSER (which usually needs a guaranteed-space storage class or non-SMS allocation).
-- **`--secondary` too small → abend SE37** (`CEE3250C ... abend SE37`) — extent-limit-exceeded, not "out of space." A tiny secondary (e.g. 2 tracks) forces many small extensions to grow the dataset, and it hits the max-extents ceiling before it's big enough. Size `--secondary` generously (comparable to `--primary`, not a token value) for anything with more than a handful of members.
-- **`-r`/`--ow` require exact blksize match against the source** — mismatch fails with `Expected target block size to match source (<N>), but the destination block size is <M>`. There's no "close enough" — get the source's blksize from `LISTDS` (step 1) rather than guessing or reusing a previously auto-created target's blksize.
-- **`--dirblk` needs headroom for the member count** — rule of thumb ~4-6 members per directory block when ISPF stats are present; round generously (member count / 4, then pad) rather than tightly. Directory-full failures are recoverable (recreate with a bigger `--dirblk` and re-copy) but wasted a round trip.
-- **`data-set create-fb`/`create-vb`/`create-adata`/`create-loadlib` take no option flags** — they're fixed-preset shortcuts (dsn only). Use plain `data-set create` with explicit `--dsorg`/`--recfm`/`--lrecl`/etc. when you need to override attributes.
-- **Bundle delete+create+copy into one SSH call per dataset** when relocating several — firing many separate `ssh` invocations back-to-back in a tight loop has triggered `kex_exchange_identification: Connection reset by peer` (looks like connection-rate protection on some hosts). A single `ssh host "cmd1; cmd2; cmd3"` per dataset, with a short sleep between datasets, avoids it.
-
 ---
 
 ## 6 · Troubleshooting
