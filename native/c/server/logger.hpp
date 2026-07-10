@@ -20,10 +20,12 @@
 #include <ctime>
 #include <cstdlib>
 #include <cerrno>
+#include <cstring>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <iostream>
+#include "../zlog_util.hpp"
 
 namespace server
 {
@@ -32,8 +34,11 @@ class Logger
 private:
   // Buffer size for log messages
   static constexpr size_t LOG_BUFFER_SIZE = 4096;
-  // Maximum log file size before truncation (10MB)
-  static constexpr size_t MAX_LOG_SIZE = 10 * 1024 * 1024;
+  // Maximum size of a single log file before it is rolled over (100KB)
+  static constexpr size_t MAX_LOG_FILE_SIZE = 100 * 1024;
+  // Number of log files retained via FIFO rotation (1 active + up to 9 backups),
+  // bounding total disk usage per user to roughly MAX_LOG_FILES * MAX_LOG_FILE_SIZE (1MB)
+  static constexpr int MAX_LOG_FILES = 10;
 
   static std::ofstream &get_log_file()
   {
@@ -59,6 +64,14 @@ private:
     return initialized;
   }
 
+  // Tracks whether the one-time "rotation is stuck" warning has already
+  // been written for the current stall, so it isn't repeated on every log call.
+  static bool &get_rotation_stall_warned()
+  {
+    static bool rotation_stall_warned = false;
+    return rotation_stall_warned;
+  }
+
   static std::string &get_log_file_path()
   {
     static std::string log_file_path;
@@ -80,34 +93,115 @@ private:
   }
 
   /**
-   * Check log file size and truncate if necessary
+   * Shift existing backup log files (log.1 -> log.2, log.2 -> log.3, ...),
+   * dropping the oldest backup, then move the active log into the log.1 slot.
+   * Returns false if the active log couldn't be archived into log.1 (e.g.
+   * ENOSPC or a permissions issue), in which case the active log file is left
+   * untouched - the caller must not truncate/replace it, since it may hold
+   * the only copy of data that failed to be backed up.
    */
-  static void check_and_truncate_log_file()
+  static bool rotate_log_files()
+  {
+    const auto &log_file_path = get_log_file_path();
+
+    // Drop the oldest backup, if it exists (intentionally destructive)
+    const std::string oldest = log_file_path + "." + std::to_string(MAX_LOG_FILES - 1);
+    unlink(oldest.c_str());
+
+    // Shift remaining backups up by one slot -> rename them all
+    for (int i = MAX_LOG_FILES - 2; i >= 1; i--)
+    {
+      const std::string from = log_file_path + "." + std::to_string(i);
+      const std::string to = log_file_path + "." + std::to_string(i + 1);
+      rename(from.c_str(), to.c_str());
+    }
+
+    // Move the active log into log.1
+    // Rename() is atomic => file either fully moves or doesnt
+    //   on failure, the active log is guaranteed to still be intact at its
+    //   original path
+    const std::string first_backup = log_file_path + ".1";
+    if (rename(log_file_path.c_str(), first_backup.c_str()) != 0)
+    {
+      std::cerr << "Failed to archive log file to " << first_backup << ": " << strerror(errno) << std::endl;
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Check log file size and roll over to a new file if necessary, retaining
+   * up to MAX_LOG_FILES in FIFO order (oldest backup {log.9} is dropped
+   * to make room for new {log.1})
+   */
+  static void check_and_rotate_log_file()
   {
     const auto &log_file_path = get_log_file_path();
     std::ofstream &log_file = get_log_file();
 
+    // bail out if logs don't exist yet
     if (log_file_path.empty() || !log_file.is_open())
     {
       return;
     }
 
+    // logger file size check: if size > MAX_LOG_FILE_SIZE (100KB), rotate
+    //   try to archive old data, only destroy if archive succeeds 
+    //   otherwise, if some failure, append to the oversized file to prevent data loss
+    // (data preservation wins out over size bounding)
     struct stat st;
     if (stat(log_file_path.c_str(), &st) == 0)
     {
-      if (static_cast<size_t>(st.st_size) > MAX_LOG_SIZE)
+      if (static_cast<size_t>(st.st_size) > MAX_LOG_FILE_SIZE)
       {
+        // close stream before renaming
         log_file.close();
 
-        // Reopen the file in truncate mode
-        log_file.open(log_file_path.c_str(), std::ios::out | std::ios::trunc);
-        if (!log_file.is_open())
+        if (!rotate_log_files())
         {
-          std::cerr << "Failed to truncate log file: " << log_file_path << std::endl;
+          log_file.open(log_file_path.c_str(), std::ios::out | std::ios::app);
+          if (!log_file.is_open())
+          {
+            std::cerr << "Failed to reopen log file after failed rotation: " << log_file_path << std::endl;
+          }
+          else
+          {
+            // Warn once per stall, not on every log call, once the file has
+            // grown to double the configured limit despite repeated rotation attempts.
+            bool &rotation_stall_warned = get_rotation_stall_warned();
+            if (!rotation_stall_warned && static_cast<size_t>(st.st_size) > 2 * MAX_LOG_FILE_SIZE)
+            {
+              log_file << get_current_timestamp() << " [WARN] Log rotation has been failing repeatedly; "
+                        << "file size (" << st.st_size << " bytes) exceeds twice the configured limit\n";
+              log_file.flush();
+              rotation_stall_warned = true;
+            }
+          }
           return;
         }
 
-        log_file << get_current_timestamp() << " [INFO] Log file truncated due to size limit\n";
+        // Rotation succeeded - reset so a future stall warns again
+        get_rotation_stall_warned() = false;
+
+        // Create/open a fresh active log file with restricted permissions (0600)
+        // 0600 = read/write for the owning user only, no access for anyone else
+        int fd = open(log_file_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0600);
+        if (fd == -1)
+        {
+          std::cerr << "Failed to create log file after rotation: " << log_file_path << std::endl;
+          return;
+        }
+        close(fd);
+
+        log_file.open(log_file_path.c_str(), std::ios::out | std::ios::trunc);
+        if (!log_file.is_open())
+        {
+          std::cerr << "Failed to reopen log file after rotation: " << log_file_path << std::endl;
+          return;
+        }
+
+        log_file << get_current_timestamp() << " [INFO] Log file rolled over due to size limit\n";
         log_file.flush();
       }
     }
@@ -127,17 +221,16 @@ private:
 
     log_file << get_current_timestamp() << " [" << level << "] " << buffer << std::endl;
 
-    check_and_truncate_log_file();
+    check_and_rotate_log_file();
   }
 
 public:
   /**
    * Initialize the logger with specified options
-   * @param exec_dir Executable directory (must be provided)
    * @param verbose Whether to enable verbose logging
    * @param truncate Whether to truncate existing log file
    */
-  static void init_logger(const char *exec_dir, bool verbose = false, bool truncate = false)
+  static void init_logger(bool verbose = false, bool truncate = false)
   {
     std::mutex &log_mutex = get_log_mutex();
     std::ofstream &log_file = get_log_file();
@@ -150,10 +243,10 @@ public:
 
       verbose_logging = verbose;
 
-      // Create logs directory
-      const std::string logs_dir = std::string(exec_dir) + "/logs";
+      // Resolve and create the per-user logs directory (honors ZOWEX_LOGS_DIR)
+      const std::string logs_dir = zlog_util::resolve_logs_dir();
 
-      if (mkdir(logs_dir.c_str(), 0700) != 0 && errno != EEXIST)
+      if (!zlog_util::make_dirs(logs_dir))
       {
         std::cerr << "Failed to create logs directory: " << logs_dir << std::endl;
         return;
