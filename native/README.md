@@ -6,7 +6,7 @@ The following sections relate to code in the `native/c` folder.
 
 ### Logging
 
-The C++ application includes a ZLogger singleton class for centralized logging. When `ZLOG_ENABLE` is defined during compilation, the logger automatically creates a `logs/` directory in the current working directory and writes log output to `logs/zowex.log`. If the current working directory cannot be determined, it falls back to `logs/zowex.log` in the relative path.
+The C++ application includes a ZLogger singleton class for centralized logging. When `ZLOG_ENABLE` is defined during compilation, the logger automatically creates a `.zowex/logs/` directory in the current user's home directory and writes log output to `~/.zowex/logs/zowex.log`. Logs are written per-user (rather than to a location shared by all users of the binary, such as next to the executable) so that concurrent users of a shared zowex installation don't contend for the same log file. The `zowex server` daemon similarly writes its logs to `~/.zowex/logs/zowex_server.log`.
 
 `ZLOG_ENABLE` is defined when building in debug mode with `make -DBuildType=DEBUG`. You can exclusively enable logging by passing it directly to the make command: `make -DZLOG_ENABLE=1`
 
@@ -54,6 +54,15 @@ ZOWEX_LOG_LEVEL=TRACE ./zowex --it
 ```
 
 To modify the log level programmatically in C++ code, use the `ZLogger::set_log_level` function. To change the log level in Metal C code, use the `ZLGSTLVL` function defined in `zlogger_metal.h`. Both functions take an integer from the enum `zlog_level_t` (also redefined as `LogLevel` in the C++ header file).
+
+Override where log files are written using the `ZOWEX_LOGS_DIR` environment variable. This is useful for shared installations where users may not have write access to the default location, or for redirecting logs elsewhere for troubleshooting:
+
+```bash
+# Write logs to a custom directory instead of ~/.zowex/logs
+ZOWEX_LOGS_DIR=/tmp/my-zowex-logs ./zowex --it
+```
+
+The `zowex server` daemon rolls its log file over once it exceeds 100KB, keeping up to 10 generations (`zowex_server.log`, `zowex_server.log.1`, ..., `zowex_server.log.9`) in FIFO order — the oldest generation is dropped to make room for the newest, bounding total disk usage per user to roughly 1MB.
 
 ### Testing
 

@@ -49,6 +49,18 @@ void zowex_system_tests()
                   ExpectWithContext(rc, response).ToBeGreaterThanOrEqualTo(0);
                 });
            });
+  describe("list-linklist tests",
+           [&]() -> void
+           {
+             it("should list linklist",
+                []()
+                {
+                  int rc = 0;
+                  string response;
+                  rc = execute_command_with_output(zowex_command + " system list-linklist", response);
+                  ExpectWithContext(rc, response).ToBeGreaterThanOrEqualTo(0);
+                });
+           });
   describe("list-subsystems tests",
            [&]() -> void
            {

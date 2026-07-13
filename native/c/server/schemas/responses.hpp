@@ -287,6 +287,13 @@ ZJSON_SCHEMA(ListApfResponse,
     FIELD_REQUIRED(returnedRows, NUMBER)
 );
 
+struct ListLinklistResponse {};
+ZJSON_SCHEMA(ListLinklistResponse,
+    FIELD_REQUIRED(success, BOOL),
+    FIELD_REQUIRED_ARRAY(items, ANY),
+    FIELD_REQUIRED(returnedRows, NUMBER)
+);
+
 struct ToolSearchResponse {};
 ZJSON_SCHEMA(ToolSearchResponse,
     FIELD_REQUIRED(success, BOOL),

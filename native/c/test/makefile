@@ -135,6 +135,7 @@ build-out/zutils.o \
 build-out/parser.test.o \
 build-out/zlogger.test.o \
 build-out/zlogger_metal.o \
+build-out/zwto.test.o \
 build-out/zjson.test.o \
 build-out/zjsonm.o \
 build-out/zowex.server.test.o \
@@ -143,7 +144,8 @@ build-out/zowex.ds.server.test.o \
 build-out/zowex.job.server.test.o \
 build-out/server.worker.test.o \
 build-out/server_validator.o \
-build-out/server.validator.test.o
+build-out/server.validator.test.o \
+build-out/server_logger.test.o
 	$(CXX) $(CPP_BND_FLAGS) -o $@ $^
 
 build-out/zut.o:
@@ -284,6 +286,9 @@ build-out/zlogger_metal.s: ../zlogger_metal.c
 build-out/zlogger_metal.o: build-out/zlogger_metal.s
 	$(ASM) $(ASM_FLAGS) $(ASM_LIST_FLAG) $(MACLIBS) -o $@ $^
 
+build-out/zwto.test.o: zwto.test.cpp
+	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
+
 build-out/zjson.test.o: zjson.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
@@ -309,6 +314,9 @@ build-out/zjsonm.o: build-out/zjsonm.s
 	$(ASM) $(ASM_FLAGS) $(ASM_LIST_FLAG) $(MACLIBS) -o $@ $^
 
 build-out/server.validator.test.o: server/validator.test.cpp
+	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
+
+build-out/server_logger.test.o: server_logger.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
 #

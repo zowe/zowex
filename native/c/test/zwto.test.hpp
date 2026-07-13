@@ -9,12 +9,7 @@
  *
  */
 
-#include "../parser.hpp"
-#include "../extend/plugin.hpp"
-
-namespace tso
-{
-using namespace plugin;
-int handle_tso_issue(InvocationContext &result);
-void register_commands(parser::Command &root_command);
-} // namespace tso
+#ifndef ZWTO_TEST_HPP
+#define ZWTO_TEST_HPP
+void zwto_tests();
+#endif
