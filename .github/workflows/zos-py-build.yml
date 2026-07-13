@@ -81,7 +81,6 @@ jobs:
       # PR (any author) and apply it so the tests can run without building.
       - name: Fetch precompiled Python bindings
         if: steps.swig.outputs.present != 'true'
-        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: npm run z:python:fetch -- ${{ github.event.pull_request.number }}
