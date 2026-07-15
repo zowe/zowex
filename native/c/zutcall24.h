@@ -9,12 +9,12 @@
  *
  */
 
-#include "../parser.hpp"
-#include "../extend/plugin.hpp"
+#ifndef ZUTCALL24_H
+#define ZUTCALL24_H
 
-namespace tso
-{
-using namespace plugin;
-int handle_tso_issue(InvocationContext &result);
-void register_commands(parser::Command &root_command);
-} // namespace tso
+// ZUTCAL24 should be copied into 24-bit storage.
+int ZUTCAL24();
+// ZUTCALQ returns ZUTCAL24's length in bytes (for copy to memory area)
+int ZUTCALQ();
+
+#endif

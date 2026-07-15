@@ -279,6 +279,7 @@ void zowex_job_server_tests()
       int req_id;
       std::string request = make_rpc_request("holdJob", "{\"jobId\":\"" + held_jobid + "\"}", req_id);
       
+      std::this_thread::sleep_for(std::chrono::milliseconds(500));
       write_to_server(server, request);
       std::string response = read_rpc_response(server);
 
