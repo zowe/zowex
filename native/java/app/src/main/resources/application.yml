@@ -21,6 +21,10 @@ zowe:
       description: "Zowex Java FFM Service for z/OS"
       version: "0.5.0"
       routingUrl: "https://localhost:${server.port}"
+  security:
+    # Enables SecurityContextController, which exposes SAF/security-context troubleshooting
+    # endpoints. Intended for testing only - must stay disabled in production.
+    test-endpoints-enabled: false
 
 eureka:
   client:

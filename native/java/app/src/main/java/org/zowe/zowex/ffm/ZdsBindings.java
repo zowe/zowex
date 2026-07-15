@@ -45,35 +45,36 @@ public class ZdsBindings implements ZdsService {
             
             responsePtr = ZDSListResponse_C.reinterpret(responsePtr, arena, null);
 
-            MemorySegment errorMsgSeg = ZDSListResponse_C.error_message(responsePtr);
-            String errorMsg = FfmUtils.readString(errorMsgSeg);
-            if (errorMsg != null) {
-                ZdsCApi.zds_c_free_list_response(responsePtr);
-                throw new RuntimeException(errorMsg);
-            }
-
-            MemorySegment entriesPtr = ZDSListResponse_C.entries(responsePtr);
-            long count = ZDSListResponse_C.count(responsePtr);
-            
-            List<ZDSEntry> results = new ArrayList<>();
-            if (count > 0 && entriesPtr.address() != 0) {
-                // reinterpret entries array to read structs
-                MemorySegment entriesArray = ZDSEntry_C.reinterpret(entriesPtr, count,arena, null);
-                for (long i = 0; i < count; i++) {
-                    MemorySegment entryStruct = ZDSEntry_C.asSlice(entriesArray, i);
-           
-                    ZDSEntry entry = new ZDSEntry();
-                    entry.name = FfmUtils.readString(ZDSEntry_C.name(entryStruct));
-                    entry.dsorg = FfmUtils.readString(ZDSEntry_C.dsorg(entryStruct));
-                    entry.volser = FfmUtils.readString(ZDSEntry_C.volser(entryStruct));
-                    entry.recfm = FfmUtils.readString(ZDSEntry_C.recfm(entryStruct));
-                    entry.migrated = ZDSEntry_C.migrated(entryStruct);
-                    results.add(entry);
+            try {
+                MemorySegment errorMsgSeg = ZDSListResponse_C.error_message(responsePtr);
+                String errorMsg = FfmUtils.readString(errorMsgSeg, FfmUtils.MAX_METADATA_STRING_LENGTH);
+                if (errorMsg != null) {
+                    throw new RuntimeException(errorMsg);
                 }
+
+                MemorySegment entriesPtr = ZDSListResponse_C.entries(responsePtr);
+                long count = ZDSListResponse_C.count(responsePtr);
+
+                List<ZDSEntry> results = new ArrayList<>();
+                if (count > 0 && entriesPtr.address() != 0) {
+                    // reinterpret entries array to read structs
+                    MemorySegment entriesArray = ZDSEntry_C.reinterpret(entriesPtr, count,arena, null);
+                    for (long i = 0; i < count; i++) {
+                        MemorySegment entryStruct = ZDSEntry_C.asSlice(entriesArray, i);
+
+                        ZDSEntry entry = new ZDSEntry();
+                        entry.name = FfmUtils.readString(ZDSEntry_C.name(entryStruct), FfmUtils.MAX_METADATA_STRING_LENGTH);
+                        entry.dsorg = FfmUtils.readString(ZDSEntry_C.dsorg(entryStruct), FfmUtils.MAX_METADATA_STRING_LENGTH);
+                        entry.volser = FfmUtils.readString(ZDSEntry_C.volser(entryStruct), FfmUtils.MAX_METADATA_STRING_LENGTH);
+                        entry.recfm = FfmUtils.readString(ZDSEntry_C.recfm(entryStruct), FfmUtils.MAX_METADATA_STRING_LENGTH);
+                        entry.migrated = ZDSEntry_C.migrated(entryStruct);
+                        results.add(entry);
+                    }
+                }
+                return results;
+            } finally {
+                ZdsCApi.zds_c_free_list_response(responsePtr);
             }
-            // Free memory
-            ZdsCApi.zds_c_free_list_response(responsePtr);
-            return results;
         } catch (Throwable e) {
             if (e instanceof Exception) throw (Exception) e;
             throw new RuntimeException(e);
@@ -91,17 +92,18 @@ public class ZdsBindings implements ZdsService {
             
             responsePtr = ZDSStringResponse_C.reinterpret(responsePtr, arena, null);
 
-            MemorySegment errorMsgSeg = ZDSStringResponse_C.error_message(responsePtr);
-            String errorMsg = FfmUtils.readString(errorMsgSeg);
-            if (errorMsg != null) {
-                ZdsCApi.zds_c_free_string_response(responsePtr);
-                throw new RuntimeException(errorMsg);
-            }
+            try {
+                MemorySegment errorMsgSeg = ZDSStringResponse_C.error_message(responsePtr);
+                String errorMsg = FfmUtils.readString(errorMsgSeg, FfmUtils.MAX_METADATA_STRING_LENGTH);
+                if (errorMsg != null) {
+                    throw new RuntimeException(errorMsg);
+                }
 
-            MemorySegment dataSeg = ZDSStringResponse_C.data(responsePtr);
-            String data = FfmUtils.readString(dataSeg);
-            ZdsCApi.zds_c_free_string_response(responsePtr);
-            return data;
+                MemorySegment dataSeg = ZDSStringResponse_C.data(responsePtr);
+                return FfmUtils.readString(dataSeg, FfmUtils.MAX_DATA_STRING_LENGTH);
+            } finally {
+                ZdsCApi.zds_c_free_string_response(responsePtr);
+            }
         } catch (Throwable e) {
             if (e instanceof Exception) throw (Exception) e;
             throw new RuntimeException(e);
@@ -121,17 +123,18 @@ public class ZdsBindings implements ZdsService {
             
             responsePtr = ZDSStringResponse_C.reinterpret(responsePtr, arena, null);
 
-            MemorySegment errorMsgSeg = ZDSStringResponse_C.error_message(responsePtr);
-            String errorMsg = FfmUtils.readString(errorMsgSeg);
-            if (errorMsg != null) {
-                ZdsCApi.zds_c_free_string_response(responsePtr);
-                throw new RuntimeException(errorMsg);
-            }
+            try {
+                MemorySegment errorMsgSeg = ZDSStringResponse_C.error_message(responsePtr);
+                String errorMsg = FfmUtils.readString(errorMsgSeg, FfmUtils.MAX_METADATA_STRING_LENGTH);
+                if (errorMsg != null) {
+                    throw new RuntimeException(errorMsg);
+                }
 
-            MemorySegment outEtagSeg = ZDSStringResponse_C.data(responsePtr);
-            String outEtag = FfmUtils.readString(outEtagSeg);
-            ZdsCApi.zds_c_free_string_response(responsePtr);
-            return outEtag;
+                MemorySegment outEtagSeg = ZDSStringResponse_C.data(responsePtr);
+                return FfmUtils.readString(outEtagSeg, FfmUtils.MAX_METADATA_STRING_LENGTH);
+            } finally {
+                ZdsCApi.zds_c_free_string_response(responsePtr);
+            }
         } catch (Throwable e) {
             if (e instanceof Exception) throw (Exception) e;
             throw new RuntimeException(e);
@@ -165,16 +168,14 @@ public class ZdsBindings implements ZdsService {
     private void handleBasicResponse(MemorySegment responsePtr, Arena arena) throws Exception {
         if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
         responsePtr = ZDSBasicResponse_C.reinterpret(responsePtr, arena, null);
-        MemorySegment errorMsgSeg = ZDSBasicResponse_C.error_message(responsePtr);
-        String errorMsg = FfmUtils.readString(errorMsgSeg);
         try {
+            MemorySegment errorMsgSeg = ZDSBasicResponse_C.error_message(responsePtr);
+            String errorMsg = FfmUtils.readString(errorMsgSeg, FfmUtils.MAX_METADATA_STRING_LENGTH);
+            if (errorMsg != null) {
+                throw new RuntimeException(errorMsg);
+            }
+        } finally {
             ZdsCApi.zds_c_free_basic_response(responsePtr);
-        } catch (Throwable e) {
-            if (e instanceof Exception) throw (Exception) e;
-            throw new RuntimeException(e);
-        }
-        if (errorMsg != null) {
-            throw new RuntimeException(errorMsg);
         }
     }
 
@@ -232,28 +233,30 @@ public class ZdsBindings implements ZdsService {
             
             responsePtr = ZDSMemListResponse_C.reinterpret(responsePtr, arena, null);
 
-            MemorySegment errorMsgSeg = ZDSMemListResponse_C.error_message(responsePtr);
-            String errorMsg = FfmUtils.readString(errorMsgSeg);
-            if (errorMsg != null) {
-                ZdsCApi.zds_c_free_mem_list_response(responsePtr);
-                throw new RuntimeException(errorMsg);
-            }
-
-            MemorySegment membersPtr = ZDSMemListResponse_C.members(responsePtr);
-            long count = ZDSMemListResponse_C.count(responsePtr);
-            
-            List<ZDSMem> results = new ArrayList<>();
-            if (count > 0 && membersPtr.address() != 0) {
-                MemorySegment membersArray = org.zowe.zowex.ffm.generated.ZDSMem_C.reinterpret(membersPtr, count, arena, null);
-                for (long i = 0; i < count; i++) {
-                    MemorySegment memStruct = org.zowe.zowex.ffm.generated.ZDSMem_C.asSlice(membersArray, i);
-                    ZDSMem mem = new ZDSMem();
-                    mem.name = FfmUtils.readString(org.zowe.zowex.ffm.generated.ZDSMem_C.name(memStruct));
-                    results.add(mem);
+            try {
+                MemorySegment errorMsgSeg = ZDSMemListResponse_C.error_message(responsePtr);
+                String errorMsg = FfmUtils.readString(errorMsgSeg, FfmUtils.MAX_METADATA_STRING_LENGTH);
+                if (errorMsg != null) {
+                    throw new RuntimeException(errorMsg);
                 }
+
+                MemorySegment membersPtr = ZDSMemListResponse_C.members(responsePtr);
+                long count = ZDSMemListResponse_C.count(responsePtr);
+
+                List<ZDSMem> results = new ArrayList<>();
+                if (count > 0 && membersPtr.address() != 0) {
+                    MemorySegment membersArray = org.zowe.zowex.ffm.generated.ZDSMem_C.reinterpret(membersPtr, count, arena, null);
+                    for (long i = 0; i < count; i++) {
+                        MemorySegment memStruct = org.zowe.zowex.ffm.generated.ZDSMem_C.asSlice(membersArray, i);
+                        ZDSMem mem = new ZDSMem();
+                        mem.name = FfmUtils.readString(org.zowe.zowex.ffm.generated.ZDSMem_C.name(memStruct), FfmUtils.MAX_METADATA_STRING_LENGTH);
+                        results.add(mem);
+                    }
+                }
+                return results;
+            } finally {
+                ZdsCApi.zds_c_free_mem_list_response(responsePtr);
             }
-            ZdsCApi.zds_c_free_mem_list_response(responsePtr);
-            return results;
         } catch (Throwable e) {
             if (e instanceof Exception) throw (Exception) e;
             throw new RuntimeException(e);

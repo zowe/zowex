@@ -37,14 +37,14 @@ public class ZusfBindings implements ZusfService {
             responsePtr = ZUSFStringResponse_C.reinterpret(responsePtr, arena, null);
 
             MemorySegment errorMsgSeg = ZUSFStringResponse_C.error_message(responsePtr);
-            String errorMsg = FfmUtils.readString(errorMsgSeg);
+            String errorMsg = FfmUtils.readString(errorMsgSeg, FfmUtils.MAX_METADATA_STRING_LENGTH);
             if (errorMsg != null) {
                 ZusfCApi.zusf_c_free_string_response(responsePtr);
                 throw new RuntimeException(errorMsg);
             }
 
             MemorySegment dataSeg = ZUSFStringResponse_C.data(responsePtr);
-            String data = FfmUtils.readString(dataSeg);
+            String data = FfmUtils.readString(dataSeg, FfmUtils.MAX_DATA_STRING_LENGTH);
             ZusfCApi.zusf_c_free_string_response(responsePtr);
             return data;
         } catch (Throwable e) {
@@ -64,14 +64,14 @@ public class ZusfBindings implements ZusfService {
             responsePtr = ZUSFStringResponse_C.reinterpret(responsePtr, arena, null);
 
             MemorySegment errorMsgSeg = ZUSFStringResponse_C.error_message(responsePtr);
-            String errorMsg = FfmUtils.readString(errorMsgSeg);
+            String errorMsg = FfmUtils.readString(errorMsgSeg, FfmUtils.MAX_METADATA_STRING_LENGTH);
             if (errorMsg != null) {
                 ZusfCApi.zusf_c_free_string_response(responsePtr);
                 throw new RuntimeException(errorMsg);
             }
 
             MemorySegment dataSeg = ZUSFStringResponse_C.data(responsePtr);
-            String data = FfmUtils.readString(dataSeg);
+            String data = FfmUtils.readString(dataSeg, FfmUtils.MAX_DATA_STRING_LENGTH);
             ZusfCApi.zusf_c_free_string_response(responsePtr);
             return data;
         } catch (Throwable e) {
@@ -94,14 +94,14 @@ public class ZusfBindings implements ZusfService {
             responsePtr = ZUSFStringResponse_C.reinterpret(responsePtr, arena, null);
 
             MemorySegment errorMsgSeg = ZUSFStringResponse_C.error_message(responsePtr);
-            String errorMsg = FfmUtils.readString(errorMsgSeg);
+            String errorMsg = FfmUtils.readString(errorMsgSeg, FfmUtils.MAX_METADATA_STRING_LENGTH);
             if (errorMsg != null) {
                 ZusfCApi.zusf_c_free_string_response(responsePtr);
                 throw new RuntimeException(errorMsg);
             }
 
             MemorySegment outDataSeg = ZUSFStringResponse_C.data(responsePtr);
-            String outEtag = FfmUtils.readString(outDataSeg);
+            String outEtag = FfmUtils.readString(outDataSeg, FfmUtils.MAX_METADATA_STRING_LENGTH);
             ZusfCApi.zusf_c_free_string_response(responsePtr);
             return outEtag;
         } catch (Throwable e) {
@@ -114,7 +114,7 @@ public class ZusfBindings implements ZusfService {
         if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
         responsePtr = ZUSFBasicResponse_C.reinterpret(responsePtr, arena, null);
         MemorySegment errorMsgSeg = ZUSFBasicResponse_C.error_message(responsePtr);
-        String errorMsg = FfmUtils.readString(errorMsgSeg);
+        String errorMsg = FfmUtils.readString(errorMsgSeg, FfmUtils.MAX_METADATA_STRING_LENGTH);
         try {
             ZusfCApi.zusf_c_free_basic_response(responsePtr);
         } catch (Throwable e) {

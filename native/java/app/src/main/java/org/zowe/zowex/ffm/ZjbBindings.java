@@ -51,7 +51,7 @@ public class ZjbBindings implements ZjbService {
             responsePtr = ZJobListResponse_C.reinterpret(responsePtr, arena, null);
 
             MemorySegment errorMsgSeg = ZJobListResponse_C.error_message(responsePtr);
-            String errorMsg = FfmUtils.readString(errorMsgSeg);
+            String errorMsg = FfmUtils.readString(errorMsgSeg, FfmUtils.MAX_METADATA_STRING_LENGTH);
             if (errorMsg != null) {
                 ZjbCApi.zjb_c_free_job_list_response(responsePtr);
                 throw new RuntimeException(errorMsg);
@@ -66,13 +66,13 @@ public class ZjbBindings implements ZjbService {
                 for (long i = 0; i < count; i++) {
                     MemorySegment jobStruct = ZJob_C.asSlice(jobsArray, i);
                     ZJob job = new ZJob();
-                    job.jobname = FfmUtils.readString(ZJob_C.jobname(jobStruct));
-                    job.jobid = FfmUtils.readString(ZJob_C.jobid(jobStruct));
-                    job.owner = FfmUtils.readString(ZJob_C.owner(jobStruct));
-                    job.status = FfmUtils.readString(ZJob_C.status(jobStruct));
-                    job.fullStatus = FfmUtils.readString(ZJob_C.full_status(jobStruct));
-                    job.retcode = FfmUtils.readString(ZJob_C.retcode(jobStruct));
-                    job.correlator = FfmUtils.readString(ZJob_C.correlator(jobStruct));
+                    job.jobname = FfmUtils.readString(ZJob_C.jobname(jobStruct), FfmUtils.MAX_METADATA_STRING_LENGTH);
+                    job.jobid = FfmUtils.readString(ZJob_C.jobid(jobStruct), FfmUtils.MAX_METADATA_STRING_LENGTH);
+                    job.owner = FfmUtils.readString(ZJob_C.owner(jobStruct), FfmUtils.MAX_METADATA_STRING_LENGTH);
+                    job.status = FfmUtils.readString(ZJob_C.status(jobStruct), FfmUtils.MAX_METADATA_STRING_LENGTH);
+                    job.fullStatus = FfmUtils.readString(ZJob_C.full_status(jobStruct), FfmUtils.MAX_METADATA_STRING_LENGTH);
+                    job.retcode = FfmUtils.readString(ZJob_C.retcode(jobStruct), FfmUtils.MAX_METADATA_STRING_LENGTH);
+                    job.correlator = FfmUtils.readString(ZJob_C.correlator(jobStruct), FfmUtils.MAX_METADATA_STRING_LENGTH);
                     results.add(job);
                 }
             }
@@ -94,7 +94,7 @@ public class ZjbBindings implements ZjbService {
             responsePtr = ZJobResponse_C.reinterpret(responsePtr, arena, null);
 
             MemorySegment errorMsgSeg = ZJobResponse_C.error_message(responsePtr);
-            String errorMsg = FfmUtils.readString(errorMsgSeg);
+            String errorMsg = FfmUtils.readString(errorMsgSeg, FfmUtils.MAX_METADATA_STRING_LENGTH);
             if (errorMsg != null) {
                 ZjbCApi.zjb_c_free_job_response(responsePtr);
                 throw new RuntimeException(errorMsg);
@@ -105,13 +105,13 @@ public class ZjbBindings implements ZjbService {
             if (jobPtr.address() != 0) {
                 MemorySegment jobStruct = ZJob_C.reinterpret(jobPtr, arena, null);
                 job = new ZJob();
-                job.jobname = FfmUtils.readString(ZJob_C.jobname(jobStruct));
-                job.jobid = FfmUtils.readString(ZJob_C.jobid(jobStruct));
-                job.owner = FfmUtils.readString(ZJob_C.owner(jobStruct));
-                job.status = FfmUtils.readString(ZJob_C.status(jobStruct));
-                job.fullStatus = FfmUtils.readString(ZJob_C.full_status(jobStruct));
-                job.retcode = FfmUtils.readString(ZJob_C.retcode(jobStruct));
-                job.correlator = FfmUtils.readString(ZJob_C.correlator(jobStruct));
+                job.jobname = FfmUtils.readString(ZJob_C.jobname(jobStruct), FfmUtils.MAX_METADATA_STRING_LENGTH);
+                job.jobid = FfmUtils.readString(ZJob_C.jobid(jobStruct), FfmUtils.MAX_METADATA_STRING_LENGTH);
+                job.owner = FfmUtils.readString(ZJob_C.owner(jobStruct), FfmUtils.MAX_METADATA_STRING_LENGTH);
+                job.status = FfmUtils.readString(ZJob_C.status(jobStruct), FfmUtils.MAX_METADATA_STRING_LENGTH);
+                job.fullStatus = FfmUtils.readString(ZJob_C.full_status(jobStruct), FfmUtils.MAX_METADATA_STRING_LENGTH);
+                job.retcode = FfmUtils.readString(ZJob_C.retcode(jobStruct), FfmUtils.MAX_METADATA_STRING_LENGTH);
+                job.correlator = FfmUtils.readString(ZJob_C.correlator(jobStruct), FfmUtils.MAX_METADATA_STRING_LENGTH);
             }
             ZjbCApi.zjb_c_free_job_response(responsePtr);
             return job;
@@ -134,7 +134,7 @@ public class ZjbBindings implements ZjbService {
         if (responsePtr.address() == 0) throw new RuntimeException("Null response from native library");
         responsePtr = ZJBBasicResponse_C.reinterpret(responsePtr, arena, null);
         MemorySegment errorMsgSeg = ZJBBasicResponse_C.error_message(responsePtr);
-        String errorMsg = FfmUtils.readString(errorMsgSeg);
+        String errorMsg = FfmUtils.readString(errorMsgSeg, FfmUtils.MAX_METADATA_STRING_LENGTH);
         try {
             ZjbCApi.zjb_c_free_basic_response(responsePtr);
         } catch (Throwable e) {
@@ -156,7 +156,7 @@ public class ZjbBindings implements ZjbService {
             responsePtr = ZJobDDListResponse_C.reinterpret(responsePtr, arena, null);
 
             MemorySegment errorMsgSeg = ZJobDDListResponse_C.error_message(responsePtr);
-            String errorMsg = FfmUtils.readString(errorMsgSeg);
+            String errorMsg = FfmUtils.readString(errorMsgSeg, FfmUtils.MAX_METADATA_STRING_LENGTH);
             if (errorMsg != null) {
                 ZjbCApi.zjb_c_free_job_dd_list_response(responsePtr);
                 throw new RuntimeException(errorMsg);
@@ -171,11 +171,11 @@ public class ZjbBindings implements ZjbService {
                 for (long i = 0; i < count; i++) {
                     MemorySegment ddStruct = ZJobDD_C.asSlice(ddsArray, i);
                     ZJobDD dd = new ZJobDD();
-                    dd.jobid = FfmUtils.readString(ZJobDD_C.jobid(ddStruct));
-                    dd.ddn = FfmUtils.readString(ZJobDD_C.ddn(ddStruct));
-                    dd.dsn = FfmUtils.readString(ZJobDD_C.dsn(ddStruct));
-                    dd.stepname = FfmUtils.readString(ZJobDD_C.stepname(ddStruct));
-                    dd.procstep = FfmUtils.readString(ZJobDD_C.procstep(ddStruct));
+                    dd.jobid = FfmUtils.readString(ZJobDD_C.jobid(ddStruct), FfmUtils.MAX_METADATA_STRING_LENGTH);
+                    dd.ddn = FfmUtils.readString(ZJobDD_C.ddn(ddStruct), FfmUtils.MAX_METADATA_STRING_LENGTH);
+                    dd.dsn = FfmUtils.readString(ZJobDD_C.dsn(ddStruct), FfmUtils.MAX_METADATA_STRING_LENGTH);
+                    dd.stepname = FfmUtils.readString(ZJobDD_C.stepname(ddStruct), FfmUtils.MAX_METADATA_STRING_LENGTH);
+                    dd.procstep = FfmUtils.readString(ZJobDD_C.procstep(ddStruct), FfmUtils.MAX_METADATA_STRING_LENGTH);
                     dd.key = ZJobDD_C.key(ddStruct);
                     results.add(dd);
                 }
@@ -198,14 +198,14 @@ public class ZjbBindings implements ZjbService {
             responsePtr = ZJBStringResponse_C.reinterpret(responsePtr, arena, null);
 
             MemorySegment errorMsgSeg = ZJBStringResponse_C.error_message(responsePtr);
-            String errorMsg = FfmUtils.readString(errorMsgSeg);
+            String errorMsg = FfmUtils.readString(errorMsgSeg, FfmUtils.MAX_METADATA_STRING_LENGTH);
             if (errorMsg != null) {
                 ZjbCApi.zjb_c_free_string_response(responsePtr);
                 throw new RuntimeException(errorMsg);
             }
 
             MemorySegment dataSeg = ZJBStringResponse_C.data(responsePtr);
-            String data = FfmUtils.readString(dataSeg);
+            String data = FfmUtils.readString(dataSeg, FfmUtils.MAX_DATA_STRING_LENGTH);
             ZjbCApi.zjb_c_free_string_response(responsePtr);
             return data;
         } catch (Throwable e) {
@@ -224,14 +224,14 @@ public class ZjbBindings implements ZjbService {
             responsePtr = ZJBStringResponse_C.reinterpret(responsePtr, arena, null);
 
             MemorySegment errorMsgSeg = ZJBStringResponse_C.error_message(responsePtr);
-            String errorMsg = FfmUtils.readString(errorMsgSeg);
+            String errorMsg = FfmUtils.readString(errorMsgSeg, FfmUtils.MAX_METADATA_STRING_LENGTH);
             if (errorMsg != null) {
                 ZjbCApi.zjb_c_free_string_response(responsePtr);
                 throw new RuntimeException(errorMsg);
             }
 
             MemorySegment dataSeg = ZJBStringResponse_C.data(responsePtr);
-            String data = FfmUtils.readString(dataSeg);
+            String data = FfmUtils.readString(dataSeg, FfmUtils.MAX_DATA_STRING_LENGTH);
             ZjbCApi.zjb_c_free_string_response(responsePtr);
             return data;
         } catch (Throwable e) {
@@ -261,14 +261,14 @@ public class ZjbBindings implements ZjbService {
             responsePtr = ZJBStringResponse_C.reinterpret(responsePtr, arena, null);
 
             MemorySegment errorMsgSeg = ZJBStringResponse_C.error_message(responsePtr);
-            String errorMsg = FfmUtils.readString(errorMsgSeg);
+            String errorMsg = FfmUtils.readString(errorMsgSeg, FfmUtils.MAX_METADATA_STRING_LENGTH);
             if (errorMsg != null) {
                 ZjbCApi.zjb_c_free_string_response(responsePtr);
                 throw new RuntimeException(errorMsg);
             }
 
             MemorySegment jobidSeg = ZJBStringResponse_C.data(responsePtr);
-            String jobid = FfmUtils.readString(jobidSeg);
+            String jobid = FfmUtils.readString(jobidSeg, FfmUtils.MAX_METADATA_STRING_LENGTH);
             ZjbCApi.zjb_c_free_string_response(responsePtr);
             return jobid;
         } catch (Throwable e) {

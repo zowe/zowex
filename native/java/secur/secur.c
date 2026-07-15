@@ -63,6 +63,7 @@ JNIEXPORT jint JNICALL Java_org_zowe_zowex_zos_security_jni_Secur_createSecurity
     }
     free_if_not_null(platformUser);
     free_if_not_null(platformApplId);
+    free_if_not_null(platformPassword);
     return rc;
 }
 
@@ -92,8 +93,14 @@ JNIEXPORT jint JNICALL Java_org_zowe_zowex_zos_security_jni_Secur_setApplid(JNIE
 
     char *origApplid = (char *)malloc(9);
     char *applid = jstring_to_ebcdic(env, jApplid);
+    if (applid == NULL) {
+            return -1;  // conversion failed
+    }
     const int applidLength = strlen(applid);
-
+    if (applidLength > 8) {
+        free_if_not_null(applid);
+        return -1;  // reject anything that won't fit the THLI field
+    }
     char *__ptr32 thliApplidLen = (char *__ptr32)(thli + THLIAPPLIDLEN);
     *thliApplidLen = applidLength;
 

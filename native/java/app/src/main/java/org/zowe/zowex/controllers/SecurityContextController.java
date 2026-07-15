@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -33,11 +34,13 @@ import static org.zowe.zowex.zos.security.platform.SafConstants.CLASS_FACILITY;
 
 /**
  * The controller is meant only for thread level security troubleshooting.
+ * It is disabled by default and must not be enabled in production deployments.
  */
 
 @Tag(name = "Security")
 @RestController
 @RequestMapping("/api/v1/securityTest")
+@ConditionalOnProperty(prefix = "zowe.security", name = "test-endpoints-enabled", havingValue = "true", matchIfMissing = false)
 public class SecurityContextController {
 
     public static final String DOC_SCHEME_BASIC_AUTH = "basicAuth";
