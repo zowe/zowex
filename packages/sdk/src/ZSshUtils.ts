@@ -14,11 +14,12 @@ import * as path from "node:path";
 import { promisify } from "node:util";
 import { ImperativeError, type IProfile, Logger } from "@zowe/imperative";
 import { type ISshSession, SshSession } from "@zowe/zos-uss-for-zowe-sdk";
-import { isEqual } from "es-toolkit";
 import { NodeSSH, type Config as NodeSSHConfig } from "node-ssh";
+import * as semver from "semver";
 import type { ConnectConfig, SFTPWrapper } from "ssh2";
 import { PrivateKeyFailurePatterns, SshErrors } from "./SshErrors";
 import { ZSshClient } from "./ZSshClient";
+import { BUNDLED_SSH_SERVER_VERSION } from "./ZSshConstants";
 
 export interface ISshCallbacks {
     onProgress?: (increment: number) => void; // Callback to report incremental progress
@@ -395,8 +396,8 @@ export class ZSshUtils {
         });
     }
 
-    public static async checkIfOutdated(remoteChecksums?: Record<string, string>): Promise<boolean> {
-        return false; // todo
+    public static async checkIfOutdated(remoteVersion: string): Promise<boolean> {
+        return semver.lt(remoteVersion, BUNDLED_SSH_SERVER_VERSION);
     }
 
     private static getBinDir(dir: string): string {
