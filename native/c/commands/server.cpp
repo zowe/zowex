@@ -77,46 +77,10 @@ void ZServer::request_shutdown()
           close(STDIN_FILENO); });
 }
 
-std::map<std::string, std::string> ZServer::load_checksums()
-{
-  std::map<std::string, std::string> checksums;
-  ZUSF zusf = {.encoding_opts = {.source_codepage = "IBM-1047", .data_type = eDataTypeText}};
-  std::string checksums_file = options.exec_dir + "/checksums.asc";
-  std::string checksums_content;
-
-  int rc = zusf_read_from_uss_file(&zusf, checksums_file, checksums_content);
-  if (rc != 0)
-  {
-    LOG_DEBUG("Failed to read checksums file: %s (expected for dev builds)", checksums_file.c_str());
-    return checksums;
-  }
-
-  std::istringstream infile(checksums_content);
-  std::string line{};
-  std::string checksum{};
-  std::string filename{};
-  while (std::getline(infile, line))
-  {
-    std::istringstream iss(line);
-    if (iss >> checksum >> filename)
-    {
-      checksums[filename] = checksum;
-    }
-  }
-
-  return checksums;
-}
-
 void ZServer::print_ready_message()
 {
   zjson::Value data = zjson::Value::create_object();
-  const auto checksums = load_checksums();
-  zjson::Value checksums_obj = zjson::Value::create_object();
-  for (const auto &pair : checksums)
-  {
-    checksums_obj.add_to_object(pair.first, zjson::Value(pair.second));
-  }
-  data.add_to_object("checksums", checksums.empty() ? zjson::Value() : checksums_obj);
+
   data.add_to_object("version", zjson::Value(core::get_version()));
 
   StatusMessage status_msg{

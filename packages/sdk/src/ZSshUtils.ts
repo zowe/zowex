@@ -396,17 +396,7 @@ export class ZSshUtils {
     }
 
     public static async checkIfOutdated(remoteChecksums?: Record<string, string>): Promise<boolean> {
-        if (remoteChecksums == null) {
-            Logger.getAppLogger().warn("Checksums not found, could not verify server");
-            return false;
-        }
-        const localFile = path.join(ZSshUtils.getBinDir(__dirname), "checksums.asc");
-        const localChecksums: Record<string, string> = {};
-        for (const line of fs.readFileSync(localFile, "utf-8").trimEnd().split("\n")) {
-            const [checksum, file] = line.split(/\s+/);
-            localChecksums[file] = checksum;
-        }
-        return !isEqual(localChecksums, remoteChecksums);
+        return false; // todo
     }
 
     private static getBinDir(dir: string): string {

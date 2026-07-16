@@ -199,27 +199,8 @@ void zowex_server_tests()
                   std::string response = read_line_from_server(server);
                   stop_server(server);
 
-                  Expect(response).ToContain("\"checksums\":null");
                   Expect(response).ToContain("\"message\":\"zowex server is ready to accept input\"");
                   Expect(response).ToContain("\"status\":\"ready\"");
-                });
-             it("should print ready message with checksums",
-                []() -> void
-                {
-                  std::string checksums_file = zowex_dir + "/checksums.asc";
-                  unlink(checksums_file.c_str());
-                  std::ofstream outfile(checksums_file);
-                  outfile << "123 abc" << std::endl;
-
-                  ServerHandle server = start_server(zowex_server_command);
-                  std::string response = read_line_from_server(server);
-                  stop_server(server);
-
-                  Expect(response).ToContain("\"checksums\":{\"abc\":\"123\"}");
-                  Expect(response).ToContain("\"message\":\"zowex server is ready to accept input\"");
-                  Expect(response).ToContain("\"status\":\"ready\"");
-
-                  unlink(checksums_file.c_str());
                 });
              it("should print ready message with version",
                 []() -> void

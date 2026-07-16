@@ -1099,21 +1099,18 @@ async function artifacts(connection: Client, packageAll: boolean) {
     const artifactPaths = ["c/build-out/zowex", packageAll && "c/build-out/zoweax"].filter(Boolean);
     const artifactNames = artifactPaths.map((file) => path.basename(file)).sort(localeCompare);
     const localDir = packageAll ? "dist" : "packages/sdk/bin";
-    const localFiles = ["server.pax.Z", "checksums.asc"];
-    const [paxFile, checksumFile] = localFiles;
+    const localFiles = ["server.pax.Z"];
+    const [paxFile] = localFiles;
     const prePaxCmds = artifactPaths.map(
         (file) => `cp ../${file} ${path.basename(file)} && chmod 700 ${path.basename(file)}`,
     );
     const postPaxCmd = `rm ${artifactNames.join(" ")} && rmdir ../bin`;
-    const e2aPipe = (file: string) => `iconv -f IBM-1047 -t ISO8859-1 > ${file} && chtag -tc ISO8859-1 ${file}`;
     await runCommandInShell(
         connection,
         [
             `cd ${deployDirs.root} && mkdir -p bin dist && cd bin`,
             ...prePaxCmds,
-            `_BPXK_AUTOCVT=OFF sha256 -r ${artifactNames.join(" ")} | ${e2aPipe(checksumFile)}`,
-            `pax -wvz -o saveext -f ../dist/${paxFile} ${artifactNames.join(" ")} ${checksumFile}`,
-            `mv ${checksumFile} ../dist/${checksumFile}`,
+            `pax -wvz -o saveext -f ../dist/${paxFile} ${artifactNames.join(" ")}`,
             postPaxCmd,
         ].join("\n"),
         { stepName: "Packaging artifacts" },
