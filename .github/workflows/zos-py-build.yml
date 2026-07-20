@@ -22,6 +22,7 @@ on:
         required: true
 
 permissions:
+  contents: read
   pull-requests: write
 
 jobs:
@@ -40,7 +41,7 @@ jobs:
 
       - name: Set up Credentials
         run: |
-          cat << EOF > config.yaml
+          cat << 'EOF' > config.yaml
           activeProfile: default
 
           profiles:
@@ -60,11 +61,43 @@ jobs:
       - name: Upload Python Bindings
         run: npm run z:upload
 
-      - name: Build Python Bindings
-        run: npm run z:build:python
+      # SWIG is required to build the bindings from source. It is not always
+      # available on the remote z/OS system, so check first and branch on it.
+      - name: Check for SWIG on z/OS
+        id: swig
+        run: |
+          if npm run -s z:has:swig; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
 
+      # Path A: SWIG present -> build the bindings from source as usual.
+      - name: Build Python Bindings
+        if: steps.swig.outputs.present == 'true'
+        run: npm run z:python:build
+
+      # Path B: SWIG absent -> fetch the latest precompiled bundle posted to this
+      # PR (any author) and apply it so the tests can run without building.
+      - name: Fetch precompiled Python bindings
+        if: steps.swig.outputs.present != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: npm run z:python:fetch -- ${{ github.event.pull_request.number }}
+
+      - name: Apply precompiled Python bindings
+        if: steps.swig.outputs.present != 'true' && hashFiles('dist/zbind_bin_dist.tar.gz') != ''
+        run: npm run z:python:apply
+
+      - name: Warn if no bindings available
+        if: steps.swig.outputs.present != 'true' && hashFiles('dist/zbind_bin_dist.tar.gz') == ''
+        run: echo "::warning::SWIG not found on z/OS and no 'Precompiled Python bindings' comment found on this PR — skipping Python tests."
+
+      # Run tests when we have bindings: either freshly built, or applied from a
+      # downloaded precompiled bundle.
       - name: Test Python Bindings
-        run: npm run z:test:python
+        if: steps.swig.outputs.present == 'true' || hashFiles('dist/zbind_bin_dist.tar.gz') != ''
+        run: npm run z:python:test
 
       - name: Clean up on z/OS
         if: always()

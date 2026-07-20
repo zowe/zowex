@@ -17,7 +17,7 @@ import { promisify } from "node:util";
 import { DeferredPromise, DeferredPromiseStatus, type IProfile, ProfileInfo } from "@zowe/imperative";
 import * as chokidar from "chokidar";
 import * as yaml from "js-yaml";
-import { Client, type ClientCallback, type SFTPWrapper } from "ssh2";
+import { Client, PseudoTtyOptions, type ClientCallback, type SFTPWrapper } from "ssh2";
 
 interface IConfig {
     sshProfile: string | IProfile;
@@ -27,6 +27,78 @@ interface IConfig {
 }
 
 type SftpError = Error & { code?: number };
+
+// Constants for precompiled Python bindings
+const STICKY_MARKER = "Precompiled Python bindings";
+const COMMENT_HEADER = "🐍 Precompiled Python bindings";
+const RELEASE_TAG = "py-bindings-dev";
+const RELEASE_TITLE = "Python Bindings (Dev Artifacts)";
+const RELEASE_NOTES =
+    "Persistent host for precompiled Python bindings built from pull requests. Not for distribution — assets here are dev artifacts linked from PR comments.";
+const SAFE_TAG = /^[\w.-]+$/;
+const SAFE_ASSET = /^zbind_bin_dist[\w.-]*\.tar\.gz$/;
+const TARBALL = path.resolve(__dirname, "../dist/zbind_bin_dist.tar.gz");
+const OUTPUT = path.resolve(__dirname, "../dist/zbind_bin_dist.tar.gz");
+
+/**
+ * Resolves an executable to an absolute path within a fixed set of trusted,
+ * system-owned directories. Spawning by bare name lets the OS search a possibly
+ * attacker-controlled PATH; resolving against a hardcoded directory list keeps
+ * execution restricted to fixed, unwriteable locations.
+ */
+function resolveExecutable(name: string): string | null {
+    const trustedDirs =
+        process.platform === "win32"
+            ? [path.join(process.env.SystemRoot ?? "C:\\Windows", "System32")]
+            : ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"];
+    const candidates = process.platform === "win32" ? [`${name}.exe`, `${name}.cmd`] : [name];
+    for (const dir of trustedDirs) {
+        for (const file of candidates) {
+            const full = path.join(dir, file);
+            if (fs.existsSync(full)) {
+                return full;
+            }
+        }
+    }
+    return null;
+}
+
+let ghBinPath: string | null = null;
+
+/**
+ * Resolves the "gh" executable lazily to avoid throwing errors during SSH-only
+ * tasks if GitHub CLI is not installed.
+ */
+function getGhBin(): string {
+    if (ghBinPath === null) {
+        ghBinPath = resolveExecutable("gh");
+        if (ghBinPath === null) {
+            console.error('Required executable "gh" was not found in a trusted system directory.');
+            process.exit(1);
+        }
+    }
+    return ghBinPath;
+}
+
+/** Runs `gh` with the given args, returning trimmed stdout. */
+function gh(args: string[]): string {
+    return childProcess.execFileSync(getGhBin(), args, { encoding: "utf-8" }).trim();
+}
+
+/** Returns the short git commit hash, or "local" if it cannot be determined. */
+function getShortHash(): string {
+    const gitBin = resolveExecutable("git");
+    if (gitBin == null) {
+        return "local";
+    }
+    try {
+        const hash = childProcess.execFileSync(gitBin, ["rev-parse", "--short", "HEAD"], { encoding: "utf-8" }).trim();
+        // Only accept a real short hash; anything else falls back to a safe literal.
+        return /^[0-9a-f]{4,40}$/i.test(hash) ? hash : "local";
+    } catch {
+        return "local";
+    }
+}
 
 /**
  * Converts a file path to use POSIX separators (forward slashes).
@@ -1124,10 +1196,98 @@ async function artifacts(connection: Client, packageAll: boolean) {
     }
 }
 
+/**
+ * Runs the precompiled Python bindings packaging script on z/OS and downloads
+ * the resulting binary tarball to the local `dist/` directory. The tarball is
+ * retrieved without ASCII conversion (binary-safe) to preserve the archive.
+ */
+async function packPrecompiled(connection: Client) {
+    await runCommandInShell(connection, `cd ${deployDirs.pythonDir} && python package_precompiled.py`, {
+        streamOutput: true,
+        stepName: "Packaging precompiled Python bindings",
+    });
+    fs.mkdirSync(path.resolve(__dirname, "./../dist"), { recursive: true });
+    await retrieve(connection, ["python/bindings/zbind_bin_dist.tar.gz"], "dist", true);
+    console.log("Precompiled bindings downloaded to dist/zbind_bin_dist.tar.gz");
+}
+
+/**
+ * Checks whether `swig` is available on the remote system using the same PATH
+ * the build uses (preBuildCmd is prepended by runCommandInShell). Sets a
+ * non-zero exit code when swig is absent so callers can branch on it, e.g.
+ * `if npm run -s z:has:swig; then ...`.
+ */
+async function hasSwig(connection: Client) {
+    const out = await runCommandInShell(connection, "command -v swig\n", {
+        stepName: "Checking for swig on remote",
+        suppressError: true,
+    });
+    const found = out.trim().length > 0 && !out.includes("not found");
+    if (found) {
+        console.log(`swig found: ${out.trim()}`);
+    } else {
+        console.log("swig not found on remote system");
+    }
+    // Override any exit code set by the suppressed command so the result is explicit.
+    process.exitCode = found ? 0 : 1;
+}
+
+/**
+ * Applies a previously downloaded precompiled bindings bundle
+ * (dist/zbind_bin_dist.tar.gz) to the remote bindings directory: uploads the
+ * archive as binary, extracts it on z/OS, and copies the compiled `.so`
+ * libraries and Python wrapper modules into the bindings dir so the test step
+ * can import them without building. Used when swig is unavailable on z/OS.
+ */
+async function applyPrecompiled(connection: Client) {
+    const localTarball = path.resolve(__dirname, "./../dist/zbind_bin_dist.tar.gz");
+    if (!fs.existsSync(localTarball)) {
+        throw new Error(`Precompiled bundle not found at ${localTarball}. Run "npm run z:python:fetch" first.`);
+    }
+    const remoteTarball = `${deployDirs.pythonDir}/zbind_bin_dist.tar.gz`;
+
+    // Upload the archive without EBCDIC conversion to preserve its binary contents.
+    await new Promise<void>((resolve, reject) => {
+        connection.sftp(async (err, sftpcon) => {
+            if (err) {
+                reject(err);
+                return;
+            }
+            try {
+                await uploadFile(sftpcon, localTarball, remoteTarball, false);
+                sftpcon.end();
+                resolve();
+            } catch (uploadErr) {
+                reject(uploadErr);
+            }
+        });
+    });
+
+    await runCommandInShell(
+        connection,
+        [
+            `cd ${deployDirs.pythonDir}`,
+            "rm -rf zbind_bin_dist zbind_bin_dist.tar",
+            // Decompress with Python (always present here) to avoid depending on a gzip binary.
+            "python -c \"import gzip, shutil; dst=open('zbind_bin_dist.tar','wb'); shutil.copyfileobj(gzip.open('zbind_bin_dist.tar.gz','rb'), dst); dst.close()\"",
+            "chtag -b zbind_bin_dist.tar",
+            "pax -r -f zbind_bin_dist.tar",
+            "cp zbind_bin_dist/_*.so zbind_bin_dist/z*_py.py .",
+            // USTAR does not carry z/OS file tags, so re-apply them by file type.
+            "chtag -b _*.so",
+            "chtag -tc ISO8859-1 z*_py.py",
+            "rm -f zbind_bin_dist.tar",
+        ].join("\n"),
+        { stepName: "Applying precompiled bindings", streamOutput: true },
+    );
+    console.log("Applied precompiled bindings to the z/OS bindings directory.");
+}
+
 interface RunCommandOpts {
     streamOutput?: boolean;
     stepName?: string;
     suppressError?: boolean;
+    ttyOptions?: PseudoTtyOptions;
 }
 
 async function runCommandInShell(connection: Client, command: string, opts?: RunCommandOpts) {
@@ -1190,7 +1350,7 @@ async function runCommandInShell(connection: Client, command: string, opts?: Run
             });
             stream.end(`${command}\nexit $?\n`);
         };
-        connection.shell(false, cb);
+        connection.shell(opts?.ttyOptions ?? false, cb);
     });
 }
 
@@ -1538,7 +1698,230 @@ async function buildSshClient(sshProfile: IProfile): Promise<Client> {
     });
 }
 
+/**
+ * Finds the REST comment id of the most recent comment on the PR that was
+ * authored by the current user and contains the sticky marker. Returns null if
+ * no such comment exists (so a fresh one should be created).
+ */
+function findStickyCommentId(prNumber: string): number | null {
+    const comments = JSON.parse(gh(["pr", "view", prNumber, "--json", "comments"])).comments as Array<{
+        body: string;
+        url: string;
+        viewerDidAuthor: boolean;
+        createdAt: string;
+    }>;
+    const mine = comments
+        .filter((c) => c.viewerDidAuthor && c.body.includes(STICKY_MARKER))
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    const latest = mine.at(-1);
+    if (!latest) {
+        return null;
+    }
+    // gh exposes a GraphQL node id; the numeric REST id needed for PATCH lives in the URL.
+    const match = latest.url.match(/#issuecomment-(\d+)/);
+    return match ? Number(match[1]) : null;
+}
+
+/**
+ * Posts the precompiled Python bindings tarball (built on z/OS via
+ * `npm run z:python:pack`) to a pull request as a downloadable link.
+ */
+function postPrecompiledBindings(prNumber: string) {
+    if (!prNumber || !/^\d+$/.test(prNumber)) {
+        console.error("Usage: npm run z:python:post -- <PR_NUMBER>");
+        process.exit(1);
+    }
+
+    if (!fs.existsSync(TARBALL)) {
+        console.error(`Tarball not found: ${TARBALL}\nRun "npm run z:python:pack" first to build it on z/OS.`);
+        process.exit(1);
+    }
+
+    const hash = getShortHash();
+    const assetName = `zbind_bin_dist-pr${prNumber}-${hash}.tar.gz`;
+
+    // Defense-in-depth: prNumber and hash are validated above, but re-check that the
+    // resolved staging path stays directly inside dist/ before any filesystem access,
+    // so a crafted argument can never escape the intended directory.
+    const distDir = path.resolve(path.dirname(TARBALL));
+    const stagedPath = path.resolve(distDir, assetName);
+    if (path.dirname(stagedPath) !== distDir) {
+        console.error(`Refusing to stage outside the dist directory: ${stagedPath}`);
+        process.exit(1);
+    }
+    fs.copyFileSync(TARBALL, stagedPath);
+
+    try {
+        const repo = gh(["repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"]);
+
+        // Ensure the shared prerelease exists; create it only the first time.
+        let releaseExists = true;
+        try {
+            childProcess.execFileSync(getGhBin(), ["release", "view", RELEASE_TAG], { stdio: "ignore" });
+        } catch {
+            releaseExists = false;
+        }
+        if (!releaseExists) {
+            console.log(`Creating prerelease "${RELEASE_TAG}"...`);
+            gh(["release", "create", RELEASE_TAG, "--prerelease", "--title", RELEASE_TITLE, "--notes", RELEASE_NOTES]);
+        }
+
+        console.log(`Uploading asset "${assetName}"...`);
+        gh(["release", "upload", RELEASE_TAG, stagedPath, "--clobber"]);
+
+        // Resolve the asset's download URL from the release metadata.
+        const assets = JSON.parse(gh(["release", "view", RELEASE_TAG, "--json", "assets"])).assets as Array<{
+            name: string;
+            url: string;
+        }>;
+        const url =
+            assets.find((a) => a.name === assetName)?.url ??
+            `https://github.com/${repo}/releases/download/${RELEASE_TAG}/${assetName}`;
+
+        const body = [
+            `### ${COMMENT_HEADER}`,
+            "",
+            `Built from \`${hash}\` on z/OS.`,
+            "",
+            `📦 **[Download \`${assetName}\`](${url})**`,
+            "",
+            `<sub>Hosted as an asset on the \`${RELEASE_TAG}\` prerelease (dev artifact, not for distribution).</sub>`,
+        ].join("\n");
+
+        // Treat the comment as sticky: update our existing one if present, else create it.
+        const existingCommentId = findStickyCommentId(prNumber);
+        if (existingCommentId != null) {
+            console.log(`Updating existing comment ${existingCommentId} on PR #${prNumber}...`);
+            gh([
+                "api",
+                "--method",
+                "PATCH",
+                `repos/${repo}/issues/comments/${existingCommentId}`,
+                "-f",
+                `body=${body}`,
+            ]);
+        } else {
+            console.log(`Posting comment to PR #${prNumber}...`);
+            gh(["pr", "comment", prNumber, "--body", body]);
+        }
+
+        console.log(`\n✅ ${existingCommentId != null ? "Updated" : "Posted"} precompiled bindings on PR #${prNumber}`);
+        console.log(`   Asset: ${url}`);
+    } finally {
+        fs.rmSync(stagedPath, { force: true });
+    }
+}
+
+/**
+ * Locates the most recent "Precompiled Python bindings" comment on a pull
+ * request (any author), parses the release-asset link it contains, and
+ * downloads that asset to dist/zbind_bin_dist.tar.gz so it can be applied to
+ * z/OS for testing.
+ */
+function fetchPrecompiledFromPr(prNumber: string) {
+    if (!prNumber || !/^\d+$/.test(prNumber)) {
+        console.error("Usage: npm run z:python:fetch -- <PR_NUMBER>");
+        process.exit(1);
+    }
+
+    // Most recent matching comment on this PR, regardless of author.
+    const comments = JSON.parse(gh(["pr", "view", prNumber, "--json", "comments"])).comments as Array<{
+        body: string;
+        createdAt: string;
+    }>;
+    const latest = comments
+        .filter((c) => c.body.includes(STICKY_MARKER))
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+        .at(-1);
+    if (!latest) {
+        console.warn(`No "${STICKY_MARKER}" comment found on PR #${prNumber}.`);
+        process.exit(2);
+    }
+
+    // Pull the release-asset URL out of the markdown download link.
+    const linkMatch = latest.body.match(/]\((https?:\/\/[^)]+\/releases\/download\/[^)]+)\)/);
+    if (!linkMatch) {
+        console.warn(`Found a "${STICKY_MARKER}" comment on PR #${prNumber} but no release-asset download link.`);
+        process.exit(2);
+    }
+    const urlMatch = linkMatch[1].match(/\/releases\/download\/([^/]+)\/([^/]+)$/);
+    const tag = urlMatch ? decodeURIComponent(urlMatch[1]) : "";
+    const assetName = urlMatch ? decodeURIComponent(urlMatch[2]) : "";
+    if (!SAFE_TAG.test(tag) || !SAFE_ASSET.test(assetName)) {
+        console.warn(`Asset link did not match the expected pattern (tag="${tag}", asset="${assetName}"); skipping.`);
+        process.exit(2);
+    }
+
+    // Download from the current repo's release by tag + asset name. Using
+    // `gh release download` (rather than the raw URL) keeps the fetch scoped to
+    // this repository regardless of what the comment URL points at.
+    const outDir = path.dirname(OUTPUT);
+    fs.mkdirSync(outDir, { recursive: true });
+    console.log(`Downloading "${assetName}" from release "${tag}"...`);
+    gh(["release", "download", tag, "--pattern", assetName, "--dir", outDir, "--clobber"]);
+
+    const downloaded = path.resolve(outDir, assetName);
+    if (path.dirname(downloaded) !== path.resolve(outDir) || !fs.existsSync(downloaded)) {
+        console.error(`Expected downloaded asset at ${downloaded} was not found.`);
+        process.exit(1);
+    }
+    if (downloaded !== OUTPUT) {
+        fs.copyFileSync(downloaded, OUTPUT);
+        fs.rmSync(downloaded, { force: true });
+    }
+    console.log(`Fetched precompiled bindings -> ${OUTPUT}`);
+}
+
+/**
+ * Runs another npm script in this package. Spawns via the absolute node path
+ * (process.execPath) and npm's own entry point (npm_execpath) rather than a
+ * bare command name, so execution never depends on a hijackable PATH.
+ */
+function npmRun(step: string, stepArgs: string[] = []) {
+    const npmExec = process.env.npm_execpath;
+    if (!npmExec) {
+        console.error("This script must be run via npm, e.g. `npm run z:python:test:precompiled -- <PR_NUMBER>`.");
+        process.exit(1);
+    }
+    const runArgs = [npmExec, "run", step, ...(stepArgs.length > 0 ? ["--", ...stepArgs] : [])];
+    childProcess.execFileSync(process.execPath, runArgs, { stdio: "inherit" });
+}
+
+/**
+ * Local convenience runner that mirrors what the CI workflow does on the
+ * precompiled (no-swig) path: fetch the latest "Precompiled Python bindings"
+ * bundle posted to a PR, apply it to z/OS, then run the Python tests against it.
+ */
+function testPrecompiledLocal(prNumber: string) {
+    if (!prNumber || !/^\d+$/.test(prNumber)) {
+        console.error("Usage: npm run z:python:test:precompiled -- <PR_NUMBER>");
+        process.exit(1);
+    }
+
+    try {
+        npmRun("z:python:fetch", [prNumber]);
+    } catch {
+        console.error(`\nNo precompiled bindings could be fetched for PR #${prNumber}; nothing to test.`);
+        process.exit(1);
+    }
+
+    npmRun("z:python:apply");
+    npmRun("z:python:test");
+    console.log(`\n✅ Tested precompiled bindings from PR #${prNumber} on z/OS.`);
+}
+
 async function main() {
+    switch (args[0]) {
+        case "python:post":
+            postPrecompiledBindings(args[1]);
+            return;
+        case "python:fetch":
+            fetchPrecompiledFromPr(args[1]);
+            return;
+        case "python:test:precompiled":
+            testPrecompiledLocal(args[1]);
+            return;
+    }
     const config = await loadConfig();
     preBuildCmd = config.preBuildCmd;
     configTestEnv = config.testEnv ?? {};
@@ -1563,7 +1946,7 @@ async function main() {
             case "build:chdsect":
                 await chdsect(sshClient);
                 break;
-            case "build:python":
+            case "python:build":
                 await make(sshClient, deployDirs.pythonDir);
                 break;
             case "clean":
@@ -1575,6 +1958,15 @@ async function main() {
             case "make":
                 await make(sshClient);
                 break;
+            case "has:swig":
+                await hasSwig(sshClient);
+                break;
+            case "python:apply":
+                await applyPrecompiled(sshClient);
+                break;
+            case "python:pack":
+                await packPrecompiled(sshClient);
+                break;
             case "package":
                 await artifacts(sshClient, true);
                 break;
@@ -1585,7 +1977,7 @@ async function main() {
             case "test":
                 await test(sshClient);
                 break;
-            case "test:python":
+            case "python:test":
                 await make(sshClient, deployDirs.pythonTestDir);
                 break;
             case "upload":
