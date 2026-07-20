@@ -6,6 +6,11 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- `c`: Added support to return information for current linklist. [#1061](https://github.com/zowe/zowex/pull/1061)
+
+## `0.6.1`
+
+- `c`: Changed `zowex` and `zowex server` to write log files to the current user's home directory (`~/.zowex/logs`) instead of a location shared by all users. `zowex server` now rolls its log over in FIFO order across up to 10 files capped at 100KB each (~1MB total) instead of truncating a single file. Added support for the `ZOWEX_LOGS_DIR` environment variable to customize the log directory. [#1003](https://github.com/zowe/zowex/issues/1003)
 - `c`: Implemented bounds checking and truncation for strings logged with the `zwto_debug` macro. [#1059](https://github.com/zowe/zowex/pull/1059)
 - `c`: Fixed an issue where data set member write operations did not produce self-contained records for stateful mixed single-byte and double-byte character sets. Now, each record written to a data set member is self-contained to avoid code page conversion errors. [#1049](https://github.com/zowe/zowex/pull/1049)
 - `c`: Fixed an issue where the `zowex ds copy` command would fail to allocate DDs when copying PDS members in parallel. [#994](https://github.com/zowe/zowex/issues/994)

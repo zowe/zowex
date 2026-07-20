@@ -21,10 +21,7 @@
 #include <iostream>
 #include "singleton.hpp"
 #include "zlogger_metal.h"
-
-#include <sys/stat.h>
-#include <unistd.h>
-#include <cerrno>
+#include "zlog_util.hpp"
 
 typedef zlog_level_t LogLevel;
 
@@ -45,19 +42,6 @@ protected:
 #ifdef ZLOG_ENABLE
     initialize();
 #endif
-  }
-
-  auto create_logs_dir() -> bool
-  {
-    if (mkdir("logs", 0700) == -1)
-    {
-      if (errno != EEXIST)
-      {
-        std::cerr << "Failed to create logs directory: " << strerror(errno) << std::endl;
-        return false;
-      }
-    }
-    return true;
   }
 
   auto get_level_from_str(const std::string &level_str) -> int
@@ -105,25 +89,15 @@ public:
    */
   auto initialize() -> void
   {
-    // Create logs directory if it doesn't exist
-    if (!create_logs_dir())
+    // Resolve and create the per-user logs directory (honors ZOWEX_LOGS_DIR)
+    const std::string logs_dir = zlog_util::resolve_logs_dir();
+    if (!zlog_util::make_dirs(logs_dir))
     {
+      std::cerr << "Failed to create logs directory: " << logs_dir << std::endl;
       return;
     }
 
-    // Get current working directory
-    char cwd[260] = {0};
-    std::string log_path_str;
-
-    if (getcwd(cwd, sizeof(cwd)) != nullptr)
-    {
-      log_path_str = std::string(cwd) + "/logs/zowex.log";
-    }
-    else
-    {
-      // Fallback to relative path if CWD cannot be deduced
-      log_path_str = "logs/zowex.log";
-    }
+    const std::string log_path_str = logs_dir + "/zowex.log";
 
     // Check environment variable for log level
     const char *env_level = std::getenv("ZOWEX_LOG_LEVEL");

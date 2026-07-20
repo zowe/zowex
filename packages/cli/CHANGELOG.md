@@ -4,7 +4,7 @@ All notable changes to the Client code for "zowex-for-zowe-cli" are documented i
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## Recent Changes
+## `0.6.1`
 
 - Added `--encoding` flag to `zssh submit local-file` and `zssh submit stdin` commands to specify the encoding of the submitted JCL. [#1050](https://github.com/zowe/zowex/pull/1050)
 - Added `zssh copy data-set` command to copy data sets and members with optional `--replace` and `--overwrite` flags. Supports PDS-to-PDS, member-to-member, and sequential-to-sequential copies. [#995](https://github.com/zowe/zowex/pull/995)

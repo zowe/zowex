@@ -154,7 +154,7 @@ void ZServer::run(const server::Options &opts)
 {
   options = opts;
 
-  server::Logger::init_logger(options.exec_dir.c_str(), options.verbose);
+  server::Logger::init_logger(options.verbose);
   LOG_INFO("Starting zowex server with %lld workers and %lld seconds until request timeout (verbose=%s)", options.num_workers, options.request_timeout, options.verbose ? "true" : "false");
 
   setup_signal_handlers();

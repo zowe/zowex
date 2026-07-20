@@ -12,7 +12,7 @@
 #
 #   zx ds   list <pattern> | members <dsn> | read <dsn> | write <dsn> <file>
 #           | get <dsn[(m)]> <localdir|file> | put <localdir|file> <dsn[(m)]>
-#           | create <dsn> [<attrs-json>] | delete <dsn> | copy <src> <dst> | rename <a> <b>
+#           | create <dsn> [<attrs-json>] | delete <dsn> | copy <src> <dst> [--ow|-r] | rename <a> <b>
 #   zx job  list [<owner> [<prefix>]] | submit <file|/uss-path|DSN[(MBR)]> | status <id> | spools <id>
 #           | spool <id> <n> | jcl <id> | cancel|delete|hold|release <id>
 #   zx uss  ls <path> | get <path> [<local>] | put <local> <path>      (sftp, binary-safe)
@@ -20,7 +20,7 @@
 #           | rm <path> | mkdir <path> | mv <a> <b> | cp <a> <b>
 #           | chmod <mode> <p> | chown <o> <p> | chtag <t> <p> | sh '<cmd>'
 #   zx tso  '<cmd>'
-#   zx system apf | proclib | parmlib | subsystems | symbol <s> | syslog
+#   zx system apf | linklist | proclib | parmlib | subsystems | symbol <s> | syslog
 #   zx tool amblist <dsn> --cs '<stmts>' | run <pgm> [opts] | search <dsn> <str> [opts]
 #           | dynalloc '<parm>' | dsect --ad <dsn> --cd <dsn>
 #   zx console '<cmd>' [--cn <name>] [--timeout <s>] [--no-wait]
@@ -422,7 +422,7 @@ ds)
     create)  [[ $# -ge 1 ]]||die "zx ds create <dsn> ['<attrs-json>']"
              a="${2-}"; [[ -n "$a" ]]||a='{}'; _rpc createDataset "{\"dsname\":$(_j "$1"),\"attributes\":$a}" | _out _pp_kv;;
     delete)  [[ $# -eq 1 ]]||die "zx ds delete <dsn>";     _rpc deleteDataset "{\"dsname\":$(_j "$1")}"  | _out _pp_kv;;
-    copy)    [[ $# -eq 2 ]]||die "zx ds copy <src> <dst>"; _rpc copyDataset   "{\"source\":$(_j "$1"),\"target\":$(_j "$2")}" | _out _pp_kv;;
+    copy)    [[ $# -ge 2 ]]||die "zx ds copy <src> <dst> [--ow|-r]"; _cli data-set copy "$@";;
     rename)  [[ $# -eq 2 ]]||die "zx ds rename <a> <b>";   _rpc renameDataset "{\"dsnameBefore\":$(_j "$1"),\"dsnameAfter\":$(_j "$2")}" | _out _pp_kv;;
     *) die "zx ds {list|members|read|write|get|put|create|delete|copy|rename}";;
   esac;;
@@ -489,13 +489,14 @@ tso)
 system)
   sub="${1-}"; shift || true
   case "$sub" in
-    apf)        _rpc listApf     '{}' | _out _pp_table volume:-6 dsname:-44 ;;
-    proclib)    _rpc listProclib '{}' | _out _pp_table ;;
-    syslog)     _rpc viewSyslog  '{}' | _out _pp_data_text;;
+    apf)        _rpc listApf      '{}' | _out _pp_table volume:-6 dsname:-44 ;;
+    linklist)   _rpc listLinklist '{}' | _out _pp_table volume:-6 dsname:-44 apf:-5 ;;
+    proclib)    _rpc listProclib  '{}' | _out _pp_table ;;
+    syslog)     _rpc viewSyslog   '{}' | _out _pp_data_text;;
     parmlib)    _cli system list-parmlib;;
     subsystems) _cli system list-subsystems;;
     symbol)     [[ $# -eq 1 ]]||die "zx system symbol <name>"; _cli system display-symbol "$1";;
-    *) die "zx system {apf|proclib|parmlib|subsystems|symbol <s>|syslog}";;
+    *) die "zx system {apf|linklist|proclib|parmlib|subsystems|symbol <s>|syslog}";;
   esac;;
 
 tool)
