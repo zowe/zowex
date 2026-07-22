@@ -12,10 +12,13 @@
 #ifndef _UNIX03_SOURCE
 #define _UNIX03_SOURCE
 #endif
+#include <cerrno>
 #include <dirent.h>
 #include <dlfcn.h>
+#include <sys/stat.h>
 #include "plugin.hpp"
 #include "../parser.hpp"
+#include "../zlogger.hpp"
 
 namespace plugin
 {
@@ -232,7 +235,30 @@ void PluginManager::load_plugins(const std::string &plugins_path)
     void (*register_plugin)(plugin::PluginManager &);
     while ((entry = readdir(plugins_dir)) != nullptr)
     {
-      std::string plugin_path = m_plugins_path + "/" + entry->d_name;
+      const std::string entry_name = entry->d_name;
+      if (entry_name == "." || entry_name == "..")
+      {
+        ZLOG_DEBUG("Skipping plugin directory entry: %s", entry_name.c_str());
+        continue;
+      }
+
+      std::string plugin_path = m_plugins_path + "/" + entry_name;
+
+      // lstat (not stat) so a symlink is rejected on its own merits rather than followed to
+      // whatever it currently points at
+      struct stat entry_stat;
+      if (lstat(plugin_path.c_str(), &entry_stat) != 0)
+      {
+        ZLOG_ERROR("Rejected plugin entry %s: unable to stat (errno %d)", plugin_path.c_str(), errno);
+        continue;
+      }
+
+      if (!S_ISREG(entry_stat.st_mode))
+      {
+        ZLOG_ERROR("Rejected plugin entry %s: not a regular file", plugin_path.c_str());
+        continue;
+      }
+
       void *plugin = dlopen(plugin_path.c_str(), RTLD_LAZY);
       if (plugin == nullptr)
       {
