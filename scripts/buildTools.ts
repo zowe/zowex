@@ -1122,14 +1122,7 @@ function getServerFiles(dir = "") {
                 }
 
                 if (stats.isDirectory()) {
-                    const files = fs.readdirSync(path.resolve(__dirname, `${localDeployDir}/${arg}`), {
-                        withFileTypes: true,
-                    });
-                    for (const entry of files) {
-                        if (!entry.isDirectory()) {
-                            fileList.push(`${arg}/${entry.name}`);
-                        }
-                    }
+                    fileList.push(...getFilesRecursive(arg.replace(/\/+$/, "")));
                 } else {
                     fileList.push(arg);
                 }
@@ -1153,6 +1146,20 @@ function getServerFiles(dir = "") {
         }
     }
     return filesList;
+}
+
+function getFilesRecursive(dir: string): string[] {
+    const fileList: string[] = [];
+    const entries = fs.readdirSync(path.resolve(__dirname, `${localDeployDir}/${dir}`), { withFileTypes: true });
+    for (const entry of entries) {
+        const entryPath = `${dir}/${entry.name}`;
+        if (entry.isDirectory()) {
+            fileList.push(...getFilesRecursive(entryPath));
+        } else {
+            fileList.push(entryPath);
+        }
+    }
+    return fileList;
 }
 
 function getDirs(next = "") {
@@ -1240,7 +1247,8 @@ async function downloadTarball(url: string, destPath: string, label: string) {
     try {
         response = await fetch(url);
     } catch (err) {
-        throw new Error(`Failed to download ${label} tarball from ${url}: ${err}`);
+        const reason = err instanceof Error && err.cause ? err.cause : err;
+        throw new Error(`Failed to download ${label} tarball from ${url}: ${reason}`);
     }
     if (!response.ok) {
         throw new Error(`Failed to download ${label} tarball from ${url}: ${response.status} ${response.statusText}`);
@@ -1251,10 +1259,8 @@ async function downloadTarball(url: string, destPath: string, label: string) {
 async function buildSwig(connection: Client) {
     const cacheDir = path.resolve(__dirname, "./../.cache");
     fs.mkdirSync(cacheDir, { recursive: true });
-
     const swigVersion = getLatestTag("swig/swig").slice(1);
     const swigTgz = path.join(cacheDir, `swig-${swigVersion}.tar.gz`);
-
     const pcreVersion = getLatestTag("PCRE2Project/pcre2").split("-").pop();
     const pcreTgz = path.join(cacheDir, `pcre2-${pcreVersion}.tar.gz`);
 
@@ -1275,8 +1281,10 @@ async function buildSwig(connection: Client) {
                 return;
             }
             try {
-                await uploadFile(sftpcon, swigTgz, `${deployDirs.pythonSwigDir}/swig-${swigVersion}.tar.gz`, false);
-                await uploadFile(sftpcon, pcreTgz, `${deployDirs.pythonSwigDir}/pcre2-${pcreVersion}.tar.gz`, false);
+                await Promise.all([
+                    uploadFile(sftpcon, swigTgz, `${deployDirs.pythonSwigDir}/swig-${swigVersion}.tar.gz`, false),
+                    uploadFile(sftpcon, pcreTgz, `${deployDirs.pythonSwigDir}/pcre2-${pcreVersion}.tar.gz`, false),
+                ]);
                 sftpcon.end();
                 resolve();
             } catch (uploadErr) {
@@ -1483,7 +1491,7 @@ async function upload(connection: Client, sshProfile: IProfile) {
                 throw err;
             }
 
-            const filteredDirs = args[1] ? dirs.filter((dir) => args.some((arg) => `${arg}/`.startsWith(dir))) : dirs;
+            const filteredDirs = args[1] ? dirs.filter((dir) => files.some((file) => file.startsWith(dir))) : dirs;
             for (const dir of ["", ...filteredDirs]) {
                 await new Promise<void>((resolve, reject) => {
                     sftpcon.mkdir(`${deployDirs.root}/${dir}`, (err) => {

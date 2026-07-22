@@ -19,6 +19,7 @@ On the z/OS build system:
 From the repo root, on your workstation:
 
 ```bash
+npm run z:upload -- python/swig
 npm run z:build:swig
 ```
 
