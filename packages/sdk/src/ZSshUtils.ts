@@ -397,7 +397,8 @@ export class ZSshUtils {
     }
 
     public static async checkIfOutdated(remoteVersion: string): Promise<boolean> {
-        return semver.lt(remoteVersion, BUNDLED_SSH_SERVER_VERSION);
+        // coerce: drop any -<githash> suffix
+        return semver.lt(semver.coerce(remoteVersion), BUNDLED_SSH_SERVER_VERSION);
     }
 
     private static getBinDir(dir: string): string {
