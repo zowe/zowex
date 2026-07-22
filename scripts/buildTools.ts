@@ -1213,13 +1213,39 @@ async function packPrecompiled(connection: Client) {
 }
 
 function getLatestTag(repoName: string) {
-    const out = childProcess.execSync(`git ls-remote --tags --refs https://github.com/${repoName}.git`);
+    // --sort=-version:refname sorts tags by their numeric version (descending)
+    const out = childProcess.execSync(
+        `git ls-remote --tags --refs --sort=-version:refname https://github.com/${repoName}.git`,
+    );
     const tags = [];
     for (const line of out.toString().trim().split(/\r?\n/)) {
         const lastSlashIdx = line.lastIndexOf("/");
         tags.push(line.slice(lastSlashIdx + 1));
     }
-    return tags.filter((tag) => !tag.includes("beta")).pop();
+    return tags.filter((tag) => !tag.includes("beta"))[0];
+}
+
+/**
+ * Downloads a tarball to `destPath` if it isn't already cached. Throws if the
+ * request fails outright (network error) or resolves with a non-2xx status
+ * (e.g. the tarball was removed from the host), so callers fail fast instead
+ * of proceeding to extract a missing or invalid archive.
+ */
+async function downloadTarball(url: string, destPath: string, label: string) {
+    if (fs.existsSync(destPath)) {
+        return;
+    }
+    console.log(`Downloading ${label} tarball...`);
+    let response: Response;
+    try {
+        response = await fetch(url);
+    } catch (err) {
+        throw new Error(`Failed to download ${label} tarball from ${url}: ${err}`);
+    }
+    if (!response.ok) {
+        throw new Error(`Failed to download ${label} tarball from ${url}: ${response.status} ${response.statusText}`);
+    }
+    fs.writeFileSync(destPath, Buffer.from(await response.arrayBuffer()));
 }
 
 async function buildSwig(connection: Client) {
@@ -1228,21 +1254,18 @@ async function buildSwig(connection: Client) {
 
     const swigVersion = getLatestTag("swig/swig").slice(1);
     const swigTgz = path.join(cacheDir, `swig-${swigVersion}.tar.gz`);
-    if (!fs.existsSync(swigTgz)) {
-        console.log("Downloading SWIG tarball...");
-        const response = await fetch(`http://prdownloads.sourceforge.net/swig/swig-${swigVersion}.tar.gz`);
-        fs.writeFileSync(swigTgz, Buffer.from(await response.arrayBuffer()));
-    }
 
     const pcreVersion = getLatestTag("PCRE2Project/pcre2").split("-").pop();
     const pcreTgz = path.join(cacheDir, `pcre2-${pcreVersion}.tar.gz`);
-    if (!fs.existsSync(pcreTgz)) {
-        console.log("Downloading PCRE2 tarball...");
-        const response = await fetch(
+
+    await Promise.all([
+        downloadTarball(`http://prdownloads.sourceforge.net/swig/swig-${swigVersion}.tar.gz`, swigTgz, "SWIG"),
+        downloadTarball(
             `https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${pcreVersion}/pcre2-${pcreVersion}.tar.gz`,
-        );
-        fs.writeFileSync(pcreTgz, Buffer.from(await response.arrayBuffer()));
-    }
+            pcreTgz,
+            "PCRE2",
+        ),
+    ]);
 
     console.log("Uploading source tarballs...");
     await new Promise<void>((resolve, reject) => {
