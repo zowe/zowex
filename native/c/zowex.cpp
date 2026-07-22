@@ -25,6 +25,7 @@
 #include "commands/tso.hpp"
 #include "commands/uss.hpp"
 #include "extend/plugin.hpp"
+#include "zlogger.hpp"
 
 // Version information
 #ifndef PACKAGE_VERSION
@@ -40,19 +41,23 @@ static std::string get_executable_dir(const char *argv0)
   return ".";
 }
 
-static std::string get_plugins_dir(const std::string &exec_dir)
+// Plugin loading is opt-in: ZOWEX_PLUGINS_DIR must be explicitly set
+static bool get_plugins_dir(std::string &plugins_path)
 {
-  std::string plugins_path = std::string(getenv("ZOWEX_PLUGINS_DIR"));
-  if (plugins_path.empty())
+  const char *env_value = getenv("ZOWEX_PLUGINS_DIR");
+  if (env_value == nullptr || *env_value == '\0')
   {
-    return exec_dir + "/plugins";
+    ZLOG_DEBUG("ZOWEX_PLUGINS_DIR not set; skipping plug-in loading");
+    return false;
   }
-  else if (plugins_path.back() == '/')
+
+  plugins_path = env_value;
+  if (plugins_path.back() == '/')
   {
     plugins_path.pop_back(); // Remove trailing slash if present
   }
 
-  return plugins_path;
+  return true;
 }
 
 int main(int argc, char *argv[])
@@ -67,7 +72,11 @@ int main(int argc, char *argv[])
 
     plugin::PluginManager pm;
     core::set_plugin_manager(&pm);
-    pm.load_plugins(get_plugins_dir(exec_dir));
+    std::string plugins_dir;
+    if (get_plugins_dir(plugins_dir))
+    {
+      pm.load_plugins(plugins_dir);
+    }
 
     console::register_commands(root_cmd);
     ds::register_commands(root_cmd);

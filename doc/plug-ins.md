@@ -3,6 +3,22 @@
 The native plug-in infrastructure lets extenders add new commands and behaviors to `zowex`. The entry points exposed in
 `native/c/extend/plugin.hpp` describe the full contract between a plug-in and `zowex`.
 
+## Enabling plug-in loading — `ZOWEX_PLUGINS_DIR`
+
+`ZOWEX_PLUGINS_DIR` is a **security-relevant control**, not just a path override. `zowex` never loads plug-ins unless
+this environment variable is explicitly set for the process — there is no implicit fallback directory. Setting it opts
+that entire `zowex` invocation into `dlopen`-ing and executing every shared library it finds in the named directory,
+running with the same privileges as the `zowex` process itself.
+
+- If `ZOWEX_PLUGINS_DIR` is unset or empty, `zowex` does not touch a plugins directory at all: no `opendir`, no
+  `dlopen`, no plug-in code runs.
+- If it is set, `zowex` treats every regular file in that directory as native code to execute. On a shared install,
+  this directory **must** be writable only by trusted installers/administrators — anyone who can write a file into it
+  can run arbitrary code as every user who subsequently invokes `zowex` with that variable set.
+- Because environment variables are controlled per-session, a per-session override of `ZOWEX_PLUGINS_DIR` is
+  equivalent to granting that session's code the privileges of whoever authored the plug-ins in the directory it
+  points at. Do not set this variable for a session unless you trust the contents of the directory it names.
+
 ## Runtime entry point
 
 Each shared library is expected to export a single function that `zowex` discovers via dynamic loading:
