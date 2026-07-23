@@ -126,6 +126,7 @@ let deployDirs: {
     cTestDir: string;
     pythonDir: string;
     pythonTestDir: string;
+    pythonSwigDir: string;
 };
 
 // python3 -c "import sys; sys.stdout.buffer.write(bytes(range(256)))" \
@@ -1121,14 +1122,7 @@ function getServerFiles(dir = "") {
                 }
 
                 if (stats.isDirectory()) {
-                    const files = fs.readdirSync(path.resolve(__dirname, `${localDeployDir}/${arg}`), {
-                        withFileTypes: true,
-                    });
-                    for (const entry of files) {
-                        if (!entry.isDirectory()) {
-                            fileList.push(`${arg}/${entry.name}`);
-                        }
-                    }
+                    fileList.push(...getFilesRecursive(arg.replace(/\/$/, "")));
                 } else {
                     fileList.push(arg);
                 }
@@ -1152,6 +1146,20 @@ function getServerFiles(dir = "") {
         }
     }
     return filesList;
+}
+
+function getFilesRecursive(dir: string): string[] {
+    const fileList: string[] = [];
+    const entries = fs.readdirSync(path.resolve(__dirname, `${localDeployDir}/${dir}`), { withFileTypes: true });
+    for (const entry of entries) {
+        const entryPath = `${dir}/${entry.name}`;
+        if (entry.isDirectory()) {
+            fileList.push(...getFilesRecursive(entryPath));
+        } else {
+            fileList.push(entryPath);
+        }
+    }
+    return fileList;
 }
 
 function getDirs(next = "") {
@@ -1209,6 +1217,95 @@ async function packPrecompiled(connection: Client) {
     fs.mkdirSync(path.resolve(__dirname, "./../dist"), { recursive: true });
     await retrieve(connection, ["python/bindings/zbind_bin_dist.tar.gz"], "dist", true);
     console.log("Precompiled bindings downloaded to dist/zbind_bin_dist.tar.gz");
+}
+
+function getLatestTag(repoName: string, prefix?: string) {
+    // --sort=-version:refname sorts tags by their numeric version (descending)
+    const out = childProcess.execSync(
+        `git ls-remote --tags --refs --sort=-version:refname https://github.com/${repoName}.git`,
+    );
+    const tags = [];
+    for (const line of out.toString().trim().split(/\r?\n/)) {
+        const lastSlashIdx = line.lastIndexOf("/");
+        tags.push(line.slice(lastSlashIdx + 1));
+    }
+    const isPrerelease = (tag: string) => tag.includes("-beta") || tag.includes("-RC");
+    const matchesPrefix = (tag: string) => prefix == null || tag.startsWith(prefix);
+    return tags.find((tag) => !isPrerelease(tag) && matchesPrefix(tag));
+}
+
+/**
+ * Downloads a tarball to `destPath` if it isn't already cached. Throws if the
+ * request fails outright (network error) or resolves with a non-2xx status
+ * (e.g. the tarball was removed from the host), so callers fail fast instead
+ * of proceeding to extract a missing or invalid archive.
+ */
+async function downloadTarball(url: string, destPath: string) {
+    if (fs.existsSync(destPath)) {
+        return;
+    }
+    const label = destPath.split(/\W/)[0].toUpperCase();
+    console.log(`Downloading ${label} tarball...`);
+    let response: Response;
+    try {
+        response = await fetch(url);
+    } catch (err) {
+        const reason = err instanceof Error && err.cause ? err.cause : err;
+        throw new Error(`Failed to download ${label} tarball from ${url}: ${reason}`);
+    }
+    if (!response.ok) {
+        throw new Error(`Failed to download ${label} tarball from ${url}: ${response.status} ${response.statusText}`);
+    }
+    fs.writeFileSync(destPath, Buffer.from(await response.arrayBuffer()));
+}
+
+async function buildSwig(connection: Client) {
+    const cacheDir = path.resolve(__dirname, "./../.cache");
+    fs.mkdirSync(cacheDir, { recursive: true });
+    const swigVersion = getLatestTag("swig/swig", "v4.").slice(1);
+    const swigTgz = path.join(cacheDir, `swig-${swigVersion}.tar.gz`);
+    const pcreVersion = getLatestTag("PCRE2Project/pcre2").split("-").pop();
+    const pcreTgz = path.join(cacheDir, `pcre2-${pcreVersion}.tar.gz`);
+
+    await Promise.all([
+        downloadTarball(`https://prdownloads.sourceforge.net/swig/swig-${swigVersion}.tar.gz`, swigTgz),
+        downloadTarball(
+            `https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${pcreVersion}/pcre2-${pcreVersion}.tar.gz`,
+            pcreTgz,
+        ),
+    ]);
+
+    console.log("Uploading source tarballs...");
+    await new Promise<void>((resolve, reject) => {
+        connection.sftp(async (err, sftpcon) => {
+            if (err) {
+                reject(err);
+                return;
+            }
+            try {
+                await Promise.all([
+                    uploadFile(sftpcon, swigTgz, `${deployDirs.pythonSwigDir}/swig-${swigVersion}.tar.gz`, false),
+                    uploadFile(sftpcon, pcreTgz, `${deployDirs.pythonSwigDir}/pcre2-${pcreVersion}.tar.gz`, false),
+                ]);
+                sftpcon.end();
+                resolve();
+            } catch (uploadErr) {
+                reject(uploadErr);
+            }
+        });
+    });
+
+    await runCommandInShell(
+        connection,
+        `cd ${deployDirs.pythonSwigDir} && LDFLAGS='' . build.sh "${swigVersion}" "${pcreVersion}"`,
+        {
+            streamOutput: true,
+            stepName: "Building SWIG for z/OS",
+        },
+    );
+    const filename = `swig-${swigVersion}.pax.Z`;
+    await retrieve(connection, [`python/swig/${filename}`], "dist", true);
+    console.log(`SWIG package downloaded to dist/${filename}`);
 }
 
 /**
@@ -1396,7 +1493,7 @@ async function upload(connection: Client, sshProfile: IProfile) {
                 throw err;
             }
 
-            const filteredDirs = args[1] ? dirs.filter((dir) => args.some((arg) => `${arg}/`.startsWith(dir))) : dirs;
+            const filteredDirs = args[1] ? dirs.filter((dir) => files.some((file) => file.startsWith(dir))) : dirs;
             for (const dir of ["", ...filteredDirs]) {
                 await new Promise<void>((resolve, reject) => {
                     sftpcon.mkdir(`${deployDirs.root}/${dir}`, (err) => {
@@ -1932,6 +2029,7 @@ async function main() {
         cTestDir: `${config.deployDir}/c/test`,
         pythonDir: `${config.deployDir}/python/bindings`,
         pythonTestDir: `${config.deployDir}/python/bindings/test`,
+        pythonSwigDir: `${config.deployDir}/python/swig`,
     };
     const sshClient = await buildSshClient(config.sshProfile as IProfile);
     await testConnection(sshClient);
@@ -1957,6 +2055,9 @@ async function main() {
                 break;
             case "make":
                 await make(sshClient);
+                break;
+            case "build:swig":
+                await buildSwig(sshClient);
                 break;
             case "has:swig":
                 await hasSwig(sshClient);
