@@ -10,7 +10,7 @@ On the z/OS build system:
 - `git`
 - `python`
 - `gmake`
-- The `xlclang` compiler toolchain
+- The `xlclang`/`ibm-clang` compiler toolchain
 
 `build.sh` checks for these tools on `PATH` and fails fast with a clear error if any are missing.
 
