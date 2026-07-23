@@ -2508,6 +2508,11 @@ int zds_list_members(ZDS *zds, std::string dsn, std::vector<ZDSMem> &members, co
 
   while (fread(&rec, sizeof(rec), 1, fp))
   {
+    if (rec.count > RECLEN)
+    {
+      rec.count = RECLEN;
+    }
+
     unsigned char *data = nullptr;
     data = (unsigned char *)&rec;
     data += sizeof(rec.count); // increment past halfword length
