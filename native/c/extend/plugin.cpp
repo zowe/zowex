@@ -12,10 +12,23 @@
 #ifndef _UNIX03_SOURCE
 #define _UNIX03_SOURCE
 #endif
+#include <cerrno>
 #include <dirent.h>
 #include <dlfcn.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 #include "plugin.hpp"
 #include "../parser.hpp"
+#include "../zlogger.hpp"
+
+namespace
+{
+bool is_trusted_owner(uid_t owner)
+{
+  return owner == 0 || owner == geteuid();
+}
+} // namespace
 
 namespace plugin
 {
@@ -27,6 +40,20 @@ public:
   explicit RegistrationContextImpl(parser::Command &root)
       : m_root(root), m_root_record(root)
   {
+    // Snapshot the built-in top-level tokens (name + aliases) a plug-in must not
+    // shadow. All built-ins are registered before this runs.
+    for (const auto &entry : m_root.get_commands())
+    {
+      m_builtin_names.insert(entry.first);
+      if (entry.second)
+      {
+        for (const auto &alias : entry.second->get_aliases())
+        {
+          m_builtin_names.insert(alias);
+        }
+      }
+    }
+    m_claimed_names = m_builtin_names;
   }
 
   CommandHandle create_command(const char *name, const char *help)
@@ -117,12 +144,23 @@ public:
 
     if (parent_record->is_root())
     {
-      m_root.add_command(child_record->get_command_ptr());
+      // Defer wiring top-level commands into the live root until
+      // commit_root_commands(), so the collision check sees each command's final
+      // name/aliases and a rejected command never reaches add_command()'s throw.
+      m_pending_root_commands.push_back(child_record->get_command_ptr());
     }
     else
     {
-      parent_record->get()
-          .add_command(child_record->get_command_ptr());
+      // Nested subcommands can't shadow a built-in verb, but guard against a
+      // malformed plug-in registering duplicate siblings so it can't abort zowex.
+      try
+      {
+        parent_record->get().add_command(child_record->get_command_ptr());
+      }
+      catch (const std::exception &e)
+      {
+        ZLOG_ERROR("Rejected plug-in subcommand: %s", e.what());
+      }
     }
   }
 
@@ -138,6 +176,84 @@ public:
   const std::set<parser::command_ptr> &get_server_commands() const
   {
     return m_server_commands;
+  }
+
+  // Wire the deferred top-level commands into the root, refusing any whose name
+  // or an alias would shadow a built-in verb (or a token another plug-in already
+  // claimed). Rejected commands are logged and dropped from the server set too,
+  // so a shadowing attempt gains no foothold on either path.
+  void commit_root_commands()
+  {
+    for (const auto &command : m_pending_root_commands)
+    {
+      if (!command)
+        continue;
+
+      std::vector<std::string> tokens;
+      tokens.push_back(command->get_name());
+      const std::vector<std::string> &aliases = command->get_aliases();
+      tokens.insert(tokens.end(), aliases.begin(), aliases.end());
+
+      bool collided = false;
+      bool shadows_builtin = false;
+      std::string collision;
+      for (const auto &token : tokens)
+      {
+        if (m_builtin_names.count(token) != 0)
+        {
+          collided = true;
+          shadows_builtin = true;
+          collision = token;
+          break;
+        }
+        if (m_claimed_names.count(token) != 0)
+        {
+          collided = true;
+          collision = token;
+          break;
+        }
+      }
+
+      if (collided)
+      {
+        if (shadows_builtin)
+        {
+          ZLOG_ERROR("Rejected plug-in command '%s': token '%s' would shadow a built-in zowex command",
+                     command->get_name().c_str(), collision.c_str());
+        }
+        else
+        {
+          ZLOG_ERROR("Rejected plug-in command '%s': token '%s' is already registered by another plug-in",
+                     command->get_name().c_str(), collision.c_str());
+        }
+        m_rejected_commands.push_back(command->get_name());
+        m_server_commands.erase(command);
+        continue;
+      }
+
+      try
+      {
+        m_root.add_command(command);
+      }
+      catch (const std::exception &e)
+      {
+        ZLOG_ERROR("Rejected plug-in command '%s': %s", command->get_name().c_str(), e.what());
+        m_rejected_commands.push_back(command->get_name());
+        m_server_commands.erase(command);
+        continue;
+      }
+
+      for (const auto &token : tokens)
+      {
+        m_claimed_names.insert(token);
+      }
+    }
+    m_pending_root_commands.clear();
+  }
+
+  const std::vector<std::string> &get_rejected_commands() const
+  {
+    return m_rejected_commands;
   }
 
 private:
@@ -220,11 +336,53 @@ private:
   CommandRecord m_root_record;
   std::vector<std::unique_ptr<CommandRecord>> m_records;
   std::set<parser::command_ptr> m_server_commands;
+  std::set<std::string> m_builtin_names;
+  std::set<std::string> m_claimed_names;
+  std::vector<parser::command_ptr> m_pending_root_commands;
+  std::vector<std::string> m_rejected_commands;
 };
 
 void PluginManager::load_plugins(const std::string &plugins_path)
 {
   m_plugins_path = plugins_path;
+
+  // Directory-level provenance checks. These run once, before any
+  // opendir/dlopen, and reject the entire directory (loading nothing) when the
+  // plugins directory is not a safe place to load native code from. Cheaper
+  // than dlopen and dangerous-code-free, so they gate everything below.
+  struct stat dir_stat;
+  if (stat(m_plugins_path.c_str(), &dir_stat) != 0)
+  {
+    ZLOG_ERROR("Refusing to load plugins: unable to stat plugins directory %s (errno %d)",
+               m_plugins_path.c_str(), errno);
+    return;
+  }
+
+  if (!S_ISDIR(dir_stat.st_mode))
+  {
+    ZLOG_ERROR("Refusing to load plugins: %s is not a directory", m_plugins_path.c_str());
+    return;
+  }
+
+  if ((dir_stat.st_mode & (S_IWGRP | S_IWOTH)) != 0)
+  {
+    ZLOG_ERROR("Refusing to load plugins: directory %s is group- or world-writable (mode %03o); "
+               "any such identity could drop executable code here",
+               m_plugins_path.c_str(), static_cast<unsigned>(dir_stat.st_mode & 07777));
+    return;
+  }
+
+  if (!is_trusted_owner(dir_stat.st_uid))
+  {
+    ZLOG_ERROR("Refusing to load plugins: directory %s is owned by untrusted uid %u "
+               "(expected root or the current user, uid %u)",
+               m_plugins_path.c_str(), static_cast<unsigned>(dir_stat.st_uid),
+               static_cast<unsigned>(geteuid()));
+    return;
+  }
+
+  const uid_t dir_uid = dir_stat.st_uid;
+
   auto *plugins_dir = opendir(m_plugins_path.c_str());
   if (plugins_dir != nullptr)
   {
@@ -232,7 +390,52 @@ void PluginManager::load_plugins(const std::string &plugins_path)
     void (*register_plugin)(plugin::PluginManager &);
     while ((entry = readdir(plugins_dir)) != nullptr)
     {
-      std::string plugin_path = m_plugins_path + "/" + entry->d_name;
+      const std::string entry_name = entry->d_name;
+      if (entry_name == "." || entry_name == "..")
+      {
+        ZLOG_DEBUG("Skipping plugin directory entry: %s", entry_name.c_str());
+        continue;
+      }
+
+      std::string plugin_path = m_plugins_path + "/" + entry_name;
+
+      // lstat (not stat) so a symlink is rejected on its own merits rather than followed to
+      // whatever it currently points at
+      struct stat entry_stat;
+      if (lstat(plugin_path.c_str(), &entry_stat) != 0)
+      {
+        ZLOG_ERROR("Rejected plugin entry %s: unable to stat (errno %d)", plugin_path.c_str(), errno);
+        continue;
+      }
+
+      if (!S_ISREG(entry_stat.st_mode))
+      {
+        ZLOG_ERROR("Rejected plugin entry %s: not a regular file", plugin_path.c_str());
+        continue;
+      }
+
+      // Per-file provenance. A plug-in dropped into an otherwise-trusted
+      // directory by a different, unprivileged identity is rejected even though the
+      // directory itself passed: the file owner must match the directory owner or be
+      // a trusted identity (root/self).
+      if (entry_stat.st_uid != dir_uid && !is_trusted_owner(entry_stat.st_uid))
+      {
+        ZLOG_ERROR("Rejected plugin entry %s: owned by untrusted uid %u (directory owner is uid %u)",
+                   plugin_path.c_str(), static_cast<unsigned>(entry_stat.st_uid),
+                   static_cast<unsigned>(dir_uid));
+        continue;
+      }
+
+      // A group- or world-writable plug-in file can be overwritten by an
+      // untrusted identity after it was placed by a trusted one, so reject it
+      // regardless of who currently owns it.
+      if ((entry_stat.st_mode & (S_IWGRP | S_IWOTH)) != 0)
+      {
+        ZLOG_ERROR("Rejected plugin entry %s: file is group- or world-writable (mode %03o)",
+                   plugin_path.c_str(), static_cast<unsigned>(entry_stat.st_mode & 07777));
+        continue;
+      }
+
       void *plugin = dlopen(plugin_path.c_str(), RTLD_LAZY);
       if (plugin == nullptr)
       {
@@ -322,6 +525,11 @@ void PluginManager::register_commands(parser::Command &rootCommand)
 
     provider->register_commands(context);
   }
+
+  // Commit deferred top-level commands, rejecting any that would shadow a
+  // built-in verb or collide with another plug-in.
+  context.commit_root_commands();
+  m_rejected_command_names = context.get_rejected_commands();
 
   for (const auto &command : context.get_server_commands())
   {
