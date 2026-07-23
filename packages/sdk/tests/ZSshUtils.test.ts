@@ -45,11 +45,6 @@ describe("ZSshUtils", () => {
         it.each([
             // compared against mocked zowex binary version: 1.2.1
             {
-                desc: "matching versions with different git hash - not outdated",
-                remoteVersion: `${BUNDLED_SSH_SERVER_VERSION}-aefdab`,
-                expected: false,
-            },
-            {
                 desc: "versions match exactly- not outdated",
                 remoteVersion: BUNDLED_SSH_SERVER_VERSION,
                 expected: false,
@@ -70,6 +65,31 @@ describe("ZSshUtils", () => {
                 expected: true,
             },
             {
+                desc: "matching versions with different git hash - snapshot considered older for the same semver - outdated",
+                remoteVersion: `${BUNDLED_SSH_SERVER_VERSION}-aefdab`,
+                expected: true,
+            },
+            {
+                desc: "older patch version also with suffix - outdated",
+                remoteVersion: `1.2.0-aefdab`,
+                expected: true,
+            },
+            {
+                desc: "remote version is not a valid semver string - outdated",
+                remoteVersion: "footballbaseball",
+                expected: true,
+            },
+            {
+                desc: "remote version is undefined - outdated",
+                remoteVersion: undefined,
+                expected: true,
+            },
+            {
+                desc: "remote version is an empty string - outdated",
+                remoteVersion: "",
+                expected: true,
+            },
+            {
                 desc: "remote version is newer by major version - not outdated",
                 remoteVersion: "2.0.0",
                 expected: false,
@@ -82,6 +102,16 @@ describe("ZSshUtils", () => {
             {
                 desc: "remote version is newer by patch version - not outdated",
                 remoteVersion: "1.2.19",
+                expected: false,
+            },
+            {
+                desc: "remote version is newer but a prerelease - not outdated",
+                remoteVersion: "1.3.0-SNAPSHOT",
+                expected: false,
+            },
+            {
+                desc: "remote version is newer but a prerelease which uses the older +gitHash syntax - not outdated",
+                remoteVersion: "1.3.0+afeb102",
                 expected: false,
             },
         ])("should return $expected for $desc", async ({ remoteVersion, expected }) => {

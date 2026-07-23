@@ -1252,7 +1252,7 @@ async function upload(connection: Client, sshProfile: IProfile) {
                 const packageJson = JSON.parse(fs.readFileSync(path.resolve(__dirname, "../package.json"), "utf-8"));
                 try {
                     const gitHash = childProcess.execSync("git rev-parse --short HEAD").toString().trim();
-                    packageJson.version += `+${gitHash}`;
+                    packageJson.gitHash = `-${gitHash}`;
                 } catch {}
                 pendingUploads.push(
                     uploadFile(
