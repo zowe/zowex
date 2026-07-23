@@ -12,8 +12,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-const main = () => {
-    const constantsClassTemplate = `
+const constantsClassTemplate = `
 /**
  * This program and the accompanying materials are made available under the terms of the
  * Eclipse Public License v2.0 which accompanies this distribution, and is available at
@@ -27,6 +26,8 @@ const main = () => {
 // Generated via generateConstants.ts 
 export const BUNDLED_SSH_SERVER_VERSION = "{{version}}";
 `;
+
+const main = () => {
     try {
         const packageJsonContent = fs.readFileSync(path.resolve(__dirname, "package.json"));
         const packageJsonObj = JSON.parse(packageJsonContent.toString());
@@ -38,7 +39,7 @@ export const BUNDLED_SSH_SERVER_VERSION = "{{version}}";
         const outputPath = path.resolve(__dirname, "src", "ZSshConstants.ts");
         fs.writeFileSync(outputPath, output);
     } catch (e) {
-        console.error(`Encountered an error trying to write out ZSshConstants.ts: ${e}`);
+        console.error("Encountered an error trying to write out ZSshConstants.ts::", e);
     }
 };
 main();
