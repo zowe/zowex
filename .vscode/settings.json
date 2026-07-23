@@ -152,5 +152,6 @@
   "files.readonlyInclude": {
     "**/schemas/*.hpp": true,
     "**/c/chdsect/*.hpp": true
-  }
+  },
+  "java.configuration.updateBuildConfiguration": "interactive"
 }
