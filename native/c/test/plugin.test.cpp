@@ -9,21 +9,30 @@
  *
  */
 
+#include <algorithm>
 #include <cstdio>
 #include <dirent.h>
 #include <fstream>
+#include <functional>
+#include <memory>
 #include <string>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <vector>
 
 #include "ztest.hpp"
 #include "../extend/plugin.hpp"
+#include "../parser.hpp"
 
 using namespace ztst;
 
-// These tests exercise the Phase 1 load_plugins() hygiene checks: '.'/'..' are
-// skipped, and any entry that isn't a regular file (subdirectory, symlink, FIFO,
-// etc.) is rejected before it is ever handed to dlopen.
+// These tests exercise the load_plugins() load-time gate:
+//   - hygiene: '.'/'..' are skipped, and any entry that isn't a regular
+//     file (subdirectory, symlink, FIFO, etc.) is rejected before dlopen.
+//   - provenance: the plugins directory is rejected wholesale when it is
+//     group-/world-writable or owned by an untrusted identity, and individual
+//     files are rejected when they are group-/world-writable or owned by an
+//     identity that is neither the directory owner nor a trusted one (root/self).
 //
 // They assert on get_loaded_plugins() (the deterministic, in-process observable)
 // rather than on log output. An earlier revision scraped logs/zowex.log for the
@@ -72,11 +81,91 @@ void write_regular_file(const std::string &path, const std::string &contents)
   std::ofstream file(path, std::ios::binary);
   file << contents;
 }
+
+// Recursively wipe and remove an arbitrary scratch directory (used by the
+// provenance tests, which need directories with non-default permission bits
+// outside the shared PLUGIN_TEST_DIR).
+void remove_scratch_dir(const std::string &dir)
+{
+  DIR *handle = opendir(dir.c_str());
+  if (handle != nullptr)
+  {
+    struct dirent *entry;
+    while ((entry = readdir(handle)) != nullptr)
+    {
+      const std::string name = entry->d_name;
+      if (name == "." || name == "..")
+        continue;
+      unlink((dir + "/" + name).c_str());
+    }
+    closedir(handle);
+  }
+  rmdir(dir.c_str());
+}
+
+// --- Dispatcher-hardening test helpers -------------------------------------
+// These exercise PluginManager::register_commands directly, without dlopen: a
+// provider is registered in-process and driven by a lambda that builds commands
+// through the same CommandRegistrationContext a real plug-in would use.
+
+using RegistrationContext = plugin::CommandProviderImpl::CommandRegistrationContext;
+using RegistrationFn = std::function<void(RegistrationContext &)>;
+
+class LambdaProvider : public plugin::CommandProviderImpl
+{
+public:
+  explicit LambdaProvider(RegistrationFn fn) : m_fn(std::move(fn)) {}
+  void register_commands(CommandRegistrationContext &context) override
+  {
+    if (m_fn)
+      m_fn(context);
+  }
+
+private:
+  RegistrationFn m_fn;
+};
+
+class LambdaProviderFactory : public plugin::CommandProvider
+{
+public:
+  explicit LambdaProviderFactory(RegistrationFn fn) : m_fn(std::move(fn)) {}
+  std::unique_ptr<plugin::CommandProviderImpl> create() override
+  {
+    return std::unique_ptr<plugin::CommandProviderImpl>(new LambdaProvider(m_fn));
+  }
+
+private:
+  RegistrationFn m_fn;
+};
+
+void register_provider(plugin::PluginManager &pm, RegistrationFn fn)
+{
+  pm.register_command_provider(
+      std::unique_ptr<plugin::CommandProvider>(new LambdaProviderFactory(std::move(fn))));
+}
+
+// Mirror the state zowex is in when it calls register_commands: a root already
+// populated with a built-in verb.
+parser::command_ptr make_builtin(const std::string &name, const std::string &help)
+{
+  return std::make_shared<parser::Command>(name, help);
+}
+
+bool root_has(const parser::Command &root, const std::string &name)
+{
+  return root.get_commands().count(name) != 0;
+}
+
+bool was_rejected(const plugin::PluginManager &pm, const std::string &name)
+{
+  const auto &rejected = pm.get_rejected_command_names();
+  return std::find(rejected.begin(), rejected.end(), name) != rejected.end();
+}
 } // namespace
 
 void plugin_tests()
 {
-  describe("PluginManager::load_plugins hygiene (Phase 1)", []() -> void
+  describe("PluginManager::load_plugins hygiene", []() -> void
            {
         beforeEach([]() {
             reset_plugin_test_dir();
@@ -193,5 +282,270 @@ void plugin_tests()
             pm.load_plugins(PLUGIN_TEST_DIR + "/does_not_exist");
 
             Expect(pm.get_loaded_plugins().size()).ToBe(std::size_t(0));
+        }); });
+
+  describe("PluginManager::load_plugins provenance", []() -> void
+           {
+        beforeEach([]() {
+            reset_plugin_test_dir();
+        });
+
+        afterAll([]() {
+            reset_plugin_test_dir();
+            rmdir(PLUGIN_TEST_DIR.c_str());
+        });
+
+        it("rejects the entire directory (loads nothing) when the plugins directory is world-writable", []() {
+            // A world-writable plugins directory means any identity on the system
+            // could drop executable code here, so the whole directory is rejected
+            // before any entry is considered - even a legitimate-looking file.
+            const std::string ww_dir = "plugin_provenance_world_writable";
+            remove_scratch_dir(ww_dir);
+            mkdir(ww_dir.c_str(), 0777);
+            chmod(ww_dir.c_str(), 0777); // defeat umask so the group/world write bits actually land
+            write_regular_file(ww_dir + "/probe.so", "not a real shared object");
+
+            plugin::PluginManager pm;
+            pm.load_plugins(ww_dir);
+
+            Expect(pm.get_loaded_plugins().size()).ToBe(std::size_t(0));
+
+            remove_scratch_dir(ww_dir);
+        });
+
+        it("rejects the entire directory (loads nothing) when the plugins directory is group-writable", []() {
+            const std::string gw_dir = "plugin_provenance_group_writable";
+            remove_scratch_dir(gw_dir);
+            mkdir(gw_dir.c_str(), 0775);
+            chmod(gw_dir.c_str(), 0775);
+            write_regular_file(gw_dir + "/probe.so", "not a real shared object");
+
+            plugin::PluginManager pm;
+            pm.load_plugins(gw_dir);
+
+            Expect(pm.get_loaded_plugins().size()).ToBe(std::size_t(0));
+
+            remove_scratch_dir(gw_dir);
+        });
+
+        it("rejects a group-/world-writable plugin file inside an otherwise-trusted directory", []() {
+            // The directory itself is safe (0755, owned by us), but the file is
+            // world-writable, so it can be swapped out after being placed. It must
+            // be rejected on its own merits before dlopen.
+            const std::string plugin_path = PLUGIN_TEST_DIR + "/world_writable_plugin.so";
+            write_regular_file(plugin_path, "not a real shared object");
+            chmod(plugin_path.c_str(), 0666);
+
+            plugin::PluginManager pm;
+            pm.load_plugins(PLUGIN_TEST_DIR);
+
+            Expect(pm.get_loaded_plugins().size()).ToBe(std::size_t(0));
+
+            unlink(plugin_path.c_str());
+        });
+
+        it("accepts a well-permissioned directory owned by the current user (regression: does not over-reject)", []() {
+            // reset_plugin_test_dir() creates PLUGIN_TEST_DIR mode 0755 owned by the
+            // test user, and this file is 0644 and owned by the same user - i.e. it
+            // satisfies every provenance check. It still fails to load because it is
+            // not a real shared object, but it must reach dlopen rather than being
+            // rejected by the provenance gate. The observable (nothing loaded, no
+            // crash) is the same; the point is that the checks do not reject
+            // legitimate, correctly-owned files outright.
+            const std::string plugin_path = PLUGIN_TEST_DIR + "/well_owned_plugin.so";
+            write_regular_file(plugin_path, "not a real shared object");
+            chmod(plugin_path.c_str(), 0644);
+
+            plugin::PluginManager pm;
+            pm.load_plugins(PLUGIN_TEST_DIR);
+
+            Expect(pm.get_loaded_plugins().size()).ToBe(std::size_t(0));
+
+            unlink(plugin_path.c_str());
+        }); });
+
+  describe("PluginManager::register_commands dispatcher hardening", []() -> void
+           {
+        it("refuses a plug-in command whose name shadows a built-in verb and keeps the built-in", []() {
+            parser::Command root("zowex", "root");
+            root.add_command(make_builtin("job", "builtin job"));
+
+            plugin::PluginManager pm;
+            register_provider(pm, [](RegistrationContext &ctx) {
+                auto shadow = ctx.create_command("job", "plugin job");
+                ctx.add_subcommand(ctx.get_root_command(), shadow);
+            });
+            pm.register_commands(root);
+
+            Expect(root_has(root, "job")).ToBe(true);
+            Expect(root.get_commands().at("job")->get_help()).ToBe(std::string("builtin job"));
+            Expect(was_rejected(pm, "job")).ToBe(true);
+        });
+
+        it("refuses a plug-in command whose alias shadows a built-in verb", []() {
+            parser::Command root("zowex", "root");
+            root.add_command(make_builtin("job", "builtin job"));
+
+            plugin::PluginManager pm;
+            register_provider(pm, [](RegistrationContext &ctx) {
+                auto cmd = ctx.create_command("safe", "plugin safe");
+                ctx.add_alias(cmd, "job"); // alias collides with the built-in name
+                ctx.add_subcommand(ctx.get_root_command(), cmd);
+            });
+            pm.register_commands(root);
+
+            // The whole command is refused because one of its tokens shadows a built-in.
+            Expect(root_has(root, "safe")).ToBe(false);
+            Expect(root_has(root, "job")).ToBe(true);
+            Expect(root.get_commands().at("job")->get_help()).ToBe(std::string("builtin job"));
+            Expect(was_rejected(pm, "safe")).ToBe(true);
+        });
+
+        it("refuses a shadowing alias even when it is added after the command is attached to root", []() {
+            // Ordering-robustness: add_alias is called *after* add_subcommand, so the check
+            // must run against the command's final token set, not its state at attach time.
+            parser::Command root("zowex", "root");
+            root.add_command(make_builtin("ds", "builtin ds"));
+
+            plugin::PluginManager pm;
+            register_provider(pm, [](RegistrationContext &ctx) {
+                auto cmd = ctx.create_command("safe", "plugin safe");
+                ctx.add_subcommand(ctx.get_root_command(), cmd);
+                ctx.add_alias(cmd, "ds");
+            });
+            pm.register_commands(root);
+
+            Expect(root_has(root, "safe")).ToBe(false);
+            Expect(root_has(root, "ds")).ToBe(true);
+            Expect(root.get_commands().at("ds")->get_help()).ToBe(std::string("builtin ds"));
+            Expect(was_rejected(pm, "safe")).ToBe(true);
+        });
+
+        it("registers a non-colliding plug-in command", []() {
+            parser::Command root("zowex", "root");
+            root.add_command(make_builtin("job", "builtin job"));
+
+            plugin::PluginManager pm;
+            register_provider(pm, [](RegistrationContext &ctx) {
+                auto hello = ctx.create_command("hello", "plugin hello");
+                ctx.add_subcommand(ctx.get_root_command(), hello);
+            });
+            pm.register_commands(root);
+
+            Expect(root_has(root, "hello")).ToBe(true);
+            Expect(root_has(root, "job")).ToBe(true);
+            Expect(pm.get_rejected_command_names().size()).ToBe(std::size_t(0));
+        });
+
+        it("does not over-reject a plug-in command whose name merely resembles a built-in verb", []() {
+            parser::Command root("zowex", "root");
+            root.add_command(make_builtin("job", "builtin job"));
+
+            plugin::PluginManager pm;
+            register_provider(pm, [](RegistrationContext &ctx) {
+                auto cmd = ctx.create_command("jobs", "plugin jobs"); // distinct from "job"
+                ctx.add_subcommand(ctx.get_root_command(), cmd);
+            });
+            pm.register_commands(root);
+
+            Expect(root_has(root, "jobs")).ToBe(true);
+            Expect(pm.get_rejected_command_names().size()).ToBe(std::size_t(0));
+        });
+
+        it("registers a plug-in's non-colliding commands even when one of its commands collides", []() {
+            parser::Command root("zowex", "root");
+            root.add_command(make_builtin("job", "builtin job"));
+
+            plugin::PluginManager pm;
+            register_provider(pm, [](RegistrationContext &ctx) {
+                auto shadow = ctx.create_command("job", "plugin job");
+                ctx.add_subcommand(ctx.get_root_command(), shadow);
+                auto ok = ctx.create_command("hello", "plugin hello");
+                ctx.add_subcommand(ctx.get_root_command(), ok);
+            });
+            pm.register_commands(root);
+
+            Expect(root_has(root, "hello")).ToBe(true);
+            Expect(root.get_commands().at("job")->get_help()).ToBe(std::string("builtin job"));
+            Expect(was_rejected(pm, "job")).ToBe(true);
+        });
+
+        it("refuses a second plug-in command that duplicates one an earlier plug-in claimed", []() {
+            parser::Command root("zowex", "root");
+            root.add_command(make_builtin("job", "builtin job"));
+
+            plugin::PluginManager pm;
+            register_provider(pm, [](RegistrationContext &ctx) {
+                auto first = ctx.create_command("hello", "first hello");
+                ctx.add_subcommand(ctx.get_root_command(), first);
+            });
+            register_provider(pm, [](RegistrationContext &ctx) {
+                auto second = ctx.create_command("hello", "second hello");
+                ctx.add_subcommand(ctx.get_root_command(), second);
+            });
+            pm.register_commands(root);
+
+            Expect(root_has(root, "hello")).ToBe(true);
+            Expect(root.get_commands().at("hello")->get_help()).ToBe(std::string("first hello"));
+            Expect(was_rejected(pm, "hello")).ToBe(true);
+        });
+
+        it("does not crash and drops a malformed plug-in's duplicate nested subcommand", []() {
+            parser::Command root("zowex", "root");
+            root.add_command(make_builtin("job", "builtin job"));
+
+            plugin::PluginManager pm;
+            register_provider(pm, [](RegistrationContext &ctx) {
+                auto grp = ctx.create_command("grp", "plugin group");
+                auto sub1 = ctx.create_command("sub", "first sub");
+                auto sub2 = ctx.create_command("sub", "second sub");
+                ctx.add_subcommand(grp, sub1);
+                ctx.add_subcommand(grp, sub2); // duplicate sibling name - guarded, must not throw
+                ctx.add_subcommand(ctx.get_root_command(), grp);
+            });
+            pm.register_commands(root);
+
+            Expect(root_has(root, "grp")).ToBe(true);
+            Expect(root.get_commands().at("grp")->get_commands().size()).ToBe(std::size_t(1));
+            // A nested duplicate is not a top-level shadowing rejection.
+            Expect(pm.get_rejected_command_names().size()).ToBe(std::size_t(0));
+        });
+
+        it("drops a rejected shadowing command from the server command set", []() {
+            parser::Command root("zowex", "root");
+            root.add_command(make_builtin("job", "builtin job"));
+
+            plugin::PluginManager pm;
+            register_provider(pm, [](RegistrationContext &ctx) {
+                auto shadow = ctx.create_command("job", "plugin job");
+                ctx.add_to_server(shadow);
+                ctx.add_subcommand(ctx.get_root_command(), shadow);
+            });
+            pm.register_commands(root);
+
+            // A shadowing command must gain no foothold on the server dispatch path either.
+            Expect(pm.get_server_commands().size()).ToBe(std::size_t(0));
+            Expect(was_rejected(pm, "job")).ToBe(true);
+        });
+
+        it("keeps a non-colliding command in the server command set", []() {
+            parser::Command root("zowex", "root");
+            root.add_command(make_builtin("job", "builtin job"));
+
+            plugin::PluginManager pm;
+            register_provider(pm, [](RegistrationContext &ctx) {
+                auto hello = ctx.create_command("hello", "plugin hello");
+                ctx.add_to_server(hello);
+                ctx.add_subcommand(ctx.get_root_command(), hello);
+            });
+            pm.register_commands(root);
+
+            bool found = false;
+            for (const auto &cmd : pm.get_server_commands())
+            {
+                if (cmd->get_name() == "hello")
+                    found = true;
+            }
+            Expect(found).ToBe(true);
         }); });
 }

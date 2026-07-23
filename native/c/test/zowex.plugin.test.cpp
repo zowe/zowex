@@ -22,7 +22,7 @@ using namespace ztst;
 
 namespace
 {
-// The directory zowex's pre-Phase-2 code implicitly fell back to when
+// The directory zowex's earlier code implicitly fell back to when
 // ZOWEX_PLUGINS_DIR was unset: <exec_dir>/plugins, where exec_dir is derived from
 // zowex_command's own path ("./../build-out/zowex" -> "./../build-out").
 const std::string LEGACY_FALLBACK_DIR = "../build-out/plugins";
@@ -54,7 +54,7 @@ void ensure_dir(const std::string &dir)
 
 void zowex_plugin_tests()
 {
-  describe("zowex ZOWEX_PLUGINS_DIR opt-in (Phase 2)",
+  describe("zowex ZOWEX_PLUGINS_DIR opt-in",
            []() -> void
            {
              it("does not load plug-ins from the legacy <exec_dir>/plugins fallback when ZOWEX_PLUGINS_DIR is unset",
