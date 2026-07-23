@@ -1731,8 +1731,12 @@ describe("AbstractConfigManager", async () => {
         let mockProfiles: any;
 
         beforeEach(async () => {
-            mockLayers = { write: vi.fn(), activate: vi.fn() };
-            mockProfiles = { set: vi.fn() };
+            mockLayers = {
+                write: vi.fn(),
+                activate: vi.fn(),
+                get: vi.fn().mockReturnValue({ properties: { defaults: {} } }),
+            };
+            mockProfiles = { set: vi.fn(), defaultGet: vi.fn(), defaultSet: vi.fn() };
             mockConfigApi = { layers: mockLayers, profiles: mockProfiles };
             mockTeamConfig = {
                 api: mockConfigApi,
@@ -1776,7 +1780,7 @@ describe("AbstractConfigManager", async () => {
 
             expect(validateConfigSpy).toHaveBeenCalledWith({ ...host, privateKey: "/home/user/.ssh/id_myhost" }, false);
             expect(mockProfiles.set).toHaveBeenCalledWith("myhost", {
-                type: "ssh-config",
+                type: "ssh",
                 properties: { extends: "myhost" },
                 secure: [],
             });
@@ -1786,7 +1790,7 @@ describe("AbstractConfigManager", async () => {
                 name: "myhost",
                 message: "",
                 failNotFound: false,
-                type: "ssh-config",
+                type: "ssh",
                 profile: { extends: "myhost" },
             });
         });
@@ -1803,7 +1807,7 @@ describe("AbstractConfigManager", async () => {
             const result = await (testManager as any).createProfileFromSshConfigHost(host);
 
             expect(mockProfiles.set).toHaveBeenCalledWith("my_host_example_com", {
-                type: "ssh-config",
+                type: "ssh",
                 properties: { extends: "my.host.example.com" },
                 secure: [],
             });
@@ -1857,7 +1861,7 @@ describe("AbstractConfigManager", async () => {
             );
             // The non-working IdentityFile key must never be persisted alongside the working one
             expect(mockProfiles.set).toHaveBeenCalledWith("myhost", {
-                type: "ssh-config",
+                type: "ssh",
                 properties: { extends: "myhost", privateKey: "/home/user/.ssh/id_rsa" },
                 secure: [],
             });
@@ -1871,7 +1875,7 @@ describe("AbstractConfigManager", async () => {
             await (testManager as any).createProfileFromSshConfigHost(host);
 
             expect(mockProfiles.set).toHaveBeenCalledWith("myhost", {
-                type: "ssh-config",
+                type: "ssh",
                 properties: { extends: "myhost", privateKey: "/home/user/.ssh/id_rsa" },
                 secure: [],
             });
@@ -1886,7 +1890,7 @@ describe("AbstractConfigManager", async () => {
             await (testManager as any).createProfileFromSshConfigHost(host);
 
             expect(mockProfiles.set).toHaveBeenCalledWith("myhost", {
-                type: "ssh-config",
+                type: "ssh",
                 properties: { extends: "myhost", privateKey: "/home/user/.ssh/id_rsa", keyPassphrase: "secretPass" },
                 secure: ["keyPassphrase"],
             });
@@ -1903,7 +1907,7 @@ describe("AbstractConfigManager", async () => {
 
             // The private key that failed to authenticate must never be persisted
             expect(mockProfiles.set).toHaveBeenCalledWith("myhost", {
-                type: "ssh-config",
+                type: "ssh",
                 properties: { extends: "myhost", password: "secretPW" },
                 secure: ["password"],
             });
@@ -1919,7 +1923,7 @@ describe("AbstractConfigManager", async () => {
             const result = await (testManager as any).createProfileFromSshConfigHost(host);
 
             expect(mockProfiles.set).toHaveBeenCalledWith("myhost", {
-                type: "ssh-config",
+                type: "ssh",
                 properties: { extends: "myhost", password: "secretPW" },
                 secure: ["password"],
             });

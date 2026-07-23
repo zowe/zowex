@@ -251,7 +251,7 @@ export abstract class AbstractConfigManager {
     }
 
     /**
-     * Creates a new "ssh-config" profile in team config that points at a migrated `~/.ssh/config` host via
+     * Creates a new "ssh" profile in team config that points at a migrated `~/.ssh/config` host via
      * the `extends` property, and handling the three possible authentication scenarios:
      *  1. The host declares `IdentityFile` in `~/.ssh/config` (`host.privateKey` is set) and it authenticates
      *     successfully — no extra profile properties beyond `extends` are needed, since it alone resolves the
@@ -272,10 +272,7 @@ export abstract class AbstractConfigManager {
         // The profile name can't contain dots (they're the team config JSON path separator), but extends
         // must retain the original ~/.ssh/config Host alias verbatim so it can be looked up later.
         const profileName = host.name!.replace(/\./g, "_");
-        const properties: { extends: string; privateKey?: string; keyPassphrase?: string; password?: string } = {
-            extends: host.name!,
-        };
-        const secure: string[] = [];
+        const newProfile: ISshConfigExt = { name: profileName, extends: host.name! };
 
         const privateKeyCandidates = Array.from(
             new Set(
@@ -302,11 +299,10 @@ export abstract class AbstractConfigManager {
         if (validation) {
             // Only persist privateKey explicitly when it wasn't already resolvable via the ~/.ssh/config IdentityFile
             if (validatedPrivateKey !== host.privateKey) {
-                properties.privateKey = validatedPrivateKey;
+                newProfile.privateKey = validatedPrivateKey;
             }
             if (validation.keyPassphrase) {
-                properties.keyPassphrase = validation.keyPassphrase;
-                secure.push("keyPassphrase");
+                newProfile.keyPassphrase = validation.keyPassphrase;
             }
         } else {
             const passwordResult = await this.promptForPassword(host, {});
@@ -314,8 +310,7 @@ export abstract class AbstractConfigManager {
                 this.showMessage("SSH setup cancelled.", MESSAGE_TYPE.WARNING);
                 return undefined;
             }
-            properties.password = passwordResult.password;
-            secure.push("password");
+            newProfile.password = passwordResult.password;
         }
 
         // Ensure the global config layer (and its schema) exists before persisting to it; no-ops if it already does
@@ -327,18 +322,23 @@ export abstract class AbstractConfigManager {
         // Always persist to the global layer, never the project-level config
         configApi.layers.activate(false, true);
         try {
-            const config: IConfigProfile = { type: "ssh-config", properties, secure };
-            configApi.profiles.set(profileName, config);
-            if (secure.length > 0) {
-                await teamConfig.save();
-            } else {
-                configApi.layers.write();
-            }
+            await this.setProfile(newProfile);
         } finally {
             configApi.layers.activate(previousLayer.user, previousLayer.global);
         }
 
-        return { name: profileName, message: "", failNotFound: false, type: "ssh-config", profile: properties };
+        return {
+            name: profileName,
+            message: "",
+            failNotFound: false,
+            type: "ssh",
+            profile: {
+                extends: newProfile.extends,
+                privateKey: newProfile.privateKey,
+                keyPassphrase: newProfile.keyPassphrase,
+                password: newProfile.password,
+            },
+        };
     }
 
     protected abstract storeServerPath(host: string, path: string): void;
@@ -712,19 +712,23 @@ export abstract class AbstractConfigManager {
 
     private async setProfile(selectedConfig: ISshConfigExt, updatedProfile?: string): Promise<void> {
         const configApi = this.mProfilesCache.getTeamConfig().api;
+        // A profile migrated from ~/.ssh/config inherits its connection details via "extends" instead of
+        // duplicating them, so only the auth properties resolved on top of that host are persisted.
+        const properties: Record<string, unknown> = {
+            user: selectedConfig.user,
+            host: selectedConfig.hostname,
+            privateKey: selectedConfig.privateKey,
+            port: selectedConfig.port || 22,
+            keyPassphrase: selectedConfig.keyPassphrase,
+            password: selectedConfig.password,
+            extends: selectedConfig.extends,
+        };
         // Create the base config object
         const config: IConfigProfile = {
             type: "ssh",
-            properties: {
-                user: selectedConfig.user,
-                host: selectedConfig.hostname,
-                privateKey: selectedConfig.privateKey,
-                port: selectedConfig.port || 22,
-                keyPassphrase: selectedConfig.keyPassphrase,
-                password: selectedConfig.password,
-            },
+            properties,
             //if user, password, or KP is defined, make them secure
-            secure: ["user", "password", "keyPassphrase"].filter((key) => selectedConfig[key as keyof ISshConfigExt]),
+            secure: ["user", "password", "keyPassphrase"].filter((key) => properties[key]),
         };
 
         if (updatedProfile) {

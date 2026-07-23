@@ -17,6 +17,7 @@ import * as sshConfig from "ssh-config";
 
 export interface ISshConfigExt extends ISshSession {
     name?: string;
+    extends?: string;
 }
 // biome-ignore lint/complexity/noStaticOnlyClass: Utilities class has static methods
 export class SshConfigUtils {
