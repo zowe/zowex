@@ -370,14 +370,14 @@ zoweax: $(OUT_DIR) $(OUT_DIR)/zoweax
 
 $(OUT_DIR)/zowex.o: zowex.cpp
 	@echo 'Building $(OUT_DIR)/zowex.o'
-# 	@if [ -f ../package.json ] && [ "$$BUILD_TYPE" = "DEBUG" ]; then \
-# 	GIT_HASH=$$(grep '"gitHash"' ../package.json | sed 's/.*"gitHash"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/'); \
-# 	GIT_HASH="$$GIT_HASH-debug"; \
-# 	echo "Extracted git hash: $$GIT_HASH"; \
-# 	else \
-# 	echo "Not a debug build, or package.json not found, building without GIT_HASH"; \
-# 	GIT_HASH=""; \
-# 	fi
+	@if [ -f ../package.json ] && [ "$$BUILD_TYPE" = "DEBUG" ]; then \
+		GIT_HASH=$$(grep '"gitHash"' ../package.json | sed 's/.*"gitHash"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/'); \
+		GIT_HASH="$$GIT_HASH-debug"; \
+		echo "Extracted git hash: $$GIT_HASH"; \
+	else \
+		echo "Not a debug build, or package.json not found, building without GIT_HASH"; \
+		GIT_HASH=""; \
+	fi
 
 	@if [ -f ../package.json ]; then \
 		PACKAGE_VERSION=$$(grep '"version"' ../package.json | sed 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/'); \
