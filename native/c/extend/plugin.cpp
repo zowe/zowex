@@ -24,13 +24,6 @@
 
 namespace
 {
-// An owner is "trusted" to supply plug-in code if it is either the superuser
-// (uid 0) or the identity running this zowex process. Loading native code owned
-// by root or by yourself is not a cross-user privilege escalation; loading code
-// owned by some *other* unprivileged identity is exactly the escalation path the
-// audit flagged, so those are rejected. This is a fixed security invariant, not
-// an administrator-tunable list - broadening trust to a dedicated (non-root)
-// installer identity is deferred to the ESM/SAF authorization gate.
 bool is_trusted_owner(uid_t owner)
 {
   return owner == 0 || owner == geteuid();

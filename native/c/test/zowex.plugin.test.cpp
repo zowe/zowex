@@ -22,9 +22,6 @@ using namespace ztst;
 
 namespace
 {
-// The directory zowex's earlier code implicitly fell back to when
-// ZOWEX_PLUGINS_DIR was unset: <exec_dir>/plugins, where exec_dir is derived from
-// zowex_command's own path ("./../build-out/zowex" -> "./../build-out").
 const std::string LEGACY_FALLBACK_DIR = "../build-out/plugins";
 const std::string EXPLICIT_OPT_IN_DIR = "zowex_plugin_opt_in_test";
 

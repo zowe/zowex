@@ -196,9 +196,6 @@ build-out/zusf.o:
 build-out/server_validator.o:
 	ln -sf ../../build-out/server/validator.o build-out/server_validator.o
 
-# Compiled directly from source (rather than symlinked from ../build-out like most of the
-# objects above) so the test binary always links a self-contained plugin.o built with this
-# makefile's own flags, independent of whether or how the top-level native/c build produced one.
 build-out/plugin.o: ../extend/plugin.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
