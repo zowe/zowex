@@ -6,7 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
-- `c`: Fixed a buffer overflow in `zowex ds list-members` caused by an out of range value in a PDS directory block.
+- `c`: Fixed a buffer overflow in `zowex ds list-members` caused by an out of range value in a PDS directory block. [#1070] (https://github.com/zowe/zowex/pull/1070)
 - `c`: Added support to return information for current linklist. [#1061](https://github.com/zowe/zowex/pull/1061)
 
 ## `0.6.1`
