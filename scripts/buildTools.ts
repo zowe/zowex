@@ -1219,7 +1219,7 @@ async function packPrecompiled(connection: Client) {
     console.log("Precompiled bindings downloaded to dist/zbind_bin_dist.tar.gz");
 }
 
-function getLatestTag(repoName: string) {
+function getLatestTag(repoName: string, prefix?: string) {
     // --sort=-version:refname sorts tags by their numeric version (descending)
     const out = childProcess.execSync(
         `git ls-remote --tags --refs --sort=-version:refname https://github.com/${repoName}.git`,
@@ -1229,7 +1229,9 @@ function getLatestTag(repoName: string) {
         const lastSlashIdx = line.lastIndexOf("/");
         tags.push(line.slice(lastSlashIdx + 1));
     }
-    return tags.filter((tag) => !tag.includes("beta"))[0];
+    const isPrerelease = (tag: string) => tag.includes("-beta") || tag.includes("-RC");
+    const matchesPrefix = (tag: string) => prefix == null || tag.startsWith(prefix);
+    return tags.filter((tag) => !isPrerelease(tag) && matchesPrefix(tag))[0];
 }
 
 /**
@@ -1238,10 +1240,11 @@ function getLatestTag(repoName: string) {
  * (e.g. the tarball was removed from the host), so callers fail fast instead
  * of proceeding to extract a missing or invalid archive.
  */
-async function downloadTarball(url: string, destPath: string, label: string) {
+async function downloadTarball(url: string, destPath: string) {
     if (fs.existsSync(destPath)) {
         return;
     }
+    const label = destPath.split(/\W/)[0].toUpperCase();
     console.log(`Downloading ${label} tarball...`);
     let response: Response;
     try {
@@ -1259,17 +1262,16 @@ async function downloadTarball(url: string, destPath: string, label: string) {
 async function buildSwig(connection: Client) {
     const cacheDir = path.resolve(__dirname, "./../.cache");
     fs.mkdirSync(cacheDir, { recursive: true });
-    const swigVersion = getLatestTag("swig/swig").slice(1);
+    const swigVersion = getLatestTag("swig/swig", "v4.").slice(1);
     const swigTgz = path.join(cacheDir, `swig-${swigVersion}.tar.gz`);
     const pcreVersion = getLatestTag("PCRE2Project/pcre2").split("-").pop();
     const pcreTgz = path.join(cacheDir, `pcre2-${pcreVersion}.tar.gz`);
 
     await Promise.all([
-        downloadTarball(`http://prdownloads.sourceforge.net/swig/swig-${swigVersion}.tar.gz`, swigTgz, "SWIG"),
+        downloadTarball(`https://prdownloads.sourceforge.net/swig/swig-${swigVersion}.tar.gz`, swigTgz),
         downloadTarball(
             `https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${pcreVersion}/pcre2-${pcreVersion}.tar.gz`,
             pcreTgz,
-            "PCRE2",
         ),
     ]);
 
