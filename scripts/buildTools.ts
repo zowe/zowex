@@ -1122,7 +1122,7 @@ function getServerFiles(dir = "") {
                 }
 
                 if (stats.isDirectory()) {
-                    fileList.push(...getFilesRecursive(arg.replace(/\/+$/, "")));
+                    fileList.push(...getFilesRecursive(arg.replace(/\/$/, "")));
                 } else {
                     fileList.push(arg);
                 }
@@ -1231,7 +1231,7 @@ function getLatestTag(repoName: string, prefix?: string) {
     }
     const isPrerelease = (tag: string) => tag.includes("-beta") || tag.includes("-RC");
     const matchesPrefix = (tag: string) => prefix == null || tag.startsWith(prefix);
-    return tags.filter((tag) => !isPrerelease(tag) && matchesPrefix(tag))[0];
+    return tags.find((tag) => !isPrerelease(tag) && matchesPrefix(tag));
 }
 
 /**
