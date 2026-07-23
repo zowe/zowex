@@ -48,7 +48,6 @@ private:
   static void signal_handler(int sig);
   void setup_signal_handlers();
   void request_shutdown();
-  std::map<std::string, std::string> load_checksums();
   void print_ready_message();
   void log_worker_count();
 
@@ -60,8 +59,14 @@ public:
   ~ZServer();
 
   static ZServer &get_instance();
-  void set_exec_dir(const std::string &dir) { exec_dir = dir; }
-  const std::string &get_exec_dir() const { return exec_dir; }
+  void set_exec_dir(const std::string &dir)
+  {
+    exec_dir = dir;
+  }
+  const std::string &get_exec_dir() const
+  {
+    return exec_dir;
+  }
   void run(const server::Options &opts);
 };
 

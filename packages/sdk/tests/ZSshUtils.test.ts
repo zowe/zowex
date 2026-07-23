@@ -17,6 +17,11 @@ import { ZSshClient } from "../src";
 import { SshErrors } from "../src/SshErrors";
 import { ZSshUtils } from "../src/ZSshUtils";
 
+vi.mock("../src/ZSshConstants", () => ({
+    BUNDLED_SSH_SERVER_VERSION: "1.2.1",
+}));
+import { BUNDLED_SSH_SERVER_VERSION } from "../src/ZSshConstants";
+
 vi.mock("node:fs", { spy: true });
 
 function setupSftpMocks(
@@ -37,43 +42,81 @@ function setupSftpMocks(
 
 describe("ZSshUtils", () => {
     describe("checkIfOutdated", () => {
-        it("should return false for dev builds without remote checksums", async () => {
-            const readFileSyncSpy = vi.spyOn(fs, "readFileSync");
-            const isOutdated = await ZSshUtils.checkIfOutdated();
-            expect(isOutdated).toBe(false);
-            expect(readFileSyncSpy).not.toHaveBeenCalled();
-        });
-
         it.each([
+            // compared against mocked zowex binary version: 1.2.1
             {
-                desc: "matching checksums with different order",
-                fileContent: "123 abc\n456 def",
-                remote: { def: "456", abc: "123" },
+                desc: "versions match exactly- not outdated",
+                remoteVersion: BUNDLED_SSH_SERVER_VERSION,
                 expected: false,
             },
             {
-                desc: "different checksums",
-                fileContent: "123 abc\n456 def",
-                remote: { abc: "789", def: "456" },
+                desc: "remote version is lower by major version - outdated",
+                remoteVersion: "0.9.1",
                 expected: true,
             },
             {
-                desc: "same checksums and local file added",
-                fileContent: "123 abc\n456 def\n789 ghi",
-                remote: { abc: "123", def: "456" },
+                desc: "remote version is lower by minor version - outdated",
+                remoteVersion: "1.1.19",
                 expected: true,
             },
             {
-                desc: "same checksums and local file removed",
-                fileContent: "123 abc",
-                remote: { abc: "123", def: "456" },
+                desc: "remote version is lower by patch version - outdated",
+                remoteVersion: "1.2.0",
                 expected: true,
             },
-        ])("should return $expected for $desc", async ({ fileContent, remote, expected }) => {
-            const readFileSyncSpy = vi.spyOn(fs, "readFileSync").mockReturnValueOnce(fileContent);
-            const isOutdated = await ZSshUtils.checkIfOutdated(remote);
+            {
+                desc: "matching versions with different git hash - snapshot considered older for the same semver - outdated",
+                remoteVersion: `${BUNDLED_SSH_SERVER_VERSION}-aefdab`,
+                expected: true,
+            },
+            {
+                desc: "older patch version also with suffix - outdated",
+                remoteVersion: `1.2.0-aefdab`,
+                expected: true,
+            },
+            {
+                desc: "remote version is not a valid semver string - outdated",
+                remoteVersion: "footballbaseball",
+                expected: true,
+            },
+            {
+                desc: "remote version is undefined - outdated",
+                remoteVersion: undefined,
+                expected: true,
+            },
+            {
+                desc: "remote version is an empty string - outdated",
+                remoteVersion: "",
+                expected: true,
+            },
+            {
+                desc: "remote version is newer by major version - not outdated",
+                remoteVersion: "2.0.0",
+                expected: false,
+            },
+            {
+                desc: "remote version is newer by minor version - not outdated",
+                remoteVersion: "1.3.0",
+                expected: false,
+            },
+            {
+                desc: "remote version is newer by patch version - not outdated",
+                remoteVersion: "1.2.19",
+                expected: false,
+            },
+            {
+                desc: "remote version is newer but a prerelease - not outdated",
+                remoteVersion: "1.3.0-SNAPSHOT",
+                expected: false,
+            },
+            {
+                desc: "remote version is newer but a prerelease which uses the older +gitHash syntax - not outdated",
+                remoteVersion: "1.3.0+afeb102",
+                expected: false,
+            },
+        ])("should return $expected for $desc", async ({ remoteVersion, expected }) => {
+            const isOutdated = await ZSshUtils.checkIfOutdated(remoteVersion);
             expect(isOutdated).toBe(expected);
-            expect(readFileSyncSpy).toHaveBeenCalled();
         });
     });
 

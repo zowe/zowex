@@ -78,7 +78,7 @@ put server.pax.Z
 bye
 EOF
 
-# 1b. unpax on the host (extracts flat: ./zowex + ./checksums.asc)
+# 1b. unpax on the host (extracts flat: ./zowex)
 ssh "$ZX_HOST" "cd $ZX_DIR && pax -rvf server.pax.Z && chmod +x zowex"
 
 ZX_BIN=$ZX_DIR/zowex
@@ -98,7 +98,7 @@ The CLI also exposes `console` / `tso` / `system` / `tool` subcommands — run `
 `zowex server` reads **JSON-RPC 2.0** requests on **stdin** and writes JSON responses on **stdout**, one object per line. Auth is whatever SSH gave you — there is no in-band handshake.
 
 **Wire behavior (verified against v0.6.0):**
-- The server emits one **ready banner** line first: `{"status":"ready","message":"...","data":{"version":"...","checksums":{...}}}`. Consume and discard it before reading responses.
+- The server emits one **ready banner** line first: `{"status":"ready","message":"...","data":{"version":"..."}}`. Consume and discard it before reading responses.
 - With the default worker pool, **responses can arrive out of order** (matched by `id`). For scripted/sequential use, start with `-w 1` to serialize. The `zx` helper does this.
 - Unknown methods return `{"error":{"code":-32601,"message":"Unrecognized command <name>"}}`.
 - Result shape: `{"id":N,"result":{"success":true, ...},"jsonrpc":"2.0"}`. Common result fields: `data` (b64 for `readDataset`/`readFile`/`readSpool`; **plain text** for `unixCommand`/`tsoCommand`), `items` (lists), `jobId`/`jobName` (`submitJcl`), `etag` (`readDataset`), `returnedRows`.

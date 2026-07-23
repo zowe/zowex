@@ -14,11 +14,12 @@ import * as path from "node:path";
 import { promisify } from "node:util";
 import { ImperativeError, type IProfile, Logger } from "@zowe/imperative";
 import { type ISshSession, SshSession } from "@zowe/zos-uss-for-zowe-sdk";
-import { isEqual } from "es-toolkit";
 import { NodeSSH, type Config as NodeSSHConfig } from "node-ssh";
+import * as semver from "semver";
 import type { ConnectConfig, SFTPWrapper } from "ssh2";
 import { PrivateKeyFailurePatterns, SshErrors } from "./SshErrors";
 import { ZSshClient } from "./ZSshClient";
+import { BUNDLED_SSH_SERVER_VERSION } from "./ZSshConstants";
 
 export interface ISshCallbacks {
     onProgress?: (increment: number) => void; // Callback to report incremental progress
@@ -395,18 +396,25 @@ export class ZSshUtils {
         });
     }
 
-    public static async checkIfOutdated(remoteChecksums?: Record<string, string>): Promise<boolean> {
-        if (remoteChecksums == null) {
-            Logger.getAppLogger().warn("Checksums not found, could not verify server");
-            return false;
+    public static async checkIfOutdated(remoteVersion: string): Promise<boolean> {
+        Logger.getAppLogger().debug(
+            `[ZSshUtils] checkIfOutdated: Comparing remote version '${remoteVersion}' to bundled server version '${BUNDLED_SSH_SERVER_VERSION}'`,
+        );
+        if (remoteVersion) {
+            // older builds of zowex were suffixed with +<gitHash>, but + will not be treated as
+            // a prerelease string. So, normalize + to - for consistent behavior.
+            remoteVersion = remoteVersion.replace("+", "-");
         }
-        const localFile = path.join(ZSshUtils.getBinDir(__dirname), "checksums.asc");
-        const localChecksums: Record<string, string> = {};
-        for (const line of fs.readFileSync(localFile, "utf-8").trimEnd().split("\n")) {
-            const [checksum, file] = line.split(/\s+/);
-            localChecksums[file] = checksum;
+        if (!semver.valid(remoteVersion)) {
+            Logger.getAppLogger().warn(
+                `[ZSshUtils] checkIfOutdated: Invalid remote version '${remoteVersion}' passed. Assuming outdated by default`,
+            );
+            return true;
         }
-        return !isEqual(localChecksums, remoteChecksums);
+
+        const isOutdated = semver.lt(remoteVersion, BUNDLED_SSH_SERVER_VERSION);
+        Logger.getAppLogger().debug(`[ZSshUtils] remote version '${remoteVersion}' is outdated? ${isOutdated}`);
+        return isOutdated;
     }
 
     private static getBinDir(dir: string): string {

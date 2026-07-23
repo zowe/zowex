@@ -23,6 +23,7 @@ SWIG_FLAGS=$(SWIG_FLAGS_BASE) -I./chdsect -MMD -MP
 
 # make -DBuildType=DEBUG or -DBuildType=RELEASE
 .IF $(BuildType) == DEBUG
+BUILD_TYPE=DEBUG
 CPP_BND_FLAGS=$(CPP_BND_DEBUG_FLAGS) $(DEBUGGER_FLAGS)
 CPP_BND_FLAGS_AUTH=$(CPP_BND_DEBUG_FLAGS_AUTH) $(DEBUGGER_FLAGS)
 C_FLAGS+=$(DEBUGGER_FLAGS)
@@ -32,6 +33,7 @@ MTL_FLAGS+=$(DEBUGGER_FLAGS) $(OTHER_C_FLAGS)
 MTL_FLAGS64+=$(DEBUGGER_FLAGS) $(OTHER_C_FLAGS)
 ASM_FLAGS+=--verbose
 .ELSIF $(BuildType) == RELEASE
+BUILD_TYPE=RELEASE
 CPP_BND_FLAGS=$(CPP_BND_BASE_FLAGS)
 CPP_BND_FLAGS_AUTH=$(CPP_BND_BASE_FLAGS_AUTH)
 DLL_BND_FLAGS=$(DLL_BND_BASE_FLAGS)
@@ -84,7 +86,7 @@ SWIG_EXTENDER_OBJS = $(OUT_DIR_SWIG)/zut.o $(OUT_DIR_SWIG)/zds.o $(OUT_DIR_SWIG)
 all: libzut.so libzut.a libzds.so libzds.a libzusf.so libzusf.a libzcn.so libzcn.a libzjb.so libzjb.a zowex zoweax
 swig-extenders: $(OUT_DIR_SWIG) $(SWIG_EXTENDER_OBJS)
 tests:
-	 $(MAKE) -c test
+	$(MAKE) -c test
 
 #
 # Out directories
@@ -368,13 +370,22 @@ zoweax: $(OUT_DIR) $(OUT_DIR)/zoweax
 
 $(OUT_DIR)/zowex.o: zowex.cpp
 	@echo 'Building $(OUT_DIR)/zowex.o'
+	@if [ -f ../package.json ] && [ "$$BUILD_TYPE" = "DEBUG" ]; then \
+		GIT_HASH=$$(grep '"gitHash"' ../package.json | sed 's/.*"gitHash"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/'); \
+		GIT_HASH="$$GIT_HASH-debug"; \
+		echo "Extracted git hash: $$GIT_HASH"; \
+	else \
+		echo "Not a debug build, or package.json not found, building without GIT_HASH"; \
+		GIT_HASH=""; \
+	fi
+
 	@if [ -f ../package.json ]; then \
 		PACKAGE_VERSION=$$(grep '"version"' ../package.json | sed 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/'); \
 		echo "Extracted version: $$PACKAGE_VERSION"; \
-		$(CXX) $(CPP_FLAGS) -DPACKAGE_VERSION="\"$$PACKAGE_VERSION\"" -c $^ -o $@; \
+	$(CXX) $(CPP_FLAGS) -DPACKAGE_VERSION="\"$$PACKAGE_VERSION$$GIT_HASH\"" -c $^ -o $@; \
 	else \
-		echo "package.json not found, building without version"; \
-		$(CXX) $(CPP_FLAGS) -c $^ -o $@; \
+	echo "package.json not found, building without version"; \
+	$(CXX) $(CPP_FLAGS) -c $^ -o $@; \
 	fi
 
 #
