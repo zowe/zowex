@@ -54,7 +54,6 @@ zx deploy user@host [/remote/dir]
 ```
 
 If `server.pax.Z` isn't present locally, `zx deploy` will:
-
 1. Hit the GitHub releases API to find the latest release asset (`*.pax.Z`)
 2. Show you the filename and destination, then download it automatically
 3. Continue with the normal sftp → unpax → verify flow
@@ -99,7 +98,6 @@ The CLI also exposes `console` / `tso` / `system` / `tool` subcommands — run `
 `zowex server` reads **JSON-RPC 2.0** requests on **stdin** and writes JSON responses on **stdout**, one object per line. Auth is whatever SSH gave you — there is no in-band handshake.
 
 **Wire behavior (verified against v0.6.0):**
-
 - The server emits one **ready banner** line first: `{"status":"ready","message":"...","data":{"version":"..."}}`. Consume and discard it before reading responses.
 - With the default worker pool, **responses can arrive out of order** (matched by `id`). For scripted/sequential use, start with `-w 1` to serialize. The `zx` helper does this.
 - Unknown methods return `{"error":{"code":-32601,"message":"Unrecognized command <name>"}}`.
@@ -122,16 +120,16 @@ $zx stop
 
 **Command groups** (run `zx help` for the full list):
 
-| group        | subcommands                                                                                                                                             |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `zx ds`      | `list <pat>` · `members <dsn>` · `read <dsn>` · `write <dsn> <file>` · `get`/`put` (member or whole PDS) · `create` · `delete` · `copy` · `rename`      |
-| `zx job`     | `list [<owner> [<prefix>]]` · `submit <file>` · `status <id>` · `spools <id>` · `spool <id> <n>` · `jcl <id>` · `cancel`/`delete`/`hold`/`release <id>` |
-| `zx uss`     | `ls` · **`get`/`put`** (sftp, binary-safe) · `read`/`write` (RPC, text) · `rm` · `mkdir` · `mv` · `cp` · `chmod` · `chown` · `chtag` · `sh '<cmd>'`     |
-| `zx tso`     | `'<cmd>'`                                                                                                                                               |
-| `zx system`  | `apf` · `linklist` · `proclib` · `syslog` (RPC) · `parmlib` · `subsystems` · `symbol <s>` (CLI)                                                         |
-| `zx tool`    | `amblist <dsn> --cs '<stmts>'` · `run <pgm> [opts]` · `search <dsn> <str>` · `dynalloc` · `dsect` (all CLI)                                             |
-| `zx console` | `'<cmd>' [--cn <n>] [--timeout <s>] [--no-wait]` (CLI; needs APF — fails `Not authorized - 4` from a plain USS dir)                                     |
-| `zx rpc`     | `<method> ['<params>']` — raw escape hatch                                                                                                              |
+| group | subcommands |
+|---|---|
+| `zx ds` | `list <pat>` · `members <dsn>` · `read <dsn>` · `write <dsn> <file>` · `get`/`put` (member or whole PDS) · `create` · `delete` · `copy` · `rename` |
+| `zx job` | `list [<owner> [<prefix>]]` · `submit <file>` · `status <id>` · `spools <id>` · `spool <id> <n>` · `jcl <id>` · `cancel`/`delete`/`hold`/`release <id>` |
+| `zx uss` | `ls` · **`get`/`put`** (sftp, binary-safe) · `read`/`write` (RPC, text) · `rm` · `mkdir` · `mv` · `cp` · `chmod` · `chown` · `chtag` · `sh '<cmd>'` |
+| `zx tso` | `'<cmd>'` |
+| `zx system` | `apf` · `linklist` · `proclib` · `syslog` (RPC) · `parmlib` · `subsystems` · `symbol <s>` (CLI) |
+| `zx tool` | `amblist <dsn> --cs '<stmts>'` · `run <pgm> [opts]` · `search <dsn> <str>` · `dynalloc` · `dsect` (all CLI) |
+| `zx console` | `'<cmd>' [--cn <n>] [--timeout <s>] [--no-wait]` (CLI; needs APF — fails `Not authorized - 4` from a plain USS dir) |
+| `zx rpc` | `<method> ['<params>']` — raw escape hatch |
 
 **Output:** grouped commands pretty-print by default (lists → one per line, b64 → decoded, status → `key=value`). Add `-j`/`--json` anywhere (before or after the group) for raw JSON: `zx ds list "SYS1.*" -j` or `zx -j ds list "SYS1.*"`.
 
@@ -152,8 +150,8 @@ All `zx` state — config, persistent-session pid, FIFOs, and the SSH `ControlMa
 under `$ZX_STATE`, which defaults to **one shared directory per UID** (`/tmp/zx.$UID`). That means
 `zx deploy`/`zx use` for a second host **overwrites** the first host's saved config, and — more
 importantly — `_live()` (the check every grouped command uses to decide "route through the
-persistent session or go one-shot") only checks _whether a pid exists_, not _which host it's
-for_. If a persistent session is already live for host A and you need one-shot calls against host
+persistent session or go one-shot") only checks *whether a pid exists*, not *which host it's
+for*. If a persistent session is already live for host A and you need one-shot calls against host
 B without touching it, exporting `ZX_HOST`/`ZX_BIN` alone is **not enough** — the dispatcher will
 still shove your request down host A's session.
 
@@ -197,52 +195,52 @@ is currently exported.
 
 ### Datasets
 
-| method          | params                                                        |
-| --------------- | ------------------------------------------------------------- |
-| `listDatasets`  | `{"pattern":"HLQ.*"}`                                         |
-| `listDsMembers` | `{"dsname":"HLQ.PDS"}`                                        |
-| `readDataset`   | `{"dsname":"HLQ.PS"}` · optional `"encoding":"ISO8859-1"`     |
-| `writeDataset`  | `{"dsname":"HLQ.PS","data":"<b64>"}` · optional `"encoding"`  |
+| method | params |
+|---|---|
+| `listDatasets` | `{"pattern":"HLQ.*"}` |
+| `listDsMembers` | `{"dsname":"HLQ.PDS"}` |
+| `readDataset` | `{"dsname":"HLQ.PS"}` · optional `"encoding":"ISO8859-1"` |
+| `writeDataset` | `{"dsname":"HLQ.PS","data":"<b64>"}` · optional `"encoding"` |
 | `createDataset` | `{"dsname":"HLQ.NEW","attributes":{"primary":10,"lrecl":80}}` |
-| `deleteDataset` | `{"dsname":"HLQ.OLD"}`                                        |
-| `renameDataset` | `{"dsnameBefore":"A","dsnameAfter":"B"}`                      |
+| `deleteDataset` | `{"dsname":"HLQ.OLD"}` |
+| `renameDataset` | `{"dsnameBefore":"A","dsnameAfter":"B"}` |
 
 **No `copyDataset` RPC** — at least as of server v0.6.0, `copyDataset` isn't wired over JSON-RPC (returns `-32601 Unrecognized command`) even though it exists as a CLI verb. `zx ds copy` calls the CLI directly instead (`zowex data-set copy <src> <dst> [--ow|-r]`, via SSH passthrough — see §2's CLI-vs-RPC note). If you're issuing raw RPC via `zx rpc` or `zx -j ds copy`-style JSON, don't rely on `copyDataset` — shell out to the CLI form instead.
 
 ### Jobs
 
-| method                                               | params                                |
-| ---------------------------------------------------- | ------------------------------------- |
-| `listJobs`                                           | `{}` · optional `"owner"`, `"prefix"` |
-| `getJobStatus`                                       | `{"jobId":"JOB01234"}`                |
-| `listSpools`                                         | `{"jobId":"JOB01234"}`                |
-| `readSpool`                                          | `{"jobId":"JOB01234","spoolId":2}`    |
-| `getJcl`                                             | `{"jobId":"JOB01234"}`                |
-| `submitJcl`                                          | `{"jcl":"<b64 of JCL text>"}`         |
-| `submitJob`                                          | `{"dsname":"HLQ.JCL(MBR)"}`           |
-| `submitUss`                                          | `{"fspath":"/path/job.jcl"}`          |
-| `cancelJob` / `deleteJob` / `holdJob` / `releaseJob` | `{"jobId":"JOB01234"}`                |
+| method | params |
+|---|---|
+| `listJobs` | `{}` · optional `"owner"`, `"prefix"` |
+| `getJobStatus` | `{"jobId":"JOB01234"}` |
+| `listSpools` | `{"jobId":"JOB01234"}` |
+| `readSpool` | `{"jobId":"JOB01234","spoolId":2}` |
+| `getJcl` | `{"jobId":"JOB01234"}` |
+| `submitJcl` | `{"jcl":"<b64 of JCL text>"}` |
+| `submitJob` | `{"dsname":"HLQ.JCL(MBR)"}` |
+| `submitUss` | `{"fspath":"/path/job.jcl"}` |
+| `cancelJob` / `deleteJob` / `holdJob` / `releaseJob` | `{"jobId":"JOB01234"}` |
 
 ### USS
 
-| method        | params                                                            |
-| ------------- | ----------------------------------------------------------------- |
-| `listFiles`   | `{"fspath":"/u/x"}`                                               |
-| `readFile`    | `{"fspath":"/u/x/f"}` · optional `"encoding"`                     |
-| `writeFile`   | `{"fspath":"/u/x/f","data":"<b64>"}` · optional `"encoding"`      |
-| `createFile`  | `{"fspath":"/u/x/f"}` · add `"isDir":true` for mkdir              |
-| `deleteFile`  | `{"fspath":"/u/x/f"}`                                             |
-| `moveFile`    | `{"source":"...","target":"..."}`                                 |
-| `copyUss`     | `{"srcFsPath":"...","dstFsPath":"..."}`                           |
-| `chmodFile`   | `{"fspath":"...","mode":"755"}`                                   |
-| `chownFile`   | `{"fspath":"...","owner":"..."}`                                  |
-| `chtagFile`   | `{"fspath":"...","tag":"UTF-8"}`                                  |
+| method | params |
+|---|---|
+| `listFiles` | `{"fspath":"/u/x"}` |
+| `readFile` | `{"fspath":"/u/x/f"}` · optional `"encoding"` |
+| `writeFile` | `{"fspath":"/u/x/f","data":"<b64>"}` · optional `"encoding"` |
+| `createFile` | `{"fspath":"/u/x/f"}` · add `"isDir":true` for mkdir |
+| `deleteFile` | `{"fspath":"/u/x/f"}` |
+| `moveFile` | `{"source":"...","target":"..."}` |
+| `copyUss` | `{"srcFsPath":"...","dstFsPath":"..."}` |
+| `chmodFile` | `{"fspath":"...","mode":"755"}` |
+| `chownFile` | `{"fspath":"...","owner":"..."}` |
+| `chtagFile` | `{"fspath":"...","tag":"UTF-8"}` |
 | `unixCommand` | `{"commandText":"<shell cmd>"}` — `result.data` is **plain text** |
 
 ### TSO
 
-| method       | params                                                      |
-| ------------ | ----------------------------------------------------------- |
+| method | params |
+|---|---|
 | `tsoCommand` | `{"commandText":"<tso cmd>"}` — `result.data` is plain text |
 
 `unixCommand` / `tsoCommand` are the escape hatches for anything not covered. There is **no JSON-RPC console method** (the `zowex console` CLI subcommand exists but isn't exposed over RPC) — use `unixCommand` with a host-side `opercmd`-equivalent if you need one, or fall back to `ssh "$ZX_HOST" "$ZX_BIN console issue ..."`.
@@ -253,22 +251,22 @@ is currently exported.
 
 When porting a workflow that used the `zowe` CLI:
 
-| `zowe` CLI                             | `zx`                                    | underlying RPC method                              |
-| -------------------------------------- | --------------------------------------- | -------------------------------------------------- |
-| `zowe files ls ds "PAT"`               | `zx ds list "PAT"`                      | `listDatasets`                                     |
-| `zowe files ls am "DSN"`               | `zx ds members "DSN"`                   | `listDsMembers`                                    |
-| `zowe files view ds "DSN"`             | `zx ds read "DSN"`                      | `readDataset` (b64)                                |
-| `zowe files upload ftds f "DSN"`       | `zx ds write "DSN" f`                   | `writeDataset`                                     |
-| `zowe files delete ds "DSN" -f`        | `zx ds delete "DSN"`                    | `deleteDataset`                                    |
-| `zowe jobs submit lf f.jcl`            | `zx job submit f.jcl`                   | `submitJcl` (local file)                           |
-| `zowe jobs submit ds "HLQ.JCL(MBR)"`   | `zx job submit "HLQ.JCL(MBR)"`          | `submitJob` (dataset)                              |
-| `zowe jobs submit uss "/path/job.jcl"` | `zx job submit /path/job.jcl`           | `submitUss` (USS path)                             |
-| `zowe jobs view jsbj JOBID`            | `zx job status JOBID`                   | `getJobStatus` → `.status`/`.retcode`/`.phaseName` |
-| `zowe jobs list sfbj JOBID`            | `zx job spools JOBID`                   | `listSpools`                                       |
-| `zowe jobs view sfbi JOBID N`          | `zx job spool JOBID N`                  | `readSpool` (b64)                                  |
-| `zowe jobs cancel job JOBID`           | `zx job cancel JOBID`                   | `cancelJob`                                        |
-| (AMBLIST batch job)                    | `zx tool amblist DSN --cs '<stmts>'`    | CLI passthrough                                    |
-| (ISRSUPC batch job)                    | `zx tool search DSN "str" --parms anyc` | CLI passthrough                                    |
+| `zowe` CLI | `zx` | underlying RPC method |
+|---|---|---|
+| `zowe files ls ds "PAT"` | `zx ds list "PAT"` | `listDatasets` |
+| `zowe files ls am "DSN"` | `zx ds members "DSN"` | `listDsMembers` |
+| `zowe files view ds "DSN"` | `zx ds read "DSN"` | `readDataset` (b64) |
+| `zowe files upload ftds f "DSN"` | `zx ds write "DSN" f` | `writeDataset` |
+| `zowe files delete ds "DSN" -f` | `zx ds delete "DSN"` | `deleteDataset` |
+| `zowe jobs submit lf f.jcl` | `zx job submit f.jcl` | `submitJcl` (local file) |
+| `zowe jobs submit ds "HLQ.JCL(MBR)"` | `zx job submit "HLQ.JCL(MBR)"` | `submitJob` (dataset) |
+| `zowe jobs submit uss "/path/job.jcl"` | `zx job submit /path/job.jcl` | `submitUss` (USS path) |
+| `zowe jobs view jsbj JOBID` | `zx job status JOBID` | `getJobStatus` → `.status`/`.retcode`/`.phaseName` |
+| `zowe jobs list sfbj JOBID` | `zx job spools JOBID` | `listSpools` |
+| `zowe jobs view sfbi JOBID N` | `zx job spool JOBID N` | `readSpool` (b64) |
+| `zowe jobs cancel job JOBID` | `zx job cancel JOBID` | `cancelJob` |
+| (AMBLIST batch job) | `zx tool amblist DSN --cs '<stmts>'` | CLI passthrough |
+| (ISRSUPC batch job) | `zx tool search DSN "str" --parms anyc` | CLI passthrough |
 
 Submit-then-poll pattern:
 
@@ -283,14 +281,14 @@ zx job spool  "$JID" 2        # read spool file #2 (JESMSGLG, etc.)
 
 ## 5 · File transfer
 
-| Command                         | What                                                                      | Transport                             |
-| ------------------------------- | ------------------------------------------------------------------------- | ------------------------------------- |
-| `zx uss get <remote> [<local>]` | download one USS file (binary-safe)                                       | sftp                                  |
-| `zx uss put <local> <remote>`   | upload one USS file (binary-safe)                                         | sftp                                  |
-| `zx ds get "<DSN(M)>" <file>`   | download one PDS member                                                   | RPC `readDataset` (b64)               |
-| `zx ds get "<DSN>" <localdir>`  | download **all** members of a PDS                                         | loops `listDsMembers` + `readDataset` |
-| `zx ds put <file> "<DSN(M)>"`   | upload one file as a member                                               | RPC `writeDataset` (b64)              |
-| `zx ds put <localdir> "<DSN>"`  | upload directory → PDS (filename → MEMBER, ext stripped, upcased, 8-char) | loops `writeDataset`                  |
+| Command | What | Transport |
+|---|---|---|
+| `zx uss get <remote> [<local>]` | download one USS file (binary-safe) | sftp |
+| `zx uss put <local> <remote>` | upload one USS file (binary-safe) | sftp |
+| `zx ds get "<DSN(M)>" <file>` | download one PDS member | RPC `readDataset` (b64) |
+| `zx ds get "<DSN>" <localdir>` | download **all** members of a PDS | loops `listDsMembers` + `readDataset` |
+| `zx ds put <file> "<DSN(M)>"` | upload one file as a member | RPC `writeDataset` (b64) |
+| `zx ds put <localdir> "<DSN>"` | upload directory → PDS (filename → MEMBER, ext stripped, upcased, 8-char) | loops `writeDataset` |
 
 `ds get|put` go through base64-in-JSON, so use them for text members (REXX/JCL/parmlib/source). For load modules or anything large/binary, stage through USS:
 
@@ -305,18 +303,18 @@ For whole-PDS `ds get`, run `zx start` first — one persistent session is much 
 
 ## 6 · Troubleshooting
 
-| Symptom                                                                                     | Likely cause / fix                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| password prompt on every `zx` call                                                          | `zx` already multiplexes its own ssh calls per `$ZX_STATE` (30min `ControlPersist`), so this is usually only about _manual/raw_ `ssh` calls outside `zx`. Prefer `ssh-copy-id <host>` (a key). If the user specifically wants a long-lived multiplexed session across _all_ ssh tools to that host, the fix is a host-wide, persistent change to `~/.ssh/config` (`ControlMaster auto` / `ControlPath` / `ControlPersist`) — it keeps an authenticated socket open for the persist duration, reusable by any local process as that user. That's a change outside this session's scope: confirm with the user and get their desired `ControlPersist` before editing `~/.ssh/config`, don't add it unprompted. |
-| `mkdir: ... EDC5134I Function not implemented` on deploy                                    | parent dir is an automount root — `zx deploy` now `cd`s to the parent first to trigger the mount; if it still fails, the parent genuinely doesn't exist                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `pax: FSUM7108 cannot open`                                                                 | wrong dir / no write perms — pick a different `ZX_DIR`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| `zowex: FSUM7351 not found`                                                                 | `ZX_BIN` path wrong — re-run the `find` from step 1b                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| `EDC5129I No such file or directory` on `zowex --help`                                      | binary not tagged/executable — `chmod +x $ZX_BIN`; if it's a tag issue, `chtag -b $ZX_BIN`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| server returns nothing then EOF                                                             | request wasn't newline-terminated, or JSON was malformed — `zx rpc` always appends `\n`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `CEE3501S module not found`                                                                 | LE runtime not in LIBPATH — prefix server start with `export LIBPATH=$ZX_DIR/c/build-out:$LIBPATH;`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| every method returns auth-style errors                                                      | the SSH user lacks the needed RACF access; zowex itself does no auth                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| `ControlPath too long ('...' >= 104 bytes)`                                                 | Unix domain socket path limit (macOS: 104 bytes) — `$ZX_STATE/cm-%C` overflowed it. Use a short `ZX_STATE`, e.g. `/tmp/zx-<label>.$UID`, not a long nested path like a session scratch dir                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| need password auth against a second host without disturbing an existing `zx` session/socket | give the second host its own `ZX_STATE` and prime its `ControlMaster` with `sshpass` — see §2c                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Symptom | Likely cause / fix |
+|---|---|
+| password prompt on every `zx` call | `zx` already multiplexes its own ssh calls per `$ZX_STATE` (30min `ControlPersist`), so this is usually only about *manual/raw* `ssh` calls outside `zx`. Prefer `ssh-copy-id <host>` (a key). If the user specifically wants a long-lived multiplexed session across *all* ssh tools to that host, the fix is a host-wide, persistent change to `~/.ssh/config` (`ControlMaster auto` / `ControlPath` / `ControlPersist`) — it keeps an authenticated socket open for the persist duration, reusable by any local process as that user. That's a change outside this session's scope: confirm with the user and get their desired `ControlPersist` before editing `~/.ssh/config`, don't add it unprompted. |
+| `mkdir: ... EDC5134I Function not implemented` on deploy | parent dir is an automount root — `zx deploy` now `cd`s to the parent first to trigger the mount; if it still fails, the parent genuinely doesn't exist |
+| `pax: FSUM7108 cannot open` | wrong dir / no write perms — pick a different `ZX_DIR` |
+| `zowex: FSUM7351 not found` | `ZX_BIN` path wrong — re-run the `find` from step 1b |
+| `EDC5129I No such file or directory` on `zowex --help` | binary not tagged/executable — `chmod +x $ZX_BIN`; if it's a tag issue, `chtag -b $ZX_BIN` |
+| server returns nothing then EOF | request wasn't newline-terminated, or JSON was malformed — `zx rpc` always appends `\n` |
+| `CEE3501S module not found` | LE runtime not in LIBPATH — prefix server start with `export LIBPATH=$ZX_DIR/c/build-out:$LIBPATH;` |
+| every method returns auth-style errors | the SSH user lacks the needed RACF access; zowex itself does no auth |
+| `ControlPath too long ('...' >= 104 bytes)` | Unix domain socket path limit (macOS: 104 bytes) — `$ZX_STATE/cm-%C` overflowed it. Use a short `ZX_STATE`, e.g. `/tmp/zx-<label>.$UID`, not a long nested path like a session scratch dir |
+| need password auth against a second host without disturbing an existing `zx` session/socket | give the second host its own `ZX_STATE` and prime its `ControlMaster` with `sshpass` — see §2c |
 
 ---
 
