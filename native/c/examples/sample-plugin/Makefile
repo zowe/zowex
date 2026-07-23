@@ -21,8 +21,8 @@ run: $(OUT_DIR)/sample_plugin.so
 	@echo 'Running ./$(OUT_DIR)/sample_plugin.so'
 	mkdir -p ../../build-out/plugins
 	cp ./$(OUT_DIR)/sample_plugin.so ../../build-out/plugins/sample_plugin.so
-	cd ../../build-out && ./zowex plugins list
-	cd ../../build-out && ./zowex sample hello World
+	cd ../../build-out && ZOWEX_PLUGINS_DIR=./plugins ./zowex plugins list
+	cd ../../build-out && ZOWEX_PLUGINS_DIR=./plugins ./zowex sample hello World
 
 $(OUT_DIR):
 	@echo 'Creating $(OUT_DIR)'

@@ -21,6 +21,7 @@
 #include "zowex.system.test.hpp"
 #include "zoweax.console.test.hpp"
 #include "zowex.tso.test.hpp"
+#include "zowex.plugin.test.hpp"
 
 using namespace ztst;
 
@@ -99,6 +100,7 @@ void zowex_tests()
              zowex_job_tests();
              zowex_system_tests();
              zowex_tso_tests();
+             zowex_plugin_tests();
            });
 
   describe("zoweax", []() -> void

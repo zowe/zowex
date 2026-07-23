@@ -130,6 +130,7 @@ build-out/zowex.job.submit.test.o \
 build-out/zowex.job.manage.test.o \
 build-out/zowex.test.o \
 build-out/zowex.tso.test.o \
+build-out/zowex.plugin.test.o \
 build-out/zoweax.console.test.o \
 build-out/zutils.o \
 build-out/parser.test.o \
@@ -146,7 +147,8 @@ build-out/server.worker.test.o \
 build-out/server_validator.o \
 build-out/server.validator.test.o \
 build-out/server_logger.test.o \
-build-out/plugin.test.o
+build-out/plugin.test.o \
+build-out/plugin.o
 	$(CXX) $(CPP_BND_FLAGS) -o $@ $^
 
 build-out/zut.o:
@@ -194,6 +196,12 @@ build-out/zusf.o:
 build-out/server_validator.o:
 	ln -sf ../../build-out/server/validator.o build-out/server_validator.o
 
+# Compiled directly from source (rather than symlinked from ../build-out like most of the
+# objects above) so the test binary always links a self-contained plugin.o built with this
+# makefile's own flags, independent of whether or how the top-level native/c build produced one.
+build-out/plugin.o: ../extend/plugin.cpp
+	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
+
 build-out/zowex.ds.test.o: zowex.ds.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
@@ -216,6 +224,9 @@ build-out/zowex.job.manage.test.o: zowex.job.manage.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
 build-out/zowex.tso.test.o: zowex.tso.test.cpp
+	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
+
+build-out/zowex.plugin.test.o: zowex.plugin.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
 build-out/zoweax.console.test.o: zoweax.console.test.cpp
