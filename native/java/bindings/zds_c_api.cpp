@@ -8,9 +8,11 @@
 
 static char* copy_string(const std::string& str) {
     if (str.empty()) return nullptr;
-    char* copy = (char*)malloc(str.length() + 1);
+    const size_t len = str.length();
+    char* copy = (char*)malloc(len + 1);
     if (copy) {
-        std::strcpy(copy, str.c_str());
+        std::memcpy(copy, str.c_str(), len);
+        copy[len] = '\0';
     }
     return copy;
 }
