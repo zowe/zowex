@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     concurrency:
       group: "zos-build"
-    timeout-minutes: 25
+    timeout-minutes: ${{ github.event_name == 'pull_request' && 25 || 20 }}
 
     steps:
       - uses: actions/checkout@v4
@@ -98,10 +98,13 @@ jobs:
           path: native/c/test/test-results.xml
           reporter: java-junit
 
+      # Debug builds run only for PRs; main/release/nightly builds stay in release mode
       - name: Clean native build artifacts
+        if: github.event_name == 'pull_request'
         run: npm run z:clean
 
       - name: Debug build on z/OS
+        if: github.event_name == 'pull_request'
         env:
           ZOWE_NATIVE_DEBUG: "1"
         run: npm run z:build
