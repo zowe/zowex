@@ -41,6 +41,7 @@ C_FLAGS+=$(RELEASE_FLAGS)
 CPP_FLAGS+=$(RELEASE_FLAGS)
 ASM_FLAGS+=--noverbose
 .ELSE
+BUILD_TYPE=LOCAL
 CPP_BND_FLAGS=$(CPP_BND_BASE_FLAGS)
 CPP_BND_FLAGS_AUTH=$(CPP_BND_BASE_FLAGS_AUTH)
 DLL_BND_FLAGS=$(DLL_BND_BASE_FLAGS)
@@ -374,14 +375,15 @@ $(OUT_DIR)/zowex.o: zowex.cpp
 		GIT_HASH="$$GIT_HASH"; \
 		echo "Extracted git hash: $$GIT_HASH"; \
 	else \
-		echo "Not a debug build, or package.json not found, building without GIT_HASH"; \
+		echo "Not a debug/local build, or package.json not found, building without GIT_HASH"; \
 		GIT_HASH=""; \
-	fi
-
-	@if [ -f ../package.json ]; then \
+	fi \
+	&& if [ -f ../package.json ]; then \
 		PACKAGE_VERSION=$$(grep '"version"' ../package.json | sed 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/'); \
+		PACKAGE_VERSION="$$PACKAGE_VERSION$$GIT_HASH"; \
+		echo "Git hash is $$GIT_HASH";  \
 		echo "Extracted version: $$PACKAGE_VERSION"; \
-		$(CXX) $(CPP_FLAGS) -DPACKAGE_VERSION="\"$$PACKAGE_VERSION$$GIT_HASH\"" -c $^ -o $@; \
+		$(CXX) $(CPP_FLAGS) -DPACKAGE_VERSION="\"$$PACKAGE_VERSION\"" -c $^ -o $@; \
 	else \
 		echo "package.json not found, building without version"; \
 		$(CXX) $(CPP_FLAGS) -c $^ -o $@; \
