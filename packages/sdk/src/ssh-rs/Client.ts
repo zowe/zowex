@@ -26,6 +26,7 @@ type DebugFn = (message: string) => void;
 const noop: DebugFn = () => {};
 
 export class Client extends EventEmitter {
+    private static readonly DEFAULT_CONNECT_TIMEOUT_MS = 30e3;
     private sshClient: AuthenticatedSSHClient | null = null;
     private disconnectSub: Subscription | null = null;
     private closed = false;
@@ -77,7 +78,7 @@ export class Client extends EventEmitter {
     private async connectAsync(config: ConnectConfig): Promise<void> {
         const address = `${config.host ?? "localhost"}:${config.port ?? 22}`;
         this.debug(`russh: opening TCP connection to ${address}`);
-        const transport = await SshTransport.newSocket(address);
+        const transport = await this.openTransport(address, config.readyTimeout);
 
         this.debug("russh: starting SSH handshake");
         const unauthClient = await SSHClient.connect(
@@ -90,6 +91,7 @@ export class Client extends EventEmitter {
                 connectionTimeoutSeconds: config.readyTimeout != null ? config.readyTimeout / 1000 : undefined,
                 keepaliveIntervalSeconds:
                     config.keepaliveInterval != null ? config.keepaliveInterval / 1000 : undefined,
+                keepaliveCountMax: config.keepaliveCountMax,
             },
         );
         this.debug("russh: SSH handshake complete");
@@ -115,6 +117,29 @@ export class Client extends EventEmitter {
         this.sshClient = authClient;
         this.debug("russh: emitting ready");
         this.emit("ready");
+    }
+
+    /**
+     * Opens the TCP transport with a timeout so a stalled connection attempt cannot
+     * hang the client indefinitely. Falls back to `readyTimeout` when configured.
+     */
+    private async openTransport(address: string, readyTimeout?: number): Promise<SshTransport> {
+        const timeoutMs = readyTimeout ?? Client.DEFAULT_CONNECT_TIMEOUT_MS;
+        let timeoutId: NodeJS.Timeout;
+        const timeoutPromise = new Promise<never>((_resolve, reject) => {
+            timeoutId = setTimeout(
+                () => reject(new Error(`Timed out opening TCP connection to ${address}`)),
+                timeoutMs,
+            );
+        });
+        try {
+            const socketPromise = SshTransport.newSocket(address);
+            // Avoid unhandled rejection if the socket settles after the timeout wins
+            socketPromise.catch(() => {});
+            return await Promise.race([socketPromise, timeoutPromise]);
+        } finally {
+            clearTimeout(timeoutId!);
+        }
     }
 
     private async authenticate(

@@ -14,6 +14,12 @@ import type { ProgressCallback, RpcPromise } from "./types";
 
 export interface ClientOptions {
     /**
+     * Maximum number of unanswered keep-alive messages before the connection is considered dead
+     * (default: 3)
+     */
+    keepAliveCountMax?: number;
+
+    /**
      * Number of seconds between keep-alive messages
      * (default: 30)
      */
@@ -51,6 +57,13 @@ export interface ClientOptions {
      * (default: `~/.zowe-server`)
      */
     serverPath?: string;
+
+    /**
+     * Number of seconds to wait for the SSH connection and Zowe server to start before failing.
+     * Prevents hanging when the connection drops during startup.
+     * (default: 60)
+     */
+    startupTimeout?: number;
 
     /**
      * Use experimental native SSH client for improved performance
