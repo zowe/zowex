@@ -29,13 +29,18 @@ export const BUNDLED_SSH_SERVER_VERSION = "{{version}}";
 
 const main = () => {
     try {
-        const packageJsonContent = fs.readFileSync(path.resolve(__dirname, "..", "..", "package.json"));
-        const packageJsonObj = JSON.parse(packageJsonContent.toString());
+        let versionValue = process.env["ZOWEX_RELEASE_VERSION"];
+        if (!versionValue) {
+            const packageJsonContent = fs.readFileSync(path.resolve(__dirname, "..", "..", "package.json"));
+            const packageJsonObj = JSON.parse(packageJsonContent.toString());
 
-        if (!packageJsonObj.version) {
-            throw new Error("No version field found in package.json");
+            if (!packageJsonObj.version) {
+                throw new Error("No version field found in package.json");
+            }
+            versionValue = packageJsonObj.version;
         }
-        const output = constantsClassTemplate.replace("{{version}}", packageJsonObj.version);
+
+        const output = constantsClassTemplate.replace("{{version}}", versionValue);
         const outputPath = path.resolve(__dirname, "src", "ZSshConstants.ts");
         fs.writeFileSync(outputPath, output);
     } catch (e) {

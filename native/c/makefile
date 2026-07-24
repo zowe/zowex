@@ -369,9 +369,9 @@ zoweax: $(OUT_DIR) $(OUT_DIR)/zoweax
 
 $(OUT_DIR)/zowex.o: zowex.cpp
 	@echo 'Building $(OUT_DIR)/zowex.o'
-	@if [ -f ../package.json ] && [ "$$BUILD_TYPE" = "DEBUG" ]; then \
+	@if [ -f ../package.json ] && [ "$$BUILD_TYPE" != "RELEASE" ]; then \
 		GIT_HASH=$$(grep '"gitHash"' ../package.json | sed 's/.*"gitHash"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/'); \
-		GIT_HASH="$$GIT_HASH-debug"; \
+		GIT_HASH="$$GIT_HASH"; \
 		echo "Extracted git hash: $$GIT_HASH"; \
 	else \
 		echo "Not a debug build, or package.json not found, building without GIT_HASH"; \
