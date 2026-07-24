@@ -382,10 +382,10 @@ $(OUT_DIR)/zowex.o: zowex.cpp
 	@if [ -f ../package.json ]; then \
 		PACKAGE_VERSION=$$(grep '"version"' ../package.json | sed 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/'); \
 		echo "Extracted version: $$PACKAGE_VERSION"; \
-	$(CXX) $(CPP_FLAGS) -DPACKAGE_VERSION="\"$$PACKAGE_VERSION$$GIT_HASH\"" -c $^ -o $@; \
+		$(CXX) $(CPP_FLAGS) -DPACKAGE_VERSION="\"$$PACKAGE_VERSION$$GIT_HASH\"" -c $^ -o $@; \
 	else \
-	echo "package.json not found, building without version"; \
-	$(CXX) $(CPP_FLAGS) -c $^ -o $@; \
+		echo "package.json not found, building without version"; \
+		$(CXX) $(CPP_FLAGS) -c $^ -o $@; \
 	fi
 
 #
