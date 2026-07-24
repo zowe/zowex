@@ -31,12 +31,14 @@ import { ZSshUtils } from "./ZSshUtils";
 export class ZSshClient extends RpcClientApi implements Disposable {
     public static readonly DEFAULT_SERVER_PATH = "~/.zowe-server";
     public static readonly BIN_NAME = "zowex";
+    private static readonly DEFAULT_STARTUP_TIMEOUT_S = 60;
     private mErrHandler: ClientOptions["onError"];
     private mResponseTimeout: number;
     private mServerInfo: { checksums?: Record<string, string> };
     private mSshClient: Client;
     private mSshStream: ClientChannel;
     private mStreamMgr: RpcStreamManager;
+    private mClosed = false;
     private mPartialStderr = "";
     private mPartialStdout = "";
     private readonly mRequestMap: Map<number, ExistingClientRequest> = new Map();
@@ -58,32 +60,84 @@ export class ZSshClient extends RpcClientApi implements Disposable {
         client.mErrHandler = opts.onError ?? ZSshClient.defaultErrHandler;
         client.mResponseTimeout = opts.responseTimeout ? opts.responseTimeout * 1000 : 60e3;
         client.mSshClient = createClient(opts.useNativeSsh);
-        client.mSshStream = await new Promise((resolve, reject) => {
-            client.mSshClient.on("error", (err) => {
-                Logger.getAppLogger().error(`Error connecting to SSH: ${err}`);
-                reject(err);
+        try {
+            client.mSshStream = await new Promise<ClientChannel>((resolve, reject) => {
+                let established = false;
+                const onStartupError = (err: Error) => {
+                    if (established) {
+                        return;
+                    }
+                    established = true;
+                    clearTimeout(startupTimeoutId);
+                    reject(err);
+                };
+                const startupTimeoutS = opts.startupTimeout ?? ZSshClient.DEFAULT_STARTUP_TIMEOUT_S;
+                const startupTimeoutId = setTimeout(() => {
+                    onStartupError(
+                        new ImperativeError({
+                            msg: "Timed out waiting for the Zowe server to start",
+                            errorCode: "ESTARTUPTIMEOUT",
+                        }),
+                    );
+                }, startupTimeoutS * 1000);
+                client.mSshClient.on("error", (err) => {
+                    Logger.getAppLogger().error(`Error connecting to SSH: ${err}`);
+                    if (established) {
+                        client.mErrHandler(err);
+                    } else {
+                        onStartupError(err);
+                    }
+                });
+                client.mSshClient.on("ready", () => {
+                    const zowexBin = posix.join(opts.serverPath ?? ZSshClient.DEFAULT_SERVER_PATH, ZSshClient.BIN_NAME);
+                    const serverArgs = ["server"];
+                    if (opts.numWorkers != null) {
+                        serverArgs.push("--num-workers", `${opts.numWorkers}`);
+                    }
+                    if (opts.requestTimeout != null) {
+                        serverArgs.push("--request-timeout", `${opts.requestTimeout}`);
+                    }
+                    if (opts.verbose) {
+                        serverArgs.push("--verbose");
+                    }
+                    client.execAsync(zowexBin, ...serverArgs).then((stream) => {
+                        established = true;
+                        clearTimeout(startupTimeoutId);
+                        resolve(stream);
+                    }, onStartupError);
+                });
+                client.mSshClient.on("close", () => {
+                    Logger.getAppLogger().debug("Client disconnected");
+                    if (!established) {
+                        onStartupError(
+                            new ImperativeError({
+                                msg: "SSH connection closed before the Zowe Remote SSH server was ready",
+                                errorCode: "ECONNCLOSED",
+                            }),
+                        );
+                        return;
+                    }
+                    // Let the onClose handler harvest pending requests for replay before
+                    // rejecting any that remain, so they fail fast instead of timing out
+                    Promise.resolve(opts.onClose?.())
+                        .catch((err) => client.mErrHandler(err))
+                        .finally(() => client.onConnectionClosed());
+                });
+                const keepAliveMsec = opts.keepAliveInterval != null ? opts.keepAliveInterval * 1000 : 30e3;
+                client.mSshClient.connect(
+                    ZSshUtils.buildSshConfig(session, {
+                        keepaliveInterval: keepAliveMsec,
+                        keepaliveCountMax: opts.keepAliveCountMax ?? 3,
+                    }),
+                );
             });
-            client.mSshClient.on("ready", async () => {
-                const zowexBin = posix.join(opts.serverPath ?? ZSshClient.DEFAULT_SERVER_PATH, ZSshClient.BIN_NAME);
-                const serverArgs = ["server"];
-                if (opts.numWorkers != null) {
-                    serverArgs.push("--num-workers", `${opts.numWorkers}`);
-                }
-                if (opts.requestTimeout != null) {
-                    serverArgs.push("--request-timeout", `${opts.requestTimeout}`);
-                }
-                if (opts.verbose) {
-                    serverArgs.push("--verbose");
-                }
-                client.execAsync(zowexBin, ...serverArgs).then(resolve, reject);
-            });
-            client.mSshClient.on("close", () => {
-                Logger.getAppLogger().debug("Client disconnected");
-                opts.onClose?.();
-            });
-            const keepAliveMsec = opts.keepAliveInterval != null ? opts.keepAliveInterval * 1000 : 30e3;
-            client.mSshClient.connect(ZSshUtils.buildSshConfig(session, { keepaliveInterval: keepAliveMsec }));
-        });
+        } catch (err) {
+            // Clean up the SSH connection so failed startups do not leak connections,
+            // keep-alive traffic, or remote server processes
+            client.mSshClient.removeAllListeners();
+            client.mSshClient.end();
+            throw err;
+        }
         client.mStreamMgr = new RpcStreamManager(client.mSshClient);
 
         if (opts.requests != null) {
@@ -121,6 +175,7 @@ export class ZSshClient extends RpcClientApi implements Disposable {
      */
     public dispose(isRestart: boolean = false): void {
         Logger.getAppLogger().debug("Stopping SSH client");
+        this.mClosed = true;
         this.mRequestMap.forEach((req) => {
             let rejMsg = "Shutting down ZRS. No action is required.";
             if (isRestart) {
@@ -142,10 +197,34 @@ export class ZSshClient extends RpcClientApi implements Disposable {
         return this.mServerInfo?.checksums;
     }
 
+    /**
+     * Rejects pending requests that have not been harvested for replay after the SSH
+     * connection closed, so they fail fast instead of waiting for the response timeout.
+     */
+    private onConnectionClosed(): void {
+        this.mClosed = true;
+        for (const [id, req] of this.mRequestMap) {
+            if (req.silenced) {
+                continue;
+            }
+            req.rpc.reject(
+                new ImperativeError({ msg: "SSH connection closed", errorCode: "ECONNCLOSED", suppressDump: true }),
+            );
+            this.mRequestMap.delete(id);
+        }
+    }
+
     public async request<T extends CommandResponse>(
         request: CommandRequest,
         progressCallback?: (percent: number) => void,
     ): Promise<T> {
+        if (this.mClosed) {
+            throw new ImperativeError({
+                msg: "SSH connection is closed",
+                errorCode: "ECONNCLOSED",
+                suppressDump: true,
+            });
+        }
         let timeoutId: NodeJS.Timeout;
         return new Promise<T>((resolve, reject) => {
             const { command, ...rest } = request;
@@ -200,22 +279,44 @@ export class ZSshClient extends RpcClientApi implements Disposable {
                     Logger.getAppLogger().error(`Error running SSH command: ${err}`);
                     reject(err);
                 } else {
+                    let settled = false;
+                    const removeListeners = () => {
+                        stream.stderr.removeListener("data", onData);
+                        stream.stdout.removeListener("data", onData);
+                        if (typeof stream.removeListener === "function") {
+                            stream.removeListener("close", onStreamClose);
+                        }
+                    };
+                    const onStreamClose = () => {
+                        if (settled) {
+                            return;
+                        }
+                        settled = true;
+                        removeListeners();
+                        reject(
+                            new ImperativeError({
+                                msg: "Zowe Remote SSH server process ended before it was ready",
+                                errorCode: "ESERVEREXIT",
+                            }),
+                        );
+                    };
                     const onData = (data: Buffer) => {
-                        const removeListeners = () => {
-                            stream.stderr.removeListener("data", onData);
-                            stream.stdout.removeListener("data", onData);
-                        };
                         try {
                             this.mServerInfo = this.getServerStatus(stream, data.toString(), args.join(" "));
                             if (this.mServerInfo) {
+                                settled = true;
                                 removeListeners();
                                 resolve(stream);
                             }
                         } catch (err) {
+                            settled = true;
                             removeListeners();
                             reject(err);
                         }
                     };
+                    if (typeof stream.on === "function") {
+                        stream.on("close", onStreamClose);
+                    }
                     stream.stderr.on("data", onData);
                     stream.stdout.on("data", onData);
                 }

@@ -32,7 +32,7 @@ const fakeSession: ISshSession = {
 };
 
 function setupMockSshClient(options?: {
-    connectEvent?: "ready" | "error" | "close";
+    connectEvent?: "ready" | "error" | "close" | "closeBeforeReady";
     connectError?: Error;
     sshStream?: any;
     mockExecAsync?: boolean;
@@ -42,6 +42,10 @@ function setupMockSshClient(options?: {
         if (options?.connectEvent === "error") {
             this.emit("error", options.connectError ?? new Error("bad ssh"));
         } else if (options?.connectEvent === "close") {
+            this.emit("ready");
+            // Emit close after the server becomes ready so it exercises the post-connect path
+            queueMicrotask(() => queueMicrotask(() => this.emit("close")));
+        } else if (options?.connectEvent === "closeBeforeReady") {
             this.emit("ready");
             this.emit("close");
         } else {
@@ -155,7 +159,113 @@ describe("ZSshClient", () => {
             expect(buildSshConfigMock).toHaveBeenCalledTimes(1);
             expect(buildSshConfigMock.mock.calls[0][buildSshConfigMock.mock.calls[0].length - 1]).toEqual({
                 keepaliveInterval: 5e3,
+                keepaliveCountMax: 3,
             });
+        });
+
+        it("should pass default keepAliveCountMax to SSH config", async () => {
+            setupMockSshClient();
+            const buildSshConfigMock = vi.spyOn(ZSshUtils, "buildSshConfig");
+            await ZSshClient.create(new SshSession(fakeSession));
+            expect(buildSshConfigMock).toHaveBeenCalledTimes(1);
+            expect(buildSshConfigMock.mock.calls[0][buildSshConfigMock.mock.calls[0].length - 1]).toEqual({
+                keepaliveInterval: 30e3,
+                keepaliveCountMax: 3,
+            });
+        });
+
+        it("should respect keepAliveCountMax option", async () => {
+            setupMockSshClient();
+            const buildSshConfigMock = vi.spyOn(ZSshUtils, "buildSshConfig");
+            await ZSshClient.create(new SshSession(fakeSession), {
+                keepAliveCountMax: 5,
+            });
+            expect(buildSshConfigMock).toHaveBeenCalledTimes(1);
+            expect(buildSshConfigMock.mock.calls[0][buildSshConfigMock.mock.calls[0].length - 1]).toEqual({
+                keepaliveInterval: 30e3,
+                keepaliveCountMax: 5,
+            });
+        });
+
+        it("should reject when the connection closes before the server is ready", async () => {
+            setupMockSshClient({ connectEvent: "closeBeforeReady" });
+            await expect(ZSshClient.create(new SshSession(fakeSession))).rejects.toMatchObject({
+                errorCode: "ECONNCLOSED",
+            });
+        });
+
+        it("should clean up the SSH connection when startup fails", async () => {
+            setupMockSshClient({ connectEvent: "closeBeforeReady" });
+            const endSpy = vi.spyOn(Client.prototype, "end").mockImplementation(() => {});
+            await expect(ZSshClient.create(new SshSession(fakeSession))).rejects.toMatchObject({
+                errorCode: "ECONNCLOSED",
+            });
+            expect(endSpy).toHaveBeenCalledTimes(1);
+        });
+
+        it("should time out when the server never becomes ready", async () => {
+            const { execAsyncSpy } = setupMockSshClient();
+            execAsyncSpy.mockReturnValue(new Promise(() => {}));
+            const endSpy = vi.spyOn(Client.prototype, "end").mockImplementation(() => {});
+            const promise = ZSshClient.create(new SshSession(fakeSession), { startupTimeout: 5 });
+            const assertion = expect(promise).rejects.toMatchObject({ errorCode: "ESTARTUPTIMEOUT" });
+            await vi.advanceTimersByTimeAsync(5e3);
+            await assertion;
+            expect(endSpy).toHaveBeenCalledTimes(1);
+        });
+
+        it("should time out after 60 seconds by default when the server never becomes ready", async () => {
+            const { execAsyncSpy } = setupMockSshClient();
+            execAsyncSpy.mockReturnValue(new Promise(() => {}));
+            const promise = ZSshClient.create(new SshSession(fakeSession));
+            const assertion = expect(promise).rejects.toMatchObject({ errorCode: "ESTARTUPTIMEOUT" });
+            await vi.advanceTimersByTimeAsync(60e3);
+            await assertion;
+        });
+
+        it("should route post-connect errors to the onError handler", async () => {
+            const { connectSpy } = setupMockSshClient();
+            const onErrorMock = vi.fn();
+            await ZSshClient.create(new SshSession(fakeSession), { onError: onErrorMock });
+            const sshClient = connectSpy.mock.contexts[0] as Client;
+            sshClient.emit("error", new Error("connection died"));
+            expect(onErrorMock).toHaveBeenCalledTimes(1);
+        });
+
+        it("should reject pending requests when the connection closes", async () => {
+            const sshStream = { stdin: { write: vi.fn() }, stdout: new EventEmitter(), stderr: new EventEmitter() };
+            const { connectSpy } = setupMockSshClient({ sshStream });
+            const client = await ZSshClient.create(new SshSession(fakeSession));
+            const response = client.request({ command: "ping" });
+            const sshClient = connectSpy.mock.contexts[0] as Client;
+            sshClient.emit("close");
+            await expect(response).rejects.toMatchObject({ errorCode: "ECONNCLOSED" });
+        });
+
+        it("should not reject silenced requests when the connection closes", async () => {
+            const sshStream = { stdin: { write: vi.fn() }, stdout: new EventEmitter(), stderr: new EventEmitter() };
+            const { connectSpy } = setupMockSshClient({ sshStream });
+            const client = await ZSshClient.create(new SshSession(fakeSession));
+            const rejectMock = vi.fn();
+            (client as any).mRequestMap.set(99, {
+                command: { command: "ping" },
+                rpc: { resolve: vi.fn(), reject: rejectMock },
+                silenced: true,
+            });
+            const sshClient = connectSpy.mock.contexts[0] as Client;
+            sshClient.emit("close");
+            await vi.waitFor(() => expect((client as any).mClosed).toBe(true));
+            expect(rejectMock).not.toHaveBeenCalled();
+        });
+
+        it("should reject new requests after the connection is closed", async () => {
+            const sshStream = { stdin: { write: vi.fn() }, stdout: new EventEmitter(), stderr: new EventEmitter() };
+            const { connectSpy } = setupMockSshClient({ sshStream });
+            const client = await ZSshClient.create(new SshSession(fakeSession));
+            const sshClient = connectSpy.mock.contexts[0] as Client;
+            sshClient.emit("close");
+            await vi.waitFor(() => expect((client as any).mClosed).toBe(true));
+            await expect(client.request({ command: "ping" })).rejects.toMatchObject({ errorCode: "ECONNCLOSED" });
         });
 
         it("should respect numWorkers option", async () => {
@@ -296,6 +406,24 @@ describe("ZSshClient", () => {
             expect(onStderrMock).toHaveBeenCalledTimes(2);
             expect(onStdoutMock).toHaveBeenCalledTimes(2);
             expect(client.serverChecksums).not.toBeNull();
+        });
+
+        it("should reject execAsync when the stream closes before the server is ready", async () => {
+            const sshStream = Object.assign(new EventEmitter(), {
+                stderr: new EventEmitter(),
+                stdout: new EventEmitter(),
+            });
+            const client: ZSshClient = new (ZSshClient as any)();
+            (client as any).mSshClient = {
+                exec: function (_command: string, callback: ClientCallback) {
+                    callback(undefined, sshStream as any);
+                    sshStream.emit("close");
+                    return this;
+                },
+            };
+            await expect((client as any).execAsync("zowex", "server")).rejects.toMatchObject({
+                errorCode: "ESERVEREXIT",
+            });
         });
 
         it("should handle not found error from Zowe server", async () => {
