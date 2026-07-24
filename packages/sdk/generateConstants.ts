@@ -12,8 +12,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-const constantsClassTemplate = `
-/**
+const constantsClassTemplate = `/**
  * This program and the accompanying materials are made available under the terms of the
  * Eclipse Public License v2.0 which accompanies this distribution, and is available at
  * https://www.eclipse.org/legal/epl-v20.html
@@ -23,13 +22,14 @@ const constantsClassTemplate = `
  * Copyright Contributors to the Zowe Project.
  *
  */
+
 // Generated via generateConstants.ts 
 export const BUNDLED_SSH_SERVER_VERSION = "{{version}}";
 `;
 
 const main = () => {
     try {
-        const packageJsonContent = fs.readFileSync(path.resolve(__dirname, "package.json"));
+        const packageJsonContent = fs.readFileSync(path.resolve(__dirname, "..", "..", "package.json"));
         const packageJsonObj = JSON.parse(packageJsonContent.toString());
 
         if (!packageJsonObj.version) {

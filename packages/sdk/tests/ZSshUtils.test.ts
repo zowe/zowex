@@ -20,6 +20,7 @@ import { ZSshUtils } from "../src/ZSshUtils";
 vi.mock("../src/ZSshConstants", () => ({
     BUNDLED_SSH_SERVER_VERSION: "1.2.1",
 }));
+
 import { BUNDLED_SSH_SERVER_VERSION } from "../src/ZSshConstants";
 
 vi.mock("node:fs", { spy: true });
