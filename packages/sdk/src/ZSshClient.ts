@@ -111,7 +111,7 @@ export class ZSshClient extends RpcClientApi implements Disposable {
                     if (!established) {
                         onStartupError(
                             new ImperativeError({
-                                msg: "SSH connection closed before the Zowe server was ready",
+                                msg: "SSH connection closed before the Zowe Remote SSH server was ready",
                                 errorCode: "ECONNCLOSED",
                             }),
                         );
@@ -295,7 +295,7 @@ export class ZSshClient extends RpcClientApi implements Disposable {
                         removeListeners();
                         reject(
                             new ImperativeError({
-                                msg: "Zowe server process ended before it was ready",
+                                msg: "Zowe Remote SSH server process ended before it was ready",
                                 errorCode: "ESERVEREXIT",
                             }),
                         );

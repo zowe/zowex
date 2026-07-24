@@ -59,7 +59,7 @@ export interface ClientOptions {
     serverPath?: string;
 
     /**
-     * Number of seconds to wait for the SSH connection and Zowe server to start before failing.
+     * Number of seconds to wait for the SSH connection and Zowe Remote SSH server to start before failing.
      * Prevents hanging when the connection drops during startup.
      * (default: 60)
      */
