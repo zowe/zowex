@@ -30,8 +30,6 @@ DLL_BND_FLAGS=$(DLL_BND_DEBUG_FLAGS) $(DEBUGGER_FLAGS)
 CPP_FLAGS+=$(DEBUGGER_FLAGS) $(OTHER_C_FLAGS)
 # Metal C (xlc) rejects full `-g` (GONUMBER/TEST conflict with METAL/INLINE) and the
 # clang-only `-H -dM`; use `-g1` like the RELEASE/dev builds.
-MTL_FLAGS+=-g1
-MTL_FLAGS64+=-g1
 ASM_FLAGS+=--verbose
 .ELSIF $(BuildType) == RELEASE
 CPP_BND_FLAGS=$(CPP_BND_BASE_FLAGS)
@@ -40,8 +38,6 @@ DLL_BND_FLAGS=$(DLL_BND_BASE_FLAGS)
 C_FLAGS+=$(RELEASE_FLAGS)
 CPP_FLAGS+=$(RELEASE_FLAGS)
 ASM_FLAGS+=--noverbose
-MTL_FLAGS+=-g1
-MTL_FLAGS64+=-g1
 .ELSE
 CPP_BND_FLAGS=$(CPP_BND_BASE_FLAGS)
 CPP_BND_FLAGS_AUTH=$(CPP_BND_BASE_FLAGS_AUTH)
@@ -49,10 +45,11 @@ DLL_BND_FLAGS=$(DLL_BND_BASE_FLAGS)
 C_FLAGS+=-g1
 CPP_FLAGS+=-g1
 ASM_FLAGS+=--noverbose
+.END
+
 # Still investigating why we need `-g1` for the MetalC flags :'(
 MTL_FLAGS+=-g1
 MTL_FLAGS64+=-g1
-.END
 
 # Apply LOG_FLAGS to all relevant compilation flags if logging is enabled
 .IF DEFINED(LOG_FLAGS)
