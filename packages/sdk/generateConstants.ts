@@ -36,6 +36,7 @@ export const BUNDLED_SSH_SERVER_VERSION = "{{version}}";
         fs.writeFileSync(outputPath, output);
     } catch (e) {
         console.error("Encountered an error trying to write out ZSshConstants.ts::", e);
+        process.exit(1);
     }
 };
 main();

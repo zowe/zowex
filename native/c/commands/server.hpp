@@ -13,7 +13,6 @@
 #define COMMANDS_SERVER_HPP
 
 #include <atomic>
-#include <map>
 #include <memory>
 #include <mutex>
 #include <string>
