@@ -23,7 +23,6 @@ SWIG_FLAGS=$(SWIG_FLAGS_BASE) -I./chdsect -MMD -MP
 
 # make -DBuildType=DEBUG or -DBuildType=RELEASE
 .IF $(BuildType) == DEBUG
-BUILD_TYPE=DEBUG
 CPP_BND_FLAGS=$(CPP_BND_DEBUG_FLAGS) $(DEBUGGER_FLAGS)
 CPP_BND_FLAGS_AUTH=$(CPP_BND_DEBUG_FLAGS_AUTH) $(DEBUGGER_FLAGS)
 C_FLAGS+=$(DEBUGGER_FLAGS)
@@ -33,7 +32,6 @@ CPP_FLAGS+=$(DEBUGGER_FLAGS) $(OTHER_C_FLAGS)
 # clang-only `-H -dM`; use `-g1` like the RELEASE/dev builds.
 ASM_FLAGS+=--verbose
 .ELSIF $(BuildType) == RELEASE
-BUILD_TYPE=RELEASE
 CPP_BND_FLAGS=$(CPP_BND_BASE_FLAGS)
 CPP_BND_FLAGS_AUTH=$(CPP_BND_BASE_FLAGS_AUTH)
 DLL_BND_FLAGS=$(DLL_BND_BASE_FLAGS)
@@ -41,7 +39,6 @@ C_FLAGS+=$(RELEASE_FLAGS)
 CPP_FLAGS+=$(RELEASE_FLAGS)
 ASM_FLAGS+=--noverbose
 .ELSE
-BUILD_TYPE=LOCAL
 CPP_BND_FLAGS=$(CPP_BND_BASE_FLAGS)
 CPP_BND_FLAGS_AUTH=$(CPP_BND_BASE_FLAGS_AUTH)
 DLL_BND_FLAGS=$(DLL_BND_BASE_FLAGS)
@@ -370,7 +367,7 @@ zoweax: $(OUT_DIR) $(OUT_DIR)/zoweax
 
 $(OUT_DIR)/zowex.o: zowex.cpp
 	@echo 'Building $(OUT_DIR)/zowex.o'
-	@if [ -f ../package.json ] && [ "$$BUILD_TYPE" != "RELEASE" ]; then \
+	@if [ -f ../package.json ] && [ "${BuildType}" != "RELEASE" ]; then \
 		GIT_HASH=$$(grep '"gitHash"' ../package.json | sed 's/.*"gitHash"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/'); \
 		GIT_HASH="$$GIT_HASH"; \
 		echo "Extracted git hash: $$GIT_HASH"; \
@@ -381,7 +378,7 @@ $(OUT_DIR)/zowex.o: zowex.cpp
 	&& if [ -f ../package.json ]; then \
 		PACKAGE_VERSION=$$(grep '"version"' ../package.json | sed 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/'); \
 		PACKAGE_VERSION="$$PACKAGE_VERSION$$GIT_HASH"; \
-		echo "Git hash is $$GIT_HASH";  \
+		echo "Git hash is $$GIT_HASH for build type '${BuildType}'";  \
 		echo "Extracted version: $$PACKAGE_VERSION"; \
 		$(CXX) $(CPP_FLAGS) -DPACKAGE_VERSION="\"$$PACKAGE_VERSION\"" -c $^ -o $@; \
 	else \
