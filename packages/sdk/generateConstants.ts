@@ -23,7 +23,7 @@ const constantsClassTemplate = `/**
  *
  */
 
-// Generated via generateConstants.ts 
+// Generated via generateConstants.ts
 export const BUNDLED_SSH_SERVER_VERSION = "{{version}}";
 `;
 
