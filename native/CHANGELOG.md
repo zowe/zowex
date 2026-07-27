@@ -6,6 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- `c`: Added RACF certificate and key ring management to the `system` command group, migrating the `keyring-utilities` functionality (RACF R_datalib and System SSL) into `zowex` as two subgroups: `system keyring create|delete|list|list-rings|count` and `system cert import|export|delete|show|connect|set-default|trust|rename|refresh`. [#XXXX](https://github.com/zowe/zowex/pull/XXXX)
 - `c`: Added support to return information for current linklist. [#1061](https://github.com/zowe/zowex/pull/1061)
 
 ## `0.6.1`

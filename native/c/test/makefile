@@ -11,6 +11,10 @@
 
 .INCLUDE: ../toolchain.mk
 
+# System SSL (GSKCMS) 64-bit side-deck: resolves the gsk_* symbols referenced by
+# zkr.o (linked into the runner for the certificates tests). Mirrors ../makefile.
+GSKCMS_SIDEDECK=/usr/lib/GSKCMS64.x
+
 BIND=ld
 
 # https://www.ibm.com/docs/en/zos/3.1.0?topic=bor-binder-options
@@ -106,6 +110,8 @@ build-out/zutcall24.o \
 build-out/zds.test.o \
 build-out/zds.o \
 build-out/zdsm.o \
+build-out/zkr.test.o \
+build-out/zkr.o \
 build-out/zam.o \
 build-out/zam24.o \
 build-out/zjb.test.o \
@@ -146,7 +152,7 @@ build-out/server.worker.test.o \
 build-out/server_validator.o \
 build-out/server.validator.test.o \
 build-out/server_logger.test.o
-	$(CXX) $(CPP_BND_FLAGS) -o $@ $^
+	$(CXX) $(CPP_BND_FLAGS) -o $@ $^ $(GSKCMS_SIDEDECK)
 
 build-out/zut.o:
 	ln -sf ../../build-out/zut.o build-out/zut.o
@@ -165,6 +171,9 @@ build-out/zds.o:
 
 build-out/zdsm.o:
 	ln -sf ../../build-out/zdsm.o build-out/zdsm.o
+
+build-out/zkr.o:
+	ln -sf ../../build-out/zkr.o build-out/zkr.o
 
 build-out/zam.o:
 	ln -sf ../../build-out/zam.o build-out/zam.o
@@ -248,6 +257,9 @@ build-out/zjb.test.o: zjb.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
 build-out/zds.test.o: zds.test.cpp
+	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
+
+build-out/zkr.test.o: zkr.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
 build-out/zcn.test.o: zcn.test.cpp

@@ -6,6 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- Added a `certificates` client API for managing RACF key rings and digital certificates: `createKeyring`, `deleteKeyring`, `refreshDigtcert`, `deleteCertificate`, `listCertificates`, `exportCertificate`, `importCertificate`, `showCertificate`, `listRings`, `countRing`, `connectCertificate`, `setDefaultCertificate`, `trustCertificate`, and `renameCertificate`. [#XXXX](https://github.com/zowe/zowex/pull/XXXX)
 - Added support to list link list data sets. [#1061](https://github.com/zowe/zowex/pull/1061)
 
 ## `0.6.1`
