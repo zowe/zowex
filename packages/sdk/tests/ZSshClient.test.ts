@@ -207,8 +207,8 @@ describe("ZSshClient", () => {
             const { execAsyncSpy } = setupMockSshClient();
             execAsyncSpy.mockReturnValue(new Promise(() => {}));
             const endSpy = vi.spyOn(Client.prototype, "end").mockImplementation(() => {});
-            const promise = ZSshClient.create(new SshSession(fakeSession), { startupTimeout: 5 });
-            const assertion = expect(promise).rejects.toMatchObject({ errorCode: "ESTARTUPTIMEOUT" });
+            const promise = ZSshClient.create(new SshSession(fakeSession), { serverStartupTimeout: 5 });
+            const assertion = expect(promise).rejects.toMatchObject({ errorCode: "ESERVERSTARTUPTIMEOUT" });
             await vi.advanceTimersByTimeAsync(5e3);
             await assertion;
             expect(endSpy).toHaveBeenCalledTimes(1);
@@ -218,7 +218,7 @@ describe("ZSshClient", () => {
             const { execAsyncSpy } = setupMockSshClient();
             execAsyncSpy.mockReturnValue(new Promise(() => {}));
             const promise = ZSshClient.create(new SshSession(fakeSession));
-            const assertion = expect(promise).rejects.toMatchObject({ errorCode: "ESTARTUPTIMEOUT" });
+            const assertion = expect(promise).rejects.toMatchObject({ errorCode: "ESERVERSTARTUPTIMEOUT" });
             await vi.advanceTimersByTimeAsync(60e3);
             await assertion;
         });

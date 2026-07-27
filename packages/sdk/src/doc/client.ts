@@ -63,7 +63,7 @@ export interface ClientOptions {
      * Prevents hanging when the connection drops during startup.
      * (default: 60)
      */
-    startupTimeout?: number;
+    serverStartupTimeout?: number;
 
     /**
      * Use experimental native SSH client for improved performance

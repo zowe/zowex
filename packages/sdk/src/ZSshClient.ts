@@ -31,7 +31,7 @@ import { ZSshUtils } from "./ZSshUtils";
 export class ZSshClient extends RpcClientApi implements Disposable {
     public static readonly DEFAULT_SERVER_PATH = "~/.zowe-server";
     public static readonly BIN_NAME = "zowex";
-    private static readonly DEFAULT_STARTUP_TIMEOUT_S = 60;
+    private static readonly DEFAULT_SERVER_STARTUP_TIMEOUT_S = 60;
     private mErrHandler: ClientOptions["onError"];
     private mResponseTimeout: number;
     private mServerInfo: { checksums?: Record<string, string> };
@@ -68,18 +68,18 @@ export class ZSshClient extends RpcClientApi implements Disposable {
                         return;
                     }
                     established = true;
-                    clearTimeout(startupTimeoutId);
+                    clearTimeout(serverStartupTimeoutId);
                     reject(err);
                 };
-                const startupTimeoutS = opts.startupTimeout ?? ZSshClient.DEFAULT_STARTUP_TIMEOUT_S;
-                const startupTimeoutId = setTimeout(() => {
+                const serverStartupTimeoutS = opts.serverStartupTimeout ?? ZSshClient.DEFAULT_SERVER_STARTUP_TIMEOUT_S;
+                const serverStartupTimeoutId = setTimeout(() => {
                     onStartupError(
                         new ImperativeError({
                             msg: "Timed out waiting for the Zowe server to start",
-                            errorCode: "ESTARTUPTIMEOUT",
+                            errorCode: "ESERVERSTARTUPTIMEOUT",
                         }),
                     );
-                }, startupTimeoutS * 1000);
+                }, serverStartupTimeoutS * 1000);
                 client.mSshClient.on("error", (err) => {
                     Logger.getAppLogger().error(`Error connecting to SSH: ${err}`);
                     if (established) {
@@ -102,7 +102,7 @@ export class ZSshClient extends RpcClientApi implements Disposable {
                     }
                     client.execAsync(zowexBin, ...serverArgs).then((stream) => {
                         established = true;
-                        clearTimeout(startupTimeoutId);
+                        clearTimeout(serverStartupTimeoutId);
                         resolve(stream);
                     }, onStartupError);
                 });
