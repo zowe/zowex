@@ -377,7 +377,6 @@ $(OUT_DIR)/zowex.o: zowex.cpp
 	@echo 'Add git hash? ${ADD_GIT_HASH}'
 	@if [ -f ../package.json ] && [ "${ADD_GIT_HASH}" = "TRUE" ]; then \
 		GIT_HASH=$$(grep '"gitHash"' ../package.json | sed 's/.*"gitHash"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/'); \
-		GIT_HASH="$$GIT_HASH"; \
 		echo "Extracted git hash: $$GIT_HASH"; \
 	else \
 		echo "ADD_GIT_HASH is not TRUE, or package.json not found, building without GIT_HASH"; \

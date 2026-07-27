@@ -115,8 +115,8 @@ describe("ZSshUtils", () => {
                 remoteVersion: "1.3.0+afeb102",
                 expected: false,
             },
-        ])("should return $expected for $desc", async ({ remoteVersion, expected }) => {
-            const isOutdated = await ZSshUtils.checkIfOutdated(remoteVersion);
+        ])("should return $expected for $desc", ({ remoteVersion, expected }) => {
+            const isOutdated = ZSshUtils.checkIfOutdated(remoteVersion);
             expect(isOutdated).toBe(expected);
         });
     });

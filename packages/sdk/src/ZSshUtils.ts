@@ -396,7 +396,7 @@ export class ZSshUtils {
         });
     }
 
-    public static async checkIfOutdated(remoteVersion: string): Promise<boolean> {
+    public static checkIfOutdated(remoteVersion?: string): Promise<boolean> {
         Logger.getAppLogger().debug(
             `[ZSshUtils] checkIfOutdated: Comparing remote version '${remoteVersion}' to bundled server version '${BUNDLED_SSH_SERVER_VERSION}'`,
         );
