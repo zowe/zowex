@@ -24,7 +24,6 @@
 #include "core.hpp"
 #include "server.hpp"
 #include "../zjson.hpp"
-#include "../zusf.hpp"
 #include "../server/rpc_server.hpp"
 #include "../server/rpc_commands.hpp"
 #include "../server/dispatcher.hpp"
