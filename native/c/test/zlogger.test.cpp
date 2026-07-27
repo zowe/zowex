@@ -47,14 +47,6 @@ std::string read_file_contents(const std::string &path)
   return content;
 }
 
-// Helper function to clean up test files
-void cleanup_test_files()
-{
-  // Clean up any test log files
-  unlink("logs/zowex.log");
-  rmdir("logs");
-}
-
 void zlogger_tests()
 {
   describe("ZLogger singleton tests", []() -> void
@@ -262,7 +254,4 @@ void zlogger_tests()
                 Expect(instances[i]).ToBe(instances[0]);
             }
         }); });
-
-  // Clean up after all tests
-  cleanup_test_files();
 }
