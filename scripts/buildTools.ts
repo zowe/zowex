@@ -612,6 +612,10 @@ function BUILD_TYPE_FLAG() {
     return "";
 }
 
+function IS_PULL_REQUEST_FLAG() {
+    return process.env.GITHUB_EVENT_NAME === "pull_request" ? "-DIsPullRequest=TRUE" : "";
+}
+
 // ANSI escape codes for terminal formatting
 const ANSI = {
     HIDE_CURSOR: "\x1b[?25l",
@@ -1278,9 +1282,13 @@ async function upload(connection: Client, sshProfile: IProfile) {
 }
 
 async function build(connection: Client) {
-    const response = await runCommandInShell(connection, `cd ${deployDirs.cDir} && make ${BUILD_TYPE_FLAG()}\n`, {
-        stepName: "Building native/c",
-    });
+    const response = await runCommandInShell(
+        connection,
+        `cd ${deployDirs.cDir} && make ${BUILD_TYPE_FLAG()} ${IS_PULL_REQUEST_FLAG()}\n`,
+        {
+            stepName: "Building native/c",
+        },
+    );
     DEBUG_MODE() && console.log(response);
     console.log("Build complete!");
 }

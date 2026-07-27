@@ -31,6 +31,7 @@ CPP_FLAGS+=$(DEBUGGER_FLAGS) $(OTHER_C_FLAGS)
 # Metal C (xlc) rejects full `-g` (GONUMBER/TEST conflict with METAL/INLINE) and the
 # clang-only `-H -dM`; use `-g1` like the RELEASE/dev builds.
 ASM_FLAGS+=--verbose
+ADD_GIT_HASH=TRUE
 .ELSIF $(BuildType) == RELEASE
 CPP_BND_FLAGS=$(CPP_BND_BASE_FLAGS)
 CPP_BND_FLAGS_AUTH=$(CPP_BND_BASE_FLAGS_AUTH)
@@ -38,6 +39,7 @@ DLL_BND_FLAGS=$(DLL_BND_BASE_FLAGS)
 C_FLAGS+=$(RELEASE_FLAGS)
 CPP_FLAGS+=$(RELEASE_FLAGS)
 ASM_FLAGS+=--noverbose
+ADD_GIT_HASH=FALSE
 .ELSE
 CPP_BND_FLAGS=$(CPP_BND_BASE_FLAGS)
 CPP_BND_FLAGS_AUTH=$(CPP_BND_BASE_FLAGS_AUTH)
@@ -45,6 +47,11 @@ DLL_BND_FLAGS=$(DLL_BND_BASE_FLAGS)
 C_FLAGS+=-g1
 CPP_FLAGS+=-g1
 ASM_FLAGS+=--noverbose
+ADD_GIT_HASH=TRUE
+.END
+
+.IF $(IsPullRequest) == TRUE
+ADD_GIT_HASH=TRUE
 .END
 
 # Still investigating why we need `-g1` for the MetalC flags :'(
@@ -367,12 +374,13 @@ zoweax: $(OUT_DIR) $(OUT_DIR)/zoweax
 
 $(OUT_DIR)/zowex.o: zowex.cpp
 	@echo 'Building $(OUT_DIR)/zowex.o'
-	@if [ -f ../package.json ] && [ "${BuildType}" != "RELEASE" ]; then \
+	@echo 'Add git hash? ${ADD_GIT_HASH}'
+	@if [ -f ../package.json ] && [ "${ADD_GIT_HASH}" = "TRUE" ]; then \
 		GIT_HASH=$$(grep '"gitHash"' ../package.json | sed 's/.*"gitHash"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/'); \
 		GIT_HASH="$$GIT_HASH"; \
 		echo "Extracted git hash: $$GIT_HASH"; \
 	else \
-		echo "Not a debug/local build, or package.json not found, building without GIT_HASH"; \
+		echo "ADD_GIT_HASH is not TRUE, or package.json not found, building without GIT_HASH"; \
 		GIT_HASH=""; \
 	fi \
 	&& if [ -f ../package.json ]; then \
