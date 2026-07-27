@@ -157,7 +157,7 @@ public:
       {
         parent_record->get().add_command(child_record->get_command_ptr());
       }
-      catch (const std::exception &e)
+      catch (const std::invalid_argument &e)
       {
         ZLOG_ERROR("Rejected plug-in subcommand: %s", e.what());
       }
@@ -194,40 +194,10 @@ public:
       const std::vector<std::string> &aliases = command->get_aliases();
       tokens.insert(tokens.end(), aliases.begin(), aliases.end());
 
-      bool collided = false;
-      bool shadows_builtin = false;
-      std::string collision;
-      for (const auto &token : tokens)
+      const TokenCollision collision = find_collision(tokens);
+      if (collision.collided)
       {
-        if (m_builtin_names.count(token) != 0)
-        {
-          collided = true;
-          shadows_builtin = true;
-          collision = token;
-          break;
-        }
-        if (m_claimed_names.count(token) != 0)
-        {
-          collided = true;
-          collision = token;
-          break;
-        }
-      }
-
-      if (collided)
-      {
-        if (shadows_builtin)
-        {
-          ZLOG_ERROR("Rejected plug-in command '%s': token '%s' would shadow a built-in zowex command",
-                     command->get_name().c_str(), collision.c_str());
-        }
-        else
-        {
-          ZLOG_ERROR("Rejected plug-in command '%s': token '%s' is already registered by another plug-in",
-                     command->get_name().c_str(), collision.c_str());
-        }
-        m_rejected_commands.push_back(command->get_name());
-        m_server_commands.erase(command);
+        reject_pending_command(command, collision);
         continue;
       }
 
@@ -235,7 +205,7 @@ public:
       {
         m_root.add_command(command);
       }
-      catch (const std::exception &e)
+      catch (const std::invalid_argument &e)
       {
         ZLOG_ERROR("Rejected plug-in command '%s': %s", command->get_name().c_str(), e.what());
         m_rejected_commands.push_back(command->get_name());
@@ -257,6 +227,45 @@ public:
   }
 
 private:
+  struct TokenCollision
+  {
+    bool collided;
+    bool shadows_builtin;
+    std::string token;
+  };
+
+  TokenCollision find_collision(const std::vector<std::string> &tokens) const
+  {
+    for (const auto &token : tokens)
+    {
+      if (m_builtin_names.count(token) != 0)
+      {
+        return TokenCollision{true, true, token};
+      }
+      if (m_claimed_names.count(token) != 0)
+      {
+        return TokenCollision{true, false, token};
+      }
+    }
+    return TokenCollision{false, false, std::string()};
+  }
+
+  void reject_pending_command(const parser::command_ptr &command, const TokenCollision &collision)
+  {
+    if (collision.shadows_builtin)
+    {
+      ZLOG_ERROR("Rejected plug-in command '%s': token '%s' would shadow a built-in zowex command",
+                 command->get_name().c_str(), collision.token.c_str());
+    }
+    else
+    {
+      ZLOG_ERROR("Rejected plug-in command '%s': token '%s' is already registered by another plug-in",
+                 command->get_name().c_str(), collision.token.c_str());
+    }
+    m_rejected_commands.push_back(command->get_name());
+    m_server_commands.erase(command);
+  }
+
   struct CommandRecord
   {
     parser::command_ptr pointer;
@@ -342,138 +351,161 @@ private:
   std::vector<std::string> m_rejected_commands;
 };
 
-void PluginManager::load_plugins(const std::string &plugins_path)
+namespace
 {
-  m_plugins_path = plugins_path;
-
-  // Directory-level provenance checks. These run once, before any
-  // opendir/dlopen, and reject the entire directory (loading nothing) when the
-  // plugins directory is not a safe place to load native code from. Cheaper
-  // than dlopen and dangerous-code-free, so they gate everything below.
+// Directory-level provenance check. Runs once, before any opendir/dlopen, and
+// rejects the entire directory (loading nothing) when the plugins directory is
+// not a safe place to load native code from. Cheaper than dlopen and
+// dangerous-code-free, so it gates everything below.
+bool validate_plugins_directory(const std::string &plugins_path, uid_t &out_dir_uid)
+{
   struct stat dir_stat;
-  if (stat(m_plugins_path.c_str(), &dir_stat) != 0)
+  if (stat(plugins_path.c_str(), &dir_stat) != 0)
   {
     ZLOG_ERROR("Refusing to load plugins: unable to stat plugins directory %s (errno %d)",
-               m_plugins_path.c_str(), errno);
-    return;
+               plugins_path.c_str(), errno);
+    return false;
   }
 
   if (!S_ISDIR(dir_stat.st_mode))
   {
-    ZLOG_ERROR("Refusing to load plugins: %s is not a directory", m_plugins_path.c_str());
-    return;
+    ZLOG_ERROR("Refusing to load plugins: %s is not a directory", plugins_path.c_str());
+    return false;
   }
 
   if ((dir_stat.st_mode & (S_IWGRP | S_IWOTH)) != 0)
   {
     ZLOG_ERROR("Refusing to load plugins: directory %s is group- or world-writable (mode %03o); "
                "any such identity could drop executable code here",
-               m_plugins_path.c_str(), static_cast<unsigned>(dir_stat.st_mode & 07777));
-    return;
+               plugins_path.c_str(), static_cast<unsigned>(dir_stat.st_mode & 07777));
+    return false;
   }
 
   if (!is_trusted_owner(dir_stat.st_uid))
   {
     ZLOG_ERROR("Refusing to load plugins: directory %s is owned by untrusted uid %u "
                "(expected root or the current user, uid %u)",
-               m_plugins_path.c_str(), static_cast<unsigned>(dir_stat.st_uid),
+               plugins_path.c_str(), static_cast<unsigned>(dir_stat.st_uid),
                static_cast<unsigned>(geteuid()));
+    return false;
+  }
+
+  out_dir_uid = dir_stat.st_uid;
+  return true;
+}
+
+// Per-file provenance check. A plug-in dropped into an otherwise-trusted
+// directory by a different, unprivileged identity is rejected even though the
+// directory itself passed: the file owner must match the directory owner or be
+// a trusted identity (root/self), and the file must not be group/world-writable.
+bool should_load_plugin_entry(const std::string &plugin_path, uid_t dir_uid)
+{
+  // lstat (not stat) so a symlink is rejected on its own merits rather than followed to
+  // whatever it currently points at
+  struct stat entry_stat;
+  if (lstat(plugin_path.c_str(), &entry_stat) != 0)
+  {
+    ZLOG_ERROR("Rejected plugin entry %s: unable to stat (errno %d)", plugin_path.c_str(), errno);
+    return false;
+  }
+
+  if (!S_ISREG(entry_stat.st_mode))
+  {
+    ZLOG_ERROR("Rejected plugin entry %s: not a regular file", plugin_path.c_str());
+    return false;
+  }
+
+  if (entry_stat.st_uid != dir_uid && !is_trusted_owner(entry_stat.st_uid))
+  {
+    ZLOG_ERROR("Rejected plugin entry %s: owned by untrusted uid %u (directory owner is uid %u)",
+               plugin_path.c_str(), static_cast<unsigned>(entry_stat.st_uid),
+               static_cast<unsigned>(dir_uid));
+    return false;
+  }
+
+  if ((entry_stat.st_mode & (S_IWGRP | S_IWOTH)) != 0)
+  {
+    ZLOG_ERROR("Rejected plugin entry %s: file is group- or world-writable (mode %03o)",
+               plugin_path.c_str(), static_cast<unsigned>(entry_stat.st_mode & 07777));
+    return false;
+  }
+
+  return true;
+}
+} // namespace
+
+void PluginManager::load_plugin_file(const std::string &plugin_path, const std::string &entry_name)
+{
+  void *plugin = dlopen(plugin_path.c_str(), RTLD_LAZY);
+  if (plugin == nullptr)
+  {
+    ZLOG_ERROR("Failed to open handle to plugin located at: %s", plugin_path.c_str());
     return;
   }
 
-  const uid_t dir_uid = dir_stat.st_uid;
+  void (*register_plugin)(plugin::PluginManager &) = nullptr;
+  *(void **)(&register_plugin) = dlsym(plugin, "register_plugin");
+  if (!register_plugin)
+  {
+    ZLOG_ERROR("Plugin %s loaded but no entrypoint available (register_plugin missing)", plugin_path.c_str());
+    dlclose(plugin);
+    return;
+  }
+
+  m_metadata_pending = false;
+  m_pending_metadata = PluginMetadata();
+  m_registration_rejected = false;
+  m_duplicate_display_name.clear();
+  m_provider_snapshot = m_command_providers.size();
+
+  register_plugin(*this);
+
+  if (m_registration_rejected)
+  {
+    ZLOG_ERROR("Plugin %s rejected because display name '%s' is already registered",
+               plugin_path.c_str(),
+               m_duplicate_display_name.c_str());
+    discard_command_providers_from(m_provider_snapshot);
+    dlclose(plugin);
+    return;
+  }
+
+  record_loaded_plugin(plugin, entry_name);
+}
+
+void PluginManager::load_plugins(const std::string &plugins_path)
+{
+  m_plugins_path = plugins_path;
+
+  uid_t dir_uid = 0;
+  if (!validate_plugins_directory(m_plugins_path, dir_uid))
+  {
+    return;
+  }
 
   auto *plugins_dir = opendir(m_plugins_path.c_str());
-  if (plugins_dir != nullptr)
+  if (plugins_dir == nullptr)
   {
-    struct dirent *entry;
-    void (*register_plugin)(plugin::PluginManager &);
-    while ((entry = readdir(plugins_dir)) != nullptr)
-    {
-      const std::string entry_name = entry->d_name;
-      if (entry_name == "." || entry_name == "..")
-      {
-        ZLOG_DEBUG("Skipping plugin directory entry: %s", entry_name.c_str());
-        continue;
-      }
-
-      std::string plugin_path = m_plugins_path + "/" + entry_name;
-
-      // lstat (not stat) so a symlink is rejected on its own merits rather than followed to
-      // whatever it currently points at
-      struct stat entry_stat;
-      if (lstat(plugin_path.c_str(), &entry_stat) != 0)
-      {
-        ZLOG_ERROR("Rejected plugin entry %s: unable to stat (errno %d)", plugin_path.c_str(), errno);
-        continue;
-      }
-
-      if (!S_ISREG(entry_stat.st_mode))
-      {
-        ZLOG_ERROR("Rejected plugin entry %s: not a regular file", plugin_path.c_str());
-        continue;
-      }
-
-      // Per-file provenance. A plug-in dropped into an otherwise-trusted
-      // directory by a different, unprivileged identity is rejected even though the
-      // directory itself passed: the file owner must match the directory owner or be
-      // a trusted identity (root/self).
-      if (entry_stat.st_uid != dir_uid && !is_trusted_owner(entry_stat.st_uid))
-      {
-        ZLOG_ERROR("Rejected plugin entry %s: owned by untrusted uid %u (directory owner is uid %u)",
-                   plugin_path.c_str(), static_cast<unsigned>(entry_stat.st_uid),
-                   static_cast<unsigned>(dir_uid));
-        continue;
-      }
-
-      // A group- or world-writable plug-in file can be overwritten by an
-      // untrusted identity after it was placed by a trusted one, so reject it
-      // regardless of who currently owns it.
-      if ((entry_stat.st_mode & (S_IWGRP | S_IWOTH)) != 0)
-      {
-        ZLOG_ERROR("Rejected plugin entry %s: file is group- or world-writable (mode %03o)",
-                   plugin_path.c_str(), static_cast<unsigned>(entry_stat.st_mode & 07777));
-        continue;
-      }
-
-      void *plugin = dlopen(plugin_path.c_str(), RTLD_LAZY);
-      if (plugin == nullptr)
-      {
-        ZLOG_ERROR("Failed to open handle to plugin located at: %s", plugin_path.c_str());
-        continue;
-      }
-
-      *(void **)(&register_plugin) = dlsym(plugin, "register_plugin");
-      if (register_plugin)
-      {
-        m_metadata_pending = false;
-        m_pending_metadata = PluginMetadata();
-        m_registration_rejected = false;
-        m_duplicate_display_name.clear();
-        m_provider_snapshot = m_command_providers.size();
-
-        register_plugin(*this);
-
-        if (m_registration_rejected)
-        {
-          ZLOG_ERROR("Plugin %s rejected because display name '%s' is already registered",
-                     plugin_path.c_str(),
-                     m_duplicate_display_name.c_str());
-          discard_command_providers_from(m_provider_snapshot);
-          dlclose(plugin);
-          continue;
-        }
-
-        record_loaded_plugin(plugin, entry->d_name);
-      }
-      else
-      {
-        ZLOG_ERROR("Plugin %s loaded but no entrypoint available (register_plugin missing)", plugin_path.c_str());
-        dlclose(plugin);
-      }
-    }
-    closedir(plugins_dir);
+    return;
   }
+
+  struct dirent *entry;
+  while ((entry = readdir(plugins_dir)) != nullptr)
+  {
+    const std::string entry_name = entry->d_name;
+    if (entry_name == "." || entry_name == "..")
+    {
+      ZLOG_DEBUG("Skipping plugin directory entry: %s", entry_name.c_str());
+      continue;
+    }
+
+    const std::string plugin_path = m_plugins_path + "/" + entry_name;
+    if (should_load_plugin_entry(plugin_path, dir_uid))
+    {
+      load_plugin_file(plugin_path, entry_name);
+    }
+  }
+  closedir(plugins_dir);
 }
 
 void PluginManager::unload_plugins()
