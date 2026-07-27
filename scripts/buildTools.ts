@@ -1255,7 +1255,10 @@ async function upload(connection: Client, sshProfile: IProfile) {
             if (args[1] == null) {
                 const packageJson = JSON.parse(fs.readFileSync(path.resolve(__dirname, "../package.json"), "utf-8"));
                 try {
-                    const gitHash = childProcess.execSync("git rev-parse --short HEAD").toString().trim();
+                    // When running CI on the pull_request event, the hash of HEAD is different from the last developer commit
+                    // so we get the hash of the previous commit instead (HEAD~1)
+                    const refForHash = process.env.GITHUB_EVENT_NAME === "pull_request" ? "HEAD~1" : "HEAD";
+                    const gitHash = childProcess.execSync(`git rev-parse --short ${refForHash}`).toString().trim();
                     packageJson.gitHash = `-${gitHash}`;
                 } catch {}
                 pendingUploads.push(
