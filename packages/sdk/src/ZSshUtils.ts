@@ -400,19 +400,14 @@ export class ZSshUtils {
         Logger.getAppLogger().debug(
             `[ZSshUtils] checkIfOutdated: Comparing remote version '${remoteVersion}' to bundled server version '${BUNDLED_SSH_SERVER_VERSION}'`,
         );
-        if (remoteVersion) {
-            // older builds of zowex were suffixed with +<gitHash>, but + will not be treated as
-            // a prerelease string. So, normalize + to - for consistent behavior.
-            remoteVersion = remoteVersion.replace("+", "-");
-        }
         if (!semver.valid(remoteVersion)) {
             Logger.getAppLogger().warn(
                 `[ZSshUtils] checkIfOutdated: Invalid remote version '${remoteVersion}' passed. Assuming outdated by default`,
             );
             return true;
         }
-
-        const isOutdated = semver.lt(remoteVersion, BUNDLED_SSH_SERVER_VERSION);
+        // coerce to drop any -suffix in the remote version
+        const isOutdated = semver.lt(semver.coerce(remoteVersion), BUNDLED_SSH_SERVER_VERSION);
         Logger.getAppLogger().debug(`[ZSshUtils] remote version '${remoteVersion}' is outdated? ${isOutdated}`);
         return isOutdated;
     }

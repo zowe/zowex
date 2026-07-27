@@ -66,11 +66,6 @@ describe("ZSshUtils", () => {
                 expected: true,
             },
             {
-                desc: "matching versions with different git hash - snapshot considered older for the same semver - outdated",
-                remoteVersion: `${BUNDLED_SSH_SERVER_VERSION}-aefdab`,
-                expected: true,
-            },
-            {
                 desc: "older patch version also with suffix - outdated",
                 remoteVersion: `1.2.0-aefdab`,
                 expected: true,
@@ -84,6 +79,11 @@ describe("ZSshUtils", () => {
                 desc: "remote version is undefined - outdated",
                 remoteVersion: undefined,
                 expected: true,
+            },
+            {
+                desc: "matching versions with different git hash - suffix is discarded - not outdated",
+                remoteVersion: `${BUNDLED_SSH_SERVER_VERSION}-aefdab`,
+                expected: false,
             },
             {
                 desc: "remote version is an empty string - outdated",
@@ -111,7 +111,7 @@ describe("ZSshUtils", () => {
                 expected: false,
             },
             {
-                desc: "remote version is newer but a prerelease which uses the older +gitHash syntax - not outdated",
+                desc: "remote version is newer with a suffix - not outdated",
                 remoteVersion: "1.3.0+afeb102",
                 expected: false,
             },
