@@ -130,6 +130,7 @@ build-out/zowex.job.submit.test.o \
 build-out/zowex.job.manage.test.o \
 build-out/zowex.test.o \
 build-out/zowex.tso.test.o \
+build-out/zowex.plugin.test.o \
 build-out/zoweax.console.test.o \
 build-out/zutils.o \
 build-out/parser.test.o \
@@ -145,7 +146,9 @@ build-out/zowex.job.server.test.o \
 build-out/server.worker.test.o \
 build-out/server_validator.o \
 build-out/server.validator.test.o \
-build-out/server_logger.test.o
+build-out/server_logger.test.o \
+build-out/plugin.test.o \
+build-out/plugin.o
 	$(CXX) $(CPP_BND_FLAGS) -o $@ $^
 
 build-out/zut.o:
@@ -193,6 +196,9 @@ build-out/zusf.o:
 build-out/server_validator.o:
 	ln -sf ../../build-out/server/validator.o build-out/server_validator.o
 
+build-out/plugin.o: ../extend/plugin.cpp
+	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
+
 build-out/zowex.ds.test.o: zowex.ds.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
@@ -215,6 +221,9 @@ build-out/zowex.job.manage.test.o: zowex.job.manage.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
 build-out/zowex.tso.test.o: zowex.tso.test.cpp
+	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
+
+build-out/zowex.plugin.test.o: zowex.plugin.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
 build-out/zoweax.console.test.o: zoweax.console.test.cpp
@@ -317,6 +326,9 @@ build-out/server.validator.test.o: server/validator.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
 build-out/server_logger.test.o: server_logger.test.cpp
+	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
+
+build-out/plugin.test.o: plugin.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
 #

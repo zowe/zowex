@@ -6,6 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- `c`: `zowex` plug-in loading is now opt-in: plug-ins are only loaded when the `ZOWEX_PLUGINS_DIR` environment variable is explicitly set, replacing the previous implicit `<exec_dir>/plugins` fallback. Added directory- and file-level ownership/permission checks before a plug-in is loaded, and rejected a plug-in command from registering if its name or an alias collides with a built-in verb or another plug-in's command. [#1074](https://github.com/zowe/zowex/pull/1074)
 - `c`: Added support to return information for current linklist. [#1061](https://github.com/zowe/zowex/pull/1061)
 
 ## `0.6.1`
