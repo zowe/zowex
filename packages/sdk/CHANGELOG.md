@@ -4,7 +4,7 @@ All notable changes to the Client code for "@zowe/zowex-for-zowe-sdk" are docume
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## Recent Changes
+## `0.7.0`
 
 - **Breaking:** Updated the `checkIfOutdated()` utility to compare version numbers with semantic versioning rather than comparing checksums of the `zowex` program. Its parameter is changed to accept the version number of `zowex` on the remote system rather than checksums, and it is no longer an `async` method. [#1073](https://github.com/zowe/zowex/pull/1073/)
 - **Breaking:** Removed the `checksums.asc` file from `zowex` server pax files and removed the `serverChecksums` getter method from the `ZSshClient` class. [#1073](https://github.com/zowe/zowex/pull/1073/)
