@@ -84,6 +84,11 @@ private:
   std::mutex exit_mutex;
   std::condition_variable exit_condition;
 
+  // Set when the supervisor gives up waiting on this worker and detaches its
+  // thread. The thread keeps running until its stuck operation returns, so it is
+  // counted as a live leak until worker_loop() finally unwinds.
+  std::atomic<bool> detached{false};
+
   void worker_loop();
   void process_request(const std::string &data);
   void update_heartbeat();
@@ -110,6 +115,15 @@ public:
   // Request recovery methods
   std::vector<RequestMetadata> drain_pending_requests();
   std::string get_current_request();
+
+  /**
+   * @brief Number of force-detached worker threads that have not yet unwound
+   *
+   * A thread stuck inside a z/OS system service cannot be cancelled safely, so
+   * detached threads are counted rather than killed. Each one holds a TCB and its
+   * stack for the life of the process.
+   */
+  static size_t live_detached_count();
 };
 
 // Worker pool that manages multiple workers
@@ -134,6 +148,17 @@ private:
   std::chrono::milliseconds base_replace_backoff;
   std::chrono::milliseconds max_replace_backoff;
 
+  // Upper bound on live force-detached threads before the process gives up and
+  // exits so the system can reclaim them. Note that max_replace_attempts cannot
+  // serve this purpose: set_worker_ready() resets the per-index attempt counter
+  // every time a replacement comes up, so it only bounds consecutive failures.
+  size_t max_live_detached;
+
+  // Outstanding detached initialize_worker() threads, waited on during shutdown
+  std::atomic<size_t> pending_initializers{0};
+  std::mutex init_mutex;
+  std::condition_variable init_condition;
+
   // Queue of ready worker indices for constant-time access (round-robin distribution)
   std::deque<size_t> ready_queue;
 
@@ -145,6 +170,14 @@ private:
   std::atomic<bool> supervisor_running{false};
 
   void initialize_worker(int worker_id);
+
+  /**
+   * @brief Spawn initialize_worker() on a detached thread, tracked for shutdown
+   *
+   * @param worker_id The index of the worker to bring up
+   */
+  void spawn_initializer(int worker_id);
+
   void monitor_workers();
   void monitor_worker_at(size_t i);
 
@@ -205,6 +238,15 @@ private:
   void redistribute_requests(std::vector<RequestMetadata> &requests, size_t worker_index, const char *reason);
 
   void distribute_request_internal(const RequestMetadata &request);
+
+  /**
+   * @brief Exit the process if too many detached worker threads are still live
+   *
+   * Terminating is the only reliable way to release threads wedged in a system
+   * service. The client treats the closed channel as a disconnect, fails pending
+   * requests fast, and reconnects to a fresh server.
+   */
+  void enforce_detached_worker_limit();
 
 public:
   explicit WorkerPool(long long num_workers,

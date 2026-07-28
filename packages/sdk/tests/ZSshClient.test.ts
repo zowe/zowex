@@ -268,6 +268,59 @@ describe("ZSshClient", () => {
             await expect(client.request({ command: "ping" })).rejects.toMatchObject({ errorCode: "ECONNCLOSED" });
         });
 
+        it.each(["close", "exit"])("should reject pending requests when the server channel emits %s", async (event) => {
+            const sshStream = Object.assign(new EventEmitter(), {
+                stdin: { write: vi.fn(), writable: true },
+                stdout: new EventEmitter(),
+                stderr: new EventEmitter(),
+            });
+            setupMockSshClient({ sshStream });
+            const client = await ZSshClient.create(new SshSession(fakeSession));
+            const response = client.request({ command: "ping" });
+            sshStream.emit(event);
+            await expect(response).rejects.toMatchObject({ errorCode: "ECONNCLOSED" });
+        });
+
+        it("should invoke onClose only once when the channel and transport both close", async () => {
+            const sshStream = Object.assign(new EventEmitter(), {
+                stdin: { write: vi.fn(), writable: true },
+                stdout: new EventEmitter(),
+                stderr: new EventEmitter(),
+            });
+            const { connectSpy } = setupMockSshClient({ sshStream });
+            const onCloseMock = vi.fn();
+            await ZSshClient.create(new SshSession(fakeSession), { onClose: onCloseMock });
+            sshStream.emit("close");
+            (connectSpy.mock.contexts[0] as Client).emit("close");
+            expect(onCloseMock).toHaveBeenCalledTimes(1);
+        });
+
+        it("should still invoke onClose when the client is disposed", async () => {
+            const sshStream = Object.assign(new EventEmitter(), {
+                stdin: { write: vi.fn(), writable: true },
+                stdout: new EventEmitter(),
+                stderr: new EventEmitter(),
+            });
+            const { connectSpy } = setupMockSshClient({ sshStream });
+            const onCloseMock = vi.fn();
+            const client = await ZSshClient.create(new SshSession(fakeSession), { onClose: onCloseMock });
+            client.dispose();
+            (connectSpy.mock.contexts[0] as Client).emit("close");
+            expect(onCloseMock).toHaveBeenCalledTimes(1);
+        });
+
+        it("should reject requests when the channel is no longer writable", async () => {
+            const sshStream = {
+                stdin: { write: vi.fn(), writable: false },
+                stdout: new EventEmitter(),
+                stderr: new EventEmitter(),
+            };
+            setupMockSshClient({ sshStream });
+            const client = await ZSshClient.create(new SshSession(fakeSession));
+            await expect(client.request({ command: "ping" })).rejects.toMatchObject({ errorCode: "ECONNCLOSED" });
+            expect(sshStream.stdin.write).not.toHaveBeenCalled();
+        });
+
         it("should respect numWorkers option", async () => {
             const { execAsyncSpy } = setupMockSshClient();
             await ZSshClient.create(new SshSession(fakeSession), {

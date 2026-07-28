@@ -39,6 +39,9 @@ export class ZSshClient extends RpcClientApi implements Disposable {
     private mSshStream: ClientChannel;
     private mStreamMgr: RpcStreamManager;
     private mClosed = false;
+    // Tracked separately from mClosed: dispose() marks the client closed up front, but
+    // the disconnect it triggers still needs to reach the onClose handler once.
+    private mDisconnectHandled = false;
     private mPartialStderr = "";
     private mPartialStdout = "";
     private readonly mRequestMap: Map<number, ExistingClientRequest> = new Map();
@@ -117,11 +120,7 @@ export class ZSshClient extends RpcClientApi implements Disposable {
                         );
                         return;
                     }
-                    // Let the onClose handler harvest pending requests for replay before
-                    // rejecting any that remain, so they fail fast instead of timing out
-                    Promise.resolve(opts.onClose?.())
-                        .catch((err) => client.mErrHandler(err))
-                        .finally(() => client.onConnectionClosed());
+                    client.handleDisconnect("SSH connection closed", opts.onClose);
                 });
                 const keepAliveMsec = opts.keepAliveInterval != null ? opts.keepAliveInterval * 1000 : 30e3;
                 client.mSshClient.connect(
@@ -139,6 +138,7 @@ export class ZSshClient extends RpcClientApi implements Disposable {
             throw err;
         }
         client.mStreamMgr = new RpcStreamManager(client.mSshClient);
+        client.watchServerChannel(opts.onClose);
 
         if (opts.requests != null) {
             for (const req of opts.requests) {
@@ -198,18 +198,52 @@ export class ZSshClient extends RpcClientApi implements Disposable {
     }
 
     /**
-     * Rejects pending requests that have not been harvested for replay after the SSH
-     * connection closed, so they fail fast instead of waiting for the response timeout.
+     * Watches the server's exec channel for the rest of the client's lifetime.
+     *
+     * The transport can stay healthy while the remote server process exits, in which
+     * case no `close` fires on the SSH client and requests would otherwise be written
+     * into a dead stream and wait out the full response timeout.
      */
-    private onConnectionClosed(): void {
+    private watchServerChannel(onClose: ClientOptions["onClose"]): void {
+        if (typeof this.mSshStream?.on !== "function") {
+            return;
+        }
+        const onChannelClose = () => {
+            this.handleDisconnect("Zowe Remote SSH server process ended", onClose);
+        };
+        this.mSshStream.on("close", onChannelClose);
+        this.mSshStream.on("exit", onChannelClose);
+    }
+
+    /**
+     * Marks the client as closed and rejects pending requests that were not harvested
+     * for replay, so they fail fast instead of waiting for the response timeout.
+     *
+     * Idempotent: the transport and the server channel can both report the same
+     * disconnect, and `dispose` closes the channel itself.
+     * @param reason - Message used to reject any requests still pending.
+     * @param onClose - Caller hook given a chance to harvest requests for replay first.
+     */
+    private handleDisconnect(reason: string, onClose?: ClientOptions["onClose"]): void {
+        if (this.mDisconnectHandled) {
+            return;
+        }
+        this.mDisconnectHandled = true;
         this.mClosed = true;
+        Logger.getAppLogger().debug(reason);
+        // Let the onClose handler harvest pending requests for replay before
+        // rejecting any that remain, so they fail fast instead of timing out
+        Promise.resolve(onClose?.())
+            .catch((err) => this.mErrHandler(err))
+            .finally(() => this.rejectPendingRequests(reason));
+    }
+
+    private rejectPendingRequests(reason: string): void {
         for (const [id, req] of this.mRequestMap) {
             if (req.silenced) {
                 continue;
             }
-            req.rpc.reject(
-                new ImperativeError({ msg: "SSH connection closed", errorCode: "ECONNCLOSED", suppressDump: true }),
-            );
+            req.rpc.reject(new ImperativeError({ msg: reason, errorCode: "ECONNCLOSED", suppressDump: true }));
             this.mRequestMap.delete(id);
         }
     }
@@ -218,7 +252,9 @@ export class ZSshClient extends RpcClientApi implements Disposable {
         request: CommandRequest,
         progressCallback?: (percent: number) => void,
     ): Promise<T> {
-        if (this.mClosed) {
+        // `writable` catches a channel that died before its close event was delivered,
+        // which would otherwise swallow the write and stall until the response timeout
+        if (this.mClosed || this.mSshStream?.stdin?.writable === false) {
             throw new ImperativeError({
                 msg: "SSH connection is closed",
                 errorCode: "ECONNCLOSED",

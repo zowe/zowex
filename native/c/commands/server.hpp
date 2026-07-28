@@ -17,6 +17,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <thread>
 #include "../parser.hpp"
 
 class WorkerPool;
@@ -44,6 +45,8 @@ private:
   std::unique_ptr<WorkerPool> worker_pool;
   std::atomic<bool> shutdown_requested{false};
   std::once_flag shutdown_flag;
+  // Joined during shutdown so it cannot outlive worker_pool
+  std::thread worker_count_thread;
 
   static void signal_handler(int sig);
   void setup_signal_handlers();
