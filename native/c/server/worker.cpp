@@ -380,11 +380,8 @@ void WorkerPool::initialize_worker(int worker_id)
 
 void WorkerPool::spawn_initializer(int worker_id)
 {
-  pending_initializers.fetch_add(1);
-
-  // The thread borrows `this`, so the count must be released on every exit path;
-  // shutdown() waits on it before the pool is destroyed, then joins it from
-  // initializer_threads instead of detaching it up front.
+  // Unlike a worker's request-processing thread, this never enters a z/OS system
+  // service and can't get stuck, so it's always safe to join -- see shutdown().
   std::thread initializer_thread([this, worker_id]()
                                  {
     try
@@ -394,13 +391,7 @@ void WorkerPool::spawn_initializer(int worker_id)
     catch (const std::system_error &e)
     {
       LOG_ERROR("Failed to initialize worker %d: %s", worker_id, e.what());
-    }
-
-    {
-      std::lock_guard<std::mutex> lock(init_mutex);
-      pending_initializers.fetch_sub(1);
-    }
-    init_condition.notify_all(); });
+    } });
 
   std::lock_guard<std::mutex> lock(init_mutex);
   initializer_threads.push_back(std::move(initializer_thread));
@@ -535,25 +526,15 @@ void WorkerPool::shutdown()
     supervisor_thread.join();
 
   // Initializer threads borrow `this`, so they must finish before the pool is
-  // destroyed or they will touch freed members. Join them once drained; any
-  // still running after the timeout are detached rather than blocking shutdown.
+  // destroyed or they would touch freed members. Safe to join unconditionally:
+  // unlike a worker's request-processing thread, initialize_worker() never
+  // enters a z/OS system service, so it can't get stuck here.
   {
-    std::unique_lock<std::mutex> lock(init_mutex);
-    const bool drained = init_condition.wait_for(lock, std::chrono::seconds(5), [this]
-                                                 { return pending_initializers.load() == 0; });
-    if (!drained)
-    {
-      LOG_WARN("%zu worker initializer thread(s) still outstanding at shutdown", pending_initializers.load());
-    }
-
+    std::lock_guard<std::mutex> lock(init_mutex);
     for (auto &initializer_thread : initializer_threads)
     {
-      if (!initializer_thread.joinable())
-        continue;
-      if (drained)
+      if (initializer_thread.joinable())
         initializer_thread.join();
-      else
-        initializer_thread.detach();
     }
     initializer_threads.clear();
   }

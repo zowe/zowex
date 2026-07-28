@@ -154,13 +154,9 @@ private:
   // every time a replacement comes up, so it only bounds consecutive failures.
   size_t max_live_detached;
 
-  // Outstanding initialize_worker() threads, waited on during shutdown
-  std::atomic<size_t> pending_initializers{0};
+  // Threads spawned by spawn_initializer(), joined at shutdown before this
+  // WorkerPool is destroyed (see spawn_initializer() for why join is always safe)
   std::mutex init_mutex;
-  std::condition_variable init_condition;
-
-  // Threads spawned by spawn_initializer(), joined once drained at shutdown
-  // (or detached as a last resort if the wait there times out first).
   std::vector<std::thread> initializer_threads;
 
   // Queue of ready worker indices for constant-time access (round-robin distribution)
@@ -176,7 +172,7 @@ private:
   void initialize_worker(int worker_id);
 
   /**
-   * @brief Spawn initialize_worker() on a thread tracked in initializer_threads
+   * @brief Spawn initialize_worker() on a thread tracked in initializer_threads and joined at shutdown
    *
    * @param worker_id The index of the worker to bring up
    */
