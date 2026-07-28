@@ -17,7 +17,7 @@ all: $(OUT_DIR) run
 
 # TODO(zFernand0): S0C4 Abend when unloading plug-ins
 # NOTE(zFernand0): Make sure to run `make clean` to remove the plugin from the build-out directory
-run: $(OUT_DIR)/sample_plugin.so
+run: $(OUT_DIR) $(OUT_DIR)/sample_plugin.so
 	@echo 'Running ./$(OUT_DIR)/sample_plugin.so'
 	mkdir -p ../../build-out/plugins
 	cp ./$(OUT_DIR)/sample_plugin.so ../../build-out/plugins/sample_plugin.so
