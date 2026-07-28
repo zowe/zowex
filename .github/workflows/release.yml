@@ -55,6 +55,8 @@ jobs:
 
       - name: Build Source
         run: npm run build
+        env:
+          ZOWEX_RELEASE_VERSION: ${{ inputs.version }}
 
       - name: Set Environment
         run: |

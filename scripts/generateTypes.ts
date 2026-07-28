@@ -161,17 +161,19 @@ const allInterfaces: Map<string, ExtractedInterface> = new Map();
 // License header content
 let licenseHeader: string = "";
 
-function loadLicenseHeader(): void {
+export function loadLicenseHeader(): string {
+    let result = "";
     try {
-        licenseHeader = fs.readFileSync(LICENSE_HEADER_PATH, "utf8");
+        result = fs.readFileSync(LICENSE_HEADER_PATH, "utf8");
         // Ensure the license header ends with a newline
-        if (!licenseHeader.endsWith("\n")) {
-            licenseHeader += "\n";
+        if (!result.endsWith("\n")) {
+            result += "\n";
         }
     } catch (error) {
         console.warn(`Could not load license header from ${LICENSE_HEADER_PATH}:`, error);
-        licenseHeader = "";
+        result = "";
     }
+    return result;
 }
 
 function collectAllProperties(iface: ExtractedInterface): Array<ExtractedInterface["properties"][0]> {
@@ -353,7 +355,7 @@ function collectBaseClassProperties(interfaces: ExtractedInterface[]): void {
 
 function processAllRpcFiles(): void {
     // Load the license header
-    loadLicenseHeader();
+    licenseHeader = loadLicenseHeader();
 
     if (!fs.existsSync(C_SCHEMAS_DIR)) {
         fs.mkdirSync(C_SCHEMAS_DIR, { recursive: true });
