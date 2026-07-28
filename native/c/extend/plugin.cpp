@@ -375,9 +375,7 @@ bool validate_plugins_directory(const std::string &plugins_path, uid_t &out_dir_
 
   if ((dir_stat.st_mode & (S_IWGRP | S_IWOTH)) != 0)
   {
-    ZLOG_ERROR("Refusing to load plugins: directory %s is group- or world-writable (mode %03o); "
-               "any such identity could drop executable code here",
-               plugins_path.c_str(), static_cast<unsigned>(dir_stat.st_mode & 07777));
+    ZLOG_ERROR("Refusing to load plugins: directory %s is group- or world-writable (mode %03o)", plugins_path.c_str(), static_cast<unsigned>(dir_stat.st_mode & 07777));
     return false;
   }
 
