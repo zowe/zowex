@@ -7,7 +7,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## Recent Changes
 
 - `c`: Added support to return information for current linklist. [#1061](https://github.com/zowe/zowex/pull/1061)
-- `c`: Made handling of control bytes (`0x0`-`0x1f`) in JSON safer. Now when an object is serialized control bytes are replaced with the Unicode substitution character, and when an string is deserialized control bytes are rejected as invalid. [#1078](https://github.com/zowe/zowex/pull/1078)
+- `c`: Made handling of control bytes (`0x0`-`0x1f`) in JSON safer. Now when an object is serialized, control bytes are replaced with the Unicode substitution character, and when a string is deserialized, control bytes are rejected as invalid. [#1078](https://github.com/zowe/zowex/pull/1078)
 
 ## `0.6.1`
 
