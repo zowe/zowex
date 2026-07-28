@@ -33,7 +33,7 @@ export class ZSshClient extends RpcClientApi implements Disposable {
     public static readonly BIN_NAME = "zowex";
     private mErrHandler: ClientOptions["onError"];
     private mResponseTimeout: number;
-    private mServerInfo: { checksums?: Record<string, string> };
+    private mServerInfo: { version?: string };
     private mSshClient: Client;
     private mSshStream: ClientChannel;
     private mStreamMgr: RpcStreamManager;
@@ -138,8 +138,8 @@ export class ZSshClient extends RpcClientApi implements Disposable {
         this.dispose();
     }
 
-    public get serverChecksums(): Record<string, string> | undefined {
-        return this.mServerInfo?.checksums;
+    public get serverVersion(): string | undefined {
+        return this.mServerInfo?.version;
     }
 
     public async request<T extends CommandResponse>(
