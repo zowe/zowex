@@ -1207,6 +1207,13 @@ public:
     return m_server_commands;
   }
 
+  // Names of plug-in top-level commands refused during registration because they
+  // would shadow a built-in verb or collide with another plug-in.
+  const std::vector<std::string> &get_rejected_command_names() const
+  {
+    return m_rejected_command_names;
+  }
+
   PluginManager(const PluginManager &) = delete;
   PluginManager &operator=(const PluginManager &) = delete;
 
@@ -1215,6 +1222,7 @@ private:
   void record_loaded_plugin(void *plugin_handle, const std::string &plugin_identifier);
   bool is_display_name_in_use(const std::string &name) const;
   void discard_command_providers_from(std::size_t start_index);
+  void load_plugin_file(const std::string &plugin_path, const std::string &entry_name);
 
   std::vector<std::unique_ptr<CommandProvider>> m_command_providers;
   std::set<parser::command_ptr> m_server_commands;
@@ -1225,6 +1233,7 @@ private:
   bool m_registration_rejected;
   std::string m_duplicate_display_name;
   std::size_t m_provider_snapshot;
+  std::vector<std::string> m_rejected_command_names;
 };
 
 inline PluginManager::PluginManager()
