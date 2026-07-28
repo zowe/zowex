@@ -6,8 +6,9 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
-- Fixed SSH connection softlocks and resource leaks when a connection drops or stalls during startup: the `ZSshClient.create` function now rejects when the connection closes before the server is ready or when a `serverStartupTimeout` (default 60s) elapses, cleans up the SSH connection on startup failure, rejects pending requests fast when the connection closes, and supports the `keepAliveCountMax` option (default 3). [#4425](https://github.com/zowe/zowe-explorer-vscode/issues/4425)
-- Fixed requests hanging until the response timeout when the Zowe Remote SSH server process ended while the SSH transport stayed healthy. `ZSshClient` now watches the server channel for the lifetime of the client and rejects requests written to a channel that is no longer writable. [#4425](https://github.com/zowe/zowe-explorer-vscode/issues/4425)
+- Fixed SSH connection softlocks and resource leaks when a connection drops or stalls during startup: the `ZSshClient.create` function now rejects when the connection closes before the server is ready or when a `serverStartupTimeout` (default 60s) elapses, cleans up the SSH connection on startup failure, rejects pending requests fast when the connection closes, and supports the `keepAliveCountMax` option (default 3). [#1076](https://github.com/zowe/zowex/pull/1076)
+- Fixed requests hanging until the response timeout when the Zowe Remote SSH server process ended while the SSH transport stayed healthy. `ZSshClient` now watches the server channel for the lifetime of the client and rejects requests written to a channel that is no longer writable. [#1076](https://github.com/zowe/zowex/pull/1076)
+- Fixed socket errors raised while tearing down a closed client being reported through the `onError` handler, which surfaced spurious errors to callers during a normal disconnect. [#1076](https://github.com/zowe/zowex/pull/1076)
 - Added support to list link list data sets. [#1061](https://github.com/zowe/zowex/pull/1061)
 
 ## `0.6.1`

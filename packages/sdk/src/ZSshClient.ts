@@ -84,12 +84,20 @@ export class ZSshClient extends RpcClientApi implements Disposable {
                     );
                 }, serverStartupTimeoutS * 1000);
                 client.mSshClient.on("error", (err) => {
-                    Logger.getAppLogger().error(`Error connecting to SSH: ${err}`);
-                    if (established) {
-                        client.mErrHandler(err);
-                    } else {
+                    if (!established) {
+                        Logger.getAppLogger().error(`Error connecting to SSH: ${err}`);
                         onStartupError(err);
+                        return;
                     }
+                    // Socket errors during teardown are noise; the disconnect was already
+                    // reported. The listener stays attached so an `error` event never goes
+                    // unhandled, which Node would rethrow.
+                    if (client.mClosed) {
+                        Logger.getAppLogger().debug(`Ignoring SSH error after client closed: ${err}`);
+                        return;
+                    }
+                    Logger.getAppLogger().error(`Error connecting to SSH: ${err}`);
+                    client.mErrHandler(err);
                 });
                 client.mSshClient.on("ready", () => {
                     const zowexBin = posix.join(opts.serverPath ?? ZSshClient.DEFAULT_SERVER_PATH, ZSshClient.BIN_NAME);

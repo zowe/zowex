@@ -309,6 +309,18 @@ describe("ZSshClient", () => {
             expect(onCloseMock).toHaveBeenCalledTimes(1);
         });
 
+        it("should not route SSH errors to onError once the client is closed", async () => {
+            const { connectSpy } = setupMockSshClient();
+            const onErrorMock = vi.fn();
+            const client = await ZSshClient.create(new SshSession(fakeSession), { onError: onErrorMock });
+            const sshClient = connectSpy.mock.contexts[0] as Client;
+
+            client.dispose();
+            sshClient.emit("error", new Error("socket torn down"));
+
+            expect(onErrorMock).not.toHaveBeenCalled();
+        });
+
         it("should reject requests when the channel is no longer writable", async () => {
             const sshStream = {
                 stdin: { write: vi.fn(), writable: false },
