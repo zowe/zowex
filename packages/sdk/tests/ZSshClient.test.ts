@@ -61,7 +61,7 @@ function setupMockSshClient(options?: {
 }
 
 describe("ZSshClient", () => {
-    const readyMessage = JSON.stringify({ status: "ready", data: { checksums: "sha256" } });
+    const readyMessage = JSON.stringify({ status: "ready", data: { version: "0.6.1" } });
     const rpcRequest: RpcRequest = {
         jsonrpc: "2.0",
         method: "ping",
@@ -470,7 +470,7 @@ describe("ZSshClient", () => {
             await (client as any).execAsync();
             expect(onStderrMock).toHaveBeenCalledTimes(2);
             expect(onStdoutMock).toHaveBeenCalledTimes(2);
-            expect(client.serverChecksums).not.toBeNull();
+            expect(client.serverVersion).not.toBeNull();
         });
 
         it("should reject execAsync when the stream closes before the server is ready", async () => {

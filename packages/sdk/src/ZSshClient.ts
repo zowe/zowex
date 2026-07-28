@@ -34,7 +34,7 @@ export class ZSshClient extends RpcClientApi implements Disposable {
     private static readonly DEFAULT_SERVER_STARTUP_TIMEOUT_S = 60;
     private mErrHandler: ClientOptions["onError"];
     private mResponseTimeout: number;
-    private mServerInfo: { checksums?: Record<string, string> };
+    private mServerInfo: { version?: string };
     private mSshClient: Client;
     private mSshStream: ClientChannel;
     private mStreamMgr: RpcStreamManager;
@@ -201,8 +201,8 @@ export class ZSshClient extends RpcClientApi implements Disposable {
         this.dispose();
     }
 
-    public get serverChecksums(): Record<string, string> | undefined {
-        return this.mServerInfo?.checksums;
+    public get serverVersion(): string | undefined {
+        return this.mServerInfo?.version;
     }
 
     /**
