@@ -1343,7 +1343,7 @@ inline std::string escape_json_string(const std::string &input)
       output += "\\t";
       break;
     default:
-      if (iscntrl(c))
+      if (iscntrl(static_cast<unsigned char>(c)))
       {
         // Native control byte values do not correspond to the same Unicode code
         // points on this EBCDIC platform (e.g. IBM-1047 NL 0x15 vs Unicode NAK
@@ -1403,16 +1403,19 @@ inline std::string unescape_json_string(const std::string &s)
           std::string hex = s.substr(i + 1, 4);
           char *endptr;
           unsigned long val = std::strtoul(hex.c_str(), &endptr, 16);
-          if (endptr != hex.c_str() && val <= 0x1F)
+          bool valid_hex = endptr == hex.c_str() + 4;
+          if (valid_hex && val <= 0x1F)
           {
-            // Control characters have no named escape and, on this platform,
-            // do not necessarily decode to the same value in a reader's encoding
-            // as their raw numeric value would suggest (e.g. IBM-1047 vs Unicode).
-            // There is no reliable way to know if the caller can tolerate a
-            // substitution, so reject outright rather than guess.
+            // \n, \t, \r, \b, \f have named escapes and are handled above, where
+            // they are deliberately mapped to this platform's native control byte
+            // rather than the Unicode code point. A \u00XX escape for the same code
+            // point (named or not) has no such platform-specific mapping to fall
+            // back on: e.g. U+0015 is Unicode NAK, but on this EBCDIC platform (IBM-1047)
+            // byte 0x15 is NL, not NAK, so there is no reliable value to substitute -
+            // reject outright rather than guess.
             throw Error::invalid_value("JSON string contains a disallowed control character escape: \\u" + hex);
           }
-          else if (endptr != hex.c_str() && val < 256)
+          else if (valid_hex && val < 256)
           {
             res += static_cast<char>(val);
           }
