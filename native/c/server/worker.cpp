@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cstdlib>
+#include <system_error>
 #include <unistd.h>
 
 using std::string;
@@ -25,7 +26,11 @@ namespace
 {
 
 // Force-detached threads that have not yet unwound, process-wide.
-std::atomic<size_t> g_live_detached_workers{0};
+std::atomic<size_t> &live_detached_workers()
+{
+  static std::atomic<size_t> counter{0};
+  return counter;
+}
 
 // Exit code used when the pool gives up because too many threads are wedged.
 const int kDetachedWorkerLimitExitCode = 3;
@@ -203,10 +208,10 @@ void Worker::worker_loop()
     LOG_ERROR("Worker %d encountered fatal error: %s", id, e.what());
   }
 
-  if (detached.exchange(false, std::memory_order_acq_rel))
+  if (detached.exchange(false))
   {
     // The stuck operation finally returned, so this thread is no longer a leak.
-    const size_t remaining = g_live_detached_workers.fetch_sub(1) - 1;
+    const size_t remaining = live_detached_workers().fetch_sub(1) - 1;
     LOG_DEBUG("Worker %d detached thread unwound; %zu detached worker thread(s) still live", id, remaining);
   }
 
@@ -276,8 +281,8 @@ void Worker::force_detach()
   {
     // The thread cannot be cancelled safely while it sits in a system service, so
     // account for it as a live leak until worker_loop() unwinds on its own.
-    detached.store(true, std::memory_order_release);
-    const size_t live = g_live_detached_workers.fetch_add(1) + 1;
+    detached.store(true);
+    const size_t live = live_detached_workers().fetch_add(1) + 1;
     worker_thread.detach();
     LOG_WARN("Worker %d thread detached and still running; %zu detached worker thread(s) now live", id, live);
   }
@@ -286,7 +291,7 @@ void Worker::force_detach()
 
 size_t Worker::live_detached_count()
 {
-  return g_live_detached_workers.load();
+  return live_detached_workers().load();
 }
 
 std::vector<RequestMetadata> Worker::drain_pending_requests()
@@ -378,14 +383,15 @@ void WorkerPool::spawn_initializer(int worker_id)
   pending_initializers.fetch_add(1);
 
   // The thread borrows `this`, so the count must be released on every exit path;
-  // shutdown() waits on it before the pool is destroyed.
-  std::thread([this, worker_id]()
-              {
+  // shutdown() waits on it before the pool is destroyed, then joins it from
+  // initializer_threads instead of detaching it up front.
+  std::thread initializer_thread([this, worker_id]()
+                                 {
     try
     {
       initialize_worker(worker_id);
     }
-    catch (const std::exception &e)
+    catch (const std::system_error &e)
     {
       LOG_ERROR("Failed to initialize worker %d: %s", worker_id, e.what());
     }
@@ -394,8 +400,10 @@ void WorkerPool::spawn_initializer(int worker_id)
       std::lock_guard<std::mutex> lock(init_mutex);
       pending_initializers.fetch_sub(1);
     }
-    init_condition.notify_all(); })
-      .detach();
+    init_condition.notify_all(); });
+
+  std::lock_guard<std::mutex> lock(init_mutex);
+  initializer_threads.push_back(std::move(initializer_thread));
 }
 
 void WorkerPool::distribute_request(const string &request)
@@ -526,8 +534,9 @@ void WorkerPool::shutdown()
   if (supervisor_thread.joinable())
     supervisor_thread.join();
 
-  // Detached initializer threads borrow `this`, so they must finish before the
-  // pool is destroyed or they will touch freed members.
+  // Initializer threads borrow `this`, so they must finish before the pool is
+  // destroyed or they will touch freed members. Join them once drained; any
+  // still running after the timeout are detached rather than blocking shutdown.
   {
     std::unique_lock<std::mutex> lock(init_mutex);
     const bool drained = init_condition.wait_for(lock, std::chrono::seconds(5), [this]
@@ -536,6 +545,17 @@ void WorkerPool::shutdown()
     {
       LOG_WARN("%zu worker initializer thread(s) still outstanding at shutdown", pending_initializers.load());
     }
+
+    for (auto &initializer_thread : initializer_threads)
+    {
+      if (!initializer_thread.joinable())
+        continue;
+      if (drained)
+        initializer_thread.join();
+      else
+        initializer_thread.detach();
+    }
+    initializer_threads.clear();
   }
 
   for (auto &worker : workers)

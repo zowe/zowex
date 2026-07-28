@@ -39,7 +39,11 @@ namespace
 
 // Set from the signal handler only. Everything the handler touches must be
 // async-signal-safe, so the real shutdown work runs on the main thread.
-volatile sig_atomic_t g_signal_shutdown = 0;
+volatile sig_atomic_t &signal_shutdown_flag()
+{
+  static volatile sig_atomic_t flag = 0;
+  return flag;
+}
 
 } // namespace
 
@@ -76,7 +80,7 @@ void ZServer::signal_handler(int sig __attribute__((unused)))
   // input loop, which then performs the real shutdown. Calling into the worker
   // pool or the logger from a signal context can self-deadlock on a mutex the
   // interrupted thread already holds, leaving the process alive forever.
-  g_signal_shutdown = 1;
+  signal_shutdown_flag() = 1;
   close(STDIN_FILENO);
 }
 
@@ -102,7 +106,7 @@ void ZServer::request_shutdown()
           }
           // The signal handler already closed stdin; closing again could clobber a
           // descriptor that has since been reused for fd 0.
-          if (g_signal_shutdown == 0) {
+          if (signal_shutdown_flag() == 0) {
               close(STDIN_FILENO);
           } });
 }
@@ -206,7 +210,7 @@ void ZServer::run(const server::Options &opts)
   std::string line{};
   while (std::getline(std::cin, line))
   {
-    if (g_signal_shutdown != 0 || shutdown_requested)
+    if (signal_shutdown_flag() != 0 || shutdown_requested)
       break;
 
     if (!line.empty())
@@ -215,7 +219,7 @@ void ZServer::run(const server::Options &opts)
     }
   }
 
-  if (g_signal_shutdown != 0)
+  if (signal_shutdown_flag() != 0)
   {
     LOG_INFO("Shutdown signal received, shutting down");
   }
