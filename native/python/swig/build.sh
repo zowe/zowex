@@ -7,7 +7,7 @@ export _CXX_CCMODE=1
 export _CXX_EXTRA_ARGS=1
 export MAKE=gmake
 
-REQUIRED_TOOLS="bison git python $MAKE"
+REQUIRED_TOOLS="bison git gunzip python $MAKE"
 for tool in $REQUIRED_TOOLS; do
     if ! command -v "$tool" >/dev/null 2>&1; then
         echo "Error: Required dependency '$tool' was not found in your PATH." >&2

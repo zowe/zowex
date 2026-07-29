@@ -1231,7 +1231,11 @@ function getLatestTag(repoName: string, prefix?: string) {
     }
     const isPrerelease = (tag: string) => tag.includes("-beta") || tag.includes("-RC");
     const matchesPrefix = (tag: string) => prefix == null || tag.startsWith(prefix);
-    return tags.find((tag) => !isPrerelease(tag) && matchesPrefix(tag));
+    const foundTag = tags.find((tag) => !isPrerelease(tag) && matchesPrefix(tag));
+    if (foundTag == null) {
+        throw Error(`No stable tag found for ${repoName}`);
+    }
+    return foundTag;
 }
 
 /**
@@ -1244,7 +1248,7 @@ async function downloadTarball(url: string, destPath: string) {
     if (fs.existsSync(destPath)) {
         return;
     }
-    const label = destPath.split(/\W/)[0].toUpperCase();
+    const label = path.basename(destPath).split(/\W/)[0];
     console.log(`Downloading ${label} tarball...`);
     let response: Response;
     try {
@@ -1256,7 +1260,19 @@ async function downloadTarball(url: string, destPath: string) {
     if (!response.ok) {
         throw new Error(`Failed to download ${label} tarball from ${url}: ${response.status} ${response.statusText}`);
     }
-    fs.writeFileSync(destPath, Buffer.from(await response.arrayBuffer()));
+    await new Promise<void>((resolve, reject) => {
+        pipeline(
+            Readable.fromWeb(response.body as import("node:stream/web").ReadableStream),
+            fs.createWriteStream(destPath),
+            (err) => {
+                if (err) {
+                    reject(new Error(`Failed to download ${label} tarball from ${url}: ${err}`));
+                } else {
+                    resolve();
+                }
+            },
+        );
+    });
 }
 
 async function buildSwig(connection: Client) {
@@ -1268,12 +1284,13 @@ async function buildSwig(connection: Client) {
     const pcreTgz = path.join(cacheDir, `pcre2-${pcreVersion}.tar.gz`);
 
     await Promise.all([
-        downloadTarball(`https://prdownloads.sourceforge.net/swig/swig-${swigVersion}.tar.gz`, swigTgz),
+        downloadTarball(`http://prdownloads.sourceforge.net/swig/swig-${swigVersion}.tar.gz`, swigTgz),
         downloadTarball(
             `https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${pcreVersion}/pcre2-${pcreVersion}.tar.gz`,
             pcreTgz,
         ),
     ]);
+    process.exit(1);
 
     console.log("Uploading source tarballs...");
     await new Promise<void>((resolve, reject) => {
@@ -1287,10 +1304,11 @@ async function buildSwig(connection: Client) {
                     uploadFile(sftpcon, swigTgz, `${deployDirs.pythonSwigDir}/swig-${swigVersion}.tar.gz`, false),
                     uploadFile(sftpcon, pcreTgz, `${deployDirs.pythonSwigDir}/pcre2-${pcreVersion}.tar.gz`, false),
                 ]);
-                sftpcon.end();
                 resolve();
             } catch (uploadErr) {
                 reject(uploadErr);
+            } finally {
+                sftpcon.end();
             }
         });
     });
@@ -1352,10 +1370,11 @@ async function applyPrecompiled(connection: Client) {
             }
             try {
                 await uploadFile(sftpcon, localTarball, remoteTarball, false);
-                sftpcon.end();
                 resolve();
             } catch (uploadErr) {
                 reject(uploadErr);
+            } finally {
+                sftpcon.end();
             }
         });
     });
