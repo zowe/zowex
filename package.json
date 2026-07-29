@@ -21,6 +21,7 @@
     "z:all": "npm run z:rebuild && npm run z:package && npm run z:test",
     "z:artifacts": "tsx scripts/buildTools.ts artifacts",
     "z:build": "tsx scripts/buildTools.ts build",
+    "z:build:swig": "tsx scripts/buildTools.ts build:swig",
     "z:chdsect": "tsx scripts/buildTools.ts build:chdsect",
     "z:clean": "tsx scripts/buildTools.ts clean",
     "z:delete": "tsx scripts/buildTools.ts delete",
