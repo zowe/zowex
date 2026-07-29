@@ -32,6 +32,7 @@
 #include "server/worker.test.hpp"
 #include "server/validator.test.hpp"
 #include "server_logger.test.hpp"
+#include "plugin.test.hpp"
 #include "ztest.hpp"
 #include <cstdlib>
 
@@ -71,6 +72,7 @@ int main(int argc, char *argv[])
         server_worker_tests();
         server_validator_tests();
         server_logger_tests();
+        plugin_tests();
       });
 
   return rc;
