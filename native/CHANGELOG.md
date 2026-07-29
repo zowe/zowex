@@ -7,8 +7,13 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## Recent Changes
 
 - `c`: Fixed `zowex server` resource leaks that could exhaust a z/OS LPAR after a request timed out or a connection dropped. The shutdown signal handler no longer calls into the worker pool or logger, which could deadlock and leave the process running forever; the number of live force-detached worker threads is now bounded, and the server exits when the limit is exceeded so the system can reclaim them; late responses from a detached worker are discarded instead of being sent for an ID the client already failed; notifications are serialized with responses so concurrent writes cannot corrupt the JSON stream; and worker initializer threads are drained before the pool is destroyed. [#537](https://github.com/zowe/zowex/issues/537)
+- `c`: Fixed an issue with `zowex ds list-members` when reading PDS directory blocks. [#1070] (https://github.com/zowe/zowex/pull/1070)
+
+## `0.7.0`
+
 - `c`: `zowex` plug-in loading is now opt-in: plug-ins are only loaded when the `ZOWEX_PLUGINS_DIR` environment variable is explicitly set, replacing the previous implicit `<exec_dir>/plugins` fallback. Added directory- and file-level ownership/permission checks before a plug-in is loaded, and rejected a plug-in command from registering if its name or an alias collides with a built-in verb or another plug-in's command. [#1074](https://github.com/zowe/zowex/pull/1074)
 - `c`: Added support to return information for current linklist. [#1061](https://github.com/zowe/zowex/pull/1061)
+- `c`: Made handling of control bytes (`0x0`-`0x1f`) in JSON safer. Now when an object is serialized, control bytes are replaced with the Unicode substitution character, and when a string is deserialized, control bytes are rejected as invalid. [#1078](https://github.com/zowe/zowex/pull/1078)
 
 ## `0.6.1`
 
@@ -282,3 +287,4 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## [Unreleased]
 
 - Initial release
+
