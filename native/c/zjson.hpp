@@ -1404,7 +1404,7 @@ inline std::string unescape_json_string(const std::string &s)
           char *endptr;
           unsigned long val = std::strtoul(hex.c_str(), &endptr, 16);
           bool valid_hex = endptr == hex.c_str() + 4;
-          if (valid_hex && val <= 0x1F)
+          if (valid_hex && val < 256 && iscntrl(static_cast<unsigned char>(val)))
           {
             // \n, \t, \r, \b, \f have named escapes and are handled above, where
             // they are deliberately mapped to this platform's native control byte
@@ -1582,12 +1582,13 @@ inline Value json_handle_to_value(JSON_INSTANCE *instance, KEY_HANDLE *key_handl
       int key_buffer_length = sizeof(key_buffer);
       KEY_HANDLE value_handle = {0};
       int actual_length = 0;
+      std::vector<char> dynamic_buffer;
 
       rc = ZJSMGOEN(instance, key_handle, &i, &key_buffer_ptr, &key_buffer_length, &value_handle, &actual_length);
       if (rc == HWTJ_BUFFER_TOO_SMALL)
       {
         // Allocate larger buffer for long keys
-        std::vector<char> dynamic_buffer(actual_length);
+        dynamic_buffer.resize(actual_length);
         key_buffer_ptr = &dynamic_buffer[0];
         key_buffer_length = actual_length;
 
