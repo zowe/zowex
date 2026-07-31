@@ -7,7 +7,13 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## Recent Changes
 
 - `c`: Added RACF certificate and key ring management to the `system` command group, migrating the `keyring-utilities` functionality (RACF R_datalib and System SSL) into `zowex` as two subgroups: `system keyring create|delete|list|list-rings|count` and `system cert import|export|delete|show|connect|set-default|trust|rename|refresh`. [#XXXX](https://github.com/zowe/zowex/pull/XXXX)
+- `c`: Fixed an issue with `zowex ds list-members` when reading PDS directory blocks. [#1070] (https://github.com/zowe/zowex/pull/1070)
+
+## `0.7.0`
+
+- `c`: `zowex` plug-in loading is now opt-in: plug-ins are only loaded when the `ZOWEX_PLUGINS_DIR` environment variable is explicitly set, replacing the previous implicit `<exec_dir>/plugins` fallback. Added directory- and file-level ownership/permission checks before a plug-in is loaded, and rejected a plug-in command from registering if its name or an alias collides with a built-in verb or another plug-in's command. [#1074](https://github.com/zowe/zowex/pull/1074)
 - `c`: Added support to return information for current linklist. [#1061](https://github.com/zowe/zowex/pull/1061)
+- `c`: Made handling of control bytes (`0x0`-`0x1f`) in JSON safer. Now when an object is serialized, control bytes are replaced with the Unicode substitution character, and when a string is deserialized, control bytes are rejected as invalid. [#1078](https://github.com/zowe/zowex/pull/1078)
 
 ## `0.6.1`
 
@@ -281,3 +287,4 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## [Unreleased]
 
 - Initial release
+
