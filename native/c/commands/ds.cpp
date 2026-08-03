@@ -469,7 +469,11 @@ int handle_data_set_list(InvocationContext &context)
     return RTNCD_FAILURE;
   }
 
-  dsn += ".**";
+  bool exact_match = context.get<bool>("exact-match", false);
+  if (!exact_match)
+  {
+    dsn += ".**";
+  }
 
   long long max_entries = context.get<long long>("max-entries", 0);
   bool warn = context.get<bool>("warn", true);
@@ -1110,6 +1114,7 @@ void register_commands(parser::Command &root_command)
   ds_list_cmd->add_alias("ls");
   ds_list_cmd->add_positional_arg(DSN_PATTERN);
   ds_list_cmd->add_keyword_arg("attributes", make_aliases("--attributes", "-a"), "display data set attributes", ArgType_Flag, false, ArgValue(false));
+  ds_list_cmd->add_keyword_arg("exact-match", make_aliases("--exact-match"), "match the pattern exactly without appending a trailing wildcard", ArgType_Flag, false, ArgValue(false));
   ds_list_cmd->add_keyword_arg(MAX_ENTRIES);
   ds_list_cmd->add_keyword_arg(WARN);
   ds_list_cmd->add_keyword_arg(RESPONSE_FORMAT_CSV);

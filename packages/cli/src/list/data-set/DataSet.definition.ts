@@ -57,6 +57,12 @@ export const ListDataSetDefinition: ICommandDefinition = {
             description: "Fetch attributes of the data sets being listed.",
             type: "boolean",
         },
+        {
+            name: "exact-match",
+            description: "Match the pattern exactly instead of appending a trailing wildcard.",
+            type: "boolean",
+            defaultValue: false,
+        },
     ],
     profile: { optional: ["ssh"] },
     outputFormatOptions: true,
