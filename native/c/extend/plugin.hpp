@@ -22,7 +22,29 @@
 #include <cstddef>
 #include <set>
 
-#include <unordered_map>
+// Ordered containers, not hashed: std::hash<std::string> resolves to the out-of-line libc++ helper
+// std::__1_e::__hash_memory, absent from CRTEQCXE on z/OS systems below the required Language
+// Environment maintenance level (CEE3561S at load time). See zowex#871 and doc/troubleshooting.md.
+#include <map>
+
+// Binary compatibility contract between zowex and out-of-tree plug-ins.
+//
+// Bump this on any change to the layout of a type that crosses the dlopen boundary - notably
+// ast::ObjMap, ast::Ast, plugin::ArgumentMap, plugin::Io, plugin::InvocationContext and
+// plugin::PluginManager. Accessors such as InvocationContext::get<T>() are inlined *into* the
+// plug-in, so a plug-in compiled against a different layout reads the wrong member offsets;
+// zowex rejects such a plug-in at load time rather than letting it corrupt memory.
+//
+// Version 1 was the implicit, unversioned contract before this constant existed. A plug-in that
+// does not export zowex_plugin_abi_version() reports as version 0 and is rejected.
+#define ZOWEX_PLUGIN_ABI_VERSION 2u
+
+// Plug-ins must expand this once, in the same translation unit as register_plugin().
+#define ZOWEX_PLUGIN_DECLARE_ABI()                   \
+  extern "C" unsigned int zowex_plugin_abi_version() \
+  {                                                  \
+    return ZOWEX_PLUGIN_ABI_VERSION;                 \
+  }
 
 template <typename Interface>
 class Factory
@@ -41,7 +63,7 @@ struct Ast;
 typedef std::shared_ptr<Ast> Node;
 typedef std::shared_ptr<std::string> StringPtr;
 typedef std::shared_ptr<std::vector<Node>> VecPtr;
-typedef std::unordered_map<std::string, Node> ObjMap;
+typedef std::map<std::string, Node> ObjMap;
 typedef std::shared_ptr<ObjMap> ObjPtr;
 
 struct Ast
@@ -773,7 +795,7 @@ struct ArgGetter<std::vector<std::string>>
   }
 };
 
-typedef std::unordered_map<std::string, Argument> ArgumentMap;
+typedef std::map<std::string, Argument> ArgumentMap;
 
 class Io
 {

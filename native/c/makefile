@@ -90,7 +90,7 @@ SWIG_EXTENDER_OBJS = $(OUT_DIR_SWIG)/zut.o $(OUT_DIR_SWIG)/zds.o $(OUT_DIR_SWIG)
 all: libzut.so libzut.a libzds.so libzds.a libzusf.so libzusf.a libzcn.so libzcn.a libzjb.so libzjb.a zowex zoweax
 swig-extenders: $(OUT_DIR_SWIG) $(SWIG_EXTENDER_OBJS)
 tests:
-	$(MAKE) -c test
+	$(MAKE) -DZosTarget=$(ZosTarget) -c test
 
 #
 # Out directories
@@ -360,13 +360,13 @@ $(OUT_DIR)/extend/plugin.o: extend/plugin.cpp
 # Test CLI
 #
 $(OUT_DIR)/zowex: $(OUT_DIR)/zowex.o $(OUT_DIR)/extend/plugin.o $(COMMAND_OBJS) $(SERVER_OBJS) $(OUT_DIR)/zjsonm.o $(OUT_DIR)/libzcn.a $(OUT_DIR)/libzut.a $(OUT_DIR)/libzjb.a $(OUT_DIR)/libzds.a $(OUT_DIR)/libzusf.a $(OUT_DIR)/libztso.a
-	@echo 'Building zowex'
+	@echo 'Building zowex (z/OS target level: $(ZosTarget))'
 	$(CXX) $(CPP_BND_FLAGS) -o $@ $^
 
 zowex: $(OUT_DIR) $(OUT_DIR)/zowex
 
 $(OUT_DIR)/zoweax: $(OUT_DIR)/zowex.o $(OUT_DIR)/extend/plugin.o $(COMMAND_OBJS) $(SERVER_OBJS) $(OUT_DIR)/zjsonm.o $(OUT_DIR)/libzcn.a $(OUT_DIR)/libzut.a $(OUT_DIR)/libzjb.a $(OUT_DIR)/libzds.a $(OUT_DIR)/libzusf.a $(OUT_DIR)/libztso.a
-	@echo 'Building zoweax'
+	@echo 'Building zoweax (z/OS target level: $(ZosTarget))'
 	$(CXX) $(CPP_BND_FLAGS_AUTH) -o $@ $^
 	extattr +ap $@
 
@@ -396,6 +396,19 @@ $(OUT_DIR)/zowex.o: zowex.cpp
 #
 # TODO(Kelosky): makefile for chdsect (must have ADATA in data set)
 #
+
+#
+# Runtime compatibility guard
+#
+# Verifies that every external symbol zowex/zoweax import is available on the minimum supported
+# z/OS release, so a CEE3561S load failure surfaces here and not on a customer system. Kept out of
+# `all` so incremental builds and `npm run z:watch` stay fast. See compat/README.md.
+#
+check-compat: zowex zoweax
+	sh tools/check_runtime_symbols.sh
+
+check-compat-update: zowex zoweax
+	sh tools/check_runtime_symbols.sh --update
 
 #
 # Misc targets

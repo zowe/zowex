@@ -14,13 +14,40 @@ METALC_CC_FLAGS=_CC_ACCEPTABLE_RC=0 _C89_ACCEPTABLE_RC=0 _CXX_ACCEPTABLE_RC=0
 CC=$(METALC_CC_FLAGS) xlc
 ASM=as
 
-CPP_BND_BASE_FLAGS=-Wl,-bMAP $(LDFLAGS)
-CPP_BND_BASE_FLAGS_AUTH=-Wl,-bMAP -Wl,-bAC=1 $(LDFLAGS)
-CPP_BND_DEBUG_FLAGS=-Wl,-bMAP -Wl,-bLIST $(LDFLAGS)
-CPP_BND_DEBUG_FLAGS_AUTH=-Wl,-bMAP -Wl,-bLIST -Wl,-bAC=1 $(LDFLAGS)
+#
+# Minimum supported z/OS level.
+#
+# `-mzos-target` pins the Language Environment / system-header API level the compiler assumes, so a
+# binary built on a newer LPAR still loads on the oldest supported z/OS release. It does NOT change
+# which libc++ runtime exports are required: those come from the Open XL compiler level and from
+# which C++ library facilities the code uses. See doc/troubleshooting.md and compat/README.md.
+#
+# The default below applies unless overridden on the command line (`make -DZosTarget=zosv2r4`) or
+# via an exported `ZosTarget` environment variable (e.g. from `preBuildCmd` in config.yaml) -- a
+# command-line/environment definition takes precedence over this plain assignment, same as
+# $(BuildType) elsewhere in this file:
+#   zosv2r5  minimum supported release (default)
+#   zosv2r4  oldest level Open XL 2.x accepts
+#   current  no pinning; assume the build system's level
+#   none     omit the option entirely, for compilers that do not support it
+#
+ZosTarget=zosv2r5
 
-DLL_BND_BASE_FLAGS=-shared -Wl,-bMAP $(LDFLAGS)
-DLL_BND_DEBUG_FLAGS=-shared -Wl,-bMAP -Wl,-bLIST $(LDFLAGS)
+.IF $(ZosTarget) == none
+TARGET_FLAGS=
+.ELSIF $(ZosTarget) == current
+TARGET_FLAGS=
+.ELSE
+TARGET_FLAGS=-mzos-target=$(ZosTarget)
+.END
+
+CPP_BND_BASE_FLAGS=-Wl,-bMAP $(TARGET_FLAGS) $(LDFLAGS)
+CPP_BND_BASE_FLAGS_AUTH=-Wl,-bMAP -Wl,-bAC=1 $(TARGET_FLAGS) $(LDFLAGS)
+CPP_BND_DEBUG_FLAGS=-Wl,-bMAP -Wl,-bLIST $(TARGET_FLAGS) $(LDFLAGS)
+CPP_BND_DEBUG_FLAGS_AUTH=-Wl,-bMAP -Wl,-bLIST -Wl,-bAC=1 $(TARGET_FLAGS) $(LDFLAGS)
+
+DLL_BND_BASE_FLAGS=-shared -Wl,-bMAP $(TARGET_FLAGS) $(LDFLAGS)
+DLL_BND_DEBUG_FLAGS=-shared -Wl,-bMAP -Wl,-bLIST $(TARGET_FLAGS) $(LDFLAGS)
 
 #
 # Metal C compilation options
@@ -61,7 +88,7 @@ ASM_FLAGS=-mRENT
 # Compilation flags
 #
 C_FLAGS_BASE=-fvisibility=default -c
-CPP_FLAGS_BASE=-fvisibility=default -c -std=gnu++17 -fno-aligned-allocation -D_EXT -D_OPEN_SYS_FILE_EXT=1 -MD
+CPP_FLAGS_BASE=$(TARGET_FLAGS) -fvisibility=default -c -std=gnu++17 -fno-aligned-allocation -D_EXT -D_OPEN_SYS_FILE_EXT=1 -MD
 SWIG_FLAGS_BASE=-DSWIG $(CPP_FLAGS_BASE)
 
 #

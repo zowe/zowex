@@ -4,6 +4,11 @@ All notable changes to the Client code for "@zowe/zowex-for-zowe-sdk" are docume
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## Recent Changes
+
+- Added recognition of Language Environment load failures. `CEE3561S` and `CEE3501S` now produce an actionable error naming the required z/OS release and Language Environment APARs, with `errorCode: "ELERUNTIME"`, instead of a generic "Error starting Zowe server". Startup output is now accumulated before it is classified, so a diagnostic split across reads is still recognized. [#871](https://github.com/zowe/zowex/issues/871)
+- Added a verification step to `installServer()` that runs the installed server binary and reports whether the remote system can load it, so a runtime mismatch surfaces during installation rather than on the next operation. The target system level from `uname -srv` is included in the error details. [#871](https://github.com/zowe/zowex/issues/871)
+
 ## `0.7.0`
 
 - **Breaking:** Updated the `checkIfOutdated()` utility to compare version numbers with semantic versioning rather than comparing checksums of the `zowex` program. Its parameter is changed to accept the version number of `zowex` on the remote system rather than checksums, and it is no longer an `async` method. [#1073](https://github.com/zowe/zowex/pull/1073/)

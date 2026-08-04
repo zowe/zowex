@@ -14,7 +14,7 @@
 
 #include <string>
 #include <vector>
-#include <unordered_map>
+#include <map>
 #include <set>
 #include <functional>
 #include <stdexcept>
@@ -94,6 +94,18 @@ template <typename T>
 struct Serializable;
 template <typename T>
 struct Deserializable;
+
+// Key/value representation for a JSON object.
+//
+// Ordered (std::map), not hashed: std::hash<std::string> resolves to the out-of-line libc++ helper
+// std::__1_e::__hash_memory, which is not exported by CRTEQCXE on z/OS systems below the required
+// Language Environment maintenance level and fails with CEE3561S at load time. See zowex#871 and
+// doc/troubleshooting.md. Do not change this back to std::unordered_map without re-checking the
+// imported symbol report produced by `make check-compat`.
+//
+// Deliberately not named `Object`: that name is already an enumerator of Value::Type and would
+// shadow this alias inside every member of Value.
+using ObjectMap = std::map<std::string, Value>;
 
 // Attributes namespace with RenameAll implementation
 namespace attributes
@@ -322,7 +334,7 @@ public:
   static Value create_object()
   {
     Value result{};
-    result.data_ = std::unordered_map<std::string, Value>();
+    result.data_ = ObjectMap();
     return result;
   }
 
@@ -372,13 +384,13 @@ public:
 private:
   // Variant type for JSON values
   using ValueVariant = std::variant<
-      std::monostate,                        // Null
-      bool,                                  // Bool
-      long long,                             // Integer
-      double,                                // Float
-      std::string,                           // String
-      std::vector<Value>,                    // Array
-      std::unordered_map<std::string, Value> // Object
+      std::monostate,     // Null
+      bool,               // Bool
+      long long,          // Integer
+      double,             // Float
+      std::string,        // String
+      std::vector<Value>, // Array
+      ObjectMap           // Object
       >;
 
   ValueVariant data_;
@@ -404,9 +416,9 @@ private:
   {
     return std::get<std::vector<Value>>(data_);
   }
-  inline std::unordered_map<std::string, Value> &get_object()
+  inline ObjectMap &get_object()
   {
-    return std::get<std::unordered_map<std::string, Value>>(data_);
+    return std::get<ObjectMap>(data_);
   }
 
   inline const bool &get_bool() const
@@ -429,9 +441,9 @@ private:
   {
     return std::get<std::vector<Value>>(data_);
   }
-  inline const std::unordered_map<std::string, Value> &get_object() const
+  inline const ObjectMap &get_object() const
   {
-    return std::get<std::unordered_map<std::string, Value>>(data_);
+    return std::get<ObjectMap>(data_);
   }
 
 public:
@@ -641,7 +653,7 @@ public:
     return get_array();
   }
 
-  const std::unordered_map<std::string, Value> &as_object() const
+  const ObjectMap &as_object() const
   {
     if (!is_object())
       throw Error::invalid_type("object", type_name());
@@ -674,7 +686,7 @@ public:
   }
   inline bool is_object() const
   {
-    return std::holds_alternative<std::unordered_map<std::string, Value>>(data_);
+    return std::holds_alternative<ObjectMap>(data_);
   }
 
   // Object access by key
@@ -683,7 +695,7 @@ public:
     if (is_null())
     {
       // Convert null to empty object on first access
-      data_ = std::unordered_map<std::string, Value>();
+      data_ = ObjectMap();
     }
 
     if (!is_object())
@@ -2316,7 +2328,7 @@ void serialize_field(const T &obj, Value &result, const Field<T, FieldType> &fie
 }
 
 template <typename T, typename FieldType>
-bool deserialize_field(T &obj, const std::unordered_map<std::string, Value> &object, const Field<T, FieldType> &field)
+bool deserialize_field(T &obj, const ObjectMap &object, const Field<T, FieldType> &field)
 {
   if (field.skip_deserializing)
   {
@@ -2394,13 +2406,13 @@ void serialize_fields(const T &obj, Value &result, Fields... fields)
 }
 
 template <typename T>
-bool deserialize_fields_impl(T &obj, const std::unordered_map<std::string, Value> &object)
+bool deserialize_fields_impl(T &obj, const ObjectMap &object)
 {
   return true;
 }
 
 template <typename T, typename Field, typename... Fields>
-bool deserialize_fields_impl(T &obj, const std::unordered_map<std::string, Value> &object, Field field, Fields... fields)
+bool deserialize_fields_impl(T &obj, const ObjectMap &object, Field field, Fields... fields)
 {
   if (!deserialize_field(obj, object, field))
   {
@@ -2410,7 +2422,7 @@ bool deserialize_fields_impl(T &obj, const std::unordered_map<std::string, Value
 }
 
 template <typename T, typename... Fields>
-bool deserialize_fields(T &obj, const std::unordered_map<std::string, Value> &object, Fields... fields)
+bool deserialize_fields(T &obj, const ObjectMap &object, Fields... fields)
 {
   return deserialize_fields_impl(obj, object, fields...);
 }
@@ -2460,7 +2472,7 @@ bool has_flattened_field(Fields... fields)
 }
 
 template <typename T, typename... Fields>
-zstd::expected<bool, Error> validate_no_unknown_fields(const std::unordered_map<std::string, Value> &object, Fields... fields)
+zstd::expected<bool, Error> validate_no_unknown_fields(const ObjectMap &object, Fields... fields)
 {
   // Check if any field is flattened - if so, we cannot reliably validate unknown fields
   if (has_flattened_field(fields...))

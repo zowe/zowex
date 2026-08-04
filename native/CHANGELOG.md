@@ -6,6 +6,9 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- **Breaking:** `c`: Changed the plug-in SDK types `ast::ObjMap` and `plugin::ArgumentMap` from `std::unordered_map` to `std::map`, and added the `ZOWEX_PLUGIN_ABI_VERSION` constant with a matching load-time check. Plug-ins must now be rebuilt against the current `extend/plugin.hpp` and must expand `ZOWEX_PLUGIN_DECLARE_ABI()` alongside `register_plugin()`; a plug-in built against an earlier header is rejected at load time with a diagnostic instead of being loaded with mismatched type layouts. [#871](https://github.com/zowe/zowex/issues/871)
+- `c`: Replaced the string-keyed `std::unordered_map`/`std::unordered_set` containers in `zjson.hpp` and the JSON-RPC server with the ordered `std::map`/`std::set`, removing the binary's dependency on the out-of-line libc++ symbol `std::__1_e::__hash_memory`. That symbol is absent from `CRTEQCXE` on z/OS systems below the required Language Environment maintenance level, where it caused `CEE3561S` at load time. JSON object members are now emitted in alphabetical key order rather than hash order; member order was never part of the API contract. [#871](https://github.com/zowe/zowex/issues/871)
+- `c`: Added a declared minimum supported z/OS level to the build. `native/c/toolchain.mk` now passes `-mzos-target=zosv2r5` (overridable with `-DZosTarget=`, the `ZosTarget` environment variable, or `zosTarget` in `config.yaml`), and `make check-compat` verifies that every LE/libc++ symbol the binary imports is available on that release. [#871](https://github.com/zowe/zowex/issues/871)
 - `c`: Fixed an issue with `zowex ds list-members` when reading PDS directory blocks. [#1070] (https://github.com/zowe/zowex/pull/1070)
 
 ## `0.7.0`
