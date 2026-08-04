@@ -6,7 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
-- Added RACF certificate and key ring management to the `zssh system` command group over SSH: `zssh system keyring create|delete|list|list-rings|count` and `zssh system cert import|export|delete|show|connect|set-default|trust|rename|refresh`. [#XXXX](https://github.com/zowe/zowex/pull/XXXX)
+- Added RACF certificate and key ring management to the `zssh system` command group over SSH: `zssh system keyring create|delete|list|list-rings|count` and `zssh system cert import|export|delete|show|connect|set-default|trust|rename|refresh`. [#1079](https://github.com/zowe/zowex/pull/1079)
 
 ## `0.6.1`
 
