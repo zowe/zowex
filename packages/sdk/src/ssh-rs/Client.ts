@@ -88,7 +88,7 @@ export class Client extends EventEmitter {
                 return true;
             },
             {
-                connectionTimeoutSeconds: config.readyTimeout != null ? config.readyTimeout / 1000 : undefined,
+                connectionTimeoutSeconds: (config.readyTimeout ?? Client.DEFAULT_CONNECT_TIMEOUT_MS) / 1000,
                 keepaliveIntervalSeconds:
                     config.keepaliveInterval != null ? config.keepaliveInterval / 1000 : undefined,
                 keepaliveCountMax: config.keepaliveCountMax,
