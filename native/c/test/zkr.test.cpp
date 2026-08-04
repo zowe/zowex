@@ -22,6 +22,7 @@
 
 #include <cctype>
 #include <cstdlib>
+#include <fstream>
 #include <string>
 #include <vector>
 #include <unistd.h>
@@ -485,6 +486,7 @@ void zkr_tests()
               // still tears down the scratch rings and any stray DB certificate.
               static std::vector<std::string> cleanup_rings;
               static std::vector<std::string> cleanup_labels;
+              static std::string exported_p12;
               afterAll(
                   [&]() -> void
                   {
@@ -499,11 +501,16 @@ void zkr_tests()
                       unlink(generated_p12.c_str());
                       generated_p12.clear();
                     }
+                    if (!exported_p12.empty())
+                    {
+                      unlink(exported_p12.c_str());
+                      exported_p12.clear();
+                    }
                   });
 
               // The full sweep issues several DIGTCERT refreshes (import/delete),
               // which are slow; the 10s default is not enough.
-              TEST_OPTIONS cert_opts = {false, 60};
+              TEST_OPTIONS cert_opts = {false, 120};
 
               itif(
                   "imports, shows, exports, alters, connects, and deletes a certificate",
@@ -613,6 +620,117 @@ void zkr_tests()
                     cleanup_labels.push_back(real_label);
                     ExpectWithContext(zkr_del_cert(&z, owner, "*", real_label, /*skip_refresh*/ false), z.diag.e_msg)
                         .ToBe(0);
+                  },
+                  cert_opts, run_cert);
+
+              // Uncovered paths from doc/certificates-test-plan.md item 3:
+              // p12 export (gsk_export_key), re-import already-exists warning,
+              // ring-scoped disconnect (4/4/12 auto-refresh), connect from the
+              // virtual ring ("--from-database"), count, standalone refresh.
+              itif(
+                  "round-trips a p12 export, warns on re-import, disconnects one ring, "
+                  "connects from the database, counts, and refreshes",
+                  [&]() -> void
+                  {
+                    const std::string ring1 = "ZKRUT.RT1." + zkr_unique();
+                    const std::string ring2 = "ZKRUT.RT2." + zkr_unique();
+                    const std::string label = "ZKRUTRT" + zkr_unique();
+                    cleanup_rings.push_back(ring1);
+                    cleanup_rings.push_back(ring2);
+                    cleanup_labels.push_back(label);
+
+                    ZKR z{};
+                    ExpectWithContext(zkr_new_ring(&z, owner, ring1), z.diag.e_msg).ToBe(0);
+                    ExpectWithContext(zkr_new_ring(&z, owner, ring2), z.diag.e_msg).ToBe(0);
+
+                    ZKRImportOptions imp;
+                    imp.owner = owner;
+                    imp.ring = ring1;
+                    imp.label = label;
+                    imp.usage = "PERSONAL";
+                    imp.p12_path = p12;
+                    imp.password = p12pass;
+                    ExpectWithContext(zkr_import_cert(&z, imp), z.diag.e_msg).ToBe(0);
+
+                    std::vector<ZKRCertInfo> certs;
+                    ExpectWithContext(zkr_list_ring(&z, owner, ring1, certs), z.diag.e_msg).ToBe(0);
+                    Expect(certs.size()).ToBeGreaterThanOrEqualTo(static_cast<size_t>(1));
+                    const std::string real_label = certs[0].label;
+                    cleanup_labels.push_back(real_label);
+
+                    // keyring count through the CLI: a real ring (GetRingInfo sum)
+                    // and the virtual ring (DataGetFirst/GetNext enumeration).
+                    std::string out;
+                    int crc = execute_command_with_output(
+                        zowex_command + " system keyring count " + owner + " " + ring1, out);
+                    ExpectWithContext(crc, out).ToBe(0);
+                    Expect(out).ToContain("1 certificate(s)");
+                    crc = execute_command_with_output(
+                        zowex_command + " system keyring count " + owner + " '*'", out);
+                    ExpectWithContext(crc, out).ToBe(0);
+
+                    // p12 export with a passphrase (the gsk_export_key path; PEM
+                    // export is covered by the lifecycle test above).
+                    ZKRExportOptions ex;
+                    ex.owner = owner;
+                    ex.ring = ring1;
+                    ex.label = real_label;
+                    ex.format = "p12";
+                    ex.password = "ZKRUTEXP" + zkr_unique();
+                    std::string p12data;
+                    ExpectWithContext(zkr_export_cert(&z, ex, p12data), z.diag.e_msg).ToBe(0);
+                    Expect(p12data.empty()).ToBe(false);
+
+                    // Re-import the exported p12 under a NEW label onto ring2. RACF
+                    // already holds this certificate, so the import must succeed
+                    // with the already-exists warning (SA23-2293 Table 79, reason
+                    // 8/12/16: supplied label ignored, existing record connected).
+                    exported_p12 = "/tmp/zkrut-rt-" + zkr_unique() + ".p12";
+                    {
+                      std::ofstream f(exported_p12.c_str(), std::ios::binary);
+                      f.write(p12data.data(), static_cast<std::streamsize>(p12data.size()));
+                    }
+                    ZKRImportOptions imp2;
+                    imp2.owner = owner;
+                    imp2.ring = ring2;
+                    imp2.label = "ZKRUTN" + zkr_unique();
+                    imp2.usage = "PERSONAL";
+                    imp2.p12_path = exported_p12;
+                    imp2.password = ex.password;
+                    ZKR z2{};
+                    ExpectWithContext(zkr_import_cert(&z2, imp2), z2.diag.e_msg).ToBe(0);
+                    Expect(z2.diag.warning.empty()).ToBe(false);
+
+                    // Ring-scoped delete: disconnect from ring1 only (exercises the
+                    // 4/4/12 auto-refresh); the cert must remain connected to ring2.
+                    ExpectWithContext(zkr_del_cert(&z, owner, ring1, real_label, false), z.diag.e_msg).ToBe(0);
+                    certs.clear();
+                    ExpectWithContext(zkr_list_ring(&z, owner, ring1, certs), z.diag.e_msg).ToBe(0);
+                    Expect(certs.size()).ToBe(static_cast<size_t>(0));
+                    certs.clear();
+                    ExpectWithContext(zkr_list_ring(&z, owner, ring2, certs), z.diag.e_msg).ToBe(0);
+                    Expect(certs.size()).ToBeGreaterThanOrEqualTo(static_cast<size_t>(1));
+
+                    // Re-connect to ring1 sourcing the bytes from the virtual ring
+                    // -- the service path behind `cert connect --from-database`.
+                    // This settles empirically that DataGetFirst on "*" can feed
+                    // DataPut (test plan item 3.4).
+                    ZKRConnectOptions conn;
+                    conn.owner = owner;
+                    conn.ring = ring1;
+                    conn.from_ring = "*";
+                    conn.label = real_label;
+                    ExpectWithContext(zkr_connect_cert(&z, conn), z.diag.e_msg).ToBe(0);
+                    certs.clear();
+                    ExpectWithContext(zkr_list_ring(&z, owner, ring1, certs), z.diag.e_msg).ToBe(0);
+                    Expect(certs.size()).ToBeGreaterThanOrEqualTo(static_cast<size_t>(1));
+
+                    // Standalone DIGTCERT refresh.
+                    ExpectWithContext(zkr_refresh(&z), z.diag.e_msg).ToBe(0);
+
+                    // Remove the certificate from the DB and every ring (also
+                    // covered by afterAll if an earlier expectation aborts).
+                    ExpectWithContext(zkr_del_cert(&z, owner, "*", real_label, false), z.diag.e_msg).ToBe(0);
                   },
                   cert_opts, run_cert);
             });
