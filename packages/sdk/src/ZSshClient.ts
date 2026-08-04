@@ -224,13 +224,14 @@ export class ZSshClient extends RpcClientApi implements Disposable {
     }
 
     /**
-     * Marks the client as closed and rejects pending requests that were not harvested
-     * for replay, so they fail fast instead of waiting for the response timeout.
+     * Marks the client as closed and rejects pending requests that the `onClose`
+     * handler didn't claim via {@link collectAllRequests}, so they fail fast
+     * instead of waiting for the response timeout.
      *
      * Idempotent: the transport and the server channel can both report the same
      * disconnect, and `dispose` closes the channel itself.
      * @param reason - Message used to reject any requests still pending.
-     * @param onClose - Caller hook given a chance to harvest requests for replay first.
+     * @param onClose - Caller hook given a chance to claim pending requests (e.g. to retry them elsewhere) before the rest are rejected.
      */
     private handleDisconnect(reason: string, onClose?: ClientOptions["onClose"]): void {
         if (this.mDisconnectHandled) {
@@ -239,8 +240,8 @@ export class ZSshClient extends RpcClientApi implements Disposable {
         this.mDisconnectHandled = true;
         this.mClosed = true;
         Logger.getAppLogger().debug(reason);
-        // Let the onClose handler harvest pending requests for replay before
-        // rejecting any that remain, so they fail fast instead of timing out
+        // Give onClose a chance to claim pending requests via collectAllRequests()
+        // before rejecting whatever's left, so those fail fast instead of timing out
         Promise.resolve(onClose?.())
             .catch((err) => this.mErrHandler(err))
             .finally(() => this.rejectPendingRequests(reason));
