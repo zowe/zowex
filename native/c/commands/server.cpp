@@ -101,8 +101,10 @@ void ZServer::request_shutdown()
           if (worker_pool) {
               worker_pool->shutdown();
           }
-          // The signal handler already closed stdin; closing again could clobber a
-          // descriptor that has since been reused for fd 0.
+          // If signal_shutdown_flag is nonzero, the signal handler already closed
+          // stdin; closing it again here could clobber a descriptor that has since
+          // been reused for fd 0. Only close it here when shutdown came from a
+          // non-signal path.
           if (signal_shutdown_flag() == 0) {
               close(STDIN_FILENO);
           } });
