@@ -16,8 +16,9 @@
 // SKIPPED, not failed, so the suite passes across a variety of user contexts.
 // The command-validation and diagnostic tests need no special authority.
 //
-// R_datalib background and the SAF return-code conventions used here are in
-// doc/certificates-code-walkthrough.md; keep assertions in sync with it.
+// R_datalib background and the SAF return-code conventions used here are
+// documented inline in zkr.cpp/zkrtype.h (with references to z/OS Security
+// Server RACF Callable Services, SA23-2293); keep assertions in sync with them.
 
 #include <cctype>
 #include <cstdlib>
@@ -376,9 +377,10 @@ void zkr_tests()
         // Certificate lifecycle. Requires create authority AND a PKCS#12 fixture
         // supplied out-of-band (ZKR_TEST_P12 / ZKR_TEST_P12_PASS) so no key
         // material is committed to the repo. Skipped when either is absent.
-        // Deep PEM/PKCS#12 round-trip parity is covered by the JS integration
-        // tests (testCertParity.js / testCertRpc.js); this asserts the new
-        // service entry points wire up end-to-end.
+        // This asserts the new service entry points wire up end-to-end; deep
+        // PEM/PKCS#12 round-trip parity (byte-for-byte against keyring-util
+        // output) is NOT covered by automated tests yet and must be verified
+        // manually when the export/import paths change.
         // ---------------------------------------------------------------------
         describe(
             "certificate lifecycle (requires authority + a PKCS#12 fixture)",
