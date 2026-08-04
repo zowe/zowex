@@ -69,6 +69,69 @@ ZKRCertInfo zkr_mk_cert(const std::string &label, const std::string &usage)
   return c;
 }
 
+// Read an env var that may arrive either under its own name or with the ZNP_
+// prefix (buildTools.ts forwards local ZNP_* variables to the remote runner
+// verbatim, prefix included).
+std::string zkr_env(const char *name, const char *znp_name)
+{
+  const char *val = std::getenv(name);
+  if (val == nullptr)
+    val = std::getenv(znp_name);
+  return val != nullptr ? val : "";
+}
+
+// Self-provision a throwaway PKCS#12 fixture via RACDCERT (see
+// doc/certificates-test-plan.md, item 2): GENCERT a scratch certificate,
+// EXPORT it as PKCS12DER to a temporary dataset, DELETE the RACF record (so a
+// later import sees a brand-new certificate), then binary-copy the dataset to
+// a USS temp file. Returns the USS path, or "" with `note` set when any step
+// fails (typically missing IRR.DIGTCERT.GENCERT/EXPORT authority) -- callers
+// then skip, exactly as with a missing ZKR_TEST_P12.
+std::string zkr_generate_p12_fixture(const std::string &owner, const std::string &password,
+                                     std::string &note)
+{
+  // Dataset-qualifier-safe uniqueness (max 8 chars, must start alphabetic).
+  const std::string uniq = "Z" + get_random_string(6);
+  const std::string label = "ZKRUTFIX" + uniq;
+  const std::string dsn = owner + ".ZKRUT." + uniq + ".P12";
+  const std::string uss = "/tmp/zkrut-" + uniq + ".p12";
+
+  std::string out;
+  int rc = execute_command_with_output(
+      "tsocmd \"RACDCERT GENCERT SUBJECTSDN(CN('ZKRUT FIXTURE')) WITHLABEL('" + label +
+          "') SIZE(2048)\"",
+      out);
+  if (rc != 0)
+  {
+    note = "RACDCERT GENCERT failed: " + out;
+    return "";
+  }
+
+  rc = execute_command_with_output(
+      "tsocmd \"RACDCERT EXPORT (LABEL('" + label + "')) DSN('" + dsn +
+          "') FORMAT(PKCS12DER) PASSWORD('" + password + "')\"",
+      out);
+
+  // The generated record is no longer needed regardless of the export result.
+  std::string ignored;
+  execute_command_with_output("tsocmd \"RACDCERT DELETE (LABEL('" + label + "'))\"", ignored);
+
+  if (rc != 0)
+  {
+    note = "RACDCERT EXPORT failed: " + out;
+    return "";
+  }
+
+  rc = execute_command_with_output("cp -B \"//'" + dsn + "'\" " + uss, out);
+  execute_command_with_output("tsocmd \"DELETE '" + dsn + "'\"", ignored);
+  if (rc != 0)
+  {
+    note = "binary copy of the exported dataset failed: " + out;
+    return "";
+  }
+  return uss;
+}
+
 } // namespace
 
 void zkr_tests()
@@ -374,9 +437,12 @@ void zkr_tests()
             });
 
         // ---------------------------------------------------------------------
-        // Certificate lifecycle. Requires create authority AND a PKCS#12 fixture
-        // supplied out-of-band (ZKR_TEST_P12 / ZKR_TEST_P12_PASS) so no key
-        // material is committed to the repo. Skipped when either is absent.
+        // Certificate lifecycle. Requires create authority AND a PKCS#12
+        // fixture. The fixture comes from ZKR_TEST_P12 / ZKR_TEST_P12_PASS
+        // when set (no key material is committed to the repo); otherwise the
+        // suite self-provisions a throwaway one via RACDCERT (GENCERT ->
+        // EXPORT -> DELETE) and removes it afterwards. Skipped when neither
+        // path yields a fixture (e.g. no GENCERT/EXPORT authority).
         // This asserts the new service entry points wire up end-to-end; deep
         // PEM/PKCS#12 round-trip parity (byte-for-byte against keyring-util
         // output) is NOT covered by automated tests yet and must be verified
@@ -386,11 +452,33 @@ void zkr_tests()
             "certificate lifecycle (requires authority + a PKCS#12 fixture)",
             [&]() -> void
             {
-              const char *p12env = std::getenv("ZKR_TEST_P12");
-              const std::string p12 = p12env != nullptr ? p12env : "";
-              const char *passenv = std::getenv("ZKR_TEST_P12_PASS");
-              const std::string p12pass = passenv != nullptr ? passenv : "password";
-              const bool have_fixture = !p12.empty() && access(p12.c_str(), R_OK) == 0;
+              std::string p12 = zkr_env("ZKR_TEST_P12", "ZNP_ZKR_TEST_P12");
+              std::string p12pass = zkr_env("ZKR_TEST_P12_PASS", "ZNP_ZKR_TEST_P12_PASS");
+              if (p12pass.empty())
+                p12pass = "password";
+              bool have_fixture = !p12.empty() && access(p12.c_str(), R_OK) == 0;
+
+              // No curated fixture: self-provision one when the user has the
+              // authority for it (static so the afterAll hook, which runs after
+              // this lambda's locals are gone, can still remove the USS file).
+              static std::string generated_p12;
+              if (!have_fixture && can_mutate)
+              {
+                std::string note;
+                const std::string gen_pass = "ZKRUT" + get_random_string(8);
+                generated_p12 = zkr_generate_p12_fixture(owner, gen_pass, note);
+                if (!generated_p12.empty())
+                {
+                  p12 = generated_p12;
+                  p12pass = gen_pass;
+                  have_fixture = true;
+                  TestLog("PKCS#12 fixture: self-provisioned via RACDCERT at " + generated_p12);
+                }
+                else
+                {
+                  TestLog("PKCS#12 fixture: could not self-provision (" + note + "); lifecycle tests will skip");
+                }
+              }
               const bool run_cert = can_mutate && have_fixture;
 
               // Cleanup registers: populated up front so a mid-flow failure/timeout
@@ -406,6 +494,11 @@ void zkr_tests()
                       zkr_try_del_ring(owner, r);
                     cleanup_rings.clear();
                     cleanup_labels.clear();
+                    if (!generated_p12.empty())
+                    {
+                      unlink(generated_p12.c_str());
+                      generated_p12.clear();
+                    }
                   });
 
               // The full sweep issues several DIGTCERT refreshes (import/delete),
