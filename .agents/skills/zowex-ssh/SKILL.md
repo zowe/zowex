@@ -131,6 +131,8 @@ $zx stop
 | `zx console` | `'<cmd>' [--cn <n>] [--timeout <s>] [--no-wait]` (CLI; needs APF — fails `Not authorized - 4` from a plain USS dir) |
 | `zx rpc` | `<method> ['<params>']` — raw escape hatch |
 
+There is no `zx` group yet for the RACF certificate / key ring commands (`zowex system cert ...` / `zowex system keyring ...`, servers newer than v0.7.0) — drive them with `zx rpc <method>` (see §3's Certificates table) or CLI passthrough: `ssh "$ZX_HOST" "$ZX_BIN system keyring list-rings $USER"`.
+
 **Output:** grouped commands pretty-print by default (lists → one per line, b64 → decoded, status → `key=value`). Add `-j`/`--json` anywhere (before or after the group) for raw JSON: `zx ds list "SYS1.*" -j` or `zx -j ds list "SYS1.*"`.
 
 `zx info` shows config + whether a session is live. `zx reset` is a harder stop: kills the session, closes the ControlMaster socket, and removes the entire `$ZX_STATE` directory — useful when the state gets corrupted or you want a clean slate.
@@ -242,6 +244,34 @@ is currently exported.
 | method | params |
 |---|---|
 | `tsoCommand` | `{"commandText":"<tso cmd>"}` — `result.data` is plain text |
+
+### Certificates / key rings (RACF)
+
+**Server version gate:** these methods exist only in servers **newer than v0.7.0** (zowex PR #1079). On older servers they return `-32601 Unrecognized command`. The caller's SSH user needs the corresponding RACF `IRR.DIGTCERT.*` / `RDATALIB` authority — without it, calls fail with a SAF diagnostic (see below), not an auth prompt.
+
+CLI equivalents live under `zowex system cert ...` and `zowex system keyring ...`.
+
+| method | params |
+|---|---|
+| `createKeyring` | `{"owner":"USER01","keyring":"RING02"}` |
+| `deleteKeyring` | `{"owner":"USER01","keyring":"RING02"}` |
+| `listRings` | `{"owner":"USER01"}` · optional `"keyring"` to narrow — rings + connected certs |
+| `countRing` | `{"owner":"USER01","keyring":"RING02"}` — `"*"` counts all the owner's certs |
+| `listCertificates` | `{"owner":"USER01","keyring":"RING02"}` · optional `"label"`, `"usage"`, `"labelOnly"`, `"ownerOnly"`, `"maxEntries"` (default 10, `0` = all) — `result.moreAvailable` flags truncation |
+| `showCertificate` | `{"owner":"USER01","keyring":"RING02","label":"CERT03"}` — adds serial, validity dates, key size |
+| `exportCertificate` | `{"owner":"USER01","keyring":"RING02","label":"CERT03"}` · optional `"format"` (`pem` default / `p12`), `"file"` (server-side path; required for p12), `"password"` (p12) — `result.data` is **b64** |
+| `importCertificate` | `{"owner":"USER01","keyring":"RING02","label":"CERT03","usage":"PERSONAL","file":"/u/user01/c.p12","password":"..."}` · optional `"skipRefresh"` — `file` is a **server-side** PKCS#12 path; `usage` is `PERSONAL` or `CERTAUTH` |
+| `deleteCertificate` | `{"owner":"USER01","keyring":"RING02","label":"CERT03"}` · or `"database":true` (omit `keyring`) to delete from the RACF DB · optional `"skipRefresh"` |
+| `connectCertificate` | `{"owner":"USER01","keyring":"RING02","label":"CERT03","fromRing":"RING01"}` · or `"fromDatabase":true` · optional `"usage"`, `"default"` |
+| `setDefaultCertificate` | `{"owner":"USER01","keyring":"RING02","label":"CERT03"}` |
+| `trustCertificate` | `{"owner":"USER01","label":"CERT03","status":"NOTRUST"}` — `TRUST`/`HIGHTRUST`/`NOTRUST`; no keyring (operates on the DB record) |
+| `renameCertificate` | `{"owner":"USER01","label":"OLD","newLabel":"NEW"}` — no keyring (DB record) |
+| `refreshDigtcert` | `{}` — refresh the DIGTCERT class (import/delete usually auto-refresh unless `skipRefresh`) |
+
+Conventions shared by these methods:
+- `"*"` as `keyring` is the RACF **virtual key ring** (all of the owner's certificates) — valid for list/count/show/export reads; rejected as a target for create/delete-ring/import/connect (use the `database`/`fromDatabase` booleans instead).
+- Failures return `result.success:false` with `message`, `service`, and a structured `safReturns` object (`functionCode`, `safReturnCode`, `racfReturnCode`, `racfReasonCode`); GSK (System SSL) failures add `gskReturnCode`. Non-fatal SAF warnings (rc 4) succeed with a `warning` string.
+- `owner`, `keyring`, and `label` are case-sensitive (userids normally uppercase).
 
 `unixCommand` / `tsoCommand` are the escape hatches for anything not covered. There is **no JSON-RPC console method** (the `zowex console` CLI subcommand exists but isn't exposed over RPC) — use `unixCommand` with a host-side `opercmd`-equivalent if you need one, or fall back to `ssh "$ZX_HOST" "$ZX_BIN console issue ..."`.
 
