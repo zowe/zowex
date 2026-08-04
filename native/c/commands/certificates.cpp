@@ -129,25 +129,32 @@ int handle_cert_list(InvocationContext &context)
     return RTNCD_FAILURE;
   }
 
+  // The filters follow RACDCERT LABEL semantics (exact, case-sensitive, no
+  // wildcards), so a match may sit anywhere in the ring. With a filter active,
+  // enumerate the whole ring and apply --max-entries to the MATCHING rows;
+  // without one, cap the enumeration itself (cheaper on enormous rings).
+  const bool has_filter = !label_filter.empty() || !usage_filter.empty();
+
   ZKR zkr{};
   std::vector<ZKRCertInfo> certs;
   bool more_available = false;
-  const int rc = zkr_list_ring(&zkr, owner, ring, certs, static_cast<size_t>(max_entries), &more_available);
+  const int rc = zkr_list_ring(&zkr, owner, ring, certs,
+                               has_filter ? 0 : static_cast<size_t>(max_entries), &more_available);
   if (rc != RTNCD_SUCCESS)
   {
     report_error(context, zkr);
     return RTNCD_FAILURE;
   }
 
-  const auto items = arr();
-  size_t shown = 0;
-  for (std::vector<ZKRCertInfo>::const_iterator it = certs.begin(); it != certs.end(); ++it)
-  {
-    if (!label_filter.empty() && it->label != label_filter)
-      continue;
-    if (!usage_filter.empty() && it->usage != usage_filter)
-      continue;
+  bool filter_more = false;
+  const std::vector<ZKRCertInfo> shown_certs =
+      zkr_filter_certs(certs, label_filter, usage_filter, static_cast<size_t>(max_entries), &filter_more);
+  if (has_filter)
+    more_available = filter_more;
 
+  const auto items = arr();
+  for (std::vector<ZKRCertInfo>::const_iterator it = shown_certs.begin(); it != shown_certs.end(); ++it)
+  {
     if (label_only)
     {
       context.output_stream() << it->label << std::endl;
@@ -172,19 +179,19 @@ int handle_cert_list(InvocationContext &context)
     item->set("status", str(it->status));
     item->set("default", boolean(it->is_default));
     items->push(item);
-    ++shown;
   }
 
   if (more_available)
   {
-    context.output_stream() << "Note: more certificates are available; showing the first "
+    context.output_stream() << "Note: more " << (has_filter ? "matching " : "")
+                            << "certificates are available; showing the first "
                             << max_entries << ". Use --max-entries 0 for all, or a higher limit."
                             << std::endl;
   }
 
   const auto result = obj();
   result->set("items", items);
-  result->set("returnedRows", i64(static_cast<long long>(shown)));
+  result->set("returnedRows", i64(static_cast<long long>(shown_certs.size())));
   result->set("moreAvailable", boolean(more_available));
   context.set_object(result);
   return RTNCD_SUCCESS;
@@ -699,10 +706,10 @@ void register_commands(parser::Command &parent)
   ring_list_cmd->add_positional_arg("owner", "key ring owner (userid; case-sensitive, normally uppercase)", ArgType_Single, true);
   ring_list_cmd->add_positional_arg("keyring", "key ring name (case-sensitive), or '*' for the owner's virtual key ring (all their certificates)", ArgType_Single, true);
   ring_list_cmd->add_keyword_arg("label", make_aliases("--label", "-l"), "filter by certificate label (exact, case-sensitive)", ArgType_Single, false);
-  ring_list_cmd->add_keyword_arg("usage", make_aliases("--usage", "-u"), "filter by usage (PERSONAL, CERTAUTH, OTHER)", ArgType_Single, false);
+  ring_list_cmd->add_keyword_arg("usage", make_aliases("--usage", "-u"), "filter by usage (exact, case-sensitive: PERSONAL, CERTAUTH, or OTHER)", ArgType_Single, false);
   ring_list_cmd->add_keyword_arg("label-only", make_aliases("--label-only"), "print only certificate labels", ArgType_Flag, false, ArgValue(false));
   ring_list_cmd->add_keyword_arg("owner-only", make_aliases("--owner-only"), "print only certificate owners", ArgType_Flag, false, ArgValue(false));
-  ring_list_cmd->add_keyword_arg("max-entries", make_aliases("--max-entries", "--me"), "maximum certificates to return; default 10, use 0 for all", ArgType_Single, false);
+  ring_list_cmd->add_keyword_arg("max-entries", make_aliases("--max-entries", "--me"), "maximum certificates (matching certificates, when filtering) to return; default 10, use 0 for all", ArgType_Single, false);
   ring_list_cmd->set_handler(handle_cert_list);
   ring_list_cmd->add_example("List certificates in a ring", "zowex system keyring list USER01 RING02");
   ring_list_cmd->add_example("List all certificates the user owns", "zowex system keyring list USER01 '*' --max-entries 0");

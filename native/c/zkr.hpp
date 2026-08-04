@@ -188,6 +188,22 @@ int zkr_list_ring(ZKR *zkr, const std::string &owner, const std::string &ring,
                   bool *more_available = nullptr);
 
 /**
+ * @brief Filter a certificate list the way RACDCERT treats the LABEL keyword:
+ *        exact, case-sensitive comparison, no wildcards or generics. usage is
+ *        matched the same way against the PERSONAL/CERTAUTH/OTHER strings
+ *        produced by zkr_list_ring. An empty label/usage means "no filter".
+ * @param max_entries cap on the number of MATCHING entries returned (0 = all)
+ * @param more_available if non-null, set to true when the cap cut off further
+ *        matching entries
+ * @return the matching entries, in enumeration order
+ */
+std::vector<ZKRCertInfo> zkr_filter_certs(const std::vector<ZKRCertInfo> &certs,
+                                          const std::string &label,
+                                          const std::string &usage,
+                                          size_t max_entries = 0,
+                                          bool *more_available = nullptr);
+
+/**
  * @brief Export a certificate from a key ring.
  *        format "pem" returns PEM text; format "p12" returns raw PKCS#12 bytes.
  * @param data receives the exported certificate bytes

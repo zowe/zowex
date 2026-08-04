@@ -19,6 +19,7 @@
 // R_datalib background and the SAF return-code conventions used here are in
 // doc/certificates-code-walkthrough.md; keep assertions in sync with it.
 
+#include <cctype>
 #include <cstdlib>
 #include <string>
 #include <vector>
@@ -54,6 +55,17 @@ void zkr_try_purge_cert(const std::string &owner, const std::string &label)
 {
   ZKR z{};
   zkr_del_cert(&z, owner, "*", label, /*skip_refresh*/ true);
+}
+
+// Build a synthetic list entry for the zkr_filter_certs unit tests.
+ZKRCertInfo zkr_mk_cert(const std::string &label, const std::string &usage)
+{
+  ZKRCertInfo c;
+  c.label = label;
+  c.owner = "TESTUSER";
+  c.usage = usage;
+  c.status = "TRUST";
+  return c;
 }
 
 } // namespace
@@ -146,6 +158,112 @@ void zkr_tests()
                        zowex_command + " system cert connect TESTUSER RING02 -l LBL", out);
                    Expect(rc).Not().ToBe(0);
                    Expect(out).ToContain("--from-ring");
+                 });
+            });
+
+        // ---------------------------------------------------------------------
+        // List filter semantics: `keyring list --label/--usage` follows the
+        // RACDCERT LABEL keyword -- exact, case-sensitive matches, no wildcards
+        // -- and --max-entries caps MATCHING rows, so a filtered list must scan
+        // past the page size. Pure functions over synthetic data; no RACF.
+        // ---------------------------------------------------------------------
+        describe(
+            "list filter semantics (RACDCERT LABEL parity, no authority required)",
+            [&]() -> void
+            {
+              it("finds an exact label match beyond the default page size",
+                 []() -> void
+                 {
+                   // 12 certs; the target sits at position 11 -- past the default
+                   // --max-entries page of 10 that used to truncate before filtering.
+                   std::vector<ZKRCertInfo> certs;
+                   for (int i = 0; i < 12; ++i)
+                     certs.push_back(zkr_mk_cert("CERT" + std::to_string(i), "PERSONAL"));
+
+                   bool more = true;
+                   const std::vector<ZKRCertInfo> out = zkr_filter_certs(certs, "CERT10", "", 10, &more);
+                   Expect(out.size()).ToBe(static_cast<size_t>(1));
+                   Expect(out[0].label).ToBe("CERT10");
+                   Expect(more).ToBe(false);
+                 });
+
+              it("label matching is case-sensitive",
+                 []() -> void
+                 {
+                   std::vector<ZKRCertInfo> certs;
+                   certs.push_back(zkr_mk_cert("MYCERT", "PERSONAL"));
+
+                   bool more = false;
+                   Expect(zkr_filter_certs(certs, "MyCert", "", 0, &more).size()).ToBe(static_cast<size_t>(0));
+                   Expect(zkr_filter_certs(certs, "MYCERT", "", 0, &more).size()).ToBe(static_cast<size_t>(1));
+                 });
+
+              it("'*' is not a wildcard for labels",
+                 []() -> void
+                 {
+                   std::vector<ZKRCertInfo> certs;
+                   certs.push_back(zkr_mk_cert("CERT1", "PERSONAL"));
+                   certs.push_back(zkr_mk_cert("*", "PERSONAL"));
+
+                   const std::vector<ZKRCertInfo> out = zkr_filter_certs(certs, "*", "", 0, nullptr);
+                   Expect(out.size()).ToBe(static_cast<size_t>(1));
+                   Expect(out[0].label).ToBe("*");
+                 });
+
+              it("--max-entries caps matching rows and flags more",
+                 []() -> void
+                 {
+                   // 30 certs alternating usage: 15 CERTAUTH among them.
+                   std::vector<ZKRCertInfo> certs;
+                   for (int i = 0; i < 30; ++i)
+                     certs.push_back(zkr_mk_cert("CERT" + std::to_string(i),
+                                                 (i % 2 == 0) ? "CERTAUTH" : "PERSONAL"));
+
+                   bool more = false;
+                   const std::vector<ZKRCertInfo> out = zkr_filter_certs(certs, "", "CERTAUTH", 10, &more);
+                   Expect(out.size()).ToBe(static_cast<size_t>(10));
+                   Expect(more).ToBe(true);
+                   for (size_t i = 0; i < out.size(); ++i)
+                     Expect(out[i].usage).ToBe("CERTAUTH");
+                 });
+
+              it("--max-entries 0 returns all matches",
+                 []() -> void
+                 {
+                   std::vector<ZKRCertInfo> certs;
+                   for (int i = 0; i < 30; ++i)
+                     certs.push_back(zkr_mk_cert("CERT" + std::to_string(i),
+                                                 (i % 2 == 0) ? "CERTAUTH" : "PERSONAL"));
+
+                   bool more = true;
+                   Expect(zkr_filter_certs(certs, "", "CERTAUTH", 0, &more).size()).ToBe(static_cast<size_t>(15));
+                   Expect(more).ToBe(false);
+                 });
+
+              it("without filters the cap applies to raw entries",
+                 []() -> void
+                 {
+                   std::vector<ZKRCertInfo> certs;
+                   for (int i = 0; i < 12; ++i)
+                     certs.push_back(zkr_mk_cert("CERT" + std::to_string(i), "PERSONAL"));
+
+                   bool more = false;
+                   Expect(zkr_filter_certs(certs, "", "", 10, &more).size()).ToBe(static_cast<size_t>(10));
+                   Expect(more).ToBe(true);
+                 });
+
+              it("label and usage filters combine with AND",
+                 []() -> void
+                 {
+                   std::vector<ZKRCertInfo> certs;
+                   certs.push_back(zkr_mk_cert("CERT1", "PERSONAL"));
+                   certs.push_back(zkr_mk_cert("CERT1", "CERTAUTH"));
+                   certs.push_back(zkr_mk_cert("CERT2", "CERTAUTH"));
+
+                   const std::vector<ZKRCertInfo> out = zkr_filter_certs(certs, "CERT1", "CERTAUTH", 0, nullptr);
+                   Expect(out.size()).ToBe(static_cast<size_t>(1));
+                   Expect(out[0].label).ToBe("CERT1");
+                   Expect(out[0].usage).ToBe("CERTAUTH");
                  });
             });
 
@@ -323,6 +441,29 @@ void zkr_tests()
                     ExpectWithContext(zkr_list_ring(&z, owner, ring1, certs), z.diag.e_msg).ToBe(0);
                     Expect(certs.size()).ToBeGreaterThanOrEqualTo(static_cast<size_t>(1));
                     const std::string real_label = certs[0].label;
+
+                    // RACDCERT LABEL parity through the CLI: an exact --label
+                    // filter finds the certificate; a case-mangled one does not
+                    // (both succeed -- an empty result is not an error).
+                    std::string flt_out;
+                    int flt_rc = execute_command_with_output(
+                        zowex_command + " system keyring list " + owner + " " + ring1 + " --label " + real_label,
+                        flt_out);
+                    ExpectWithContext(flt_rc, flt_out).ToBe(0);
+                    Expect(flt_out).ToContain(real_label);
+
+                    std::string lower_label = real_label;
+                    for (size_t li = 0; li < lower_label.size(); ++li)
+                      lower_label[li] = static_cast<char>(std::tolower(static_cast<unsigned char>(lower_label[li])));
+                    if (lower_label != real_label)
+                    {
+                      std::string miss_out;
+                      int miss_rc = execute_command_with_output(
+                          zowex_command + " system keyring list " + owner + " " + ring1 + " --label " + lower_label,
+                          miss_out);
+                      ExpectWithContext(miss_rc, miss_out).ToBe(0);
+                      Expect(miss_out).Not().ToContain("Certificate: ");
+                    }
 
                     // show: R_datalib fields + GSK-decoded serial/validity.
                     ZKRCertDetail detail;
