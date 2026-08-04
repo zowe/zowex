@@ -72,17 +72,23 @@ void zowex_cert_server_tests()
     });
 
     describe("read-only methods (gated on RACF authority)", [&]() -> void {
-      // Probe with the CLI: if this user cannot list their own rings, the RPC
-      // read tests assert the error shape instead of the success shape.
+      // Probe with the CLI, matching each RPC's underlying service so the gate
+      // tracks AUTHORITY, not data: GetRingInfo (list-rings) fails for a user
+      // who simply has no rings even with full authority, while the
+      // virtual-ring enumeration (list/count on "*") succeeds empty -- so the
+      // two families need separate probes.
       const std::string user = get_user();
       std::string probe_out;
-      const bool can_read =
+      const bool can_read_rings =
           execute_command_with_output(zowex_command + " system keyring list-rings " + user, probe_out) == 0;
+      const bool can_read_certs =
+          execute_command_with_output(
+              zowex_command + " system keyring list " + user + " '*' --max-entries 1", probe_out) == 0;
 
       it("listRings responds with the documented shape", [&]() -> void {
         write_to_server(server, make_rpc_request("listRings", "{\"owner\":\"" + user + "\"}"));
         std::string response = read_rpc_response(server);
-        if (can_read)
+        if (can_read_rings)
         {
           // A success response has also passed server-side response validation.
           Expect(response).ToContain("\"success\":true");
@@ -102,7 +108,7 @@ void zowex_cert_server_tests()
                                                  "{\"owner\":\"" + user +
                                                      "\",\"keyring\":\"*\",\"maxEntries\":1,\"labelOnly\":true}"));
         std::string response = read_rpc_response(server);
-        if (can_read)
+        if (can_read_certs)
         {
           Expect(response).ToContain("\"success\":true");
           Expect(response).ToContain("\"moreAvailable\"");
@@ -117,7 +123,7 @@ void zowex_cert_server_tests()
         write_to_server(server, make_rpc_request("countRing",
                                                  "{\"owner\":\"" + user + "\",\"keyring\":\"*\"}"));
         std::string response = read_rpc_response(server);
-        if (can_read)
+        if (can_read_certs)
         {
           Expect(response).ToContain("\"success\":true");
           Expect(response).ToContain("\"count\"");
