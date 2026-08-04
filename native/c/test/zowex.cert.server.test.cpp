@@ -1,0 +1,131 @@
+/**
+ * This program and the accompanying materials are made available under the terms of the
+ * Eclipse Public License v2.0 which accompanies this distribution, and is available at
+ * https://www.eclipse.org/legal/epl-v20.html
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Copyright Contributors to the Zowe Project.
+ *
+ */
+
+// JSON-RPC layer tests for the certificate/key ring methods (test plan item 4,
+// doc/certificates-test-plan.md). The service layer is covered by zkr.test.cpp;
+// these assert what only the RPC path can break: request schema validation,
+// camelCase->kebab-case parameter mapping, response schema validation (the
+// server 500s a success response that violates its schema), and the error
+// shape. Read-only calls are gated on a CLI probe of the caller's authority so
+// the suite passes for users without RACF certificate access.
+
+#include "ztest.hpp"
+#include <string>
+#include "zutils.hpp"
+#include "zowex.server.test.hpp"
+#include "zowex.cert.server.test.hpp"
+
+using namespace ztst;
+
+void zowex_cert_server_tests()
+{
+  describe("certificate server tests", []() -> void
+           {
+    ServerHandle server;
+
+    beforeAll([&]() -> void {
+      server = start_server(zowex_server_command, true);
+    });
+
+    afterAll([&]() -> void {
+      stop_server(server);
+    });
+
+    describe("request validation (no authority required)", [&]() -> void {
+      it("rejects createKeyring without the required keyring field", [&]() -> void {
+        write_to_server(server, make_rpc_request("createKeyring", "{\"owner\":\"TESTUSER\"}"));
+        std::string response = read_rpc_response(server);
+        Expect(response).ToContain("Request validation failed");
+        Expect(response).Not().ToContain("\"success\":true");
+      });
+
+      it("rejects deleteCertificate without the required label field", [&]() -> void {
+        write_to_server(server, make_rpc_request("deleteCertificate",
+                                                 "{\"owner\":\"TESTUSER\",\"keyring\":\"RING01\"}"));
+        std::string response = read_rpc_response(server);
+        Expect(response).ToContain("Request validation failed");
+      });
+
+      it("rejects trustCertificate without the required status field", [&]() -> void {
+        write_to_server(server, make_rpc_request("trustCertificate",
+                                                 "{\"owner\":\"TESTUSER\",\"label\":\"LBL\"}"));
+        std::string response = read_rpc_response(server);
+        Expect(response).ToContain("Request validation failed");
+      });
+
+      it("accepts unknown request fields for forward compatibility", [&]() -> void {
+        // Validation must not reject the extra field; execution may still fail
+        // on authority, so only assert the failure is NOT a validation error.
+        write_to_server(server, make_rpc_request("listRings",
+                                                 "{\"owner\":\"" + get_user() + "\",\"futureField\":true}"));
+        std::string response = read_rpc_response(server);
+        Expect(response).Not().ToContain("Request validation failed");
+      });
+    });
+
+    describe("read-only methods (gated on RACF authority)", [&]() -> void {
+      // Probe with the CLI: if this user cannot list their own rings, the RPC
+      // read tests assert the error shape instead of the success shape.
+      const std::string user = get_user();
+      std::string probe_out;
+      const bool can_read =
+          execute_command_with_output(zowex_command + " system keyring list-rings " + user, probe_out) == 0;
+
+      it("listRings responds with the documented shape", [&]() -> void {
+        write_to_server(server, make_rpc_request("listRings", "{\"owner\":\"" + user + "\"}"));
+        std::string response = read_rpc_response(server);
+        if (can_read)
+        {
+          // A success response has also passed server-side response validation.
+          Expect(response).ToContain("\"success\":true");
+          Expect(response).ToContain("\"returnedRows\"");
+          Expect(response).ToContain("\"items\"");
+        }
+        else
+        {
+          Expect(response).ToContain("\"error\"");
+        }
+      });
+
+      it("listCertificates on the virtual ring maps camelCase params", [&]() -> void {
+        // maxEntries/labelOnly arrive camelCase and must reach the handler as
+        // max-entries/label-only via the dispatcher's key conversion.
+        write_to_server(server, make_rpc_request("listCertificates",
+                                                 "{\"owner\":\"" + user +
+                                                     "\",\"keyring\":\"*\",\"maxEntries\":1,\"labelOnly\":true}"));
+        std::string response = read_rpc_response(server);
+        if (can_read)
+        {
+          Expect(response).ToContain("\"success\":true");
+          Expect(response).ToContain("\"moreAvailable\"");
+        }
+        else
+        {
+          Expect(response).ToContain("\"error\"");
+        }
+      });
+
+      it("countRing returns a numeric count for the virtual ring", [&]() -> void {
+        write_to_server(server, make_rpc_request("countRing",
+                                                 "{\"owner\":\"" + user + "\",\"keyring\":\"*\"}"));
+        std::string response = read_rpc_response(server);
+        if (can_read)
+        {
+          Expect(response).ToContain("\"success\":true");
+          Expect(response).ToContain("\"count\"");
+        }
+        else
+        {
+          Expect(response).ToContain("\"error\"");
+        }
+      });
+    }); });
+}

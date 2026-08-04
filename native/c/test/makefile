@@ -148,6 +148,7 @@ build-out/zjsonm.o \
 build-out/zowex.server.test.o \
 build-out/zowex.uss.server.test.o \
 build-out/zowex.ds.server.test.o \
+build-out/zowex.cert.server.test.o \
 build-out/zowex.job.server.test.o \
 build-out/server.worker.test.o \
 build-out/server_validator.o \
@@ -320,6 +321,9 @@ build-out/zowex.uss.server.test.o: zowex.uss.server.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
 build-out/zowex.ds.server.test.o: zowex.ds.server.test.cpp
+	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
+
+build-out/zowex.cert.server.test.o: zowex.cert.server.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
 build-out/zowex.job.server.test.o: zowex.job.server.test.cpp

@@ -29,6 +29,7 @@
 #include "zowex.server.test.hpp"
 #include "zowex.uss.server.test.hpp"
 #include "zowex.ds.server.test.hpp"
+#include "zowex.cert.server.test.hpp"
 #include "zowex.job.server.test.hpp"
 #include "server/worker.test.hpp"
 #include "server/validator.test.hpp"
@@ -70,6 +71,7 @@ int main(int argc, char *argv[])
         zowex_server_tests();
         zowex_uss_server_tests();
         zowex_ds_server_tests();
+        zowex_cert_server_tests();
         zowex_job_server_tests();
         server_worker_tests();
         server_validator_tests();
