@@ -98,13 +98,14 @@ struct ZKRRingEntry
 };
 
 // Options for connecting a certificate to a key ring. R_datalib DataPut requires
-// the certificate's bytes, so the certificate is located in `from_ring` (a ring
-// it is already connected to) and re-connected to the target `ring`.
+// the certificate's bytes, so the certificate is read from `from_ring` -- a ring
+// it is already connected to, or the owner's virtual key ring "*" (which also
+// covers certificates not connected to any ring) -- and connected to `ring`.
 struct ZKRConnectOptions
 {
   std::string owner;     // certificate owner (userid), or CERTAUTH/SITE pseudo-ids
   std::string ring;      // target key ring name
-  std::string from_ring; // source key ring holding the certificate (to read its bytes)
+  std::string from_ring; // source ring to read the bytes from; "*" = virtual key ring (--from-database)
   std::string label;     // certificate label
   std::string usage;     // PERSONAL | CERTAUTH; empty = keep the certificate's current usage
   bool make_default;     // set this certificate as the target ring default
@@ -238,8 +239,9 @@ int zkr_list_rings(ZKR *zkr, const std::string &owner, const std::string &ring,
 
 /**
  * @brief Connect a certificate that already exists in the RACF database to a key
- *        ring with the given usage and optional default flag (R_datalib DataPut
- *        with no certificate bytes).
+ *        ring with the given usage and optional default flag. The certificate's
+ *        bytes are read from opts.from_ring (a real ring or the virtual ring
+ *        "*") and re-put via R_datalib DataPut.
  * @return 0 on success; non-zero otherwise (details in zkr->diag)
  */
 int zkr_connect_cert(ZKR *zkr, const ZKRConnectOptions &opts);

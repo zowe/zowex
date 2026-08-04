@@ -905,10 +905,11 @@ namespace
 {
 
 // Enumerate `ring` and return the DER bytes and usage code of the certificate
-// with the given label. R_datalib exposes a connected certificate's bytes via
-// DataGetFirst/GetNext; there is no way to read a certificate that is only in
-// the database and not connected to any ring, which is why connect() needs a
-// source ring.
+// with the given label. R_datalib DataPut needs the certificate's bytes, and
+// DataGetFirst/GetNext is how they are read: from a real ring the certificate
+// is connected to, or from the owner's virtual key ring "*", which also covers
+// certificates not connected to any ring (verified on z/OS; this is the path
+// behind `cert connect --from-database`).
 int fetch_cert_from_ring(ZKR *zkr, const std::string &service, const std::string &owner,
                          const std::string &ring, const std::string &label,
                          std::string &der, int &usage_code)
@@ -1039,8 +1040,9 @@ int zkr_connect_cert(ZKR *zkr, const ZKRConnectOptions &opts)
     return record_message(zkr, "CONNECT", "Certificate label is required");
   if (opts.from_ring.empty())
     return record_message(zkr, "CONNECT",
-                          "--from-ring is required: R_datalib DataPut needs the certificate bytes, which "
-                          "are read from a ring the certificate is already connected to");
+                          "--from-ring or --from-database is required: R_datalib DataPut needs the "
+                          "certificate bytes, which are read from a ring the certificate is connected "
+                          "to or from the owner's virtual key ring");
 
   std::string der;
   int current_usage = 0;
