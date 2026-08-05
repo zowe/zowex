@@ -14,6 +14,8 @@
 
 #include <string>
 #include <mutex>
+#include <deque>
+#include <set>
 #include "../extend/plugin.hpp"
 #include "../singleton.hpp"
 
@@ -41,7 +43,29 @@ class RpcServer : public Singleton<RpcServer>
   friend class Singleton<RpcServer>;
 
 private:
-  std::mutex response_mutex;
+  /**
+   * @brief Guards every write to stdout/stderr on the wire
+   *
+   * Static because send_notification() is static; notifications and responses
+   * share one stream, and an unsynchronized write can interleave mid-line and
+   * hand the client invalid JSON.
+   */
+  static std::mutex &output_mutex();
+
+  /**
+   * @brief IDs whose response was already answered with a timeout error
+   *
+   * A detached worker keeps running and will eventually emit its own response for
+   * the same ID. The client has already failed that request, so a second response
+   * only produces a spurious "missing promise" error. Bounded ring of recent IDs.
+   */
+  static std::mutex &abandoned_mutex();
+  static std::set<int> &abandoned_ids();
+  static std::deque<int> &abandoned_order();
+  static bool is_abandoned(int request_id);
+  static void clear_abandoned(int request_id);
+
+  static constexpr size_t kMaxAbandonedIds = 64;
 
   // Private constructor for singleton
   RpcServer() = default;

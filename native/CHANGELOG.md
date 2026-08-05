@@ -6,6 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- `c`: Fixed `zowex server` resource leaks that could exhaust a z/OS LPAR after a request timed out or a connection dropped. The shutdown signal handler no longer calls into the worker pool or logger, which could deadlock and leave the process running forever; the number of live force-detached worker threads is now bounded, and the server exits when the limit is exceeded so the system can reclaim them; late responses from a detached worker are discarded instead of being sent for an ID the client already failed; notifications are serialized with responses so concurrent writes cannot corrupt the JSON stream; and worker initializer threads are drained before the pool is destroyed. [#537](https://github.com/zowe/zowex/issues/537)
 - `c`: Fixed an issue with `zowex ds list-members` when reading PDS directory blocks. [#1070] (https://github.com/zowe/zowex/pull/1070)
 
 ## `0.7.0`

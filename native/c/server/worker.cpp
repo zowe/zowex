@@ -14,11 +14,26 @@
 #include "logger.hpp"
 #include <thread>
 #include <chrono>
+#include <algorithm>
+#include <atomic>
+#include <cstdlib>
+#include <system_error>
+#include <unistd.h>
 
 using std::string;
 
 namespace
 {
+
+// Force-detached threads that have not yet unwound, process-wide.
+std::atomic<size_t> &live_detached_workers()
+{
+  static std::atomic<size_t> counter{0};
+  return counter;
+}
+
+// Exit code used when the pool gives up because too many threads are wedged.
+const int kDetachedWorkerLimitExitCode = 3;
 
 const char *worker_state_to_string(WorkerState state)
 {
@@ -193,6 +208,13 @@ void Worker::worker_loop()
     LOG_ERROR("Worker %d encountered fatal error: %s", id, e.what());
   }
 
+  if (detached.exchange(false))
+  {
+    // The stuck operation finally returned, so this thread is no longer a leak.
+    const size_t remaining = live_detached_workers().fetch_sub(1) - 1;
+    LOG_DEBUG("Worker %d detached thread unwound; %zu detached worker thread(s) still live", id, remaining);
+  }
+
   {
     std::lock_guard<std::mutex> lock(exit_mutex);
   }
@@ -256,8 +278,20 @@ void Worker::force_detach()
   queue_condition.notify_all();
   LOG_WARN(worker_thread.joinable() ? "Worker %d forcibly detached due to heartbeat timeout" : "Worker %d marked faulted due to heartbeat timeout (thread not joinable)", id);
   if (worker_thread.joinable())
+  {
+    // The thread cannot be cancelled safely while it sits in a system service, so
+    // account for it as a live leak until worker_loop() unwinds on its own.
+    detached.store(true);
+    const size_t live = live_detached_workers().fetch_add(1) + 1;
     worker_thread.detach();
+    LOG_WARN("Worker %d thread detached and still running; %zu detached worker thread(s) now live", id, live);
+  }
   update_heartbeat();
+}
+
+size_t Worker::live_detached_count()
+{
+  return live_detached_workers().load();
 }
 
 std::vector<RequestMetadata> Worker::drain_pending_requests()
@@ -296,7 +330,8 @@ WorkerPool::WorkerPool(long long num_workers,
     : request_timeout(request_timeout_param <= std::chrono::milliseconds(0) ? std::chrono::seconds(60) : request_timeout_param),
       max_replace_attempts(max_replacement_attempts),
       base_replace_backoff(base_replacement_backoff),
-      max_replace_backoff(max_replacement_backoff)
+      max_replace_backoff(max_replacement_backoff),
+      max_live_detached(std::max<size_t>(2UL, static_cast<size_t>(num_workers > 0LL ? num_workers : 0LL)))
 {
   workers.reserve(num_workers);
 
@@ -312,7 +347,7 @@ WorkerPool::WorkerPool(long long num_workers,
 
   // Initialize workers asynchronously
   for (auto i = 0LL; i < num_workers; ++i)
-    std::thread(&WorkerPool::initialize_worker, this, i).detach();
+    spawn_initializer(static_cast<int>(i));
 
   if (num_workers > 0LL)
   {
@@ -341,6 +376,25 @@ void WorkerPool::initialize_worker(int worker_id)
 
   // Mark worker as ready
   set_worker_ready(worker_id);
+}
+
+void WorkerPool::spawn_initializer(int worker_id)
+{
+  // Unlike a worker's request-processing thread, this never enters a z/OS system
+  // service and can't get stuck, so it's always safe to join -- see shutdown().
+  std::thread initializer_thread([this, worker_id]()
+                                 {
+    try
+    {
+      initialize_worker(worker_id);
+    }
+    catch (const std::system_error &e)
+    {
+      LOG_ERROR("Failed to initialize worker %d: %s", worker_id, e.what());
+    } });
+
+  std::lock_guard<std::mutex> lock(init_mutex);
+  initializer_threads.push_back(std::move(initializer_thread));
 }
 
 void WorkerPool::distribute_request(const string &request)
@@ -470,6 +524,20 @@ void WorkerPool::shutdown()
 
   if (supervisor_thread.joinable())
     supervisor_thread.join();
+
+  // Initializer threads borrow `this`, so they must finish before the pool is
+  // destroyed or they would touch freed members. Safe to join unconditionally:
+  // unlike a worker's request-processing thread, initialize_worker() never
+  // enters a z/OS system service, so it can't get stuck here.
+  {
+    std::lock_guard<std::mutex> lock(init_mutex);
+    for (auto &initializer_thread : initializer_threads)
+    {
+      if (initializer_thread.joinable())
+        initializer_thread.join();
+    }
+    initializer_threads.clear();
+  }
 
   for (auto &worker : workers)
   {
@@ -660,10 +728,12 @@ std::vector<RequestMetadata> WorkerPool::recover_requests_from_worker(
     }
   }
 
-  // Stop/detach the old worker
+  // Stop/detach the old worker. force_detach() already detaches the thread, which
+  // leaves stop() with nothing to join, so only one of the two applies.
   if (force_detach)
     old_worker->force_detach();
-  old_worker->stop();
+  else
+    old_worker->stop();
 
   return recovered_requests;
 }
@@ -690,8 +760,25 @@ void WorkerPool::spawn_replacement_worker(size_t worker_index)
     ready_list[worker_index] = false;
   }
 
-  std::thread(&WorkerPool::initialize_worker, this, static_cast<int>(worker_index)).detach();
+  spawn_initializer(static_cast<int>(worker_index));
   LOG_DEBUG("Replacement worker %zu spawned, awaiting readiness", worker_index);
+}
+
+void WorkerPool::enforce_detached_worker_limit()
+{
+  const size_t live = Worker::live_detached_count();
+  if (live <= max_live_detached)
+    return;
+
+  LOG_FATAL("%zu worker thread(s) are wedged and could not be reclaimed (limit %zu). "
+            "Exiting so the system can release them; the client will reconnect to a new server.",
+            live, max_live_detached);
+
+  // Flush the log before leaving. _exit() rather than exit(): we are on the
+  // supervisor thread, and the atexit handler would call shutdown(), which joins
+  // the supervisor thread and would therefore deadlock on itself.
+  server::Logger::shutdown();
+  _exit(kDetachedWorkerLimitExitCode);
 }
 
 void WorkerPool::replace_worker(size_t worker_index, const char *reason, bool force_detach)
@@ -709,6 +796,12 @@ void WorkerPool::replace_worker(size_t worker_index, const char *reason, bool fo
   // Recover requests and stop the old worker
   std::vector<RequestMetadata> recovered_requests =
       recover_requests_from_worker(ctx.old_worker, worker_index, reason, force_detach);
+
+  if (force_detach)
+  {
+    // Does not return if too many threads are wedged
+    enforce_detached_worker_limit();
+  }
 
   // Don't create new worker if we exceeded max attempts
   if (ctx.max_attempts_reached)

@@ -31,6 +31,19 @@
 
 using namespace parser;
 
+namespace
+{
+
+// Set from the signal handler only. Everything the handler touches must be
+// async-signal-safe, so the real shutdown work runs on the main thread.
+volatile sig_atomic_t &signal_shutdown_flag()
+{
+  static volatile sig_atomic_t flag = 0;
+  return flag;
+}
+
+} // namespace
+
 struct StatusMessage
 {
   std::string status;
@@ -41,7 +54,16 @@ ZJSON_DERIVE(StatusMessage, status, message, data);
 
 // ZServer implementation
 
-ZServer::~ZServer() = default;
+ZServer::~ZServer()
+{
+  // std::thread's destructor terminates the process if the thread is still
+  // joinable, so make teardown independent of atexit ordering.
+  shutdown_requested = true;
+  if (worker_count_thread.joinable())
+  {
+    worker_count_thread.join();
+  }
+}
 
 ZServer &ZServer::get_instance()
 {
@@ -51,7 +73,12 @@ ZServer &ZServer::get_instance()
 
 void ZServer::signal_handler(int sig __attribute__((unused)))
 {
-  get_instance().request_shutdown();
+  // Only async-signal-safe operations belong here. Closing stdin wakes the main
+  // input loop, which then performs the real shutdown. Calling into the worker
+  // pool or the logger from a signal context can self-deadlock on a mutex the
+  // interrupted thread already holds, leaving the process alive forever.
+  signal_shutdown_flag() = 1;
+  close(STDIN_FILENO);
 }
 
 void ZServer::setup_signal_handlers()
@@ -68,10 +95,19 @@ void ZServer::request_shutdown()
   std::call_once(shutdown_flag, [this]()
                  {
           shutdown_requested = true;
+          if (worker_count_thread.joinable()) {
+              worker_count_thread.join();
+          }
           if (worker_pool) {
               worker_pool->shutdown();
           }
-          close(STDIN_FILENO); });
+          // If signal_shutdown_flag is nonzero, the signal handler already closed
+          // stdin; closing it again here could clobber a descriptor that has since
+          // been reused for fd 0. Only close it here when shutdown came from a
+          // non-signal path.
+          if (signal_shutdown_flag() == 0) {
+              close(STDIN_FILENO);
+          } });
 }
 
 void ZServer::print_ready_message()
@@ -95,8 +131,8 @@ void ZServer::log_worker_count()
   if (!server::Logger::is_verbose_logging())
     return;
 
-  std::thread([this]()
-              {
+  worker_count_thread = std::thread([this]()
+                                    {
           while (!shutdown_requested) {
               if (worker_pool) {
                   int32_t count = worker_pool->get_available_workers_count();
@@ -107,8 +143,7 @@ void ZServer::log_worker_count()
                   }
               }
               std::this_thread::sleep_for(std::chrono::milliseconds(100));
-          } })
-      .detach();
+          } });
 }
 
 void ZServer::run(const server::Options &opts)
@@ -136,15 +171,25 @@ void ZServer::run(const server::Options &opts)
 
   LOG_DEBUG("Entering main input processing loop");
   std::string line{};
-  while (std::getline(std::cin, line) && !shutdown_requested)
+  while (std::getline(std::cin, line))
   {
+    if (signal_shutdown_flag() != 0 || shutdown_requested)
+      break;
+
     if (!line.empty())
     {
       worker_pool->distribute_request(line);
     }
   }
 
-  LOG_INFO("Input stream closed, shutting down");
+  if (signal_shutdown_flag() != 0)
+  {
+    LOG_INFO("Shutdown signal received, shutting down");
+  }
+  else
+  {
+    LOG_INFO("Input stream closed, shutting down");
+  }
   request_shutdown();
 
   server::Logger::shutdown();
