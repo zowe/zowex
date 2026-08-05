@@ -1,6 +1,6 @@
 {
   "name": "zowex",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "private": true,
   "scripts": {
     "all": "npm run z:rebuild && concurrently \"npm run z:artifacts\" \"npm run build\"",
@@ -16,6 +16,7 @@
     "prepare": "husky",
     "test": "npm run test --workspaces --if-present",
     "tools": "tsx scripts/buildTools.ts",
+    "version:bump": "tsx scripts/bumpVersion.ts",
     "watch": "npm run watch --workspaces",
     "watch:all": "concurrently \"npm run z:watch\" \"npm run watch\"",
     "z:all": "npm run z:rebuild && npm run z:package && npm run z:test",
