@@ -164,6 +164,26 @@ describe("Client", () => {
         expect(err).toBe(testErr);
     });
 
+    it("should pass keepaliveCountMax to SSHClient.connect", async () => {
+        await createAndConnectClient({ keepaliveInterval: 5000, keepaliveCountMax: 5 });
+        const configArg = vi.mocked(SSHClient.connect).mock.calls[0][2];
+        expect(configArg).toMatchObject({ keepaliveIntervalSeconds: 5, keepaliveCountMax: 5 });
+    });
+
+    it("should emit error when the TCP connection times out", async () => {
+        const client = new Client();
+        vi.mocked(SshTransport.newSocket).mockReturnValue(new Promise(() => {}));
+
+        const errorPromise = new Promise<any>((resolve) => {
+            client.on("error", resolve);
+        });
+
+        client.connect({ host: "test-host", readyTimeout: 25 });
+
+        const err = await errorPromise;
+        expect(err.message).toContain("Timed out opening TCP connection to test-host:22");
+    });
+
     it("should handle authentication failure and clean up", async () => {
         const client = new Client();
         mockUnauthClient.authenticateWithPassword.mockResolvedValue({
