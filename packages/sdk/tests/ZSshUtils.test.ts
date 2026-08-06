@@ -137,6 +137,8 @@ describe("ZSshUtils", () => {
                 info: vi.fn(),
                 trace: vi.fn(),
             } as any);
+
+            ZSshUtils.getAvailableMb = vi.fn().mockResolvedValue({ mb: 9999, stderr: "" });
         });
 
         it("should upload via SFTP and extract server", async () => {

@@ -29,7 +29,7 @@ export interface ISshCallbacks {
      * Callback to ask if the user wants to proceed with deployment even when they appear
      * @returns true if we should attempt deployment anyway.
      */
-    onInsufficientSpaceWarning?: (available: number) => Promise<boolean>;
+    onInsufficientSpaceWarning?: (available: number, recommended: number) => Promise<boolean>;
 }
 
 export interface IServerOnPathDetails {
@@ -50,8 +50,13 @@ export interface IServerOnPathDetails {
 }
 type SftpError = Error & { code?: number };
 
-interface PathExistsResult {
+interface PathExistsResponse {
     exists: boolean;
+    stderr: string;
+}
+
+interface AvailableMBResponse {
+    mb: number;
     stderr: string;
 }
 
@@ -131,7 +136,7 @@ export class ZSshUtils {
         };
     }
 
-    private static async pathExists(ssh: NodeSSH, testPath: string): Promise<PathExistsResult> {
+    private static async pathExists(ssh: NodeSSH, testPath: string): Promise<PathExistsResponse> {
         const testExistsCmd = await ssh.execCommand(`test -e ${testPath}`);
         Logger.getAppLogger().debug(
             `[ZSshUtils] test -e %s, code %d, stdout: '%s', stderr: '%s'`,
@@ -140,7 +145,7 @@ export class ZSshUtils {
             testExistsCmd.stdout,
             testExistsCmd.stderr,
         );
-        return { exists: testExistsCmd.code !== 0, stderr: testExistsCmd.stderr };
+        return { exists: testExistsCmd.code === 0, stderr: testExistsCmd.stderr };
     }
     /**
      * Check the user's $PATH for our server binary.
@@ -245,7 +250,7 @@ export class ZSshUtils {
             Logger.getAppLogger().info(`[ZSshUtils] Testing lacksWriteAccess to path '%s'`, testPath);
 
             // See: https://www.man7.org/linux/man-pages/man1/test.1.html
-            const pathExists = await ZSshUtils.pathExists(ssh, testPath);
+            const pathExistsCheck = await ZSshUtils.pathExists(ssh, testPath);
             const testWriteCmd = await ssh.execCommand(`test -w ${testPath}`);
             Logger.getAppLogger().debug(
                 `[ZSshUtils] test -w %s, code %d, stdout: '%s', stderr: '%s'`,
@@ -255,7 +260,7 @@ export class ZSshUtils {
                 testWriteCmd.stderr,
             );
 
-            return pathExists && testWriteCmd.code !== 0; // non-zero: lacks access
+            return pathExistsCheck.exists && testWriteCmd.code !== 0; // testWriteCmd non-zero: lacks write access
         });
     }
 
@@ -263,17 +268,35 @@ export class ZSshUtils {
      * Get how many megabytes of available in the specified directory.
      *
      */
-    private static async getAvailableMB(ssh: NodeSSH, dir: string): Promise<number> {
-        const dfCommandResult = await ssh.execCommand(`df -m ${dir}`);
-        if (dfCommandResult.code !== 0) {
+    public static async getAvailableMb(ssh: NodeSSH, dir: string): Promise<AvailableMBResponse> {
+        const dfCommand = await ssh.execCommand(`df -m ${dir}`);
+        const response: AvailableMBResponse = { mb: -1, stderr: dfCommand.stderr };
+        if (dfCommand.code !== 0) {
             Logger.getAppLogger().info(
                 `[ZSshUtils] getAvailableMB: failed to issue df command on path ${dir} ` +
-                    `with exit code ${dfCommandResult.code} ${dfCommandResult.stderr}. ` +
+                    `with exit code ${dfCommand.code} ${dfCommand.stderr}. ` +
                     "Unable to determine the available space.",
             );
-            return -1;
+            return response;
         }
-        return 0;
+
+        const statsLine = dfCommand.stdout.substring(dfCommand.stdout.indexOf("\n"));
+        Logger.getAppLogger().info(`[ZSshUtils] getAvailableMB: df -m ${dir} output:\n${dfCommand.stdout} `);
+        // example output:
+        // Mounted on     Filesystem                Avail/Total    Files      Status
+        // /u/users       (EXAMPLE.USER.ZFS)        826934/8120160 4294919164 Available
+        const stats = statsLine.trim().split(/\s+/);
+        if (stats.length < 4 || stats[2].indexOf("/") < 0) {
+            Logger.getAppLogger().warn(
+                `[ZSshUtils] getAvailableMB: Unexpected format of df command output. Unable to parse available space`,
+            );
+        } else {
+            const availableMB = stats[2].substring(0, stats[2].indexOf("/"));
+            response.mb = Number.parseInt(availableMB, 10);
+            Logger.getAppLogger().info(`[ZSshUtils] getAvailableMB: Path '${dir}' has ${response.mb} MB remaining`);
+        }
+
+        return response;
     }
     public static async installServer(
         session: SshSession,
@@ -287,6 +310,7 @@ export class ZSshUtils {
         const remoteDir = serverPath.replace(/^~/, ".");
 
         return ZSshUtils.sftp(session, async (sftp, ssh) => {
+            // todo : renumber steps?
             Logger.getAppLogger().info(`[ZSshUtils] Step 1/4: Creating remote directory ${remoteDir}`);
             const remotePaxPath = path.posix.join(remoteDir, ZSshUtils.SERVER_PAX_FILE);
             const initialRemoteDirExistCheck = await ZSshUtils.pathExists(ssh, remoteDir);
@@ -295,6 +319,25 @@ export class ZSshUtils {
 
             try {
                 const execReturn = await ssh.execCommand(`mkdir -p ${remoteDir}`);
+                const availableMB = await ZSshUtils.getAvailableMb(ssh, remoteDir);
+                if (await ZSshUtils.routeExpiredPasswordError(availableMB.stderr ?? "", "deploy", options))
+                    return false;
+
+                if (availableMB.mb < ZSshClient.REQUIRED_DEPLOY_SIZE_MB) {
+                    if (
+                        !options.onInsufficientSpaceWarning ||
+                        !(await options.onInsufficientSpaceWarning(availableMB.mb, ZSshClient.REQUIRED_DEPLOY_SIZE_MB))
+                    ) {
+                        Logger.getAppLogger().info(
+                            `[ZSshUtils] User declined to deploy to '${remoteDir}' due to lack of available space `,
+                        );
+                        return false;
+                    } else {
+                        Logger.getAppLogger().info(
+                            `[ZSshUtils] No onInsufficientSpaceWarning callback provided or user accepted the risk and proceeded to deploy`,
+                        );
+                    }
+                }
                 if (await ZSshUtils.routeExpiredPasswordError(execReturn.stderr ?? "", "deploy", options)) return false;
                 if (execReturn.code !== 0) {
                     const technical = `mkdir -p ${remoteDir} RC=${execReturn.code}: ${execReturn.stderr}`;
