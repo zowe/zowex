@@ -1,6 +1,6 @@
-# Runtime compatibility data
+# Runtime compatibility
 
-`zowex` is built on one LPAR and the resulting `server.pax.Z` ships to every customer system. It links
+`zowex` is built on one LPAR and the resulting `server.pax.Z` ships to every end-user system. It links
 dynamically against the C++ runtime (libc++) that IBM ships **inside Language Environment**, in the DLL
 `CRTEQCXE`. If the build references a symbol the target system's LE does not export, `zowex` fails at
 **load** time, before `main()`:
@@ -9,8 +9,8 @@ dynamically against the C++ runtime (libc++) that IBM ships **inside Language En
 CEE3561S External function _ZNSt5__1_e13__hash_memoryEPKvm was not found in DLL CRTEQCXE
 ```
 
-The files here exist so that failure is caught by CI on the build host instead of by a user on a
-customer system. See [zowe/zowex#871](https://github.com/zowe/zowex/issues/871) and
+Nothing in the binary can diagnose that, because the binary never runs. See
+[zowe/zowex#871](https://github.com/zowe/zowex/issues/871) and
 [`doc/troubleshooting.md`](../../../doc/troubleshooting.md).
 
 ## What determines compatibility
@@ -21,67 +21,61 @@ Three separate things, often confused:
 |---|---|
 | **Open XL C/C++ level** used to build | Which libc++ symbols the binary references. This is the dominant factor. Open XL 2.1 is supported on z/OS 2.4/2.5/3.1; **Open XL 2.2 requires z/OS 3.1+** and references a newer libc++. |
 | **LE maintenance (PTF) level** on the target | Which libc++ symbols the target actually exports. A z/OS release alone does not tell you this. |
-| **`-mzos-target`** (`ZosTarget` in `toolchain.mk`) | Only the LE **system-header** API level, via `__TARGET_LIB__`. It makes no link-step change and does **not** restrict libc++. Useful, but not a fix for a missing libc++ export. |
+| **`-mzos-target`** (`ZosMinLevel` in `toolchain.mk`) | Only the LE **system-header** API level, via `__TARGET_LIB__`. It makes no link-step change and does **not** restrict libc++. It catches a call to a libc function that is too new; it is not a fix for a missing libc++ export. |
 
-## Files
+The floor itself — `ZosMinLevel=zosv2r5` — is declared in
+[`native/c/toolchain.mk`](../toolchain.mk) and nowhere else.
 
-| File | Meaning |
-|---|---|
-| `zos-min-level.txt` | The declared minimum supported z/OS release, as an Open XL target name. Single source of truth for the tooling. Changing it changes the floor for every consumer of the published artifact. |
-| `runtime-imports.baseline` | Allow-list of the external symbols `zowex`/`zoweax` import. `make check-compat` fails when the built binary imports something not listed. |
-| `CRTEQCXE.<level>.exports` | Snapshot of the libc++/LE side-deck exports on a real system at the minimum supported level. `make check-compat` fails when the binary imports something this snapshot does not contain — the check that actually catches a CEE3561S before shipping. |
+## What keeps the binary loadable
 
-## Expected build toolchain
+**1. The pinned compiler.** [`.github/workflows/zos-build.yml`](../../../.github/workflows/zos-build.yml)
+puts Open XL 2.1 on the `PATH`. This is the dominant factor and it is what zowex#871 came down to:
+the build had moved to Open XL 2.2, whose newer libc++ raises the LE level every consumer must carry.
+Keep it at 2.1 for as long as z/OS 2.5 is supported.
 
-- **Open XL C/C++ 2.1** (`/usr/lpp/IBM/cnw/v2r1/openxl/bin`), pinned in
-  `.github/workflows/zos-build.yml`. The compiler version is *logged* into the check report rather
-  than hard-asserted, so an LPAR upgrade shows up as a reviewable diff instead of a broken build.
-- `ZosTarget=zosv2r5` (the default in `native/c/toolchain.mk`).
+**2. A source-level lint.** `npm run lint:compat` ([`scripts/checkNoStringHash.js`](../../../scripts/checkNoStringHash.js))
+rejects string-keyed hash containers, which pull in `std::__1_e::__hash_memory` — the specific symbol
+behind zowex#871. Runs on any machine in milliseconds, no z/OS needed, and catches the regression at
+the point someone writes it.
 
-## Running the check
+**3. Documented target requirements.** The floor is z/OS 2.5 *with current LE maintenance*; the APAR
+list is in the [top-level README](../../../README.md) and `ZSshUtils` verifies the binary loads at
+install time so a mismatch is reported then rather than on some later operation.
 
-On z/OS, from the deployed `native/c` directory:
+## If you need a hard guarantee: bind against floor side decks
 
-```sh
-make check-compat          # verify; fails on a new or unavailable import
-make check-compat-update   # refresh runtime-imports.baseline after a reviewed change
-```
+Not currently done, and not needed while the compiler stays pinned. Worth knowing about if the floor
+ever has to be enforced mechanically — for example if the build LPAR's compiler level starts moving.
 
-Or from a workstation, against the configured build system:
-
-```sh
-npm run z:check:compat
-```
-
-## Refreshing the data
-
-### `runtime-imports.baseline`
-
-Only after you have confirmed each added symbol is available at the minimum supported level:
+The build LPAR is newer than the oldest system we support, so binding against *its* LE side decks
+proves nothing. Copy the side decks off a system at the floor release and point `LDFLAGS` at the
+copies; a symbol that release does not export then becomes an unresolved external at bind time, on
+the build host, in the right release's terms:
 
 ```sh
-make check-compat-update   # then review the diff and commit
+mkdir -p ~/sidedecks/zosv2r5
+for m in CELQS001 CELQS003 CRTDQCXE CRTDQCXG CRTDQCXH CRTDQCXS CRTDQCXP CRTDQCXA CRTDQXLA CRTDQUNW; do
+  cp "//'CEE.SCEELIB2($m)'" "~/sidedecks/zosv2r5/$m.x"
+done
 ```
 
-Do **not** run this to make a red build green. If a symbol is genuinely unavailable on the floor
-release, change the code to stop using it.
+Then point `LDFLAGS` at that directory via `preBuildCmd` (see `config.example.yaml`).
 
-### `CRTEQCXE.<level>.exports`
+This pins the **maintenance level** too, which a z/OS release number cannot: a 2.5 system with current
+PTFs exports symbols a 2.5 system without them does not. Capture from a system at the maintenance
+floor you actually intend to support — capturing from a fully serviced system produces a check that
+passes while protecting nobody. Record which system it came from; **a side-deck set without a recorded
+maintenance level is not reproducible**, and re-capture whenever the floor moves or that system takes
+LE maintenance.
 
-Must be produced on a real system at the minimum supported level — the side decks for an older LE
-cannot be fabricated on a newer LPAR:
+## Inspecting what the binary imports
+
+Informational, not a gate:
 
 ```sh
-sh tools/dump_sidedeck_exports.sh > compat/CRTEQCXE.zosv2r5.exports
+make runtime-imports     # on z/OS, from native/c; writes build-out/runtime-imports.txt
+npm run z:imports        # or from a workstation, against the configured build system
 ```
 
-Record the source system's LE PTF level in the file's header comment. **An export snapshot without a
-maintenance level is not reproducible**, and a stale snapshot silently degrades this check to no
-protection. Re-capture whenever the declared floor moves or the reference system takes LE maintenance.
-
-## Unseeded state
-
-Both `runtime-imports.baseline` and `CRTEQCXE.<level>.exports` need data from real systems. Until a
-file is seeded, `check_runtime_symbols.sh` reports what is missing and continues (warning, not
-failure), so the build is not blocked by data nobody has captured yet. Once seeded, the corresponding
-check is enforced.
+CI uploads the report as the `zowex-runtime-imports` artifact. Useful when raising the floor, changing
+the compiler level, or working out which symbol a `CEE3561S` is complaining about.

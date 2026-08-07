@@ -17,29 +17,22 @@ ASM=as
 #
 # Minimum supported z/OS level.
 #
-# `-mzos-target` pins the Language Environment / system-header API level the compiler assumes, so a
-# binary built on a newer LPAR still loads on the oldest supported z/OS release. It does NOT change
-# which libc++ runtime exports are required: those come from the Open XL compiler level and from
-# which C++ library facilities the code uses. See doc/troubleshooting.md and compat/README.md.
+# $(ZosMinLevel) is the release this project promises its published artifact loads on, declared here
+# and nowhere else. `-mzos-target` pins the system-header API level the compiler assumes (via
+# __TARGET_LIB__), which catches a call to a libc function that only exists on a newer release.
 #
-# The default below applies unless overridden on the command line (`make -DZosTarget=zosv2r4`) or
-# via an exported `ZosTarget` environment variable (e.g. from `preBuildCmd` in config.yaml) -- a
-# command-line/environment definition takes precedence over this plain assignment, same as
-# $(BuildType) elsewhere in this file:
-#   zosv2r5  minimum supported release (default)
-#   zosv2r4  oldest level Open XL 2.x accepts
-#   current  no pinning; assume the build system's level
-#   none     omit the option entirely, for compilers that do not support it
+# It does NOT restrict libc++ and makes no link-step change, so it is not what keeps the binary
+# loadable on the floor release. Two other things do that, and both live outside this file:
+#   - the Open XL C/C++ level used to build (2.1; pinned in .github/workflows/zos-build.yml)
+#   - binding against side decks captured from a system at the floor level (LDFLAGS)
+# See compat/README.md and doc/troubleshooting.md.
 #
-ZosTarget=zosv2r5
+# Open XL 2.x rejects target levels older than zosv2r4. A compiler that does not accept the option
+# at all cannot build this project; drop -mzos-target from TARGET_FLAGS below if you need to try.
+#
+ZosMinLevel=zosv2r5
 
-.IF $(ZosTarget) == none
-TARGET_FLAGS=
-.ELSIF $(ZosTarget) == current
-TARGET_FLAGS=
-.ELSE
-TARGET_FLAGS=-mzos-target=$(ZosTarget)
-.END
+TARGET_FLAGS=-mzos-target=$(ZosMinLevel)
 
 CPP_BND_BASE_FLAGS=-Wl,-bMAP $(TARGET_FLAGS) $(LDFLAGS)
 CPP_BND_BASE_FLAGS_AUTH=-Wl,-bMAP -Wl,-bAC=1 $(TARGET_FLAGS) $(LDFLAGS)

@@ -101,7 +101,7 @@ struct Deserializable;
 // std::__1_e::__hash_memory, which is not exported by CRTEQCXE on z/OS systems below the required
 // Language Environment maintenance level and fails with CEE3561S at load time. See zowex#871 and
 // doc/troubleshooting.md. Do not change this back to std::unordered_map without re-checking the
-// imported symbol report produced by `make check-compat`.
+// imported symbol report produced by `make runtime-imports`.
 //
 // Deliberately not named `Object`: that name is already an enumerator of Value::Type and would
 // shadow this alias inside every member of Value.

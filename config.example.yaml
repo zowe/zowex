@@ -30,15 +30,14 @@ profiles:
     # preBuildCmd: |-
     #   export LDFLAGS="//'CEE.SCEELIB2(CELQS001)' //'CEE.SCEELIB2(CELQS003)' //'CEE.SCEELIB2(CRTDQCXE)'"
     #
-    # To make a missing runtime export fail the BIND here rather than fail at load time on a
-    # customer system, copy the side decks from a system at your minimum supported z/OS release
-    # and point LDFLAGS at those copies instead. Re-copy whenever the declared floor moves.
-    # preBuildCmd: 'export LDFLAGS="$HOME/sidedecks/zosv2r5/CRTDQCXE.x"'
-
-    # Minimum z/OS level to build for, passed to the compiler as -mzos-target.
-    # Defaults to zosv2r5 (see native/c/toolchain.mk). Use "current" to build for this LPAR only,
-    # or "none" if your Open XL level does not support the option.
-    # zosTarget: zosv2r5
+    # Optional, if you build on an LPAR newer than the oldest system you deploy to and want a hard
+    # guarantee. Copy the LE C/C++ side decks off a system at that older level and bind against the
+    # copies: a libc++ symbol the old system does not export then fails the BIND here, instead of
+    # failing at load time with CEE3561S on that system. See native/c/compat/README.md for the
+    # member list and the caveats. Re-copy whenever that system takes LE maintenance.
+    # preBuildCmd: |-
+    #   export PATH=/usr/lpp/IBM/cnw/v2r1/openxl/bin:$PATH
+    #   export LDFLAGS="$(echo $HOME/sidedecks/zosv2r5/*.x)"
 
     # Environment variables forwarded to the test runner on z/OS (npm run z:test).
     # Use this to enable optional tests that depend on system-specific capabilities.

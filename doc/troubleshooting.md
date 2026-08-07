@@ -60,7 +60,7 @@ its z/OS release — a system at a supported release can still be missing the re
 |---|---|
 | Open XL C/C++ level used to build | Determines which libc++ symbols the binary references. Dominant factor. Open XL 2.1 is supported on z/OS 2.4/2.5/3.1; **Open XL 2.2 requires z/OS 3.1+** and references a newer libc++. |
 | LE maintenance level on the target | Determines which libc++ symbols the target exports. |
-| `-mzos-target` (`ZosTarget`) | Only the LE **system-header** API level, via `__TARGET_LIB__`. Makes no link-step change and does **not** restrict libc++, so it will not resolve this message on its own. |
+| `-mzos-target` (`ZosMinLevel`) | Only the LE **system-header** API level, via `__TARGET_LIB__`. Makes no link-step change and does **not** restrict libc++, so it will not resolve this message on its own. |
 
 ### If you are running a released build
 
@@ -76,28 +76,26 @@ Build with the Open XL level that matches your oldest target system. `.github/wo
 `/usr/lpp/IBM/cnw/v2r1/openxl/bin` (Open XL 2.1) for exactly this reason; put the same on your `PATH` via
 `preBuildCmd` in `config.yaml`.
 
-Then check what the binary actually needs:
+Then make the mismatch fail at **bind** time on your build host rather than at load time on someone else's system: copy
+the LE C++ side decks from a system at your oldest supported release and point `LDFLAGS` at those copies. A symbol that
+release does not export becomes an unresolved external during the bind. See
+[`native/c/compat/README.md`](../native/c/compat/README.md) for the member list and staging steps, and the commented
+`preBuildCmd` examples in `config.example.yaml`.
+
+To see what the binary imports today:
 
 ```sh
-npm run z:check:compat
+npm run z:imports
 ```
 
-This compares the imported symbols against `native/c/compat/`. If the check reports a symbol that is unavailable on the
-minimum supported release, the fix is to stop using it — not to refresh the baseline. See
-[`native/c/compat/README.md`](../native/c/compat/README.md).
-
-To make this fail at **bind** time on your build host rather than at load time on someone else's system, copy the LE
-C++ side decks from a system at your minimum supported release and point `LDFLAGS` at those copies (see the commented
-examples in `config.example.yaml`).
+That writes `listings/runtime-imports.txt`. It reports; it does not gate.
 
 ## Every compile fails with: error: unknown argument '-mzos-target=...'
 
 Your Open XL C/C++ level does not support the option. Clang treats an unknown `-m` argument as an error, not a warning,
-so this breaks every compile. Disable the option in `config.yaml`:
+so this breaks every compile. Open XL 2.1 and later accept it, and the project requires 2.1 — so this usually means the
+wrong compiler is on your `PATH`. Check that first.
 
-```yaml
-    zosTarget: none
-```
-
-Equivalently, `make -DZosTarget=none` or `ZOWE_NATIVE_ZOS_TARGET=none npm run z:build`. Note Open XL 2.x rejects target
-levels older than `zosv2r4`.
+If you genuinely need to build without it, drop `-mzos-target` from `TARGET_FLAGS` in `native/c/toolchain.mk`. That only
+removes the system-header API pin; it does not change which libc++ symbols the binary references, so it does not affect
+the `CEE3561S` class of failure above. Note Open XL 2.x also rejects target levels older than `zosv2r4`.

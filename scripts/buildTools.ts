@@ -24,12 +24,6 @@ interface IConfig {
     deployDir: string;
     preBuildCmd?: string;
     testEnv?: Record<string, string>;
-    /**
-     * Minimum z/OS level to build for, passed to the native build as `-mzos-target`.
-     * Omit to use the default in native/c/toolchain.mk. Use "none" if the installed
-     * Open XL level does not support the option.
-     */
-    zosTarget?: string;
 }
 
 type SftpError = Error & { code?: number };
@@ -52,7 +46,6 @@ function localeCompare(a: string, b: string): number {
 const localDeployDir = "./../native";
 const args = process.argv.slice(2);
 let preBuildCmd: string | undefined;
-let configZosTarget: string | undefined;
 let configTestEnv: Record<string, string> = {};
 let deployDirs: {
     root: string;
@@ -397,7 +390,7 @@ class WatchUtils {
 
                 const cwd = inDir ?? deployDirs.cDir;
                 const envSetup = preBuildCmd ? `${preBuildCmd}\n` : "";
-                const cmd = `${envSetup}cd ${cwd}\nmake ${BUILD_TYPE_FLAG()} ${ZOS_TARGET_FLAG()}\nexit $?\n`;
+                const cmd = `${envSetup}cd ${cwd}\nmake ${BUILD_TYPE_FLAG()}\nexit $?\n`;
                 stream.write(cmd);
 
                 let outText = "";
@@ -621,15 +614,6 @@ function BUILD_TYPE_FLAG() {
 
 function IS_PULL_REQUEST_FLAG() {
     return process.env.GITHUB_EVENT_NAME === "pull_request" ? "-DIsPullRequest=TRUE" : "";
-}
-
-/**
- * Minimum z/OS level to build for. An explicit env var wins over config.yaml; when neither is set
- * the default in native/c/toolchain.mk applies.
- */
-function ZOS_TARGET_FLAG() {
-    const target = (process.env.ZOWE_NATIVE_ZOS_TARGET ?? configZosTarget)?.trim();
-    return target ? `-DZosTarget=${target}` : "";
 }
 
 // ANSI escape codes for terminal formatting
@@ -1300,7 +1284,7 @@ async function upload(connection: Client, sshProfile: IProfile) {
 async function build(connection: Client) {
     const response = await runCommandInShell(
         connection,
-        `cd ${deployDirs.cDir} && make ${BUILD_TYPE_FLAG()} ${IS_PULL_REQUEST_FLAG()} ${ZOS_TARGET_FLAG()}\n`,
+        `cd ${deployDirs.cDir} && make ${BUILD_TYPE_FLAG()} ${IS_PULL_REQUEST_FLAG()}\n`,
         {
             stepName: "Building native/c",
         },
@@ -1312,13 +1296,9 @@ async function build(connection: Client) {
 async function make(connection: Client, inDir?: string) {
     const pwd = inDir ?? deployDirs.cDir;
     const targets = args.filter((arg, idx) => idx > 0 && !arg.startsWith("--")).join(" ");
-    const response = await runCommandInShell(
-        connection,
-        `cd ${pwd} && make ${targets} ${BUILD_TYPE_FLAG()} ${ZOS_TARGET_FLAG()}\n`,
-        {
-            stepName: `Running make ${targets || "all"}`,
-        },
-    );
+    const response = await runCommandInShell(connection, `cd ${pwd} && make ${targets} ${BUILD_TYPE_FLAG()}\n`, {
+        stepName: `Running make ${targets || "all"}`,
+    });
     console.log(response);
 }
 
@@ -1346,23 +1326,19 @@ async function test(connection: Client) {
 }
 
 /**
- * Verifies the built binaries only import LE/libc++ symbols that exist on the minimum supported
- * z/OS release, so a CEE3561S load failure is caught here rather than on a customer system.
- * Downloads the import report for inspection. See native/c/compat/README.md.
+ * Lists the LE/libc++ symbols the built binaries import and downloads the report.
+ *
+ * Informational, not a gate: the floor is enforced at bind time by pointing LDFLAGS at side decks
+ * captured from a system at the minimum supported release. See native/c/compat/README.md.
  */
-async function checkCompat(connection: Client) {
+async function reportRuntimeImports(connection: Client) {
     try {
-        await runCommandInShell(
-            connection,
-            `cd ${deployDirs.cDir} && make check-compat ${BUILD_TYPE_FLAG()} ${ZOS_TARGET_FLAG()}\n`,
-            {
-                streamOutput: true,
-                stepName: "Checking runtime symbol compatibility",
-            },
-        );
+        await runCommandInShell(connection, `cd ${deployDirs.cDir} && make runtime-imports ${BUILD_TYPE_FLAG()}\n`, {
+            streamOutput: true,
+            stepName: "Listing runtime imports",
+        });
     } finally {
-        // Retrieve the report even when the check fails - that is exactly when it is needed to
-        // work out which symbol appeared.
+        // Retrieve the report even on failure - that is exactly when it is needed.
         await retrieve(connection, ["c/build-out/runtime-imports.txt"], "listings", true, true);
     }
 }
@@ -1588,7 +1564,6 @@ async function buildSshClient(sshProfile: IProfile): Promise<Client> {
 async function main() {
     const config = await loadConfig();
     preBuildCmd = config.preBuildCmd;
-    configZosTarget = config.zosTarget;
     configTestEnv = config.testEnv ?? {};
     deployDirs = {
         root: config.deployDir,
@@ -1614,14 +1589,14 @@ async function main() {
             case "build:python":
                 await make(sshClient, deployDirs.pythonDir);
                 break;
-            case "check:compat":
-                await checkCompat(sshClient);
-                break;
             case "clean":
                 await clean(sshClient);
                 break;
             case "delete":
                 await rmdir(sshClient, config.sshProfile as IProfile);
+                break;
+            case "imports":
+                await reportRuntimeImports(sshClient);
                 break;
             case "make":
                 await make(sshClient);

@@ -77,7 +77,7 @@ MTL_FLAGS64+=$(LOG_FLAGS)
 .END
 
 all:
-	$(MAKE) -DZLOG_ENABLE=1 -DZosTarget=$(ZosTarget) build-out build-out/ztest_runner
+	$(MAKE) -DZLOG_ENABLE=1 build-out build-out/ztest_runner
 
 
 #
@@ -335,7 +335,7 @@ build-out/plugin.test.o: plugin.test.cpp
 # Testing utilities
 #
 test:
-	$(MAKE) -DZLOG_ENABLE=1 -DZosTarget=$(ZosTarget) build-out build-out/ztest_runner
+	$(MAKE) -DZLOG_ENABLE=1 build-out build-out/ztest_runner
 	chmod +x test.sh
 	./build-out/ztest_runner
 
