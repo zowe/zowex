@@ -420,6 +420,10 @@ export class ZSshUtils {
                 Logger.getAppLogger().error(
                     `Error was thrown during deployment: ${deployErr}. Attempting post-failure cleanup...`,
                 );
+                if (deployErr instanceof ImperativeError && deployErr.errorCode === "EPASSWD_EXPIRED") {
+                    // we can't clean up if the error is a password expiration, so just re-throw
+                    throw deployErr;
+                }
                 try {
                     const postFailurePaxExistsCheck = await ZSshUtils.pathExists(ssh, remotePaxPath);
                     if (
