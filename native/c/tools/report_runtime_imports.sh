@@ -18,16 +18,19 @@
 # Use this report to answer "what does the binary actually depend on?" -- when raising the floor,
 # changing the compiler level, or investigating a CEE3561S.
 #
-#   sh tools/report_runtime_imports.sh     # writes build-out/runtime-imports.txt
+#   sh tools/report_runtime_imports.sh [level]     # writes build-out/runtime-imports.txt
 #
 # Run from native/c after a build.
 
 OUT_DIR=${OUT_DIR:-build-out}
 REPORT=$OUT_DIR/runtime-imports.txt
 
-# Context for the report header only. `make runtime-imports` passes it down; fall back to reading
-# the makefile so a bare invocation still labels the output.
-MIN_LEVEL=${ZosMinLevel:-$(sed -n 's/^ZosMinLevel[[:blank:]]*=[[:blank:]]*\([^[:blank:]#]*\).*/\1/p' toolchain.mk 2>/dev/null | head -n 1)}
+# Context for the report header only. `make runtime-imports` passes it as $1 -- not as an env var
+# prefix, which some z/OS make implementations exec directly instead of routing through a shell
+# when the recipe line has no other shell metacharacter, leaving "ZosMinLevel=zosv2r5" as the
+# literal (missing) command. Fall back to reading toolchain.mk so a bare invocation still labels
+# the output.
+MIN_LEVEL=${1:-$(sed -n 's/^ZosMinLevel[[:blank:]]*=[[:blank:]]*\([^[:blank:]#]*\).*/\1/p' toolchain.mk 2>/dev/null | head -n 1)}
 MIN_LEVEL=${MIN_LEVEL:-unknown}
 
 # Every symbol the program object imports from a DLL starts life as an undefined external in one of

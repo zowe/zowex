@@ -405,7 +405,7 @@ $(OUT_DIR)/zowex.o: zowex.cpp
 # fast. See compat/README.md.
 #
 runtime-imports: zowex zoweax
-	ZosMinLevel=$(ZosMinLevel) sh tools/report_runtime_imports.sh
+	sh tools/report_runtime_imports.sh $(ZosMinLevel)
 
 #
 # Misc targets
