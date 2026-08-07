@@ -92,8 +92,7 @@ const ImportCertDefinition: ICommandDefinition = {
         {
             name: "label",
             aliases: ["l"],
-            description:
-                "The certificate label to assign (used only when the certificate is new to the ESM database).",
+            description: "The certificate label to assign (used only when the certificate is new to the ESM database).",
             type: "string",
             required: true,
         },
