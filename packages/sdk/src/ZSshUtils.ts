@@ -49,7 +49,7 @@ export interface IServerOnPathDetails {
 }
 type SftpError = Error & { code?: number };
 
-interface PathExistsResponse {
+export interface PathExistsResponse {
     exists: boolean;
     stderr: string;
 }
@@ -136,10 +136,11 @@ export class ZSshUtils {
     }
 
     /**
-     * todo docs
-     * @param ssh
-     * @param testPath
-     * @returns
+     * Check whether a remote file or directory exists.
+     * @param ssh Existing ssh connection
+     * @param testPath the path to test for existence
+     * @returns An object with the stderr of the exists check (you can check for password expired errors)
+     * and a boolean of whether the path exists.
      */
     public static async pathExists(ssh: NodeSSH, testPath: string): Promise<PathExistsResponse> {
         const testExistsCmd = await ssh.execCommand(`test -e ${testPath}`);
@@ -454,7 +455,6 @@ export class ZSshUtils {
                     Logger.getAppLogger().error(`Error was thrown during post-failure cleanup: ${failureCleanupErr} `);
                 }
 
-                // todo: should i call onError? You can't continue from errors thrown here
                 return false;
             }
             Logger.getAppLogger().info(`[ZSshUtils] Step 4/4: Cleaning up ${remotePaxPath}`);
