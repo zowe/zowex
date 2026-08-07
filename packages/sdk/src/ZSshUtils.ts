@@ -135,7 +135,13 @@ export class ZSshUtils {
         };
     }
 
-    private static async pathExists(ssh: NodeSSH, testPath: string): Promise<PathExistsResponse> {
+    /**
+     * todo docs
+     * @param ssh
+     * @param testPath
+     * @returns
+     */
+    public static async pathExists(ssh: NodeSSH, testPath: string): Promise<PathExistsResponse> {
         const testExistsCmd = await ssh.execCommand(`test -e ${testPath}`);
         Logger.getAppLogger().debug(
             `[ZSshUtils] test -e %s, code %d, stdout: '%s', stderr: '%s'`,

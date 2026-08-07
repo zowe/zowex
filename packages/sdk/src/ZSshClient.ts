@@ -46,6 +46,7 @@ export class ZSshClient extends RpcClientApi implements Disposable {
     private mPartialStderr = "";
     private mPartialStdout = "";
     private readonly mRequestMap: Map<number, ExistingClientRequest> = new Map();
+    // biome-ignore lint/correctness/noUnusedPrivateClassMembers: Not unused, sent to SSH server
     private mRequestId = 0;
 
     private constructor() {
