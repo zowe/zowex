@@ -20,7 +20,6 @@ import type { ConnectConfig, SFTPWrapper } from "ssh2";
 import { PrivateKeyFailurePatterns, SshErrors } from "./SshErrors";
 import { ZSshClient } from "./ZSshClient";
 import { BUNDLED_SSH_SERVER_VERSION } from "./ZSshConstants";
-import { error } from "node:console";
 
 export interface ISshCallbacks {
     onProgress?: (increment: number) => void; // Callback to report incremental progress
