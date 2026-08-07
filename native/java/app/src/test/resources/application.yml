@@ -1,0 +1,27 @@
+spring:
+  main:
+    allow-bean-definition-overriding: true
+  application:
+    name: zowex-test
+
+zowe:
+  apiml:
+    discovery:
+      enabled: false
+    service:
+      id: zowex-test
+      title: "Zowex Test"
+      description: "Test"
+      version: "0.5.0"
+      routingUrl: "https://localhost:10190"
+
+eureka:
+  client:
+    enabled: false
+    registerWithEureka: false
+    fetchRegistry: false
+  instance:
+    hostname: localhost
+
+apiml:
+  enabled: false

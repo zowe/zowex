@@ -32,4 +32,6 @@ packages/sdk/logs/imperative.log
 packages/sdk/logs/test.log
 .jscpd-report/jscpd-report.json
 *.tgz
+native/java/app/.gradle/*
+native/java/app/build
 *.env
