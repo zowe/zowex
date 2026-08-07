@@ -18,6 +18,26 @@ profiles:
 
     # Command to run before building the native code
     # preBuildCmd: '. ~/entrypoint.sh'  # Run script to configure build environment
+    #
+    # Put the supported Open XL C/C++ level on the PATH. Use 2.1 (v2r1) if you need the binary to
+    # run on z/OS 2.5: Open XL 2.2 requires z/OS 3.1+ and its libc++ raises the Language
+    # Environment level the target system must carry. See native/c/compat/README.md.
+    # preBuildCmd: 'export PATH=/usr/lpp/IBM/cnw/v2r1/openxl/bin:$PATH'
+    #
+    # If the bind fails with unresolved _ZNSt... references, your LPAR's default library
+    # concatenation does not reach the LE C++ side decks. Name them explicitly (adjust the data
+    # set name for your site). This fixes the build; it does not change runtime compatibility.
+    # preBuildCmd: |-
+    #   export LDFLAGS="//'CEE.SCEELIB2(CELQS001)' //'CEE.SCEELIB2(CELQS003)' //'CEE.SCEELIB2(CRTDQCXE)'"
+    #
+    # Optional, if you build on an LPAR newer than the oldest system you deploy to and want a hard
+    # guarantee. Copy the LE C/C++ side decks off a system at that older level and bind against the
+    # copies: a libc++ symbol the old system does not export then fails the BIND here, instead of
+    # failing at load time with CEE3561S on that system. See native/c/compat/README.md for the
+    # member list and the caveats. Re-copy whenever that system takes LE maintenance.
+    # preBuildCmd: |-
+    #   export PATH=/usr/lpp/IBM/cnw/v2r1/openxl/bin:$PATH
+    #   export LDFLAGS="$(echo $HOME/sidedecks/zosv2r5/*.x)"
 
     # Environment variables forwarded to the test runner on z/OS (npm run z:test).
     # Use this to enable optional tests that depend on system-specific capabilities.

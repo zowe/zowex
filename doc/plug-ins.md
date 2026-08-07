@@ -83,12 +83,32 @@ public:
   }
 };
 
+ZOWEX_PLUGIN_DECLARE_ABI()
+
 extern "C" void register_plugin(PluginManager &manager)
 {
   manager.register_plugin_metadata("Sample Plug-in", "1.0.0");
   manager.register_command_provider(std::make_unique<MyCommandProviderFactory>());
 }
 ```
+
+## Binary compatibility
+
+`ZOWEX_PLUGIN_DECLARE_ABI()` is required, and must be expanded exactly once, in the same translation unit as
+`register_plugin`. It exports the version of the plug-in ABI your library was compiled against.
+
+Types like `InvocationContext`, `ArgumentMap` and `ast::ObjMap` cross the `dlopen` boundary, and accessors such as
+`context.get<T>(...)` are inlined *into your plug-in*. A plug-in built against a different revision of `plugin.hpp`
+therefore reads the wrong member offsets. `zowex` compares the reported version against its own
+`ZOWEX_PLUGIN_ABI_VERSION` before calling `register_plugin`, and rejects a mismatch with a `ZLOG_ERROR` message rather
+than loading the plug-in and corrupting memory. A library that does not export the symbol at all is treated as version
+0 and rejected.
+
+Rebuild your plug-in against the current `native/c/extend/plugin.hpp` whenever the constant is bumped.
+
+Plug-ins are also subject to the same runtime floor as `zowex` itself: build them with the Open XL C/C++ level the
+project targets, or they will fail to load on older Language Environment maintenance levels even when `zowex` loads
+fine. See [`native/c/compat/README.md`](../native/c/compat/README.md).
 
 ## Implementing a command provider
 

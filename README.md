@@ -9,11 +9,27 @@ An open-source, native protocol for z/OS mainframe operations via SSH with minim
 - Node.js & npm - required to build client packages
 - VS Code extensions - recommended ones are listed in [extensions.json](./.vscode/extensions.json)
 
-### z/OS
+### z/OS (build system)
 
-- [IBM Open XL C/C++ for z/OS](https://www.ibm.com/docs/en/open-xl-c-cpp-zos/latest) - `ibm-clang++` (C++ compilation)
+- [IBM Open XL C/C++ for z/OS](https://www.ibm.com/docs/en/open-xl-c-cpp-zos/latest) - `ibm-clang++` (C++ compilation).
+  Use **Open XL C/C++ 2.1**, not 2.2: 2.2 requires z/OS 3.1 or later and references a newer C++ runtime than a z/OS 2.5
+  system can provide. See [native/c/compat/README.md](./native/c/compat/README.md).
 - [IBM C/C++ for z/OS](https://www.ibm.com/products/xl-cpp-compiler-zos) - `xlc` (required for Metal C compilation)
 - [SWIG](https://github.com/t1m0thyj/swig-zos) (optional) - used to build experimental Python bindings
+
+### z/OS (target system)
+
+The server binary is built once and deployed to every target system, so the target's runtime level matters:
+
+- **z/OS 2.5 or later.**
+- **Current Language Environment maintenance.** `zowex` links dynamically against the C++ runtime (libc++) that ships
+  inside Language Environment. A system at a supported z/OS release can still be missing the required service, in which
+  case the server fails to load with `CEE3561S ... was not found in DLL CRTEQCXE`. Required APARs:
+  - z/OS 2.5 - the Language Environment C++ runtime service for Open XL C/C++ (the `PH45516` APAR family)
+  - z/OS 3.1 - `PH53938`, `PH60056`, `PH62468`, `PH68179`, per the IBM Z Distribution for Zowe program directory
+- An SSH login and a writable z/OS UNIX directory. No other server-side configuration is needed.
+
+See [Troubleshooting](./doc/troubleshooting.md) if the server fails to start with a `CEE`-prefixed message.
 
 ## Setup
 

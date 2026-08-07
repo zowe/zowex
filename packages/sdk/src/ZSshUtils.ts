@@ -17,7 +17,7 @@ import { type ISshSession, SshSession } from "@zowe/zos-uss-for-zowe-sdk";
 import { NodeSSH, type Config as NodeSSHConfig } from "node-ssh";
 import * as semver from "semver";
 import type { ConnectConfig, SFTPWrapper } from "ssh2";
-import { PrivateKeyFailurePatterns, SshErrors } from "./SshErrors";
+import { matchLeRuntimeFailure, PrivateKeyFailurePatterns, SshErrors } from "./SshErrors";
 import { ZSshClient } from "./ZSshClient";
 import { BUNDLED_SSH_SERVER_VERSION } from "./ZSshConstants";
 
@@ -73,6 +73,47 @@ export class ZSshUtils {
             return true;
         }
         throw err;
+    }
+
+    /**
+     * Runs the freshly installed server binary to confirm z/OS can load it.
+     *
+     * A Language Environment mismatch (e.g. CEE3561S) is a *load-time* failure: the binary never
+     * reaches `main()`, so it can never report the problem itself. Without this check the first
+     * symptom is a confusing failure on the user's next operation, long after the install reported
+     * success.
+     *
+     * @returns `undefined` when the binary runs, or an `ImperativeError` describing why it does not.
+     */
+    private static async verifyServerBinary(ssh: NodeSSH, remoteDir: string): Promise<ImperativeError | undefined> {
+        const bin = `./${ZSshClient.BIN_NAME}`;
+        const result = await ssh.execCommand(`${bin} --version`, { cwd: remoteDir });
+        if (result.code === 0) {
+            Logger.getAppLogger().info(`[ZSshUtils] Server binary verified: ${result.stdout.trim()}`);
+            return undefined;
+        }
+
+        const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`.trim();
+        // Raw uname output, deliberately not parsed into a marketing release name: the mapping needs
+        // verification per system, and an unparsed string is more useful in a bug report than a
+        // wrong one.
+        let systemInfo = "";
+        try {
+            const uname = await ssh.execCommand("uname -srv");
+            systemInfo = `${uname.stdout ?? ""}${uname.stderr ?? ""}`.trim();
+        } catch (err) {
+            Logger.getAppLogger().debug(`[ZSshUtils] Could not read the target system level: ${err}`);
+        }
+
+        const details = [`${bin} --version RC=${result.code}: ${output}`, systemInfo && `System: ${systemInfo}`]
+            .filter(Boolean)
+            .join("\n");
+        const leFailure = matchLeRuntimeFailure(output);
+        return new ImperativeError({
+            msg: leFailure ?? "The server was installed but the server binary could not be run on the remote system.",
+            errorCode: leFailure != null ? "ELERUNTIME" : "EDEPLOYFAIL",
+            additionalDetails: details,
+        });
     }
 
     /**
@@ -259,7 +300,7 @@ export class ZSshUtils {
         const remoteDir = serverPath.replace(/^~/, ".");
 
         return ZSshUtils.sftp(session, async (sftp, ssh) => {
-            Logger.getAppLogger().info(`[ZSshUtils] Step 1/4: Creating remote directory ${remoteDir}`);
+            Logger.getAppLogger().info(`[ZSshUtils] Step 1/5: Creating remote directory ${remoteDir}`);
             const execReturn = await ssh.execCommand(`mkdir -p ${remoteDir}`);
             if (await ZSshUtils.routeExpiredPasswordError(execReturn.stderr ?? "", "deploy", options)) return false;
             if (execReturn.code !== 0) {
@@ -296,7 +337,7 @@ export class ZSshUtils {
                 : undefined;
 
             Logger.getAppLogger().info(
-                `[ZSshUtils] Step 2/4: Uploading ${ZSshUtils.SERVER_PAX_FILE} to ${remotePaxPath}`,
+                `[ZSshUtils] Step 2/5: Uploading ${ZSshUtils.SERVER_PAX_FILE} to ${remotePaxPath}`,
             );
             try {
                 await promisify(sftp.fastPut.bind(sftp))(localPaxPath, remotePaxPath, { step: progressCallback });
@@ -320,7 +361,7 @@ export class ZSshUtils {
                 return false;
             }
 
-            Logger.getAppLogger().info(`[ZSshUtils] Step 3/4: Extracting PAX archive in ${remoteDir}`);
+            Logger.getAppLogger().info(`[ZSshUtils] Step 3/5: Extracting PAX archive in ${remoteDir}`);
             const result = await ssh.execCommand(`pax -rzf ${ZSshUtils.SERVER_PAX_FILE}`, { cwd: remoteDir });
             if (await ZSshUtils.routeExpiredPasswordError(result.stderr ?? "", "extract", options)) return false;
             if (result.code === 0) {
@@ -343,7 +384,7 @@ export class ZSshUtils {
                 }
             }
 
-            Logger.getAppLogger().info(`[ZSshUtils] Step 4/4: Cleaning up ${remotePaxPath}`);
+            Logger.getAppLogger().info(`[ZSshUtils] Step 4/5: Cleaning up ${remotePaxPath}`);
             try {
                 await promisify(sftp.unlink.bind(sftp))(remotePaxPath);
             } catch (err) {
@@ -360,6 +401,19 @@ export class ZSshUtils {
                     Logger.getAppLogger().debug("Cleanup error is non-fatal, continuing...");
                 }
             }
+
+            Logger.getAppLogger().info("[ZSshUtils] Step 5/5: Verifying the server binary runs");
+            const verifyErr = await ZSshUtils.verifyServerBinary(ssh, remoteDir);
+            if (verifyErr != null) {
+                Logger.getAppLogger().error(`[ZSshUtils] Step 5 FAILED: ${verifyErr.additionalDetails}`);
+                if (options?.onError) {
+                    // The files are in place; only the runtime is unusable. Retrying the install
+                    // cannot help, so treat the callback's answer as "reported, carry on or stop".
+                    return await options.onError(verifyErr, "verify");
+                }
+                throw verifyErr;
+            }
+
             Logger.getAppLogger().info("[ZSshUtils] installServer completed successfully");
             return true;
         });
