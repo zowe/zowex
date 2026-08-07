@@ -4,6 +4,10 @@ All notable changes to the Client code for "@zowe/zowex-for-zowe-sdk" are docume
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## TBD Release
+
+- Added detection of available disk space on the z/OS Unix deployment dir in the `ZSshUtils.installServer` method, giving the user the opportunity to cancel deployment if they have less than the recommended amount of available space. [#1088](https://github.com/zowe/zowex/pull/1088)
+
 ## `0.7.1`
 
 - Fixed SSH connection softlocks and resource leaks when a connection drops or stalls during startup: the `ZSshClient.create` function now rejects when the connection closes before the server is ready or when a `serverStartupTimeout` (default 60s) elapses, cleans up the SSH connection on startup failure, rejects pending requests fast when the connection closes, and supports the `keepAliveCountMax` option (default 3). [#1076](https://github.com/zowe/zowex/pull/1076)
