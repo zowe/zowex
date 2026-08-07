@@ -8,6 +8,12 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 - Added a `certificates` client API for managing ESM (RACF or equivalent) key rings and digital certificates: `createKeyring`, `deleteKeyring`, `refreshDigtcert`, `deleteCertificate`, `listCertificates`, `exportCertificate`, `importCertificate`, `showCertificate`, `listRings`, `countRing`, `connectCertificate`, `setDefaultCertificate`, `trustCertificate`, and `renameCertificate`. [#1079](https://github.com/zowe/zowex/pull/1079)
 
+## `0.7.1`
+
+- Fixed SSH connection softlocks and resource leaks when a connection drops or stalls during startup: the `ZSshClient.create` function now rejects when the connection closes before the server is ready or when a `serverStartupTimeout` (default 60s) elapses, cleans up the SSH connection on startup failure, rejects pending requests fast when the connection closes, and supports the `keepAliveCountMax` option (default 3). [#1076](https://github.com/zowe/zowex/pull/1076)
+- Fixed requests hanging until the response timeout when the Zowe Remote SSH server process ended while the SSH transport stayed healthy. `ZSshClient` now watches the server channel for the lifetime of the client and rejects requests written to a channel that is no longer writable. [#1076](https://github.com/zowe/zowex/pull/1076)
+- Fixed socket errors raised while tearing down a closed client being reported through the `onError` handler, which surfaced spurious errors to callers during a normal disconnect. [#1076](https://github.com/zowe/zowex/pull/1076)
+
 ## `0.7.0`
 
 - **Breaking:** Updated the `checkIfOutdated()` utility to compare version numbers with semantic versioning rather than comparing checksums of the `zowex` program. Its parameter is changed to accept the version number of `zowex` on the remote system rather than checksums, and it is no longer an `async` method. [#1073](https://github.com/zowe/zowex/pull/1073/)
