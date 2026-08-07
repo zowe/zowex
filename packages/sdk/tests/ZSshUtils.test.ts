@@ -270,7 +270,7 @@ describe("ZSshUtils", () => {
             const sshMock = {
                 execCommand: vi.fn().mockImplementation(async () => {
                     callCount++;
-                    if (callCount === 1) {
+                    if (callCount === 2) {
                         return { code: 1, stderr: "temporary error", stdout: "" };
                     }
                     return { code: 0, stderr: "", stdout: "" };
@@ -282,7 +282,7 @@ describe("ZSshUtils", () => {
             const result = await ZSshUtils.installServer(new SshSession(fakeSession), "~/.zowe-server", { onError });
             expect(result).toBe(true);
             expect(onError).toHaveBeenCalledOnce();
-            expect(sshMock.execCommand).toHaveBeenCalledTimes(3);
+            expect(sshMock.execCommand).toHaveBeenCalledTimes(5);
         });
 
         it("should call onError when mkdir fails and return false if onError returns false", async () => {
