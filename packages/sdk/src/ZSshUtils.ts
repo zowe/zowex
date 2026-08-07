@@ -54,7 +54,7 @@ interface PathExistsResponse {
     stderr: string;
 }
 
-interface AvailableMBResponse {
+export interface AvailableMBResponse {
     mb: number;
     stderr: string;
 }
@@ -309,7 +309,6 @@ export class ZSshUtils {
         const remoteDir = serverPath.replace(/^~/, ".");
 
         return ZSshUtils.sftp(session, async (sftp, ssh) => {
-            // todo : renumber steps?
             Logger.getAppLogger().info(`[ZSshUtils] Step 1/4: Creating remote directory ${remoteDir}`);
             const remotePaxPath = path.posix.join(remoteDir, ZSshUtils.SERVER_PAX_FILE);
             const initialRemoteDirExistCheck = await ZSshUtils.pathExists(ssh, remoteDir);
@@ -318,14 +317,14 @@ export class ZSshUtils {
 
             try {
                 const execReturn = await ssh.execCommand(`mkdir -p ${remoteDir}`);
-                const availableMB = await ZSshUtils.getAvailableMb(ssh, remoteDir);
-                if (await ZSshUtils.routeExpiredPasswordError(availableMB.stderr ?? "", "deploy", options))
+                const availableMb = await ZSshUtils.getAvailableMb(ssh, remoteDir);
+                if (await ZSshUtils.routeExpiredPasswordError(availableMb.stderr ?? "", "deploy", options))
                     return false;
 
-                if (availableMB.mb < ZSshClient.REQUIRED_DEPLOY_SIZE_MB) {
+                if (availableMb.mb < ZSshClient.REQUIRED_DEPLOY_SIZE_MB) {
                     if (
                         !options.onInsufficientSpaceWarning ||
-                        !(await options.onInsufficientSpaceWarning(availableMB.mb, ZSshClient.REQUIRED_DEPLOY_SIZE_MB))
+                        !(await options.onInsufficientSpaceWarning(availableMb.mb, ZSshClient.REQUIRED_DEPLOY_SIZE_MB))
                     ) {
                         Logger.getAppLogger().info(
                             `[ZSshUtils] User declined to deploy to '${remoteDir}' due to lack of available space `,

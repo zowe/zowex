@@ -138,7 +138,7 @@ describe("ZSshUtils", () => {
                 trace: vi.fn(),
             } as any);
 
-            ZSshUtils.getAvailableMb = vi.fn().mockResolvedValue({ mb: 9999, stderr: "" });
+            vi.spyOn(ZSshUtils, "getAvailableMb").mockResolvedValue({ mb: 9999, stderr: "" });
         });
 
         it("should upload via SFTP and extract server", async () => {
@@ -531,9 +531,6 @@ describe("ZSshUtils", () => {
         });
 
         it("should execute real sftp helper method successfully", async () => {
-            // Restore sftp mock to test the real sftp method
-            vi.restoreAllMocks();
-
             // Re-mock fs.existsSync and Logger
             vi.spyOn(fs, "existsSync").mockReturnValue(true);
             vi.spyOn(Logger, "getAppLogger").mockReturnValue({
