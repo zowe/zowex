@@ -82,9 +82,9 @@ void set_up_r_datalib_parameters(R_datalib_parm_list_64 *p, const R_datalib_func
   p->parmlist = fn->parmlist;
 }
 
-// RACF callable services follow the SAF convention where a return code of 0 is
+// R_datalib calls follow the SAF convention where a return code of 0 is
 // success and 4 is "success with a warning/informational condition" (e.g. the
-// certificate already exists in the RACF database). Only 8 and above are hard
+// certificate already exists in the ESM database). Only 8 and above are hard
 // failures. keyring-util never fails on nonzero rc at all; we treat >= 8 as an
 // error and let warnings (rc 4) succeed.
 bool saf_failed(const R_datalib_parm_list_64 *p)
@@ -96,13 +96,13 @@ int record_saf_error(ZKR *zkr, const R_datalib_parm_list_64 *p, const std::strin
 {
   zkr->diag.function_code = static_cast<unsigned char>(p->function_code);
   zkr->diag.saf_rc = p->return_code;
-  zkr->diag.racf_rc = p->RACF_return_code;
-  zkr->diag.racf_rsn = p->RACF_reason_code;
+  zkr->diag.esm_rc = p->RACF_return_code;
+  zkr->diag.esm_rsn = p->RACF_reason_code;
   zkr->diag.gsk_rc = 0;
   zkr->diag.service = service;
 
   char buf[160];
-  snprintf(buf, sizeof(buf), "%s failed: SAF rc: %d, RACF rc: %d, RACF rsn: %d",
+  snprintf(buf, sizeof(buf), "%s failed: SAF rc: %d, ESM rc: %d, ESM rsn: %d",
            service.c_str(), p->return_code, p->RACF_return_code, p->RACF_reason_code);
   zkr->diag.e_msg = buf;
   return RTNCD_FAILURE;
@@ -115,11 +115,11 @@ void note_saf_warning(ZKR *zkr, const R_datalib_parm_list_64 *p,
 {
   zkr->diag.function_code = static_cast<unsigned char>(p->function_code);
   zkr->diag.saf_rc = p->return_code;
-  zkr->diag.racf_rc = p->RACF_return_code;
-  zkr->diag.racf_rsn = p->RACF_reason_code;
+  zkr->diag.esm_rc = p->RACF_return_code;
+  zkr->diag.esm_rsn = p->RACF_reason_code;
 
   char buf[256];
-  snprintf(buf, sizeof(buf), "%s (%s: SAF rc %d, RACF rc %d, reason %d)",
+  snprintf(buf, sizeof(buf), "%s (%s: SAF rc %d, ESM rc %d, reason %d)",
            friendly.c_str(), service.c_str(), p->return_code, p->RACF_return_code, p->RACF_reason_code);
   zkr->diag.warning = buf;
 }
@@ -157,13 +157,14 @@ std::string datalib_rc4_message(char function_code, int reason)
       return "the certificate was imported, but the DIGTCERT class must be refreshed for the update to "
              "take effect (run 'system cert refresh')";
     case 8:
-      return "the certificate already exists in RACF; the supplied label was ignored and the existing "
-             "certificate was connected to the ring";
+      return "the certificate already exists in the ESM database; the supplied label was ignored and the "
+             "existing certificate was connected to the ring";
     case 12:
-      return "the certificate already exists in RACF (the supplied label was ignored) and its status is NOTRUST";
+      return "the certificate already exists in the ESM database (the supplied label was ignored) and its "
+             "status is NOTRUST";
     case 16:
-      return "the certificate already exists in RACF (the supplied label was ignored); the DIGTCERT class "
-             "must be refreshed for the update to take effect (run 'system cert refresh')";
+      return "the certificate already exists in the ESM database (the supplied label was ignored); the "
+             "DIGTCERT class must be refreshed for the update to take effect (run 'system cert refresh')";
     default:
       return "the certificate was imported with a warning";
     }
@@ -173,17 +174,17 @@ std::string datalib_rc4_message(char function_code, int reason)
     switch (reason)
     {
     case 0:
-      return "the certificate was removed from the ring but was not deleted from RACF because it is "
-             "connected to other rings";
+      return "the certificate was removed from the ring but was not deleted from the ESM database because "
+             "it is connected to other rings";
     case 4:
-      return "the certificate was removed from the ring but was not deleted from RACF because of an "
-             "unexpected error";
+      return "the certificate was removed from the ring but was not deleted from the ESM database because "
+             "of an unexpected error";
     case 8:
-      return "the certificate was removed from the ring but was not deleted from RACF because of "
-             "insufficient authority";
+      return "the certificate was removed from the ring but was not deleted from the ESM database because "
+             "of insufficient authority";
     case 16:
-      return "the certificate was removed from the ring but was not deleted from RACF because it has been "
-             "used to generate a request";
+      return "the certificate was removed from the ring but was not deleted from the ESM database because "
+             "it has been used to generate a request";
     default:
       return "the operation completed with a warning";
     }
@@ -380,10 +381,10 @@ int zkr_del_cert(ZKR *zkr, const std::string &owner, const std::string &ring,
   memcpy(rem.CERT_userid, owner.data(), ulen);
 
   // A database delete (ring "*") should remove the certificate entirely, like
-  // RACDCERT DELETE. Set DEL_CERT_TOO + DEL_ALLRINGS so it is removed from the
-  // RACF database even when still connected to other rings; otherwise RACF
-  // returns 8/8/44 ("connected to other rings"). A real-ring delete uses no
-  // attributes (disconnect from that ring only).
+  // RACDCERT DELETE (or the ESM equivalent). Set DEL_CERT_TOO + DEL_ALLRINGS so
+  // it is removed from the ESM database even when still connected to other
+  // rings; otherwise the ESM returns 8/8/44 ("connected to other rings"). A
+  // real-ring delete uses no attributes (disconnect from that ring only).
   int attributes = 0x00000000;
   if (ring == "*")
     attributes = static_cast<int>(ZKR_ATTR_DEL_CERT_TOO | ZKR_ATTR_DEL_ALLRINGS);
@@ -396,7 +397,7 @@ int zkr_del_cert(ZKR *zkr, const std::string &owner, const std::string &ring,
   if (saf_failed(&p))
     return record_saf_error(zkr, &p, "IRRSDL64 DELCERT");
 
-  // RACF signals (4/4/12) that the DIGTCERT class must be refreshed for the
+  // The ESM signals (4/4/12) that the DIGTCERT class must be refreshed for the
   // disconnect to take effect (SA23-2293 Table 80). Match keyring-util and
   // refresh automatically, unless the caller asked to skip it.
   if (p.return_code == 4 && p.RACF_return_code == 4 && p.RACF_reason_code == 12)
@@ -413,7 +414,7 @@ int zkr_del_cert(ZKR *zkr, const std::string &owner, const std::string &ring,
   }
 
   // Other rc-4 reason codes report that the certificate was disconnected from the
-  // ring but not deleted from the RACF database (Table 80).
+  // ring but not deleted from the ESM database (Table 80).
   if (p.return_code == 4)
     note_saf_warning(zkr, &p, "IRRSDL64 DELCERT",
                      datalib_rc4_message(ZKR_DELCERT_CODE, p.RACF_reason_code));
@@ -665,7 +666,7 @@ int zkr_import_cert(ZKR *zkr, const ZKRImportOptions &opts)
   }
   else if (p.return_code == 4)
   {
-    // RACF SAF rc 4 is a non-fatal warning; the exact meaning depends on the
+    // SAF rc 4 is a non-fatal warning; the exact meaning depends on the
     // reason code (SA23-2293 Table 79). Reasons 4 and 16 indicate the DIGTCERT
     // class must be refreshed for the update to take effect; reasons 8/12/16
     // indicate the certificate already existed (its label was ignored).
@@ -687,8 +688,8 @@ int zkr_import_cert(ZKR *zkr, const ZKRImportOptions &opts)
       else if (already_exists)
       {
         note_saf_warning(zkr, &p, "IRRSDL64 IMPORT",
-                         "the certificate already exists in RACF (the supplied label was ignored); the "
-                         "DIGTCERT class was refreshed");
+                         "the certificate already exists in the ESM database (the supplied label was "
+                         "ignored); the DIGTCERT class was refreshed");
       }
       // else (reason 4, a genuinely new certificate): clean success after refresh.
     }
@@ -987,7 +988,7 @@ int fetch_cert_from_ring(ZKR *zkr, const std::string &service, const std::string
 
 // DataPut a certificate (identified by its DER bytes) to a ring, which connects
 // or reconnects it with the given usage and default flag. The certificate must
-// already exist in the RACF database (it does, since the bytes were read from a
+// already exist in the ESM database (it does, since the bytes were read from a
 // ring), so this reconnects rather than re-adding.
 int data_put_connect(ZKR *zkr, const std::string &service, const std::string &owner,
                      const std::string &ring, const std::string &label,

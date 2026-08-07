@@ -10,7 +10,7 @@
  */
 
 // Unit tests for the `system cert` / `system keyring` command group (zkr service
-// layer + CLI). Certificate and key ring operations require RACF authority that
+// layer + CLI). Certificate and key ring operations require ESM authority that
 // not every build user has, so the mutating tests are gated behind a runtime
 // capability probe (see `can_mutate` below): where authority is missing they are
 // SKIPPED, not failed, so the suite passes across a variety of user contexts.
@@ -52,7 +52,7 @@ void zkr_try_del_ring(const std::string &owner, const std::string &ring)
   zkr_del_ring(&z, owner, ring);
 }
 
-// Purge a scratch certificate from the RACF database by label, swallowing errors.
+// Purge a scratch certificate from the ESM database by label, swallowing errors.
 void zkr_try_purge_cert(const std::string &owner, const std::string &label)
 {
   ZKR z{};
@@ -83,7 +83,7 @@ std::string zkr_env(const char *name, const char *znp_name)
 
 // Self-provision a throwaway PKCS#12 fixture via RACDCERT (see
 // doc/certificates-test-plan.md, item 2): GENCERT a scratch certificate,
-// EXPORT it as PKCS12DER to a temporary dataset, DELETE the RACF record (so a
+// EXPORT it as PKCS12DER to a temporary dataset, DELETE the ESM record (so a
 // later import sees a brand-new certificate), then binary-copy the dataset to
 // a USS temp file. Returns the USS path, or "" with `note` set when any step
 // fails (typically missing IRR.DIGTCERT.GENCERT/EXPORT authority) -- callers
@@ -145,7 +145,7 @@ void zkr_tests()
 
         // ---------------------------------------------------------------------
         // CLI input validation. These exercise the argument/virtual-ring policy
-        // in commands/certificates.cpp, which rejects bad input BEFORE any RACF
+        // in commands/certificates.cpp, which rejects bad input BEFORE any ESM
         // call, so they need no key ring authority and are fully deterministic.
         // ---------------------------------------------------------------------
         describe(
@@ -230,7 +230,7 @@ void zkr_tests()
         // List filter semantics: `keyring list --label/--usage` follows the
         // RACDCERT LABEL keyword -- exact, case-sensitive matches, no wildcards
         // -- and --max-entries caps MATCHING rows, so a filtered list must scan
-        // past the page size. Pure functions over synthetic data; no RACF.
+        // past the page size. Pure functions over synthetic data; no ESM.
         // ---------------------------------------------------------------------
         describe(
             "list filter semantics (RACDCERT LABEL parity, no authority required)",
@@ -536,7 +536,7 @@ void zkr_tests()
                     imp.password = p12pass;
                     ExpectWithContext(zkr_import_cert(&z, imp), z.diag.e_msg).ToBe(0);
 
-                    // The RACF DB may already hold this cert content under an earlier
+                    // The ESM DB may already hold this cert content under an earlier
                     // label; in that case its existing record/label is connected. Use
                     // whatever label is actually on the ring for the rest of the flow.
                     std::vector<ZKRCertInfo> certs;
@@ -681,7 +681,7 @@ void zkr_tests()
                     ExpectWithContext(zkr_export_cert(&z, ex, p12data), z.diag.e_msg).ToBe(0);
                     Expect(p12data.empty()).ToBe(false);
 
-                    // Re-import the exported p12 under a NEW label onto ring2. RACF
+                    // Re-import the exported p12 under a NEW label onto ring2. The ESM
                     // already holds this certificate, so the import must succeed
                     // with the already-exists warning (SA23-2293 Table 79, reason
                     // 8/12/16: supplied label ignored, existing record connected).

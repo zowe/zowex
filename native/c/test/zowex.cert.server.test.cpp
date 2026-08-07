@@ -15,7 +15,7 @@
 // camelCase->kebab-case parameter mapping, response schema validation (the
 // server 500s a success response that violates its schema), and the error
 // shape. Read-only calls are gated on a CLI probe of the caller's authority so
-// the suite passes for users without RACF certificate access.
+// the suite passes for users without ESM certificate access.
 
 #include "ztest.hpp"
 #include <string>
@@ -71,7 +71,7 @@ void zowex_cert_server_tests()
       });
     });
 
-    describe("read-only methods (gated on RACF authority)", [&]() -> void {
+    describe("read-only methods (gated on ESM authority)", [&]() -> void {
       // Probe with the CLI, matching each RPC's underlying service so the gate
       // tracks AUTHORITY, not data: GetRingInfo (list-rings) fails for a user
       // who simply has no rings even with full authority, while the

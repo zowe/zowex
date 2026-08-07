@@ -31,7 +31,7 @@ const CreateKeyringDefinition: ICommandDefinition = {
     name: "create",
     aliases: ["cre"],
     summary: "Create a new key ring",
-    description: "Create a new RACF key ring owned by the specified user.",
+    description: "Create a new ESM key ring owned by the specified user.",
     examples: [{ description: "Create a key ring", options: "USER01 RING02" }],
     positionals: [OWNER_POSITIONAL, KEYRING_POSITIONAL],
     profile: { optional: ["ssh"] },
@@ -43,7 +43,7 @@ const DeleteKeyringDefinition: ICommandDefinition = {
     name: "delete",
     aliases: ["del"],
     summary: "Delete a key ring",
-    description: "Delete a RACF key ring. The certificates it referenced remain in the RACF database.",
+    description: "Delete an ESM key ring. The certificates it referenced remain in the ESM database.",
     examples: [{ description: "Delete a key ring", options: "USER01 RING02" }],
     positionals: [OWNER_POSITIONAL, KEYRING_POSITIONAL],
     profile: { optional: ["ssh"] },
@@ -63,7 +63,7 @@ const ListKeyringDefinition: ICommandDefinition = {
     aliases: ["ls"],
     summary: "List certificates connected to a key ring",
     description:
-        "List the certificates connected to a RACF key ring, showing each certificate's label, owner, " +
+        "List the certificates connected to an ESM key ring, showing each certificate's label, owner, " +
         "usage, trust status, and whether it is the ring's default certificate.",
     examples: [
         { description: "List certificates in a ring", options: "USER01 RING02" },

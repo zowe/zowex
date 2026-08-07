@@ -409,7 +409,7 @@ void register_commands(parser::Command &root_command)
   system_view_syslog_cmd->add_example("View syslog for a specific date and time", "zowex system view-syslog --date 2026-03-13 --time 10:41:00 --max-lines 100");
   system_cmd->add_command(system_view_syslog_cmd);
 
-  // RACF certificate and key ring commands live as `cert` and `keyring` sibling
+  // ESM certificate and key ring commands live as `cert` and `keyring` sibling
   // subgroups under `system` (provisional placement -- see doc/certificates-pr-notes.md).
   certificates::register_commands(*system_cmd);
 

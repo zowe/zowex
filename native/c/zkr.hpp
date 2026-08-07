@@ -15,25 +15,25 @@
 #include <string>
 #include <vector>
 
-// zkr -- RACF key ring / certificate services built on the R_datalib
-// (IRRSDL64) SAF callable service and the System SSL (GSKCMS) certificate APIs.
-// This mirrors the service-layer pattern used by zds/zjb/zcn: plain result
-// structs plus a ZKR handle carrying diagnostics; the command layer
+// zkr -- ESM (RACF or equivalent) key ring / certificate services built on the
+// R_datalib (IRRSDL64) SAF callable service and the System SSL (GSKCMS)
+// certificate APIs. This mirrors the service-layer pattern used by zds/zjb/zcn:
+// plain result structs plus a ZKR handle carrying diagnostics; the command layer
 // (commands/certificates.cpp) formats the results.
 
-// SAF/RACF (and, where relevant, GSK) diagnostic details for the last call.
+// SAF/ESM (and, where relevant, GSK) diagnostic details for the last call.
 struct ZKRDiag
 {
   int function_code;   // R_datalib function code that failed (0 when GSK failed)
   int saf_rc;          // SAF return code (R_datalib return_code)
-  int racf_rc;         // RACF return code
-  int racf_rsn;        // RACF reason code
+  int esm_rc;          // ESM (e.g. RACF) return code
+  int esm_rsn;         // ESM (e.g. RACF) reason code
   int gsk_rc;          // System SSL / GSKCMS status (0 when not applicable)
   std::string service; // human name of the failing service, e.g. "IRRSDL64 DELCERT"
   std::string e_msg;   // human-readable message (populated on failure)
   std::string warning; // human-readable note for a non-fatal SAF warning (rc == 4)
 
-  ZKRDiag() : function_code(0), saf_rc(0), racf_rc(0), racf_rsn(0), gsk_rc(0)
+  ZKRDiag() : function_code(0), saf_rc(0), esm_rc(0), esm_rsn(0), gsk_rc(0)
   {
   }
 };
@@ -69,7 +69,7 @@ struct ZKRCertDetail
   std::string status;
   bool is_default;
   std::string subject;       // subject distinguished name (from R_datalib)
-  std::string record_id;     // RACF record ID, hex-encoded (from R_datalib)
+  std::string record_id;     // ESM record ID, hex-encoded (from R_datalib)
   int key_type;              // private-key type code (R_datalib), -1 if absent
   int key_size;              // private-key bit size (R_datalib), 0 if absent
   std::string serial_number; // certificate serial number, hex (from GSK decode)
@@ -143,7 +143,7 @@ struct ZKRImportOptions
   std::string usage;         // PERSONAL | CERTAUTH
   std::string p12_path;      // path to the source PKCS#12 file
   std::string password;      // PKCS#12 passphrase
-  bool skip_refresh = false; // do not auto-refresh DIGTCERT when RACF signals it is required
+  bool skip_refresh = false; // do not auto-refresh DIGTCERT when the ESM signals it is required
 };
 
 /**
@@ -165,9 +165,9 @@ int zkr_del_ring(ZKR *zkr, const std::string &owner, const std::string &ring);
 int zkr_refresh(ZKR *zkr);
 
 /**
- * @brief Remove/disconnect a certificate from a key ring or the RACF database
- *        (R_datalib DELCERT). A ring of "*" targets the RACF database.
- *        When RACF signals the DIGTCERT class must be refreshed for the change
+ * @brief Remove/disconnect a certificate from a key ring or the ESM database
+ *        (R_datalib DELCERT). A ring of "*" targets the ESM database.
+ *        When the ESM signals the DIGTCERT class must be refreshed for the change
  *        to take effect (4/4/12), this automatically issues REFRESH unless
  *        skip_refresh is set (in which case a note is left in zkr->diag.warning).
  * @return 0 on success; non-zero otherwise (details in zkr->diag)
@@ -238,7 +238,7 @@ int zkr_list_rings(ZKR *zkr, const std::string &owner, const std::string &ring,
                    std::vector<ZKRRingEntry> &rings);
 
 /**
- * @brief Connect a certificate that already exists in the RACF database to a key
+ * @brief Connect a certificate that already exists in the ESM database to a key
  *        ring with the given usage and optional default flag. The certificate's
  *        bytes are read from opts.from_ring (a real ring or the virtual ring
  *        "*") and re-put via R_datalib DataPut.
@@ -256,7 +256,7 @@ int zkr_set_default(ZKR *zkr, const std::string &owner, const std::string &ring,
 
 /**
  * @brief Change a certificate's trust status and/or label (R_datalib DataAlter,
- *        X'0C'). Ring is not required (DataAlter operates on the RACF database
+ *        X'0C'). Ring is not required (DataAlter operates on the ESM database
  *        record; Ring_name and RACF_user_ID are ignored by the service).
  * @return 0 on success; non-zero otherwise (details in zkr->diag)
  */

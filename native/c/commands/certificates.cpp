@@ -27,19 +27,19 @@ namespace certificates
 namespace
 {
 
-// Attach the exact SAF/RACF return, reason, and function codes (and any GSK
+// Attach the exact SAF/ESM return, reason, and function codes (and any GSK
 // status) from the last service call to a response node, so the precise codes
 // remain available programmatically even though the human-readable message is
 // natural language. Emitted whenever a non-zero code was recorded.
 void add_saf_returns(const ast::Node &node, const ZKR &zkr)
 {
-  if (zkr.diag.saf_rc != 0 || zkr.diag.racf_rc != 0 || zkr.diag.racf_rsn != 0 || zkr.diag.function_code != 0)
+  if (zkr.diag.saf_rc != 0 || zkr.diag.esm_rc != 0 || zkr.diag.esm_rsn != 0 || zkr.diag.function_code != 0)
   {
     const auto saf = obj();
     saf->set("functionCode", i64(zkr.diag.function_code));
     saf->set("safReturnCode", i64(zkr.diag.saf_rc));
-    saf->set("racfReturnCode", i64(zkr.diag.racf_rc));
-    saf->set("racfReasonCode", i64(zkr.diag.racf_rsn));
+    saf->set("esmReturnCode", i64(zkr.diag.esm_rc));
+    saf->set("esmReasonCode", i64(zkr.diag.esm_rsn));
     node->set("safReturns", saf);
   }
   if (zkr.diag.gsk_rc != 0)
@@ -64,7 +64,7 @@ void report_error(InvocationContext &context, const ZKR &zkr)
   set_error_object(context, zkr);
 }
 
-// "*" is the RACF *virtual key ring* (the whole collection of a user's
+// "*" is the ESM *virtual key ring* (the whole collection of a user's
 // certificates), not a real ring. Using it as the target of a ring-creating or
 // ring-modifying operation is nonsensical or unsafe, so those commands reject it
 // with a clear message rather than passing it to R_datalib.
@@ -347,7 +347,7 @@ int handle_cert_delete(InvocationContext &context)
   }
   if (ring == "*")
   {
-    context.error_stream() << "Error: use --database (not '*') to delete a certificate from the RACF database"
+    context.error_stream() << "Error: use --database (not '*') to delete a certificate from the ESM database"
                            << std::endl;
     return RTNCD_FAILURE;
   }
@@ -359,17 +359,17 @@ int handle_cert_delete(InvocationContext &context)
   if (!database && ring.empty())
   {
     context.error_stream() << "Error: specify a key ring to disconnect the certificate from, or --database to "
-                              "delete it from the RACF database"
+                              "delete it from the ESM database"
                            << std::endl;
     return RTNCD_FAILURE;
   }
 
   // --database maps to the R_datalib virtual key ring ("*"), which removes the
-  // certificate from the RACF database rather than a single ring.
+  // certificate from the ESM database rather than a single ring.
   const std::string effective_ring = database ? "*" : ring;
   ZKR zkr{};
   const int rc = zkr_del_cert(&zkr, owner, effective_ring, label, skip_refresh);
-  const std::string where = database ? "the RACF database" : (owner + "/" + ring);
+  const std::string where = database ? "the ESM database" : (owner + "/" + ring);
   return run_simple(context, rc, zkr, "Certificate '" + label + "' removed from " + where);
 }
 
@@ -582,7 +582,7 @@ int handle_cert_connect(InvocationContext &context)
     return RTNCD_FAILURE;
   if (from_ring == "*")
   {
-    context.error_stream() << "Error: use --from-database (not '*') to read a certificate from the RACF database"
+    context.error_stream() << "Error: use --from-database (not '*') to read a certificate from the ESM database"
                            << std::endl;
     return RTNCD_FAILURE;
   }
@@ -679,7 +679,7 @@ void register_commands(parser::Command &parent)
   //
   // <parent> keyring <verb> -- key ring operations
   //
-  auto keyring_cmd = command_ptr(new Command("keyring", "z/OS RACF key ring operations"));
+  auto keyring_cmd = command_ptr(new Command("keyring", "z/OS ESM key ring operations"));
   keyring_cmd->add_alias("ring");
 
   // keyring create <owner> <keyring>
@@ -735,7 +735,7 @@ void register_commands(parser::Command &parent)
   //
   // <parent> cert <verb> -- certificate operations
   //
-  auto certops_cmd = command_ptr(new Command("cert", "z/OS RACF certificate operations"));
+  auto certops_cmd = command_ptr(new Command("cert", "z/OS ESM certificate operations"));
   certops_cmd->add_alias("certificate");
 
   // cert export <owner> <keyring> --label L
@@ -759,22 +759,22 @@ void register_commands(parser::Command &parent)
   import_cmd->add_keyword_arg("usage", make_aliases("--usage", "-u"), "certificate usage: PERSONAL or CERTAUTH", ArgType_Single, true);
   import_cmd->add_keyword_arg("file", make_aliases("--file", "-f"), "path to the source PKCS#12 file", ArgType_Single, true);
   import_cmd->add_keyword_arg("password", make_aliases("--password", "-p"), "PKCS#12 passphrase", ArgType_Single, true);
-  import_cmd->add_keyword_arg("skip-refresh", make_aliases("--skip-refresh"), "do not automatically REFRESH the DIGTCERT class if RACF reports it is required (by default the refresh is issued so the change takes effect)", ArgType_Flag, false, ArgValue(false));
+  import_cmd->add_keyword_arg("skip-refresh", make_aliases("--skip-refresh"), "do not automatically REFRESH the DIGTCERT class if the ESM reports it is required (by default the refresh is issued so the change takes effect)", ArgType_Flag, false, ArgValue(false));
   import_cmd->set_handler(handle_cert_import);
   import_cmd->add_example("Import a personal certificate", "zowex system cert import USER01 RING02 -l CERT03 -u PERSONAL -f ./file.p12 -p secret");
   certops_cmd->add_command(import_cmd);
 
   // cert delete <owner> [keyring] --label L [--database]
-  auto delete_cmd = command_ptr(new Command("delete", "disconnect a certificate from a key ring, or delete it from the RACF database"));
+  auto delete_cmd = command_ptr(new Command("delete", "disconnect a certificate from a key ring, or delete it from the ESM database"));
   delete_cmd->add_alias("del");
   delete_cmd->add_positional_arg("owner", "certificate owner (userid)", ArgType_Single, true);
-  delete_cmd->add_positional_arg("keyring", "key ring to disconnect the certificate from (omit and use --database to delete from the RACF database)", ArgType_Single, false);
+  delete_cmd->add_positional_arg("keyring", "key ring to disconnect the certificate from (omit and use --database to delete from the ESM database)", ArgType_Single, false);
   delete_cmd->add_keyword_arg("label", make_aliases("--label", "-l"), "certificate label", ArgType_Single, true);
-  delete_cmd->add_keyword_arg("database", make_aliases("--database", "--db"), "delete the certificate from the RACF database (removes it entirely, not just from one ring)", ArgType_Flag, false, ArgValue(false));
-  delete_cmd->add_keyword_arg("skip-refresh", make_aliases("--skip-refresh"), "do not automatically REFRESH the DIGTCERT class if RACF reports it is required (by default the refresh is issued so the change takes effect)", ArgType_Flag, false, ArgValue(false));
+  delete_cmd->add_keyword_arg("database", make_aliases("--database", "--db"), "delete the certificate from the ESM database (removes it entirely, not just from one ring)", ArgType_Flag, false, ArgValue(false));
+  delete_cmd->add_keyword_arg("skip-refresh", make_aliases("--skip-refresh"), "do not automatically REFRESH the DIGTCERT class if the ESM reports it is required (by default the refresh is issued so the change takes effect)", ArgType_Flag, false, ArgValue(false));
   delete_cmd->set_handler(handle_cert_delete);
   delete_cmd->add_example("Disconnect a certificate from a ring", "zowex system cert delete USER01 RING02 -l CERT03");
-  delete_cmd->add_example("Delete a certificate from the RACF database", "zowex system cert delete USER01 -l CERT03 --database");
+  delete_cmd->add_example("Delete a certificate from the ESM database", "zowex system cert delete USER01 -l CERT03 --database");
   certops_cmd->add_command(delete_cmd);
 
   // cert show <owner> <keyring> --label L
@@ -792,7 +792,7 @@ void register_commands(parser::Command &parent)
   connect_cmd->add_positional_arg("keyring", "target key ring name", ArgType_Single, true);
   connect_cmd->add_keyword_arg("label", make_aliases("--label", "-l"), "certificate label", ArgType_Single, true);
   connect_cmd->add_keyword_arg("from-ring", make_aliases("--from-ring"), "source key ring the certificate is already on (R_datalib DataPut needs the certificate bytes, which are read from here)", ArgType_Single, false);
-  connect_cmd->add_keyword_arg("from-database", make_aliases("--from-database", "--from-db"), "read the certificate from the RACF database instead of a specific ring (use when it is not connected to any ring)", ArgType_Flag, false, ArgValue(false));
+  connect_cmd->add_keyword_arg("from-database", make_aliases("--from-database", "--from-db"), "read the certificate from the ESM database instead of a specific ring (use when it is not connected to any ring)", ArgType_Flag, false, ArgValue(false));
   connect_cmd->add_keyword_arg("usage", make_aliases("--usage", "-u"), "certificate usage: PERSONAL or CERTAUTH (default: the certificate's current usage)", ArgType_Single, false);
   connect_cmd->add_keyword_arg("default", make_aliases("--default"), "set this certificate as the target ring's default", ArgType_Flag, false, ArgValue(false));
   connect_cmd->set_handler(handle_cert_connect);
@@ -810,7 +810,7 @@ void register_commands(parser::Command &parent)
   certops_cmd->add_command(set_default_cmd);
 
   // cert trust <owner> --label L --status S  (DataAlter; ring not required)
-  auto trust_cmd = command_ptr(new Command("trust", "change a certificate's trust status (RACF DataAlter)"));
+  auto trust_cmd = command_ptr(new Command("trust", "change a certificate's trust status (ESM DataAlter)"));
   trust_cmd->add_positional_arg("owner", "certificate owner (userid)", ArgType_Single, true);
   trust_cmd->add_keyword_arg("label", make_aliases("--label", "-l"), "certificate label", ArgType_Single, true);
   trust_cmd->add_keyword_arg("status", make_aliases("--status", "-s"), "new trust status: TRUST, HIGHTRUST, or NOTRUST", ArgType_Single, true);
@@ -819,7 +819,7 @@ void register_commands(parser::Command &parent)
   certops_cmd->add_command(trust_cmd);
 
   // cert rename <owner> --label L --new-label N  (DataAlter; ring not required)
-  auto rename_cmd = command_ptr(new Command("rename", "change a certificate's label (RACF DataAlter)"));
+  auto rename_cmd = command_ptr(new Command("rename", "change a certificate's label (ESM DataAlter)"));
   rename_cmd->add_positional_arg("owner", "certificate owner (userid)", ArgType_Single, true);
   rename_cmd->add_keyword_arg("label", make_aliases("--label", "-l"), "current certificate label", ArgType_Single, true);
   rename_cmd->add_keyword_arg("new-label", make_aliases("--new-label", "-n"), "new certificate label", ArgType_Single, true);

@@ -13,7 +13,7 @@ import type { B64String } from "../types";
 import type * as common from "./common";
 
 /**
- * The exact SAF/RACF codes returned by the underlying R_datalib call, preserved
+ * The exact SAF/ESM codes returned by the underlying R_datalib call, preserved
  * alongside the natural-language message so the precise codes remain available.
  * See z/OS Security Server RACF Callable Services (SA23-2293), R_datalib.
  */
@@ -27,18 +27,18 @@ export interface SafReturns {
      */
     safReturnCode: number;
     /**
-     * RACF return code
+     * ESM (e.g. RACF) return code
      */
-    racfReturnCode: number;
+    esmReturnCode: number;
     /**
-     * RACF reason code
+     * ESM (e.g. RACF) reason code
      */
-    racfReasonCode: number;
+    esmReasonCode: number;
 }
 
 /**
- * A command response that may carry a non-fatal SAF warning (RACF return code 4),
- * e.g. "the certificate already exists in RACF; the supplied label was ignored".
+ * A command response that may carry a non-fatal SAF warning (ESM return code 4),
+ * e.g. "the certificate already exists in the ESM database; the supplied label was ignored".
  */
 export interface CertCommandResponse extends common.CommandResponse {
     /**
@@ -46,7 +46,7 @@ export interface CertCommandResponse extends common.CommandResponse {
      */
     warning?: string;
     /**
-     * The exact SAF/RACF codes behind a warning or error, when a non-zero code was returned
+     * The exact SAF/ESM codes behind a warning or error, when a non-zero code was returned
      */
     safReturns?: SafReturns;
     /**
@@ -92,11 +92,11 @@ export interface DeleteCertificateRequest extends common.CommandRequest<"deleteC
     owner: string;
     /**
      * Key ring to disconnect the certificate from. Omit and set `database: true`
-     * to delete the certificate from the RACF database instead.
+     * to delete the certificate from the ESM database instead.
      */
     keyring?: string;
     /**
-     * Delete the certificate from the RACF database (removes it entirely, not
+     * Delete the certificate from the ESM database (removes it entirely, not
      * just from one ring). Mutually exclusive with `keyring`.
      */
     database?: boolean;
@@ -105,7 +105,7 @@ export interface DeleteCertificateRequest extends common.CommandRequest<"deleteC
      */
     label: string;
     /**
-     * Do not automatically REFRESH the DIGTCERT class if RACF reports it is
+     * Do not automatically REFRESH the DIGTCERT class if the ESM reports it is
      * required for the change to take effect (default is to refresh)
      */
     skipRefresh?: boolean;
@@ -244,7 +244,7 @@ export interface ImportCertificateRequest extends common.CommandRequest<"importC
      */
     password: string;
     /**
-     * Do not automatically REFRESH the DIGTCERT class if RACF reports it is
+     * Do not automatically REFRESH the DIGTCERT class if the ESM reports it is
      * required for the change to take effect (default is to refresh)
      */
     skipRefresh?: boolean;
@@ -322,7 +322,7 @@ export interface ShowCertificateResponse extends common.CommandResponse {
      */
     notAfter?: string;
     /**
-     * RACF record ID (serial + issuer identifier)
+     * ESM record ID (serial + issuer identifier)
      */
     recordId?: string;
 }
@@ -390,7 +390,7 @@ export interface ConnectCertificateRequest extends common.CommandRequest<"connec
      */
     fromRing?: string;
     /**
-     * Read the certificate from the RACF database instead of a specific ring (use
+     * Read the certificate from the ESM database instead of a specific ring (use
      * when the certificate is not connected to any ring). Mutually exclusive with `fromRing`.
      */
     fromDatabase?: boolean;

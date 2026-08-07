@@ -79,7 +79,7 @@ const ImportCertDefinition: ICommandDefinition = {
     summary: "Import a certificate into a key ring from a PKCS#12 file",
     description:
         "Import a certificate (and its private key, when present) into a key ring from a PKCS#12 file " +
-        "that already resides on the z/OS server. If the certificate content already exists in the RACF " +
+        "that already resides on the z/OS server. If the certificate content already exists in the ESM " +
         "database, the existing record is connected to the ring and keeps its original label.",
     examples: [
         {
@@ -93,7 +93,7 @@ const ImportCertDefinition: ICommandDefinition = {
             name: "label",
             aliases: ["l"],
             description:
-                "The certificate label to assign (used only when the certificate is new to the RACF database).",
+                "The certificate label to assign (used only when the certificate is new to the ESM database).",
             type: "string",
             required: true,
         },
@@ -115,7 +115,7 @@ const ImportCertDefinition: ICommandDefinition = {
         { name: "password", aliases: ["p"], description: "PKCS#12 passphrase.", type: "string", required: true },
         {
             name: "skip-refresh",
-            description: "Do not automatically REFRESH the DIGTCERT class if RACF reports it is required.",
+            description: "Do not automatically REFRESH the DIGTCERT class if the ESM reports it is required.",
             type: "boolean",
         },
     ],
@@ -127,22 +127,22 @@ const DeleteCertDefinition: ICommandDefinition = {
     type: "command",
     name: "delete",
     aliases: ["del"],
-    summary: "Disconnect a certificate from a key ring, or delete it from the RACF database",
+    summary: "Disconnect a certificate from a key ring, or delete it from the ESM database",
     description:
-        "Disconnect a certificate from a key ring, or delete it from the RACF database with --database " +
-        "(which removes it entirely, not just from one ring). When RACF reports that the DIGTCERT class " +
+        "Disconnect a certificate from a key ring, or delete it from the ESM database with --database " +
+        "(which removes it entirely, not just from one ring). When the ESM reports that the DIGTCERT class " +
         "must be refreshed for the change to take effect, the refresh is issued automatically unless " +
         "--skip-refresh is specified.",
     examples: [
         { description: "Disconnect a certificate from a ring", options: "USER01 RING02 -l CERT03" },
-        { description: "Delete a certificate from the RACF database", options: "USER01 -l CERT03 --database" },
+        { description: "Delete a certificate from the ESM database", options: "USER01 -l CERT03 --database" },
     ],
     positionals: [
         OWNER_POSITIONAL,
         {
             name: "keyring",
             description:
-                "The key ring to disconnect the certificate from. Omit and use --database to delete it from the RACF database.",
+                "The key ring to disconnect the certificate from. Omit and use --database to delete it from the ESM database.",
             type: "string",
         },
     ],
@@ -151,12 +151,12 @@ const DeleteCertDefinition: ICommandDefinition = {
         {
             name: "database",
             aliases: ["db"],
-            description: "Delete the certificate from the RACF database (removes it entirely, not just from one ring).",
+            description: "Delete the certificate from the ESM database (removes it entirely, not just from one ring).",
             type: "boolean",
         },
         {
             name: "skip-refresh",
-            description: "Do not automatically REFRESH the DIGTCERT class if RACF reports it is required.",
+            description: "Do not automatically REFRESH the DIGTCERT class if the ESM reports it is required.",
             type: "boolean",
         },
     ],
@@ -185,7 +185,7 @@ const ConnectCertDefinition: ICommandDefinition = {
     summary: "Connect a certificate to a key ring (read from another ring or the database)",
     description:
         "Connect a certificate to a key ring. R_datalib DataPut requires the certificate bytes, so the " +
-        "certificate is read from a ring it is already on (--from-ring) or from the RACF database " +
+        "certificate is read from a ring it is already on (--from-ring) or from the ESM database " +
         "(--from-database) and reconnected to the target ring.",
     examples: [
         {
@@ -212,7 +212,7 @@ const ConnectCertDefinition: ICommandDefinition = {
             name: "from-database",
             aliases: ["from-db"],
             description:
-                "Read the certificate from the RACF database instead of a ring (use when it is not on any ring).",
+                "Read the certificate from the ESM database instead of a ring (use when it is not on any ring).",
             type: "boolean",
         },
         {
@@ -245,7 +245,7 @@ const TrustCertDefinition: ICommandDefinition = {
     name: "trust",
     summary: "Change a certificate's trust status",
     description:
-        "Change a certificate's trust status (RACF DataAlter). A key ring is not required; the certificate is " +
+        "Change a certificate's trust status (ESM DataAlter). A key ring is not required; the certificate is " +
         "identified by owner and label. HIGHTRUST is honored only for CERTAUTH certificates.",
     examples: [{ description: "Mark a certificate NOTRUST", options: "USER01 -l CERT03 -s NOTRUST" }],
     positionals: [OWNER_POSITIONAL],
@@ -269,7 +269,7 @@ const RenameCertDefinition: ICommandDefinition = {
     name: "rename",
     summary: "Change a certificate's label",
     description:
-        "Change a certificate's label (RACF DataAlter). A key ring is not required; the certificate is " +
+        "Change a certificate's label (ESM DataAlter). A key ring is not required; the certificate is " +
         "identified by owner and current label.",
     examples: [{ description: "Rename a certificate", options: "USER01 -l OLDLABEL -n NEWLABEL" }],
     positionals: [OWNER_POSITIONAL],
@@ -296,7 +296,7 @@ export const CertDefinition: ICommandDefinition = {
     name: "cert",
     aliases: ["certificate"],
     summary: "Manage certificates: export, import, delete, show, connect, set-default, trust, rename",
-    description: "Certificate operations on a key ring or in the RACF database.",
+    description: "Certificate operations on a key ring or in the ESM database.",
     type: "group",
     children: [
         ExportCertDefinition,

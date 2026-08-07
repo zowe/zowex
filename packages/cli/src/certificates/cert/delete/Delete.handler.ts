@@ -21,7 +21,7 @@ export default class DeleteCertHandler extends SshBaseHandler {
         const { owner, keyring, label, skipRefresh, database } = params.arguments;
         const response = await client.certificates.deleteCertificate({ owner, keyring, label, skipRefresh, database });
 
-        const target = database ? "the RACF database" : `${owner}/${keyring}`;
+        const target = database ? "the ESM database" : `${owner}/${keyring}`;
         params.response.data.setMessage("Certificate '%s' removed from %s", label, target);
         params.response.console.log("Certificate '%s' removed from %s", label, target);
         if (response.warning) {

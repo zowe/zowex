@@ -16,7 +16,7 @@ export const RefreshDefinition: ICommandDefinition = {
     type: "command",
     name: "refresh",
     summary: "Refresh the DIGTCERT class",
-    description: "Refresh the RACF DIGTCERT class so that certificate and key ring changes take effect.",
+    description: "Refresh the DIGTCERT class so that certificate and key ring changes take effect.",
     examples: [{ description: "Refresh the DIGTCERT class", options: "" }],
     profile: { optional: ["ssh"] },
 };

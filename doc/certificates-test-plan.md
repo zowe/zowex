@@ -126,7 +126,7 @@ that starts `zowex server`, invokes the certificate methods, and asserts:
 
 - request validation rejects missing required fields (`-32602`-class errors)
 - responses pass their schemas (server-side response validation not tripped)
-- error responses carry `safReturns` with the SAF/RACF codes
+- error responses carry `safReturns` with the SAF/ESM codes
 - read-only methods (`listRings`, `listCertificates`, `countRing`) work
   without mutation authority
 
