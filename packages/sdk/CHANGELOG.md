@@ -4,6 +4,10 @@ All notable changes to the Client code for "@zowe/zowex-for-zowe-sdk" are docume
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## Recent Changes
+
+- Added a `certificates` client API for managing ESM (RACF or equivalent) key rings and digital certificates: `createKeyring`, `deleteKeyring`, `refreshDigtcert`, `deleteCertificate`, `listCertificates`, `exportCertificate`, `importCertificate`, `showCertificate`, `listRings`, `countRing`, `connectCertificate`, `setDefaultCertificate`, `trustCertificate`, and `renameCertificate`. [#1079](https://github.com/zowe/zowex/pull/1079)
+
 ## `0.7.1`
 
 - Fixed SSH connection softlocks and resource leaks when a connection drops or stalls during startup: the `ZSshClient.create` function now rejects when the connection closes before the server is ready or when a `serverStartupTimeout` (default 60s) elapses, cleans up the SSH connection on startup failure, rejects pending requests fast when the connection closes, and supports the `keepAliveCountMax` option (default 3). [#1076](https://github.com/zowe/zowex/pull/1076)

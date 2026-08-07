@@ -4,6 +4,10 @@ All notable changes to the Client code for "zowex-for-zowe-cli" are documented i
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## Recent Changes
+
+- Added ESM (RACF or equivalent) certificate and key ring management to the `zssh system` command group over SSH: `zssh system keyring create|delete|list|list-rings|count` and `zssh system cert import|export|delete|show|connect|set-default|trust|rename|refresh`. [#1079](https://github.com/zowe/zowex/pull/1079)
+
 ## `0.6.1`
 
 - Added `--encoding` flag to `zssh submit local-file` and `zssh submit stdin` commands to specify the encoding of the submitted JCL. [#1050](https://github.com/zowe/zowex/pull/1050)

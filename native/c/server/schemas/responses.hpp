@@ -16,6 +16,15 @@
 
 #include "../validator.hpp"
 
+struct CertificateInfo {};
+ZJSON_SCHEMA(CertificateInfo,
+    FIELD_REQUIRED(label, STRING),
+    FIELD_REQUIRED(owner, STRING),
+    FIELD_REQUIRED(usage, STRING),
+    FIELD_REQUIRED(status, STRING),
+    FIELD_REQUIRED(default, BOOL)
+);
+
 struct Dataset {};
 ZJSON_SCHEMA(Dataset,
     FIELD_REQUIRED(name, STRING),
@@ -94,6 +103,143 @@ ZJSON_SCHEMA(UssItem,
     FIELD_OPTIONAL(filetag, STRING),
     FIELD_OPTIONAL(mtime, STRING),
     FIELD_OPTIONAL(mode, STRING)
+);
+
+struct CertCommandResponse {};
+ZJSON_SCHEMA(CertCommandResponse,
+    FIELD_REQUIRED(success, BOOL),
+    FIELD_OPTIONAL(warning, STRING),
+    FIELD_OPTIONAL(safReturns, ANY),
+    FIELD_OPTIONAL(gskReturnCode, NUMBER)
+);
+
+struct CreateKeyringResponse {};
+ZJSON_SCHEMA(CreateKeyringResponse,
+    FIELD_REQUIRED(success, BOOL),
+    FIELD_OPTIONAL(warning, STRING),
+    FIELD_OPTIONAL(safReturns, ANY),
+    FIELD_OPTIONAL(gskReturnCode, NUMBER)
+);
+
+struct DeleteKeyringResponse {};
+ZJSON_SCHEMA(DeleteKeyringResponse,
+    FIELD_REQUIRED(success, BOOL),
+    FIELD_OPTIONAL(warning, STRING),
+    FIELD_OPTIONAL(safReturns, ANY),
+    FIELD_OPTIONAL(gskReturnCode, NUMBER)
+);
+
+struct RefreshDigtcertResponse {};
+ZJSON_SCHEMA(RefreshDigtcertResponse,
+    FIELD_REQUIRED(success, BOOL),
+    FIELD_OPTIONAL(warning, STRING),
+    FIELD_OPTIONAL(safReturns, ANY),
+    FIELD_OPTIONAL(gskReturnCode, NUMBER)
+);
+
+struct DeleteCertificateResponse {};
+ZJSON_SCHEMA(DeleteCertificateResponse,
+    FIELD_REQUIRED(success, BOOL),
+    FIELD_OPTIONAL(warning, STRING),
+    FIELD_OPTIONAL(safReturns, ANY),
+    FIELD_OPTIONAL(gskReturnCode, NUMBER)
+);
+
+struct ListCertificatesResponse {};
+ZJSON_SCHEMA(ListCertificatesResponse,
+    FIELD_REQUIRED(success, BOOL),
+    FIELD_REQUIRED_OBJECT_ARRAY(items, CertificateInfo),
+    FIELD_REQUIRED(returnedRows, NUMBER),
+    FIELD_REQUIRED(moreAvailable, BOOL)
+);
+
+struct ExportCertificateResponse {};
+ZJSON_SCHEMA(ExportCertificateResponse,
+    FIELD_REQUIRED(success, BOOL),
+    FIELD_REQUIRED(label, STRING),
+    FIELD_REQUIRED(owner, STRING),
+    FIELD_REQUIRED(keyring, STRING),
+    FIELD_REQUIRED(format, STRING),
+    FIELD_OPTIONAL(file, STRING),
+    FIELD_OPTIONAL(bytesWritten, NUMBER),
+    FIELD_REQUIRED(data, STRING)
+);
+
+struct ImportCertificateResponse {};
+ZJSON_SCHEMA(ImportCertificateResponse,
+    FIELD_REQUIRED(success, BOOL),
+    FIELD_OPTIONAL(warning, STRING),
+    FIELD_OPTIONAL(safReturns, ANY),
+    FIELD_OPTIONAL(gskReturnCode, NUMBER),
+    FIELD_REQUIRED(label, STRING),
+    FIELD_REQUIRED(owner, STRING),
+    FIELD_REQUIRED(keyring, STRING)
+);
+
+struct ShowCertificateResponse {};
+ZJSON_SCHEMA(ShowCertificateResponse,
+    FIELD_REQUIRED(success, BOOL),
+    FIELD_REQUIRED(label, STRING),
+    FIELD_REQUIRED(owner, STRING),
+    FIELD_REQUIRED(usage, STRING),
+    FIELD_REQUIRED(status, STRING),
+    FIELD_REQUIRED(default, BOOL),
+    FIELD_REQUIRED(keyType, NUMBER),
+    FIELD_REQUIRED(keySize, NUMBER),
+    FIELD_OPTIONAL(serialNumber, STRING),
+    FIELD_OPTIONAL(notBefore, STRING),
+    FIELD_OPTIONAL(notAfter, STRING),
+    FIELD_OPTIONAL(recordId, STRING)
+);
+
+struct ListRingsResponse {};
+ZJSON_SCHEMA(ListRingsResponse,
+    FIELD_REQUIRED(success, BOOL),
+    FIELD_OPTIONAL(warning, STRING),
+    FIELD_OPTIONAL(safReturns, ANY),
+    FIELD_OPTIONAL(gskReturnCode, NUMBER),
+    FIELD_REQUIRED_ARRAY(items, ANY),
+    FIELD_REQUIRED(returnedRows, NUMBER)
+);
+
+struct ConnectCertificateResponse {};
+ZJSON_SCHEMA(ConnectCertificateResponse,
+    FIELD_REQUIRED(success, BOOL),
+    FIELD_OPTIONAL(warning, STRING),
+    FIELD_OPTIONAL(safReturns, ANY),
+    FIELD_OPTIONAL(gskReturnCode, NUMBER)
+);
+
+struct SetDefaultCertificateResponse {};
+ZJSON_SCHEMA(SetDefaultCertificateResponse,
+    FIELD_REQUIRED(success, BOOL),
+    FIELD_OPTIONAL(warning, STRING),
+    FIELD_OPTIONAL(safReturns, ANY),
+    FIELD_OPTIONAL(gskReturnCode, NUMBER)
+);
+
+struct TrustCertificateResponse {};
+ZJSON_SCHEMA(TrustCertificateResponse,
+    FIELD_REQUIRED(success, BOOL),
+    FIELD_OPTIONAL(warning, STRING),
+    FIELD_OPTIONAL(safReturns, ANY),
+    FIELD_OPTIONAL(gskReturnCode, NUMBER)
+);
+
+struct RenameCertificateResponse {};
+ZJSON_SCHEMA(RenameCertificateResponse,
+    FIELD_REQUIRED(success, BOOL),
+    FIELD_OPTIONAL(warning, STRING),
+    FIELD_OPTIONAL(safReturns, ANY),
+    FIELD_OPTIONAL(gskReturnCode, NUMBER)
+);
+
+struct CountRingResponse {};
+ZJSON_SCHEMA(CountRingResponse,
+    FIELD_REQUIRED(success, BOOL),
+    FIELD_REQUIRED(count, NUMBER),
+    FIELD_REQUIRED(owner, STRING),
+    FIELD_REQUIRED(keyring, STRING)
 );
 
 struct IssueConsoleCmdResponse {};
