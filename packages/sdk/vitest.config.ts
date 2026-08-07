@@ -16,7 +16,7 @@
 
 import { defineConfig, mergeConfig } from "vitest/config";
 import rootConfig from "../../vitest.config";
-const { ...sharedTestConfig } = rootConfig.test || {};
+const { projects, ...sharedTestConfig } = rootConfig.test || {};
 const sharedConfig = { ...rootConfig, test: sharedTestConfig };
 
 export default mergeConfig(

@@ -292,7 +292,7 @@ export class ZSshUtils {
         // Mounted on     Filesystem                Avail/Total    Files      Status
         // /u/users       (EXAMPLE.USER.ZFS)        826934/8120160 4294919164 Available
         const stats = statsLine.trim().split(/\s+/);
-        if (stats.length < 4 || stats[2].indexOf("/") < 0) {
+        if (stats.length < 4 || !stats[2].includes("/")) {
             Logger.getAppLogger().warn(
                 `[ZSshUtils] getAvailableMB: Unexpected format of df command output. Unable to parse available space`,
             );
