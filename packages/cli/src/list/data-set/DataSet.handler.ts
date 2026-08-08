@@ -50,28 +50,32 @@ export default class ListDataSetsHandler extends SshBaseHandler {
             response.returnedRows,
             params.arguments.pattern,
         );
-        params.response.format.output({
-            output: response.items.map((item) => ({
-                ...item,
-                migrated: item.migrated ? "YES" : "NO",
-                volser: item.multivolume ? `${item.volser}+` : item.volser,
-            })),
-            format: "table",
-            fields: [
-                "name",
-                "volser",
-                "devtype",
-                "dsorg",
-                "recfm",
-                "lrecl",
-                "blksize",
-                "primary",
-                "secondary",
-                "dsntype",
-                "migrated",
-            ],
-            header: true,
-        });
+        if (params.arguments.attributes) {
+            params.response.format.output({
+                output: response.items.map((item) => ({
+                    ...item,
+                    migrated: item.migrated ? "YES" : "NO",
+                    volser: item.multivolume ? `${item.volser}+` : item.volser,
+                })),
+                format: "table",
+                fields: [
+                    "name",
+                    "volser",
+                    "devtype",
+                    "dsorg",
+                    "recfm",
+                    "lrecl",
+                    "blksize",
+                    "primary",
+                    "secondary",
+                    "dsntype",
+                    "migrated",
+                ],
+                header: true,
+            });
+        } else {
+            params.response.console.log(response.items.map((item) => item.name).join("\n"));
+        }
         return response;
     }
 }
