@@ -6,7 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
-- Added `--exact-match` option to the `zssh list data-set` command. This option defaults to true for backwards compatibility, but can be set to false to avoid appending `.**` to the end of data set patterns. [#914](https://github.com/zowe/zowex/issues/914)
+- Added `--exact-match` option to the `zssh list data-set` command. This option defaults to false for backwards compatibility, but can be set to true to avoid appending `.**` to the end of data set patterns. [#914](https://github.com/zowe/zowex/issues/914)
 
 ## `0.6.1`
 

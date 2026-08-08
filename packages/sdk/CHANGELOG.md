@@ -6,7 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
-- Added `exactMatch` property to the `ListDatasetsRequest` type. This option defaults to true for backwards compatibility, but can be set to false to avoid appending `.**` to the end of data set patterns. [#914](https://github.com/zowe/zowex/issues/914)
+- Added `exactMatch` property to the `ListDatasetsRequest` type. This option defaults to false for backwards compatibility, but can be set to true to avoid appending `.**` to the end of data set patterns. [#914](https://github.com/zowe/zowex/issues/914)
 
 ## `0.7.0`
 

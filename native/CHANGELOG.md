@@ -7,7 +7,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## Recent Changes
 
 - `c`: Fixed an issue with `zowex ds list-members` when reading PDS directory blocks. [#1070] (https://github.com/zowe/zowex/pull/1070)
-- `c`: Added `--exact-match` option to the `zowex ds list` command. This option defaults to true for backwards compatibility, but can be set to false to avoid appending `.**` to the end of data set patterns. [#914](https://github.com/zowe/zowex/issues/914)
+- `c`: Added `--exact-match` option to the `zowex ds list` command. This option defaults to false for backwards compatibility, but can be set to true to avoid appending `.**` to the end of data set patterns. [#914](https://github.com/zowe/zowex/issues/914)
 
 ## `0.7.0`
 
