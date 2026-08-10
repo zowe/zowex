@@ -581,6 +581,23 @@ describe("ZSshUtils", () => {
             expect(fastPutMock).not.toHaveBeenCalled();
         });
 
+        it("should continue the deployment if insufficient space detected and the onInsufficientSpaceWarning callback is not provided", async () => {
+            vi.spyOn(ZSshUtils, "getAvailableMb").mockResolvedValue({ mb: 1, stderr: "" });
+            const sshMock = {
+                execCommand: vi.fn().mockResolvedValue({ code: 0, stderr: "", stdout: "" }),
+            };
+            const fastPutMock = vi.fn((_local: string, _remote: string, _opts: any, cb: (err?: Error) => void) => cb());
+            const unlinkMock = vi.fn((_path: string, cb: (err?: Error) => void) => cb());
+            const sftpMock = { fastPut: fastPutMock, unlink: unlinkMock };
+            setupSftpMocks(sftpMock, sshMock);
+
+            const result = await ZSshUtils.installServer(new SshSession(fakeSession), "~/.zowe-server", {
+                onInsufficientSpaceWarning: undefined,
+            });
+            expect(result).toBe(true);
+            expect(fastPutMock).toHaveBeenCalled();
+        });
+
         it("should continue the deployment if insufficient space detected and the onInsufficientSpaceWarning callback returns true", async () => {
             vi.spyOn(ZSshUtils, "getAvailableMb").mockResolvedValue({ mb: 1, stderr: "" });
             const sshMock = {

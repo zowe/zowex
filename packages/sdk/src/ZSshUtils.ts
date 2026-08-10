@@ -330,7 +330,7 @@ export class ZSshUtils {
 
                 if (availableMb.mb < ZSshClient.REQUIRED_DEPLOY_SIZE_MB) {
                     if (
-                        !options.onInsufficientSpaceWarning ||
+                        options.onInsufficientSpaceWarning &&
                         !(await options.onInsufficientSpaceWarning(availableMb.mb, ZSshClient.REQUIRED_DEPLOY_SIZE_MB))
                     ) {
                         Logger.getAppLogger().info(
