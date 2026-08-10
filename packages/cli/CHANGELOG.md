@@ -4,6 +4,11 @@ All notable changes to the Client code for "zowex-for-zowe-cli" are documented i
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## Recent Changes
+
+- Added `--exact-match` option to the `zssh list data-set` command. This option defaults to false for backwards compatibility, but can be set to true to avoid appending `.**` to the end of data set patterns. [#914](https://github.com/zowe/zowex/issues/914)
+- Fixed attribute columns being displayed when `zssh list data-set` is run without the `--attributes` option. [#1012](https://github.com/zowe/zowex/issues/1012)
+
 ## `0.6.1`
 
 - Added `--encoding` flag to `zssh submit local-file` and `zssh submit stdin` commands to specify the encoding of the submitted JCL. [#1050](https://github.com/zowe/zowex/pull/1050)
