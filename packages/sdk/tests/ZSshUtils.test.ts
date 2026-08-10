@@ -610,7 +610,6 @@ describe("ZSshUtils", () => {
             setupSftpMocks(sftpMock, sshMock);
             const expectedDeployDir = "/my/subdir/";
             // if the deploy dir did not exist before we started deploying, post-failure cleanup should try to delete it
-            let existsCalls = 0;
             vi.spyOn(ZSshUtils, "getAvailableMb").mockImplementation(async (_ssh, _dir) => {
                 throw new Error("Eek!");
             });
@@ -633,17 +632,13 @@ describe("ZSshUtils", () => {
             setupSftpMocks(sftpMock, sshMock);
             const expectedDeployDir = "/my/subdir/";
             // if the deploy dir did not exist before we started deploying, post-failure cleanup should try to delete it
-            let existsCalls = 0;
             const passwordErr = new ImperativeError({ msg: "bad pass", errorCode: "EPASSWD_EXPIRED" });
             vi.spyOn(ZSshUtils, "getAvailableMb").mockImplementation(async (_ssh, _dir) => {
                 throw passwordErr;
             });
-            vi.spyOn(ZSshUtils, "pathExists").mockImplementation(async (_ssh, _dir) => {
-                existsCalls++;
-                // only the first call should return false  so that when we do the cleanup, we
-                // simulate having
-                return { exists: existsCalls !== 1, stderr: "" };
-            });
+            vi.spyOn(ZSshUtils, "pathExists")
+                .mockReturnValueOnce({ exists: false, stderr: "" })
+                .mockReturnValue({ exists: true, stderr: "" });
             await expect(ZSshUtils.installServer(new SshSession(fakeSession), expectedDeployDir, {})).rejects.toThrow(
                 passwordErr,
             );
