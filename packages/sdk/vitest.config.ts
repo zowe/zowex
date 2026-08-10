@@ -16,6 +16,8 @@
 
 import { defineConfig, mergeConfig } from "vitest/config";
 import rootConfig from "../../vitest.config";
+
+// biome-ignore lint/correctness/noUnusedVariables: removing `projects` variable breaks tests
 const { projects, ...sharedTestConfig } = rootConfig.test || {};
 const sharedConfig = { ...rootConfig, test: sharedTestConfig };
 
