@@ -212,7 +212,7 @@ typedef struct
 typedef void (*PTR64 ROUTINE)(ZRCVY_ENV *);
 typedef int (*PTR64 RECOVERY_ROUTINE)(SDWA);
 
-#pragma prolog(ZRCVYRTY, " ZWEPROLG NEWDSA=NO ")
+#pragma prolog(ZRCVYRTY, " ZWEPROLG NEWDSA=NO,SAVE=NO ")
 #pragma epilog(ZRCVYRTY, " ZWEEPILG ")
 typedef void (*RETRY_ROUTINE)(ZRCVY_ENV);
 static void ZRCVYRTY(ZRCVY_ENV zenv)
@@ -264,11 +264,11 @@ static int ZRCVYARR(SDWA sdwa)
   zenv->recovery_entered = 1;
 
   // capture abend information from SDWA using IBM standards
-  // Extract completion code from SDWAABCC (4 bytes)  
+  // Extract completion code from SDWAABCC (4 bytes)
   unsigned int temp_abend_code = 0;
-  memcpy(&temp_abend_code, &sdwa.sdwafiob.sdwaabcc, sizeof(unsigned int)); //4 bytes
+  memcpy(&temp_abend_code, &sdwa.sdwafiob.sdwaabcc, sizeof(unsigned int)); // 4 bytes
   zenv->abend_rc = temp_abend_code;
-  
+
   // Extract reason code from SDWAOCRC using the DSECT definition
   if (sdwa.sdwaxpad) {
     struct sdwaptrs *ptrs = (struct sdwaptrs *)sdwa.sdwaxpad;
@@ -280,7 +280,7 @@ static int ZRCVYARR(SDWA sdwa)
       zenv->abend_rsn = 0;
     }
   } else {
-    zenv->abend_rsn = 0; 
+    zenv->abend_rsn = 0;
   }
 
   if (sdwa.sdwaerrd & sdwaclup) // clean up only
