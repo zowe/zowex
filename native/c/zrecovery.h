@@ -270,22 +270,16 @@ static int ZRCVYARR(SDWA sdwa)
   zenv->abend_rc = temp_abend_code;
 
   // Extract reason code from SDWAOCRC using the DSECT definition
-  if (sdwa.sdwaxpad)
-  {
+  if (sdwa.sdwaxpad) {
     struct sdwaptrs *ptrs = (struct sdwaptrs *)sdwa.sdwaxpad;
-    if (ptrs->sdwasrvp)
-    {
+    if (ptrs->sdwasrvp) {
       const struct sdwarc1 *rc1 = (const struct sdwarc1 *)ptrs->sdwasrvp;
       // Use the DSECT macro directly, which expands to sdwaserv.sdwarc1p.sdwart12._sdwaocrc
       zenv->abend_rsn = rc1->sdwaocrc;
-    }
-    else
-    {
+    } else {
       zenv->abend_rsn = 0;
     }
-  }
-  else
-  {
+  } else {
     zenv->abend_rsn = 0;
   }
 
