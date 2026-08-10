@@ -31,6 +31,11 @@
          GBLB  &ZG_SAM64
 .*
 &MACNM   SETC  '&SYSMAC(0)'
+.*
+.*       Re-enable the compiler-generated F4SA signature store in
+.*       case the paired ZWEPROLG SAVE=NO suppressed it
+.*
+&CCN_SASIG SETB 1
 
 &IS_64   SETB  (&CCN_LP64 OR &ZG_SAM64)
 &IS_AR   SETB  ('&CCN_ASCM' EQ 'AR')
