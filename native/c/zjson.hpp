@@ -2406,7 +2406,7 @@ void serialize_fields(const T &obj, Value &result, Fields... fields)
 }
 
 template <typename T>
-bool deserialize_fields_impl(T &obj, const ObjectMap &object)
+bool deserialize_fields_impl(T &, const ObjectMap &)
 {
   return true;
 }

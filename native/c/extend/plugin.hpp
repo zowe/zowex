@@ -37,7 +37,7 @@
 //
 // Version 1 was the implicit, unversioned contract before this constant existed. A plug-in that
 // does not export zowex_plugin_abi_version() reports as version 0 and is rejected.
-#define ZOWEX_PLUGIN_ABI_VERSION 2u
+constexpr unsigned int ZOWEX_PLUGIN_ABI_VERSION = 2u;
 
 // Plug-ins must expand this once, in the same translation unit as register_plugin().
 #define ZOWEX_PLUGIN_DECLARE_ABI()                   \
@@ -60,11 +60,11 @@ namespace ast
 {
 struct Ast;
 
-typedef std::shared_ptr<Ast> Node;
-typedef std::shared_ptr<std::string> StringPtr;
-typedef std::shared_ptr<std::vector<Node>> VecPtr;
-typedef std::map<std::string, Node> ObjMap;
-typedef std::shared_ptr<ObjMap> ObjPtr;
+using Node = std::shared_ptr<Ast>;
+using StringPtr = std::shared_ptr<std::string>;
+using VecPtr = std::shared_ptr<std::vector<Node>>;
+using ObjMap = std::map<std::string, Node>;
+using ObjPtr = std::shared_ptr<ObjMap>;
 
 struct Ast
 {
@@ -795,7 +795,7 @@ struct ArgGetter<std::vector<std::string>>
   }
 };
 
-typedef std::map<std::string, Argument> ArgumentMap;
+using ArgumentMap = std::map<std::string, Argument>;
 
 class Io
 {

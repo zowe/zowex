@@ -102,7 +102,7 @@ export class ZSshUtils {
             const uname = await ssh.execCommand("uname -srv");
             systemInfo = `${uname.stdout ?? ""}${uname.stderr ?? ""}`.trim();
         } catch (err) {
-            Logger.getAppLogger().debug(`[ZSshUtils] Could not read the target system level: ${err}`);
+            Logger.getAppLogger().debug(`[ZSshUtils] Could not read the target system level: ${err.message}`);
         }
 
         const details = [`${bin} --version RC=${result.code}: ${output}`, systemInfo && `System: ${systemInfo}`]
