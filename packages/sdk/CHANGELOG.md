@@ -7,6 +7,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## Recent Changes
 
 - Added detection of available disk space on the z/OS Unix deployment directory in the `ZSshUtils.installServer` method, giving the user the opportunity to cancel deployment if they have less than the recommended amount of available space. [#1088](https://github.com/zowe/zowex/pull/1088)
+- Added `exactMatch` property to the `ListDatasetsRequest` type. This option defaults to false for backwards compatibility, but can be set to true to avoid appending `.**` to the end of data set patterns. [#914](https://github.com/zowe/zowex/issues/914)
 
 ## `0.7.1`
 
