@@ -614,12 +614,9 @@ describe("ZSshUtils", () => {
             vi.spyOn(ZSshUtils, "getAvailableMb").mockImplementation(async (_ssh, _dir) => {
                 throw new Error("Eek!");
             });
-            vi.spyOn(ZSshUtils, "pathExists").mockImplementation(async (_ssh, _dir) => {
-                existsCalls++;
-                // only the first call should return false  so that when we do the cleanup, we
-                // simulate having
-                return { exists: existsCalls !== 1, stderr: "" };
-            });
+            vi.spyOn(ZSshUtils, "pathExists")
+                .mockReturnValueOnce({ exists: false, stderr: "" })
+                .mockReturnValue({ exists: true, stderr: "" });
             const result = await ZSshUtils.installServer(new SshSession(fakeSession), expectedDeployDir, {});
             expect(result).toBe(false);
             expect(fastPutMock).not.toHaveBeenCalled();
