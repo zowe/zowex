@@ -33,7 +33,8 @@
 .*       SAVE=[SA,BAKR,NO]
 .*         SA: (default) save input regs
 .*         BAKR: save registers on linkage stack
-.*         NO: do not save save input registers
+.*         NO: do not save save input registers; also suppresses
+.*             the compiler-generated F4SA save area signature
 .*
 .*       USENAB=[NO,YES]
 .*         NO: (default) do not attempt to use NAB
@@ -133,8 +134,20 @@
 .*
 .*       Process SAVE=
 .*
+.*       &CCN_SASIG gates the compiler-generated F4SA signature store
+.*       (ST x,4(,13)) emitted after this prolog. A SAVE=NO function
+.*       has no save area and R13 may not address usable storage, so
+.*       we suppress the store. 
+.*       IBM Doc: Metal C and MVS linkage conventions
+.*
+.*       Allow compiler-generated F4SA signature store by default.
+&CCN_SASIG SETB 1
          AIF   ('&SAVE' EQ 'BAKR').CONT120
-         AIF   ('&SAVE' EQ 'NO').CONT200
+         AIF   ('&SAVE' NE 'NO').CONT110
+&CCN_SASIG SETB 0
+         AGO   .CONT200
+.*
+.CONT110 ANOP  ,
 &ZG_SAVE SETB  1
          AGO   .CONT130
 .*
