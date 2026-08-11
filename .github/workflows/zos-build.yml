@@ -53,7 +53,14 @@ jobs:
                 user: "${{ secrets.SSH_MARIST_ZNP_ID }}"
                 password: "${{ secrets.SSH_MARIST_ZNP_PASS }}"
               deployDir: "/ZOWE/tmp/zowex"
-              preBuildCmd: "export PATH=/usr/lpp/IBM/cnw/v2r2/openxl/bin:$PATH"
+              # Open XL C/C++ 2.1 is the newest compiler IBM supports on z/OS 2.5, our minimum
+              # supported release. Open XL 2.2 requires z/OS 3.1+, and its newer libc++ raises the
+              # Language Environment runtime level every consumer of this artifact must carry.
+              # See native/c/compat/README.md and https://github.com/zowe/zowex/issues/871.
+              #
+              # \$PATH is escaped so it reaches config.yaml literally and is expanded by the z/OS
+              # shell, not by this runner's heredoc.
+              preBuildCmd: "export PATH=/usr/lpp/IBM/cnw/v2r1/openxl/bin:\$PATH"
           EOF
 
       - name: Install Dependencies
@@ -64,7 +71,21 @@ jobs:
         run: npm pkg set version=${{ inputs.version }}
 
       - name: Build on z/OS
-        run: npm run z:rebuild && npm run z:package
+        run: npm run z:rebuild
+
+      # Informational, uploaded as an artifact for inspection. Does not gate: what keeps the binary
+      # loadable on the minimum supported release is the Open XL level pinned above.
+      - name: List runtime imports
+        run: npm run z:imports
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: zowex-runtime-imports
+          path: listings/*
+
+      - name: Package server artifacts
+        run: npm run z:package
 
       - uses: actions/upload-artifact@v4
         with:

@@ -152,6 +152,74 @@ describe("ZSshUtils", () => {
             expect(result).toBe(true);
             expect(fastPutMock).toHaveBeenCalledTimes(1);
             expect(unlinkMock).toHaveBeenCalledTimes(1);
+            // The install is only complete once the binary is confirmed to load on the target
+            expect(sshMock.execCommand).toHaveBeenCalledWith("./zowex --version", { cwd: "./.zowe-server" });
+        });
+
+        describe("installServer binary verification", () => {
+            const CEE3561S =
+                "CEE3561S The external function _ZNSt5__1_e13__hash_memoryEPKvm was not found in DLL CRTEQCXE.";
+
+            function mocksFailingVerify(verifyResult: { code: number; stdout?: string; stderr?: string }) {
+                const sftpMock = {
+                    fastPut: vi.fn((_l: string, _r: string, _o: any, cb: (err?: Error) => void) => cb()),
+                    unlink: vi.fn((_p: string, cb: (err?: Error) => void) => cb()),
+                };
+                const sshMock = {
+                    execCommand: vi.fn().mockImplementation(async (command: string) => {
+                        if (command.includes("--version")) return { code: 0, stdout: "", stderr: "", ...verifyResult };
+                        if (command.startsWith("uname")) return { code: 0, stdout: "OS/390 27.00 04", stderr: "" };
+                        return { code: 0, stdout: "", stderr: "" };
+                    }),
+                };
+                setupSftpMocks(sftpMock, sshMock);
+                return sshMock;
+            }
+
+            it("throws ELERUNTIME when the binary cannot be loaded by Language Environment", async () => {
+                mocksFailingVerify({ code: 1, stderr: CEE3561S });
+
+                await expect(
+                    ZSshUtils.installServer(new SshSession(fakeSession), "~/.zowe-server"),
+                ).rejects.toMatchObject({
+                    errorCode: "ELERUNTIME",
+                    mDetails: expect.objectContaining({
+                        msg: expect.stringContaining("Language Environment"),
+                    }),
+                });
+            });
+
+            it("includes the target system level in the details of a load failure", async () => {
+                mocksFailingVerify({ code: 1, stderr: CEE3561S });
+
+                await expect(
+                    ZSshUtils.installServer(new SshSession(fakeSession), "~/.zowe-server"),
+                ).rejects.toMatchObject({
+                    mDetails: expect.objectContaining({
+                        additionalDetails: expect.stringContaining("OS/390 27.00 04"),
+                    }),
+                });
+            });
+
+            it("routes a load failure through onError with the verify context", async () => {
+                mocksFailingVerify({ code: 1, stderr: CEE3561S });
+                const onError = vi.fn().mockResolvedValue(false);
+
+                const result = await ZSshUtils.installServer(new SshSession(fakeSession), "~/.zowe-server", {
+                    onError,
+                });
+
+                expect(result).toBe(false);
+                expect(onError).toHaveBeenCalledWith(expect.objectContaining({ errorCode: "ELERUNTIME" }), "verify");
+            });
+
+            it("reports EDEPLOYFAIL when the binary fails for a reason unrelated to the runtime", async () => {
+                mocksFailingVerify({ code: 126, stderr: "EDC5111I Permission denied." });
+
+                await expect(
+                    ZSshUtils.installServer(new SshSession(fakeSession), "~/.zowe-server"),
+                ).rejects.toMatchObject({ errorCode: "EDEPLOYFAIL" });
+            });
         });
 
         it("should report progress during SFTP upload", async () => {

@@ -45,6 +45,10 @@ void BasicCommandRegistry::register_commands(CommandProviderImpl::CommandRegistr
   ctx.add_to_server(sample_group);
 }
 
+// Declares which zowex plug-in ABI this .so was compiled against. Required: zowex rejects any
+// plug-in that does not export it, or that reports a version it was not built for.
+ZOWEX_PLUGIN_DECLARE_ABI()
+
 void register_plugin(plugin::PluginManager &pm)
 {
   pm.register_plugin_metadata("Sample Plug-in", "1.0.0");

@@ -360,13 +360,13 @@ $(OUT_DIR)/extend/plugin.o: extend/plugin.cpp
 # Test CLI
 #
 $(OUT_DIR)/zowex: $(OUT_DIR)/zowex.o $(OUT_DIR)/extend/plugin.o $(COMMAND_OBJS) $(SERVER_OBJS) $(OUT_DIR)/zjsonm.o $(OUT_DIR)/libzcn.a $(OUT_DIR)/libzut.a $(OUT_DIR)/libzjb.a $(OUT_DIR)/libzds.a $(OUT_DIR)/libzusf.a $(OUT_DIR)/libztso.a
-	@echo 'Building zowex'
+	@echo 'Building zowex (z/OS target level: $(ZosMinLevel))'
 	$(CXX) $(CPP_BND_FLAGS) -o $@ $^
 
 zowex: $(OUT_DIR) $(OUT_DIR)/zowex
 
 $(OUT_DIR)/zoweax: $(OUT_DIR)/zowex.o $(OUT_DIR)/extend/plugin.o $(COMMAND_OBJS) $(SERVER_OBJS) $(OUT_DIR)/zjsonm.o $(OUT_DIR)/libzcn.a $(OUT_DIR)/libzut.a $(OUT_DIR)/libzjb.a $(OUT_DIR)/libzds.a $(OUT_DIR)/libzusf.a $(OUT_DIR)/libztso.a
-	@echo 'Building zoweax'
+	@echo 'Building zoweax (z/OS target level: $(ZosMinLevel))'
 	$(CXX) $(CPP_BND_FLAGS_AUTH) -o $@ $^
 	extattr +ap $@
 
@@ -396,6 +396,16 @@ $(OUT_DIR)/zowex.o: zowex.cpp
 #
 # TODO(Kelosky): makefile for chdsect (must have ADATA in data set)
 #
+
+#
+# Runtime import report
+#
+# Lists the external symbols zowex/zoweax import from DLLs. Informational: the floor is enforced at
+# bind time by LDFLAGS, not here. Kept out of `all` so incremental builds and `npm run z:watch` stay
+# fast. See compat/README.md.
+#
+runtime-imports: zowex zoweax
+	sh tools/report_runtime_imports.sh $(ZosMinLevel)
 
 #
 # Misc targets

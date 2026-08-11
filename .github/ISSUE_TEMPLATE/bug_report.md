@@ -42,6 +42,8 @@ Details about the behavior:
 - Operating system and version:
 - Shell/terminal (bash, cmd, powershell, etc...):
 - Daemon mode enabled or disabled:
+- z/OS release of the target system (run `uname -srv` over SSH):
+- Language Environment maintenance level on the target system (ask your system programmer; needed for any CEE-prefixed failure):
 - For more information, see Gathering information to troubleshoot Zowe CLI
 -->
 
