@@ -25,7 +25,9 @@ export interface ISshCallbacks {
     onProgress?: (increment: number) => void; // Callback to report incremental progress
     onError?: (error: Error, context: string) => Promise<boolean>; // Callback to handle errors, returns true to continue/retry
     /**
-     * Callback to ask if the user wants to proceed with deployment even when they appear
+     * Callback to ask if the user wants to proceed with deployment even when they appear.
+     * If "available" is -1, it means we were not able to parse the output of the df command
+     * and do not know the amount of available space.
      * @returns true if we should attempt deployment anyway.
      */
     onInsufficientSpaceWarning?: (available: number, recommended: number) => Promise<boolean>;
