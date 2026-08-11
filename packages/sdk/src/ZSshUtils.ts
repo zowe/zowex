@@ -428,7 +428,7 @@ export class ZSshUtils {
                     : undefined;
 
                 Logger.getAppLogger().info(
-                    `[ZSshUtils] Step 2/4: Uploading ${ZSshUtils.SERVER_PAX_FILE} to ${remotePaxPath}`,
+                    `[ZSshUtils] Step 2/5: Uploading ${ZSshUtils.SERVER_PAX_FILE} to ${remotePaxPath}`,
                 );
                 try {
                     await promisify(sftp.fastPut.bind(sftp))(localPaxPath, remotePaxPath, { step: progressCallback });
@@ -452,7 +452,7 @@ export class ZSshUtils {
                     return false;
                 }
 
-                Logger.getAppLogger().info(`[ZSshUtils] Step 3/4: Extracting PAX archive in ${remoteDir}`);
+                Logger.getAppLogger().info(`[ZSshUtils] Step 3/5: Extracting PAX archive in ${remoteDir}`);
                 const result = await ssh.execCommand(`pax -rzf ${ZSshUtils.SERVER_PAX_FILE}`, { cwd: remoteDir });
                 if (await ZSshUtils.routeExpiredPasswordError(result.stderr ?? "", "extract", options)) return false;
                 if (result.code === 0) {
@@ -508,7 +508,7 @@ export class ZSshUtils {
 
                 return false;
             }
-            Logger.getAppLogger().info(`[ZSshUtils] Step 4/4: Cleaning up ${remotePaxPath}`);
+            Logger.getAppLogger().info(`[ZSshUtils] Step 4/5: Cleaning up ${remotePaxPath}`);
             try {
                 await promisify(sftp.unlink.bind(sftp))(remotePaxPath);
             } catch (err) {
