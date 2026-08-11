@@ -18,6 +18,21 @@ profiles:
 
     # Command to run before building the native code
     # preBuildCmd: '. ~/entrypoint.sh'  # Run script to configure build environment
+    #
+    # Put the supported Open XL C/C++ level on the PATH. See native/c/compat/README.md for why
+    # the level matters and which one to pick.
+    # preBuildCmd: 'export PATH=/usr/lpp/IBM/cnw/v2r1/openxl/bin:$PATH'
+    #
+    # If the bind fails with unresolved _ZNSt... references, name the LE C++ side decks
+    # explicitly. See native/c/compat/README.md.
+    # preBuildCmd: |-
+    #   export LDFLAGS="//'CEE.SCEELIB2(CELQS001)' //'CEE.SCEELIB2(CELQS003)' //'CEE.SCEELIB2(CRTDQCXE)'"
+    #
+    # For a hard guarantee, bind against side decks copied from your oldest supported system.
+    # See native/c/compat/README.md for the member list and caveats.
+    # preBuildCmd: |-
+    #   export PATH=/usr/lpp/IBM/cnw/v2r1/openxl/bin:$PATH
+    #   export LDFLAGS="$(echo $HOME/sidedecks/zosv2r5/*.x)"
 
     # Environment variables forwarded to the test runner on z/OS (npm run z:test).
     # Use this to enable optional tests that depend on system-specific capabilities.
