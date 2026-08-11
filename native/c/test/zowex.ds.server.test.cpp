@@ -298,13 +298,49 @@ void zowex_ds_server_tests()
       it("should properly list data sets via RPC", [&]() -> void {
         int req_id;
         std::string request = make_rpc_request("listDatasets", "{\"pattern\":\"" + ds_pattern + "\"}", req_id);
-        
+
         write_to_server(server, request);
         std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
         Expect(response).ToContain("\"id\":" + std::to_string(req_id));
         Expect(response).ToContain("\"items\"");
+      });
+
+      it("should honor exactMatch via RPC", [&]() -> void {
+        const std::string ds_name = get_test_ds();
+        const std::string child_ds = ds_name + ".T00";
+
+        std::string setup_response;
+        execute_command_with_output(zowex_command + " ds create " + ds_name, setup_response);
+        execute_command_with_output(zowex_command + " ds create " + child_ds, setup_response);
+
+        int inclusive_id;
+        std::string inclusive_request = make_rpc_request(
+            "listDatasets", "{\"pattern\":\"" + ds_name + "\"}", inclusive_id);
+        write_to_server(server, inclusive_request);
+        const std::string inclusive_response = read_rpc_response(server);
+
+        int exact_id;
+        std::string exact_request = make_rpc_request(
+            "listDatasets", "{\"pattern\":\"" + ds_name + "\",\"exactMatch\":true}", exact_id);
+        write_to_server(server, exact_request);
+        const std::string exact_response = read_rpc_response(server);
+
+        // Clean up before asserting so a failure cannot leak data sets
+        execute_command_with_output(zowex_command + " ds delete " + child_ds, setup_response);
+        execute_command_with_output(zowex_command + " ds delete " + ds_name, setup_response);
+
+        // Default: trailing ".**" is appended, so the descendant matches too
+        Expect(inclusive_response).ToContain("\"success\":true");
+        Expect(inclusive_response).ToContain(ds_name);
+        Expect(inclusive_response).ToContain(child_ds);
+
+        // exactMatch: the pattern is used verbatim
+        Expect(exact_response).ToContain("\"success\":true");
+        Expect(exact_response).ToContain("\"id\":" + std::to_string(exact_id));
+        Expect(exact_response).ToContain(ds_name);
+        Expect(exact_response).Not().ToContain(child_ds);
       });
     });
 
