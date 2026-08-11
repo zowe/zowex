@@ -101,6 +101,24 @@ export class ZSshUtils {
     }
 
     /**
+     * Remove unsafe characters from a path to avoid injection attacks when
+     * From the MIT-licensed node-shlex.
+     * https://github.com/rgov/node-shlex
+     */
+    private static quotePath(path: string): string {
+        if (path === "") {
+            return "''";
+        }
+
+        const unsafeRe = /[^\w@%\-+=:,./]/;
+        if (!unsafeRe.test(path)) {
+            return path;
+        }
+
+        return `'${path.replace(/('+)/g, "'\"$1\"'")}'`.replace(/^''|''$/g, "");
+    }
+
+    /**
      * Runs the freshly installed server binary to confirm z/OS can load it.
      *
      * A Language Environment mismatch (e.g. CEE3561S) is a *load-time* failure: the binary never
@@ -194,7 +212,7 @@ export class ZSshUtils {
      * and a boolean of whether the path exists.
      */
     public static async pathExists(ssh: NodeSSH, testPath: string): Promise<PathExistsResponse> {
-        const testExistsCmd = await ssh.execCommand(`test -e ${testPath}`);
+        const testExistsCmd = await ssh.execCommand(`test -e ${ZSshUtils.quotePath(testPath)}`);
         Logger.getAppLogger().debug(
             `[ZSshUtils] test -e %s, code %d, stdout: '%s', stderr: '%s'`,
             testPath,
@@ -282,6 +300,7 @@ export class ZSshUtils {
             if (foundBin) {
                 details.serverPath = foundBin;
                 Logger.getAppLogger().info(`[ZSshUtils] Found zowex executable at ${details.serverPath}`);
+                // should not need to use quotePath here since this is not based on user input
                 const testExecuteCmd = await ssh.execCommand(`${details.serverPath} -v`);
                 details.hasExecutePermission = testExecuteCmd.code === 0;
                 details.version = details.hasExecutePermission ? testExecuteCmd.stdout.trim() : undefined;
@@ -308,7 +327,7 @@ export class ZSshUtils {
 
             // See: https://www.man7.org/linux/man-pages/man1/test.1.html
             const pathExistsCheck = await ZSshUtils.pathExists(ssh, testPath);
-            const testWriteCmd = await ssh.execCommand(`test -w ${testPath}`);
+            const testWriteCmd = await ssh.execCommand(`test -w ${ZSshUtils.quotePath(testPath)}`);
             Logger.getAppLogger().debug(
                 `[ZSshUtils] test -w %s, code %d, stdout: '%s', stderr: '%s'`,
                 testPath,
@@ -326,7 +345,7 @@ export class ZSshUtils {
      *
      */
     public static async getAvailableMb(ssh: NodeSSH, dir: string): Promise<AvailableMBResponse> {
-        const dfCommand = await ssh.execCommand(`df -m ${dir}`);
+        const dfCommand = await ssh.execCommand(`df -m ${ZSshUtils.quotePath(dir)}`);
         const response: AvailableMBResponse = { mb: -1, stderr: dfCommand.stderr };
         if (dfCommand.code !== 0) {
             Logger.getAppLogger().info(
@@ -370,18 +389,20 @@ export class ZSshUtils {
             Logger.getAppLogger().info(`[ZSshUtils] Step 1/5: Creating remote directory ${remoteDir}`);
             const remotePaxPath = path.posix.join(remoteDir, ZSshUtils.SERVER_PAX_FILE);
             const initialRemoteDirExistCheck = await ZSshUtils.pathExists(ssh, remoteDir);
-            if (await ZSshUtils.routeExpiredPasswordError(initialRemoteDirExistCheck.stderr ?? "", "deploy", options))
+            if (await ZSshUtils.routeExpiredPasswordError(initialRemoteDirExistCheck.stderr ?? "", "deploy", options)) {
                 return false;
+            }
 
             try {
-                const execReturn = await ssh.execCommand(`mkdir -p ${remoteDir}`);
+                const execReturn = await ssh.execCommand(`mkdir -p ${ZSshUtils.quotePath(remoteDir)}`);
                 const availableMb = await ZSshUtils.getAvailableMb(ssh, remoteDir);
-                if (await ZSshUtils.routeExpiredPasswordError(availableMb.stderr ?? "", "deploy", options))
+                if (await ZSshUtils.routeExpiredPasswordError(availableMb.stderr ?? "", "deploy", options)) {
                     return false;
+                }
 
                 if (availableMb.mb < ZSshClient.REQUIRED_DEPLOY_SIZE_MB) {
                     if (
-                        options.onInsufficientSpaceWarning &&
+                        options?.onInsufficientSpaceWarning &&
                         !(await options.onInsufficientSpaceWarning(availableMb.mb, ZSshClient.REQUIRED_DEPLOY_SIZE_MB))
                     ) {
                         Logger.getAppLogger().info(
@@ -394,7 +415,9 @@ export class ZSshUtils {
                         );
                     }
                 }
-                if (await ZSshUtils.routeExpiredPasswordError(execReturn.stderr ?? "", "deploy", options)) return false;
+                if (await ZSshUtils.routeExpiredPasswordError(execReturn.stderr ?? "", "deploy", options)) {
+                    return false;
+                }
                 if (execReturn.code !== 0) {
                     const technical = `mkdir -p ${remoteDir} RC=${execReturn.code}: ${execReturn.stderr}`;
                     Logger.getAppLogger().error(`[ZSshUtils] Step 1 FAILED: ${technical}`);
@@ -433,7 +456,9 @@ export class ZSshUtils {
                 try {
                     await promisify(sftp.fastPut.bind(sftp))(localPaxPath, remotePaxPath, { step: progressCallback });
                 } catch (err) {
-                    if (await ZSshUtils.routeExpiredPasswordError(String(err), "upload", options)) return false;
+                    if (await ZSshUtils.routeExpiredPasswordError(String(err), "upload", options)) {
+                        return false;
+                    }
                     const codePart = (err as SftpError).code == null ? "" : ` RC=${(err as SftpError).code}`;
                     const technical = `Upload ${ZSshUtils.SERVER_PAX_FILE}${codePart}: ${err}`;
                     Logger.getAppLogger().error(`[ZSshUtils] Step 2 FAILED: ${technical}`);
@@ -454,7 +479,9 @@ export class ZSshUtils {
 
                 Logger.getAppLogger().info(`[ZSshUtils] Step 3/5: Extracting PAX archive in ${remoteDir}`);
                 const result = await ssh.execCommand(`pax -rzf ${ZSshUtils.SERVER_PAX_FILE}`, { cwd: remoteDir });
-                if (await ZSshUtils.routeExpiredPasswordError(result.stderr ?? "", "extract", options)) return false;
+                if (await ZSshUtils.routeExpiredPasswordError(result.stderr ?? "", "extract", options)) {
+                    return false;
+                }
                 if (result.code === 0) {
                     Logger.getAppLogger().info(`[ZSshUtils] Step 3 OK: Extracted server binaries`);
                 } else {
@@ -471,7 +498,7 @@ export class ZSshUtils {
                             return false;
                         }
                     } else {
-                        return false;
+                        throw paxErr;
                     }
                 }
             } catch (deployErr) {
@@ -490,8 +517,9 @@ export class ZSshUtils {
                             "extract",
                             options,
                         )
-                    )
+                    ) {
                         return false;
+                    }
                     if (postFailurePaxExistsCheck.exists) {
                         await promisify(sftp.unlink.bind(sftp))(remotePaxPath);
                     }
@@ -500,7 +528,7 @@ export class ZSshUtils {
                         Logger.getAppLogger().debug(
                             `Post-failure cleanup: deleting remote dir ${remoteDir} which we created`,
                         );
-                        await promisify(sftp.unlink.bind(sftp))(remoteDir);
+                        await promisify(sftp.rmdir.bind(sftp))(remoteDir);
                     }
                 } catch (failureCleanupErr) {
                     Logger.getAppLogger().error(`Error was thrown during post-failure cleanup: ${failureCleanupErr} `);
@@ -550,7 +578,7 @@ export class ZSshUtils {
     ): Promise<void> {
         Logger.getAppLogger().debug(`Uninstalling server from ${session.ISshSession.hostname} at path: ${serverPath}`);
         return ZSshUtils.sftp(session, async (_sftp, ssh) => {
-            const result = await ssh.execCommand(`rm -rf ${serverPath}`);
+            const result = await ssh.execCommand(`rm -rf ${ZSshUtils.quotePath(serverPath)}`);
             if (await ZSshUtils.routeExpiredPasswordError(result.stderr ?? "", "unlink", options)) return;
             if (result.code === 0) {
                 Logger.getAppLogger().debug(`Deleted directory ${serverPath} with response: ${result.stdout}`);

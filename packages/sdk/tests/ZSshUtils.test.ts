@@ -691,8 +691,12 @@ describe("ZSshUtils", () => {
                 execCommand: vi.fn().mockResolvedValue({ code: 0, stderr: "", stdout: "" }),
             };
             const fastPutMock = vi.fn((_local: string, _remote: string, _opts: any, cb: (err?: Error) => void) => cb());
-            const unlinkMock = vi.fn((_path: string, cb: (err?: Error) => void) => cb());
-            const sftpMock = { fastPut: fastPutMock, unlink: unlinkMock };
+            const rmdirMock = vi.fn((_path: string, cb: (err?: Error) => void) => cb());
+            const sftpMock = {
+                fastPut: fastPutMock,
+                unlink: vi.fn((_path: string, cb: (err?: Error) => void) => cb()),
+                rmdir: rmdirMock,
+            };
             setupSftpMocks(sftpMock, sshMock);
             const expectedDeployDir = "/my/subdir/";
             // if the deploy dir did not exist before we started deploying, post-failure cleanup should try to delete it
@@ -707,7 +711,7 @@ describe("ZSshUtils", () => {
             const result = await ZSshUtils.installServer(new SshSession(fakeSession), expectedDeployDir, {});
             expect(result).toBe(false);
             expect(fastPutMock).not.toHaveBeenCalled();
-            expect(unlinkMock).toHaveBeenLastCalledWith(expectedDeployDir, expect.anything());
+            expect(rmdirMock).toHaveBeenCalledWith(expectedDeployDir, expect.anything());
         });
 
         it("should NOT attempt post-failure cleanup if a step of the deployment throws a password expired error", async () => {
