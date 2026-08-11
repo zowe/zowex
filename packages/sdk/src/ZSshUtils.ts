@@ -57,7 +57,15 @@ export interface PathExistsResponse {
 }
 
 export interface AvailableMBResponse {
+    /**
+     * The number of available megabytes detected at the mount point of the provided path.
+     * is -1, it means we were not able to parse the output of the df command
+     * and do not know the amount of available space.
+     */
     mb: number;
+    /**
+     * Any standard error output produced when executing the df command to detect available space.
+     */
     stderr: string;
 }
 
