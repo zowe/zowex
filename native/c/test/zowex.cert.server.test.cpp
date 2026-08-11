@@ -145,5 +145,20 @@ void zowex_cert_server_tests()
           Expect(response).ToContain("\"error\"");
         }
       });
+    });
+
+    describe("structured error payload (no authority required)", [&]() -> void {
+      it("deleteCertificate surfaces safReturns in the JSON-RPC error data", [&]() -> void {
+        // R_datalib rejects a nonexistent owner/ring/label combination for any
+        // caller, regardless of the caller's own ESM authority, so this SAF
+        // failure -- and the structured error object the handler attaches via
+        // set_error_object()/report_error() -- is guaranteed without a gate.
+        write_to_server(server, make_rpc_request("deleteCertificate",
+                                                 "{\"owner\":\"ZZNOSUCH\",\"keyring\":\"NORING\",\"label\":\"NOLABEL\"}"));
+        std::string response = read_rpc_response(server);
+        Expect(response).ToContain("\"error\"");
+        Expect(response).ToContain("\"safReturns\"");
+        Expect(response).Not().ToContain("\"success\":true");
+      });
     }); });
 }

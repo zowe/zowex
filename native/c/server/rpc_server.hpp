@@ -77,6 +77,7 @@ private:
   zjson::Value convert_ast_to_json(const ast::Node &ast_node);
   void print_response(const RpcResponse &response, MiddlewareContext *context = nullptr);
   void print_error(int request_id, int code, const std::string &message, const std::string *data = nullptr);
+  void print_error(int request_id, int code, const std::string &message, const zjson::Value &data);
   validator::ValidationResult validate_json_with_schema(const std::string &method, const zjson::Value &params, bool is_request);
   void add_large_data_to_json(std::string &json_string, const std::string &field_name, const std::string &data);
 
