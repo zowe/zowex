@@ -137,13 +137,13 @@ graph LR
   subgraph Client
   sdk[Node.js SDK Package]
   cli[Zowe CLI Plug-in]-->sdk
-  vsce[Zowe Explorer<br>VS Code Extension]-->sdk
-  other[&lt;My Custom App&gt;]-->sdk
+  vsce[Zowe Explorer for VS Code]-->sdk
+  other[&quot;My Custom App&quot;]-->sdk
   end
   subgraph z/OS Server
-  zowex["C++ CLI Binary<br>(zowex)"]-->cpp
-  ioserver["C++ I/O Server<br>(zowex server)"]-->cpp["C++ Libraries<br>(Backend)"]
-  python["Python REST API<br>(experimental)"]-->cpp
+  zowex["C++ CLI Binary (zowex)"]-->cpp
+  ioserver["C++ I/O Server (zowex server)"]-->cpp["C++ Libraries (Backend)"]
+  python["Python REST API (experimental)"]-->cpp
   sdk<-->|SSH|ioserver
   subgraph Mainframe Resources
   ds[Data Sets]
