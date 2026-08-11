@@ -342,6 +342,7 @@ For whole-PDS `ds get`, run `zx start` first — one persistent session is much 
 | `EDC5129I No such file or directory` on `zowex --help` | binary not tagged/executable — `chmod +x $ZX_BIN`; if it's a tag issue, `chtag -b $ZX_BIN` |
 | server returns nothing then EOF | request wasn't newline-terminated, or JSON was malformed — `zx rpc` always appends `\n` |
 | `CEE3501S module not found` | LE runtime not in LIBPATH — prefix server start with `export LIBPATH=$ZX_DIR/c/build-out:$LIBPATH;` |
+| `CEE3561S ... was not found in DLL CRTEQCXE` | the target's Language Environment libc++ doesn't export a symbol the binary needs — a *maintenance level* problem, not just a z/OS release. Nothing to fix on the client side: the binary must be built with Open XL 2.1 (not 2.2) for a z/OS 2.5 target, or the target needs LE PTFs. See `doc/troubleshooting.md` |
 | every method returns auth-style errors | the SSH user lacks the needed ESM access; zowex itself does no auth |
 | `ControlPath too long ('...' >= 104 bytes)` | Unix domain socket path limit (macOS: 104 bytes) — `$ZX_STATE/cm-%C` overflowed it. Use a short `ZX_STATE`, e.g. `/tmp/zx-<label>.$UID`, not a long nested path like a session scratch dir |
 | need password auth against a second host without disturbing an existing `zx` session/socket | give the second host its own `ZX_STATE` and prime its `ControlMaster` with `sshpass` — see §2c |

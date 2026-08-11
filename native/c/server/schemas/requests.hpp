@@ -187,7 +187,8 @@ ZJSON_SCHEMA(ListDatasetsRequest,
     FIELD_OPTIONAL(responseTimeout, NUMBER),
     FIELD_OPTIONAL(start, STRING),
     FIELD_REQUIRED(pattern, STRING),
-    FIELD_OPTIONAL(attributes, BOOL)
+    FIELD_OPTIONAL(attributes, BOOL),
+    FIELD_OPTIONAL(exactMatch, BOOL)
 );
 
 struct ListDsMembersRequest {};

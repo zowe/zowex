@@ -390,7 +390,7 @@ class WatchUtils {
 
                 const cwd = inDir ?? deployDirs.cDir;
                 const envSetup = preBuildCmd ? `${preBuildCmd}\n` : "";
-                const cmd = `${envSetup}cd ${cwd}\nmake\nexit $?\n`;
+                const cmd = `${envSetup}cd ${cwd}\nmake ${BUILD_TYPE_FLAG()}\nexit $?\n`;
                 stream.write(cmd);
 
                 let outText = "";
@@ -1325,6 +1325,24 @@ async function test(connection: Client) {
     await retrieve(connection, [`c/test/test-results.xml`], "native", false, true);
 }
 
+/**
+ * Lists the LE/libc++ symbols the built binaries import and downloads the report.
+ *
+ * Informational, not a gate: the floor is enforced at bind time by pointing LDFLAGS at side decks
+ * captured from a system at the minimum supported release. See native/c/compat/README.md.
+ */
+async function reportRuntimeImports(connection: Client) {
+    try {
+        await runCommandInShell(connection, `cd ${deployDirs.cDir} && make runtime-imports ${BUILD_TYPE_FLAG()}\n`, {
+            streamOutput: true,
+            stepName: "Listing runtime imports",
+        });
+    } finally {
+        // Retrieve the report even on failure - that is exactly when it is needed.
+        await retrieve(connection, ["c/build-out/runtime-imports.txt"], "listings", true, true);
+    }
+}
+
 async function buildChdsect(connection: Client, sftpcon: SFTPWrapper, target: string) {
     await uploadFile(
         sftpcon,
@@ -1576,6 +1594,9 @@ async function main() {
                 break;
             case "delete":
                 await rmdir(sshClient, config.sshProfile as IProfile);
+                break;
+            case "imports":
+                await reportRuntimeImports(sshClient);
                 break;
             case "make":
                 await make(sshClient);

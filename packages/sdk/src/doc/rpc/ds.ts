@@ -93,6 +93,10 @@ export interface ListDatasetsRequest
      * Whether to include attributes in the response
      */
     attributes?: boolean;
+    /**
+     * Whether to match the pattern exactly instead of appending a trailing wildcard
+     */
+    exactMatch?: boolean;
 }
 
 export interface ListDatasetsResponse extends common.CommandResponse {

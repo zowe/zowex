@@ -37,9 +37,8 @@ int handle_awesome(InvocationContext &context)
   //   arg.second.print(std::cout);
   // }
 
-  const std::unordered_map<std::string, plugin::Argument> &dynamic_args = context.dynamic_arguments();
-  for (std::unordered_map<std::string, plugin::Argument>::const_iterator it = dynamic_args.begin();
-       it != dynamic_args.end(); ++it)
+  const plugin::ArgumentMap &dynamic_args = context.dynamic_arguments();
+  for (plugin::ArgumentMap::const_iterator it = dynamic_args.begin(); it != dynamic_args.end(); ++it)
   {
     const std::pair<const std::string, plugin::Argument> &arg = *it;
     std::cout << "dynamic arg: " << arg.first << " " << arg.second.get_string_value() << std::endl;

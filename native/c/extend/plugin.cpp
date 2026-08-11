@@ -441,6 +441,23 @@ void PluginManager::load_plugin_file(const std::string &plugin_path, const std::
     return;
   }
 
+  // Check the ABI contract before calling into the plug-in: a plug-in built against a different
+  // layout of the types that cross this boundary would otherwise corrupt memory silently.
+  unsigned int (*abi_version)() = nullptr;
+  *(void **)(&abi_version) = dlsym(plugin, "zowex_plugin_abi_version");
+  const unsigned int reported_abi = abi_version != nullptr ? abi_version() : 0u;
+  if (reported_abi != ZOWEX_PLUGIN_ABI_VERSION)
+  {
+    ZLOG_ERROR("Rejected plugin %s: reports plug-in ABI version %u, zowex requires %u. "
+               "Rebuild the plug-in against the matching extend/plugin.hpp and expand "
+               "ZOWEX_PLUGIN_DECLARE_ABI() alongside register_plugin().",
+               plugin_path.c_str(),
+               reported_abi,
+               ZOWEX_PLUGIN_ABI_VERSION);
+    dlclose(plugin);
+    return;
+  }
+
   void (*register_plugin)(plugin::PluginManager &) = nullptr;
   *(void **)(&register_plugin) = dlsym(plugin, "register_plugin");
   if (!register_plugin)
