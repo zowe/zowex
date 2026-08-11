@@ -10,9 +10,12 @@
  */
 
 #include <cstdio>
+#include <fstream>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
+#include <sys/stat.h>
+#include <unistd.h>
 #include "ztest.hpp"
 #include "zut.hpp"
 #include "../zlogger.hpp"
@@ -357,6 +360,91 @@ void zut_tests()
 
                              expect(result).ToBe(input_data);
                              expect(result.length()).ToBe(input_data.length());
+                           });
+                      });
+
+             describe("zut_write_file_private",
+                      []() -> void
+                      {
+                        it("creates a new file with 0600 permissions regardless of umask",
+                           []() -> void
+                           {
+                             const std::string path = get_random_uss("/tmp");
+                             const mode_t old_umask = umask(0);
+
+                             std::string error;
+                             const int rc = zut_write_file_private(path, "hello", error);
+
+                             umask(old_umask);
+
+                             ExpectWithContext(rc, error).ToBe(RTNCD_SUCCESS);
+
+                             struct stat st{};
+                             expect(stat(path.c_str(), &st)).ToBe(0);
+                             expect(static_cast<int>(st.st_mode & 0777)).ToBe(0600);
+
+                             std::ifstream in(path.c_str(), std::ios::binary);
+                             const std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+                             expect(content).ToBe(std::string("hello"));
+
+                             unlink(path.c_str());
+                           });
+
+                        it("truncates and tightens permissions of an existing file",
+                           []() -> void
+                           {
+                             const std::string path = get_random_uss("/tmp");
+                             std::ofstream pre(path.c_str(), std::ios::binary);
+                             pre << "this is much longer pre-existing content";
+                             pre.close();
+                             chmod(path.c_str(), 0666);
+
+                             std::string error;
+                             const int rc = zut_write_file_private(path, "hi", error);
+
+                             ExpectWithContext(rc, error).ToBe(RTNCD_SUCCESS);
+
+                             struct stat st{};
+                             expect(stat(path.c_str(), &st)).ToBe(0);
+                             expect(static_cast<int>(st.st_mode & 0777)).ToBe(0600);
+
+                             std::ifstream in(path.c_str(), std::ios::binary);
+                             const std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+                             expect(content).ToBe(std::string("hi"));
+
+                             unlink(path.c_str());
+                           });
+
+                        it("reports an error when the path is not writable",
+                           []() -> void
+                           {
+                             const std::string path = get_random_uss("/tmp") + "-nonexistent-dir/file";
+
+                             std::string error;
+                             const int rc = zut_write_file_private(path, "data", error);
+
+                             expect(rc).Not().ToBe(RTNCD_SUCCESS);
+                             expect(error.empty()).ToBe(false);
+                           });
+
+                        it("writes binary data with null bytes intact",
+                           []() -> void
+                           {
+                             const std::string path = get_random_uss("/tmp");
+                             const std::string data("before\0after", 12); // explicit length to keep the embedded NUL
+
+                             std::string error;
+                             const int rc = zut_write_file_private(path, data, error);
+
+                             ExpectWithContext(rc, error).ToBe(RTNCD_SUCCESS);
+
+                             std::ifstream in(path.c_str(), std::ios::binary);
+                             const std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+
+                             expect(content.size()).ToBe(data.size());
+                             expect(content).ToBe(data);
+
+                             unlink(path.c_str());
                            });
                       });
 

@@ -15,7 +15,6 @@
 #include "../ztype.h"
 #include "../zut.hpp"
 #include <cctype>
-#include <fstream>
 #include <string>
 #include <vector>
 
@@ -232,14 +231,15 @@ int handle_cert_export(InvocationContext &context)
 
   if (!file.empty())
   {
-    std::ofstream out(file.c_str(), std::ios::binary);
-    if (!out)
+    // The exported bytes may be a PKCS#12 bundle containing a private key, so
+    // the file is created (or truncated) owner-read/write only, independent of
+    // the process umask.
+    std::string err;
+    if (zut_write_file_private(file, data, err) != RTNCD_SUCCESS)
     {
-      context.error_stream() << "Error: could not open output file: " << file << std::endl;
+      context.error_stream() << "Error: could not write output file: " << file << " (" << err << ")" << std::endl;
       return RTNCD_FAILURE;
     }
-    out.write(data.data(), static_cast<std::streamsize>(data.size()));
-    out.close();
     context.output_stream() << "Certificate written to " << file
                             << " (" << data.size() << " bytes)" << std::endl;
     result->set("file", str(file));
