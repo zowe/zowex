@@ -350,7 +350,8 @@ describe("ZSshUtils", () => {
             const result = await ZSshUtils.installServer(new SshSession(fakeSession), "~/.zowe-server", { onError });
             expect(result).toBe(true);
             expect(onError).toHaveBeenCalledOnce();
-            expect(sshMock.execCommand).toHaveBeenCalledTimes(5);
+            // last time is the -v check
+            expect(sshMock.execCommand).toHaveBeenCalledTimes(6);
         });
 
         it("should call onError when mkdir fails and return false if onError returns false", async () => {
