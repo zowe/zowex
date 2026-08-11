@@ -395,6 +395,23 @@ export class ZSshUtils {
 
             try {
                 const execReturn = await ssh.execCommand(`mkdir -p ${ZSshUtils.quotePath(remoteDir)}`);
+                if (execReturn.code !== 0) {
+                    const technical = `mkdir -p ${remoteDir} RC=${execReturn.code}: ${execReturn.stderr}`;
+                    Logger.getAppLogger().error(`[ZSshUtils] Step 1 FAILED: ${technical}`);
+                    const err = new ImperativeError({
+                        msg: "Failed to create the server directory on the remote system.",
+                        errorCode: "EDEPLOYFAIL",
+                        additionalDetails: technical,
+                    });
+                    if (options?.onError) {
+                        const shouldRetry = await options.onError(err, "deploy");
+                        if (!shouldRetry) {
+                            return false;
+                        }
+                        return ZSshUtils.installServer(session, serverPath, options);
+                    }
+                    return false;
+                }
                 const availableMb = await ZSshUtils.getAvailableMb(ssh, remoteDir);
                 if (await ZSshUtils.routeExpiredPasswordError(availableMb.stderr ?? "", "deploy", options)) {
                     return false;
@@ -416,23 +433,6 @@ export class ZSshUtils {
                     }
                 }
                 if (await ZSshUtils.routeExpiredPasswordError(execReturn.stderr ?? "", "deploy", options)) {
-                    return false;
-                }
-                if (execReturn.code !== 0) {
-                    const technical = `mkdir -p ${remoteDir} RC=${execReturn.code}: ${execReturn.stderr}`;
-                    Logger.getAppLogger().error(`[ZSshUtils] Step 1 FAILED: ${technical}`);
-                    const err = new ImperativeError({
-                        msg: "Failed to create the server directory on the remote system.",
-                        errorCode: "EDEPLOYFAIL",
-                        additionalDetails: technical,
-                    });
-                    if (options?.onError) {
-                        const shouldRetry = await options.onError(err, "deploy");
-                        if (!shouldRetry) {
-                            return false;
-                        }
-                        return ZSshUtils.installServer(session, serverPath, options);
-                    }
                     return false;
                 }
 
