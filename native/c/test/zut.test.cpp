@@ -397,7 +397,9 @@ void zut_tests()
                              std::ofstream pre(path.c_str(), std::ios::binary);
                              pre << "this is much longer pre-existing content";
                              pre.close();
-                             chmod(path.c_str(), 0666);
+                             // Looser than 0600 to prove tightening; 0644 rather than
+                             // 0666 so the fixture never creates a world-writable file.
+                             chmod(path.c_str(), 0644);
 
                              std::string error;
                              const int rc = zut_write_file_private(path, "hi", error);
