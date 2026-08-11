@@ -21,8 +21,7 @@ const SystemDefinition: ICommandDefinition = {
     aliases: ["sys"],
     summary: "System-level operations",
     description:
-        "Perform system-level operations such as viewing the syslog and managing ESM certificates and key rings. " +
-        "NOTE: the placement of the certificate/key ring commands here is provisional (see the PR notes).",
+        "Perform system-level operations such as viewing the syslog and managing ESM certificates and key rings.",
     type: "group",
     children: [ViewSyslogDefinition, CertDefinition, KeyringDefinition],
     passOn: [

@@ -672,8 +672,7 @@ int handle_cert_rename(InvocationContext &context)
 }
 
 // Registers the `keyring` and `cert` command groups as siblings under the given
-// parent (the `system` group). NOTE: the top-level placement is provisional --
-// see doc/certificates-pr-notes.md; reviewers should revisit the group name.
+// parent (the `system` group).
 void register_commands(parser::Command &parent)
 {
   //

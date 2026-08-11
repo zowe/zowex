@@ -410,7 +410,7 @@ void register_commands(parser::Command &root_command)
   system_cmd->add_command(system_view_syslog_cmd);
 
   // ESM certificate and key ring commands live as `cert` and `keyring` sibling
-  // subgroups under `system` (provisional placement -- see doc/certificates-pr-notes.md).
+  // subgroups under `system`.
   certificates::register_commands(*system_cmd);
 
   root_command.add_command(system_cmd);
