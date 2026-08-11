@@ -533,6 +533,10 @@ int zkr_export_cert(ZKR *zkr, const ZKRExportOptions &opts, std::string &data)
   if (opts.label.empty())
     return record_message(zkr, "EXPORT", "Certificate label is required");
 
+  const bool want_p12 = (opts.format == "p12" || opts.format == "P12");
+  if (want_p12 && opts.password.empty())
+    return record_message(zkr, "EXPORT", "A PKCS#12 passphrase is required (gsk_export_key rejects an empty password)");
+
   gsk_handle handle = NULL;
   int num_records = 0;
   std::string db_name = opts.owner + "/" + opts.ring;
@@ -541,7 +545,6 @@ int zkr_export_cert(ZKR *zkr, const ZKRExportOptions &opts, std::string &data)
   if (rc != 0)
     return record_gsk_error(zkr, rc, "gsk_open_keyring(" + db_name + ")");
 
-  const bool want_p12 = (opts.format == "p12" || opts.format == "P12");
   int result = RTNCD_SUCCESS;
   data.clear();
 
@@ -574,11 +577,10 @@ int zkr_export_cert(ZKR *zkr, const ZKRExportOptions &opts, std::string &data)
   }
   else
   {
-    const char *pass = opts.password.empty() ? "password" : opts.password.c_str();
     gsk_buffer key_stream = {0, 0};
     rc = gsk_export_key(handle, const_cast<char *>(opts.label.c_str()),
                         gskdb_export_pkcs12v3_binary, x509_alg_pbeWithSha1And128BitRc4,
-                        const_cast<char *>(pass), &key_stream);
+                        const_cast<char *>(opts.password.c_str()), &key_stream);
     if (rc != 0)
     {
       result = record_gsk_error(zkr, rc, "gsk_export_key(" + opts.label + ")");

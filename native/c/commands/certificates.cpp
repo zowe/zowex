@@ -214,6 +214,12 @@ int handle_cert_export(InvocationContext &context)
   const bool is_p12 = (to_lower(context.get<std::string>("format", "pem")) == "p12");
   opts.format = is_p12 ? "p12" : "pem";
 
+  if (is_p12 && opts.password.empty())
+  {
+    context.error_stream() << "Error: --password is required with --format p12" << std::endl;
+    return RTNCD_FAILURE;
+  }
+
   ZKR zkr{};
   std::string data;
   const int rc = zkr_export_cert(&zkr, opts, data);
@@ -744,7 +750,7 @@ void register_commands(parser::Command &parent)
   export_cmd->add_keyword_arg("label", make_aliases("--label", "-l"), "certificate label", ArgType_Single, true);
   export_cmd->add_keyword_arg("format", make_aliases("--format", "-F"), "export format: pem (certificate) or p12 (certificate + private key)", ArgType_Single, false, ArgValue(std::string("pem")));
   export_cmd->add_keyword_arg("file", make_aliases("--file", "-f"), "output file path (required for p12; PEM prints to stdout if omitted)", ArgType_Single, false);
-  export_cmd->add_keyword_arg("password", make_aliases("--password", "-p"), "PKCS#12 passphrase (used with --format p12)", ArgType_Single, false);
+  export_cmd->add_keyword_arg("password", make_aliases("--password", "-p"), "PKCS#12 passphrase (required with --format p12)", ArgType_Single, false);
   export_cmd->set_handler(handle_cert_export);
   export_cmd->add_example("Export a certificate as PEM", "zowex system cert export USER01 RING02 -l CERT03 -f ./CERT03.pem");
   export_cmd->add_example("Export a certificate + key as PKCS#12", "zowex system cert export USER01 RING02 -l CERT03 -F p12 -f ./CERT03.p12 -p secret");

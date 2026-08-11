@@ -224,6 +224,17 @@ void zkr_tests()
                    Expect(rc).Not().ToBe(0);
                    Expect(out).ToContain("--from-ring");
                  });
+
+              it("`cert export -F p12` requires --password",
+                 []() -> void
+                 {
+                   std::string out;
+                   int rc = execute_command_with_output(
+                       zowex_command + " system cert export TESTUSER RING01 -l LBL -F p12 -f /tmp/ignored.p12",
+                       out);
+                   Expect(rc).Not().ToBe(0);
+                   Expect(out).ToContain("--password is required");
+                 });
             });
 
         // ---------------------------------------------------------------------
@@ -392,6 +403,33 @@ void zkr_tests()
                    int rc = zkr_list_ring(&z, owner, "*", certs);
                    if (rc != 0)
                      Expect(z.diag.e_msg.empty()).ToBe(false);
+                 });
+            });
+
+        // ---------------------------------------------------------------------
+        // Export option validation. gsk_export_key rejects an empty password
+        // (z/OS System SSL Programming, SC14-7495), so a PKCS#12 export without
+        // one must fail fast, before any key ring is even opened. No authority
+        // needed.
+        // ---------------------------------------------------------------------
+        describe(
+            "export option validation (no authority required)",
+            [&]() -> void
+            {
+              it("rejects a p12 export with an empty password before touching the key ring",
+                 []() -> void
+                 {
+                   ZKRExportOptions ex;
+                   ex.owner = "TESTUSER";
+                   ex.ring = "RING01";
+                   ex.label = "ANYLABEL";
+                   ex.format = "p12";
+                   ex.password = "";
+
+                   ZKR z{};
+                   std::string data;
+                   Expect(zkr_export_cert(&z, ex, data)).Not().ToBe(0);
+                   Expect(z.diag.e_msg).ToContain("passphrase");
                  });
             });
 

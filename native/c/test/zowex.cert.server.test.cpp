@@ -69,6 +69,18 @@ void zowex_cert_server_tests()
         std::string response = read_rpc_response(server);
         Expect(response).Not().ToContain("Request validation failed");
       });
+
+      it("rejects exportCertificate p12 without a password at the handler level", [&]() -> void {
+        // The request schema allows an omitted password (pem exports don't need
+        // one), so this is caught by handle_cert_export, not schema validation.
+        write_to_server(server, make_rpc_request("exportCertificate",
+                                                 "{\"owner\":\"TESTUSER\",\"keyring\":\"RING01\",\"label\":\"LBL\","
+                                                 "\"format\":\"p12\"}"));
+        std::string response = read_rpc_response(server);
+        Expect(response).ToContain("password");
+        Expect(response).Not().ToContain("\"success\":true");
+        Expect(response).Not().ToContain("Request validation failed");
+      });
     });
 
     describe("read-only methods (gated on ESM authority)", [&]() -> void {

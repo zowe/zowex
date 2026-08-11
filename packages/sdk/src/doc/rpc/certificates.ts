@@ -182,7 +182,7 @@ export interface ExportCertificateRequest extends common.CommandRequest<"exportC
      */
     file?: string;
     /**
-     * PKCS#12 passphrase (used with format "p12")
+     * PKCS#12 passphrase (required when format is "p12")
      */
     password?: string;
 }

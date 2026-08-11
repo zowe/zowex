@@ -134,7 +134,7 @@ that starts `zowex server`, invokes the certificate methods, and asserts:
 
 For release validation on a real system, in addition to the automated suites:
 
-- [ ] `cert export -F p12` with and without `--password`
+- [ ] `cert export -F p12` with `--password` (and confirm omitting `--password` is rejected)
 - [ ] `cert import` over an existing certificate (label ignored warning)
 - [ ] `cert delete <ring>` (disconnect) and `--database` variants
 - [ ] `cert connect --from-database`
