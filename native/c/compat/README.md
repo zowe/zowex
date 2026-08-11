@@ -17,10 +17,10 @@ Nothing in the binary can diagnose that, because the binary never runs. See
 
 Three separate things, often confused:
 
-| Lever | What it controls |
-|---|---|
-| **Open XL C/C++ level** used to build | Which libc++ symbols the binary references. This is the dominant factor. Open XL 2.1 is supported on z/OS 2.4/2.5/3.1; **Open XL 2.2 requires z/OS 3.1+** and references a newer libc++. |
-| **LE maintenance (PTF) level** on the target | Which libc++ symbols the target actually exports. A z/OS release alone does not tell you this. |
+| Lever                                                | What it controls                                                                                                                                                                                                                 |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Open XL C/C++ level** used to build                | Which libc++ symbols the binary references. This is the dominant factor. Open XL 2.1 is supported on z/OS 2.4/2.5/3.1; **Open XL 2.2 requires z/OS 3.1+** and references a newer libc++.                                         |
+| **LE maintenance (PTF) level** on the target         | Which libc++ symbols the target actually exports. A z/OS release alone does not tell you this.                                                                                                                                   |
 | **`-mzos-target`** (`ZosMinLevel` in `toolchain.mk`) | Only the LE **system-header** API level, via `__TARGET_LIB__`. It makes no link-step change and does **not** restrict libc++. It catches a call to a libc function that is too new; it is not a fix for a missing libc++ export. |
 
 The floor itself — `ZosMinLevel=zosv2r5` — is declared in
@@ -38,7 +38,7 @@ rejects string-keyed hash containers, which pull in `std::__1_e::__hash_memory` 
 behind zowex#871. Runs on any machine in milliseconds, no z/OS needed, and catches the regression at
 the point someone writes it.
 
-**3. Documented target requirements.** The floor is z/OS 2.5 *with current LE maintenance*; the APAR
+**3. Documented target requirements.** The floor is z/OS 2.5 _with current LE maintenance_; the APAR
 list is in the [top-level README](../../../README.md) and `ZSshUtils` verifies the binary loads at
 install time so a mismatch is reported then rather than on some later operation.
 
@@ -47,7 +47,7 @@ install time so a mismatch is reported then rather than on some later operation.
 Not currently done, and not needed while the compiler stays pinned. Worth knowing about if the floor
 ever has to be enforced mechanically — for example if the build LPAR's compiler level starts moving.
 
-The build LPAR is newer than the oldest system we support, so binding against *its* LE side decks
+The build LPAR is newer than the oldest system we support, so binding against _its_ LE side decks
 proves nothing. Copy the side decks off a system at the floor release and point `LDFLAGS` at the
 copies; a symbol that release does not export then becomes an unresolved external at bind time, on
 the build host, in the right release's terms:
@@ -62,7 +62,7 @@ done
 Then point `LDFLAGS` at that directory via `preBuildCmd` (see `config.example.yaml`).
 
 This pins the **maintenance level** too, which a z/OS release number cannot: a 2.5 system with current
-PTFs exports symbols a 2.5 system without them does not. Capture from a system at the maintenance
+PTFs exports symbols that a 2.5 system without them does not. Capture from a system at the maintenance
 floor you actually intend to support — capturing from a fully serviced system produces a check that
 passes while protecting nobody. Record which system it came from; **a side-deck set without a recorded
 maintenance level is not reproducible**, and re-capture whenever the floor moves or that system takes
