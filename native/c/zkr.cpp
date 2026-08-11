@@ -272,6 +272,8 @@ int load_pkcs12_file(gsk_buffer *buff_in, const std::string &filename, ZKR *zkr)
     return record_message(zkr, "IMPORT", "Could not stat PKCS#12 file: " + filename);
   if (!S_ISREG(info.st_mode))
     return record_message(zkr, "IMPORT", "PKCS#12 path is not a regular file: " + filename);
+  if (info.st_size == 0)
+    return record_message(zkr, "IMPORT", "PKCS#12 file is empty: " + filename);
 
   FILE *stream = fopen(filename.c_str(), "rb");
   if (stream == NULL)
@@ -399,7 +401,9 @@ int zkr_del_cert(ZKR *zkr, const std::string &owner, const std::string &ring,
 
   // The ESM signals (4/4/12) that the DIGTCERT class must be refreshed for the
   // disconnect to take effect (SA23-2293 Table 80). Match keyring-util and
-  // refresh automatically, unless the caller asked to skip it.
+  // refresh automatically, unless the caller asked to skip it. The delete itself
+  // already succeeded at this point, so a failed refresh is downgraded to a
+  // warning rather than failing the whole call.
   if (p.return_code == 4 && p.RACF_return_code == 4 && p.RACF_reason_code == 12)
   {
     if (skip_refresh)
@@ -410,7 +414,17 @@ int zkr_del_cert(ZKR *zkr, const std::string &owner, const std::string &ring,
                        "'system cert refresh' to apply)");
       return RTNCD_SUCCESS;
     }
-    return zkr_refresh(zkr);
+
+    // Auto-refresh, matching the Import behavior. Use a separate handle so the
+    // delete's SAF codes are not clobbered by the refresh call.
+    ZKR refresh_zkr;
+    if (zkr_refresh(&refresh_zkr) != RTNCD_SUCCESS)
+    {
+      note_saf_warning(zkr, &p, "IRRSDL64 DELCERT",
+                       "certificate removed, but the automatic DIGTCERT refresh failed (" +
+                           refresh_zkr.diag.e_msg + "); run 'system cert refresh' manually");
+    }
+    return RTNCD_SUCCESS;
   }
 
   // Other rc-4 reason codes report that the certificate was disconnected from the

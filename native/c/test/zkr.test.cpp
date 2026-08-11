@@ -434,6 +434,39 @@ void zkr_tests()
             });
 
         // ---------------------------------------------------------------------
+        // Import option validation. zkr_import_cert validates label/usage and
+        // loads the PKCS#12 file from disk before ever touching the key ring, so
+        // an empty source file must fail fast, before any SAF/GSK call. No
+        // authority needed.
+        // ---------------------------------------------------------------------
+        describe(
+            "import option validation (no authority required)",
+            [&]() -> void
+            {
+              it("rejects an empty PKCS#12 file before touching the key ring",
+                 []() -> void
+                 {
+                   const std::string path = "/tmp/zkrut-empty-" + zkr_unique() + ".p12";
+                   std::ofstream f(path.c_str());
+                   f.close();
+
+                   ZKRImportOptions opts;
+                   opts.owner = "TESTUSER";
+                   opts.ring = "RING01";
+                   opts.label = "ANYLABEL";
+                   opts.usage = "PERSONAL";
+                   opts.p12_path = path;
+                   opts.password = "x";
+
+                   ZKR z{};
+                   Expect(zkr_import_cert(&z, opts)).Not().ToBe(0);
+                   Expect(z.diag.e_msg).ToContain("empty");
+
+                   unlink(path.c_str());
+                 });
+            });
+
+        // ---------------------------------------------------------------------
         // Key ring lifecycle. Requires authority to create key rings; skipped
         // (not failed) otherwise.
         // ---------------------------------------------------------------------
