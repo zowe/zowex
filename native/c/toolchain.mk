@@ -14,13 +14,33 @@ METALC_CC_FLAGS=_CC_ACCEPTABLE_RC=0 _C89_ACCEPTABLE_RC=0 _CXX_ACCEPTABLE_RC=0
 CC=$(METALC_CC_FLAGS) xlc
 ASM=as
 
-CPP_BND_BASE_FLAGS=-Wl,-bMAP $(LDFLAGS)
-CPP_BND_BASE_FLAGS_AUTH=-Wl,-bMAP -Wl,-bAC=1 $(LDFLAGS)
-CPP_BND_DEBUG_FLAGS=-Wl,-bMAP -Wl,-bLIST $(LDFLAGS)
-CPP_BND_DEBUG_FLAGS_AUTH=-Wl,-bMAP -Wl,-bLIST -Wl,-bAC=1 $(LDFLAGS)
+#
+# Minimum supported z/OS level.
+#
+# $(ZosMinLevel) is the release this project promises its published artifact loads on, declared here
+# and nowhere else. `-mzos-target` pins the system-header API level the compiler assumes (via
+# __TARGET_LIB__), which catches a call to a libc function that only exists on a newer release.
+#
+# It does NOT restrict libc++ and makes no link-step change, so it is not what keeps the binary
+# loadable on the floor release. Two other things do that, and both live outside this file:
+#   - the Open XL C/C++ level used to build (2.1; pinned in .github/workflows/zos-build.yml)
+#   - binding against side decks captured from a system at the floor level (LDFLAGS)
+# See compat/README.md and doc/troubleshooting.md.
+#
+# Open XL 2.x rejects target levels older than zosv2r4. A compiler that does not accept the option
+# at all cannot build this project; drop -mzos-target from TARGET_FLAGS below if you need to try.
+#
+ZosMinLevel=zosv2r5
 
-DLL_BND_BASE_FLAGS=-shared -Wl,-bMAP $(LDFLAGS)
-DLL_BND_DEBUG_FLAGS=-shared -Wl,-bMAP -Wl,-bLIST $(LDFLAGS)
+TARGET_FLAGS=-mzos-target=$(ZosMinLevel)
+
+CPP_BND_BASE_FLAGS=-Wl,-bMAP $(TARGET_FLAGS) $(LDFLAGS)
+CPP_BND_BASE_FLAGS_AUTH=-Wl,-bMAP -Wl,-bAC=1 $(TARGET_FLAGS) $(LDFLAGS)
+CPP_BND_DEBUG_FLAGS=-Wl,-bMAP -Wl,-bLIST $(TARGET_FLAGS) $(LDFLAGS)
+CPP_BND_DEBUG_FLAGS_AUTH=-Wl,-bMAP -Wl,-bLIST -Wl,-bAC=1 $(TARGET_FLAGS) $(LDFLAGS)
+
+DLL_BND_BASE_FLAGS=-shared -Wl,-bMAP $(TARGET_FLAGS) $(LDFLAGS)
+DLL_BND_DEBUG_FLAGS=-shared -Wl,-bMAP -Wl,-bLIST $(TARGET_FLAGS) $(LDFLAGS)
 
 #
 # Metal C compilation options
@@ -61,7 +81,7 @@ ASM_FLAGS=-mRENT
 # Compilation flags
 #
 C_FLAGS_BASE=-fvisibility=default -c
-CPP_FLAGS_BASE=-fvisibility=default -c -std=gnu++17 -fno-aligned-allocation -D_EXT -D_OPEN_SYS_FILE_EXT=1 -MD
+CPP_FLAGS_BASE=$(TARGET_FLAGS) -fvisibility=default -c -std=gnu++17 -fno-aligned-allocation -D_EXT -D_OPEN_SYS_FILE_EXT=1 -MD
 SWIG_FLAGS_BASE=-DSWIG $(CPP_FLAGS_BASE)
 
 #

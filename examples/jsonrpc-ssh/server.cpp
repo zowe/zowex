@@ -12,9 +12,9 @@
 #include <cctype>
 #include <cstdio>
 #include <iostream>
+#include <map>
 #include <optional>
 #include <string>
-#include <unordered_map>
 
 // Naive JSON helpers - just enough for flat objects with string/int values.
 // Not a general-purpose parser; only covers the JSON-RPC 2.0 subset used here.
@@ -22,7 +22,7 @@
 namespace json
 {
 
-using Object = std::unordered_map<std::string, std::string>;
+using Object = std::map<std::string, std::string>;
 
 static void skip_ws(const std::string &s, size_t &i)
 {

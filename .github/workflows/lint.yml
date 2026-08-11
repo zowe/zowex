@@ -21,6 +21,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # std::hash<std::string> resolves to the out-of-line libc++ helper __hash_memory, which is
+      # not exported by CRTEQCXE on z/OS systems below the required Language Environment
+      # maintenance level (CEE3561S at load time). See native/c/compat/README.md and
+      # https://github.com/zowe/zowex/issues/871.
+      - name: Check for string-keyed hash containers
+        run: npm run lint:compat
+
       - name: Run Cpp-Linter
         uses: cpp-linter/cpp-linter-action@v2
         env:

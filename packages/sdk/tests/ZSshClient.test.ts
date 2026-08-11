@@ -517,6 +517,38 @@ describe("ZSshClient", () => {
             await expect((client as any).execAsync()).rejects.toThrow("Error starting Zowe server");
         });
 
+        it("should handle a Language Environment load failure from Zowe server", async () => {
+            const sshStream = { stderr: new EventEmitter(), stdout: new EventEmitter() };
+            const client: ZSshClient = new (ZSshClient as any)();
+            (client as any).mSshClient = {
+                exec: function (_command: string, callback: ClientCallback) {
+                    callback(undefined, sshStream as any);
+                    sshStream.stderr.emit(
+                        "data",
+                        "CEE3561S The external function _ZNSt5__1_e13__hash_memoryEPKvm was not found in DLL CRTEQCXE.",
+                    );
+                    return this;
+                },
+            };
+            await expect((client as any).execAsync()).rejects.toMatchObject({ errorCode: "ELERUNTIME" });
+        });
+
+        it("should detect a load failure split across multiple stderr chunks", async () => {
+            const sshStream = { stderr: new EventEmitter(), stdout: new EventEmitter() };
+            const client: ZSshClient = new (ZSshClient as any)();
+            (client as any).mErrHandler = vi.fn();
+            (client as any).mSshClient = {
+                exec: function (_command: string, callback: ClientCallback) {
+                    callback(undefined, sshStream as any);
+                    // z/OS can split the message across reads; neither half matches on its own.
+                    sshStream.stderr.emit("data", "CEE3561S The external function _ZNSt5__1_e13__hash");
+                    sshStream.stderr.emit("data", "_memoryEPKvm was not found in DLL CRTEQCXE.");
+                    return this;
+                },
+            };
+            await expect((client as any).execAsync()).rejects.toMatchObject({ errorCode: "ELERUNTIME" });
+        });
+
         it("should process stderr data from Zowe server", async () => {
             const request: CommandRequest = { command: "ping" };
             const fakeStderr = new EventEmitter();
