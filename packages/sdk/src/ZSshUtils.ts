@@ -495,7 +495,7 @@ export class ZSshUtils {
                     if (options?.onError) {
                         const shouldContinue = await options.onError(paxErr, "extract");
                         if (!shouldContinue) {
-                            return false;
+                            throw paxErr;
                         }
                     } else {
                         throw paxErr;
