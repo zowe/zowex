@@ -85,7 +85,7 @@ const ArgTemplate ENCODING = {
     ArgType_Single,
     false,
     ArgValue(),
-    make_aliases()};
+    make_aliases(), false, true};
 
 const ArgTemplate LOCAL_ENCODING = {
     "local-encoding",
