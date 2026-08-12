@@ -6,7 +6,6 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
-- `c`:
 - `c`: Fixed `--local-encoding` being ignored when reading spool files. The source codepage was never copied to the `ZDS` struct passed to `zds_read`, so the conversion always fell back to the default source encoding (`UTF-8`). [#1097] (https://github.com/zowe/zowex/pull/1097)
 - `c`: Added ESM (RACF or equivalent) certificate and key ring management to the `system` command group, migrating the `keyring-utilities` functionality (R_datalib and System SSL) into `zowex` as two subgroups: `system keyring create|delete|list|list-rings|count` and `system cert import|export|delete|show|connect|set-default|trust|rename|refresh`. [#1079](https://github.com/zowe/zowex/pull/1079)
 - **Breaking:** `c`: Changed the plug-in SDK types `ast::ObjMap` and `plugin::ArgumentMap` from `std::unordered_map` to `std::map`, and added the `ZOWEX_PLUGIN_ABI_VERSION` constant with a matching load-time check. Plug-ins must now be rebuilt against the current `extend/plugin.hpp` and must expand `ZOWEX_PLUGIN_DECLARE_ABI()` alongside `register_plugin()`; a plug-in built against an earlier header is rejected at load time with a diagnostic instead of being loaded with mismatched type layouts. [#871](https://github.com/zowe/zowex/issues/871)
