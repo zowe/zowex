@@ -94,7 +94,7 @@ const ArgTemplate LOCAL_ENCODING = {
     ArgType_Single,
     false,
     ArgValue(),
-    make_aliases()};
+    make_aliases(), false, true};
 
 const ArgTemplate RESPONSE_FORMAT_CSV = {
     "response-format-csv",
