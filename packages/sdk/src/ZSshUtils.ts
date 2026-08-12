@@ -481,7 +481,7 @@ export class ZSshUtils {
                         return false;
                     }
                     const codePart = (err as SftpError).code == null ? "" : ` RC=${(err as SftpError).code}`;
-                    const technical = `Upload ${ZSshUtils.SERVER_PAX_FILE}${codePart}: ${err}`;
+                    const technical = `Upload ${ZSshUtils.SERVER_PAX_FILE}${codePart}: ${err.message}`;
                     Logger.getAppLogger().error(`[ZSshUtils] Step 2 FAILED: ${technical}`);
                     const uploadErr = new ImperativeError({
                         msg: "Failed to upload the server binary to the remote system.",
@@ -524,7 +524,7 @@ export class ZSshUtils {
                 }
             } catch (deployErr) {
                 Logger.getAppLogger().error(
-                    `Error was thrown during deployment: ${deployErr}. Attempting post-failure cleanup...`,
+                    `Error was thrown during deployment: ${deployErr.message}. Attempting post-failure cleanup...`,
                 );
                 if (deployErr instanceof ImperativeError && deployErr.errorCode === "EPASSWD_EXPIRED") {
                     // we can't clean up if the error is a password expiration, so just re-throw
@@ -552,7 +552,9 @@ export class ZSshUtils {
                         await promisify(sftp.rmdir.bind(sftp))(remoteDir);
                     }
                 } catch (failureCleanupErr) {
-                    Logger.getAppLogger().error(`Error was thrown during post-failure cleanup: ${failureCleanupErr} `);
+                    Logger.getAppLogger().error(
+                        `Error was thrown during post-failure cleanup: ${failureCleanupErr.message} `,
+                    );
                 }
 
                 return false;
