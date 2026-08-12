@@ -361,13 +361,22 @@ export class ZSshUtils {
         // example output:
         // Mounted on     Filesystem                Avail/Total    Files      Status
         // /u/users       (EXAMPLE.USER.ZFS)        826934/8120160 4294919164 Available
-        const stats = statsLine.trim().split(/\s+/);
-        if (stats.length < 4 || !stats[2].includes("/")) {
+        if (!statsLine.includes(")")) {
+            Logger.getAppLogger().warn(
+                `[ZSshUtils] getAvailableMB: Unexpected format of df command output. Unable to parse available space`,
+            );
+            return response;
+        }
+        const stats = statsLine
+            .substring(statsLine.lastIndexOf(")") + 1)
+            .trim()
+            .split(/\s+/);
+        if (stats.length < 3 || !stats[0].includes("/")) {
             Logger.getAppLogger().warn(
                 `[ZSshUtils] getAvailableMB: Unexpected format of df command output. Unable to parse available space`,
             );
         } else {
-            const availableMB = stats[2].substring(0, stats[2].indexOf("/"));
+            const availableMB = stats[0].substring(0, stats[0].indexOf("/"));
             response.mb = Number.parseInt(availableMB, 10);
             Logger.getAppLogger().info(`[ZSshUtils] getAvailableMB: Path '${dir}' has ${response.mb} MB remaining`);
         }

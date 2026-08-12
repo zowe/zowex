@@ -753,7 +753,21 @@ describe("ZSshUtils", () => {
             expect(result.mb).toEqual(expectedMb);
             expect(result.stderr).toEqual("");
         });
-
+        it("should parse a properly formatted 80 MB available correctly even if the USS directory contains spaces and parens", async () => {
+            const expectedMb = 80;
+            const sshMock = {
+                execCommand: vi.fn().mockResolvedValue({
+                    code: 0,
+                    stderr: "",
+                    stdout:
+                        " Mounted on     Filesystem                Avail/Total    Files      Status\n" +
+                        `/u/users/space man/my (excellent) dir       (EXAMPLE.USER.ZFS)        ${expectedMb}/8120160 4294919164 Available`,
+                }),
+            };
+            const result = await ZSshUtils.getAvailableMb(sshMock as NodeSSH, "/u/users");
+            expect(result.mb).toEqual(expectedMb);
+            expect(result.stderr).toEqual("");
+        });
         it("should parse a properly formatted 40 MB available correctly even if the headers are in another language", async () => {
             const expectedMb = 40;
             const sshMock = {
