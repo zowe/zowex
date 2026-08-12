@@ -454,7 +454,7 @@ export abstract class AbstractConfigManager {
                             ...configModifications,
                             keyPassphrase: testKeyPassphrase,
                         });
-                        return { ...configModifications, keyPassphrase: testKeyPassphrase };
+                        return { ...configModifications, privateKey: privateKeyPath, keyPassphrase: testKeyPassphrase };
                     } catch (error) {
                         if (!`${error}`.includes("integrity check failed")) break;
                         this.showMessage(`Passphrase Authentication Failed (${attempts + 1}/3)`, MESSAGE_TYPE.ERROR);
