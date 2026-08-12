@@ -103,6 +103,20 @@ void RpcServer::process_request(const string &request_data)
       {
         error_message = "Command execution failed (" + request.method + ")";
       }
+
+      // A handler may attach a structured error object (e.g. the SAF/ESM return,
+      // reason, and function codes from a failed certificate command) via
+      // context.set_object(). When present, that structured payload must survive
+      // to the JSON-RPC error's "data" field instead of being discarded in favor
+      // of the plain-text stderr detail, so RPC/SDK consumers can inspect it
+      // programmatically.
+      const auto &err_object = context.get_object();
+      if (err_object)
+      {
+        print_error(request.id, result, error_message, convert_ast_to_json(err_object));
+        return;
+      }
+
       const string *detail_ptr = error_data.empty() ? nullptr : &error_data;
       print_error(request.id, result, error_message, detail_ptr);
       return;
@@ -544,6 +558,20 @@ void RpcServer::print_error(int request_id, int code, const string &message, con
   }
 
   ErrorDetails error{code, message, error_data};
+
+  RpcResponse response;
+  response.jsonrpc = "2.0";
+  response.result = std::optional<zjson::Value>();
+  response.error = std::optional<ErrorDetails>(error);
+  // Use -1 as sentinel for null ID (per JSON-RPC spec for parse errors)
+  response.id = (request_id == -1) ? std::optional<int>() : std::optional<int>(request_id);
+
+  print_response(response);
+}
+
+void RpcServer::print_error(int request_id, int code, const string &message, const zjson::Value &data)
+{
+  ErrorDetails error{code, message, std::optional<zjson::Value>(data)};
 
   RpcResponse response;
   response.jsonrpc = "2.0";

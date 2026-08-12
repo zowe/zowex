@@ -6,9 +6,11 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- Added a `certificates` client API for managing ESM (RACF or equivalent) key rings and digital certificates, exposing the following functions: `createKeyring`, `deleteKeyring`, `refreshDigtcert`, `deleteCertificate`, `listCertificates`, `exportCertificate`, `importCertificate`, `showCertificate`, `listRings`, `countRing`, `connectCertificate`, `setDefaultCertificate`, `trustCertificate`, and `renameCertificate`. [#1079](https://github.com/zowe/zowex/pull/1079)
 - Added recognition of Language Environment load failures. `CEE3561S` and `CEE3501S` error codes now produce an actionable error naming the required z/OS release and Language Environment APARs, with `errorCode: "ELERUNTIME"`, instead of a generic "Error starting Zowe server." Startup output is now accumulated before it is classified, so a diagnostic split across reads is still recognized. [#871](https://github.com/zowe/zowex/issues/871)
 - Added a verification step to `installServer()` that runs the installed server binary and reports whether the remote system can load it, so a runtime mismatch surfaces during installation rather than on the next operation. The target system level from the `uname -srv` command is included in the error details. [#871](https://github.com/zowe/zowex/issues/871)
 - Added `exactMatch` property to the `ListDatasetsRequest` type. This option defaults to false for backwards compatibility, but can be set to true to avoid appending `.**` to the end of data set patterns. [#914](https://github.com/zowe/zowex/issues/914)
+- When a command fails, a structured error payload attached by the server (e.g. the `safReturns` SAF/ESM codes from certificate commands) is now delivered to SDK consumers via the `ImperativeError`'s `causeErrors`, instead of being flattened into the error text. [#1079](https://github.com/zowe/zowex/pull/1079)
 
 ## `0.7.1`
 

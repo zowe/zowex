@@ -10,6 +10,7 @@
  */
 
 #include "system.hpp"
+#include "certificates.hpp"
 #include "common_args.hpp"
 #include "../zut.hpp"
 #include "../zjb.hpp"
@@ -80,13 +81,13 @@ int handle_system_list_proclib(InvocationContext &context)
 
   const auto result = obj();
   const auto items = arr();
-  
+
   for (const auto &dsn : proclib)
   {
     context.output_stream() << dsn << endl;
     items->push(str(dsn));
   }
-  
+
   result->set("items", items);
   result->set("returnedRows", i64(proclib.size()));
   context.set_object(result);
@@ -360,7 +361,6 @@ int handle_system_list_linklist(InvocationContext &context)
   return RTNCD_SUCCESS;
 }
 
-
 void register_commands(parser::Command &root_command)
 {
   auto system_cmd = command_ptr(new Command("system", "system operations"));
@@ -408,6 +408,10 @@ void register_commands(parser::Command &root_command)
   system_view_syslog_cmd->add_example("View last 5 minutes of syslog", "zowex system view-syslog --seconds-ago 300");
   system_view_syslog_cmd->add_example("View syslog for a specific date and time", "zowex system view-syslog --date 2026-03-13 --time 10:41:00 --max-lines 100");
   system_cmd->add_command(system_view_syslog_cmd);
+
+  // ESM certificate and key ring commands live as `cert` and `keyring` sibling
+  // subgroups under `system`.
+  certificates::register_commands(*system_cmd);
 
   root_command.add_command(system_cmd);
 }
