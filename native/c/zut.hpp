@@ -463,6 +463,22 @@ int zut_list_subsystems(ZDIAG &diag, std::vector<std::string> &subsystems, std::
  */
 std::string zut_read_input(std::istream &input_stream);
 
+/**
+ * @brief Write data to a file that is created (or truncated) with owner-only
+ *   read/write permissions (0600), regardless of the process umask.
+ *
+ * Intended for output that may hold secrets, such as an exported private key
+ * (e.g. a PKCS#12 bundle). The file is opened O_CREAT | O_TRUNC and then
+ * chmod'd to 0600 so a pre-existing file with looser permissions is tightened
+ * as well, since O_CREAT's mode argument only applies to newly created files.
+ *
+ * @param path Path of the file to create/truncate and write
+ * @param data The bytes to write
+ * @param error Reference to a string that receives a short error description on failure
+ * @return Return code (0 for success, non-zero for error)
+ */
+int zut_write_file_private(const std::string &path, const std::string &data, std::string &error);
+
 int zut_convert_date(const unsigned char *date_ptr, std::string &out_str);
 
 /**

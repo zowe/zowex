@@ -426,6 +426,44 @@ describe("ZSshClient", () => {
             expect(writeMock.mock.calls[0]).toEqual([`${JSON.stringify(rpcRequest)}\n`]);
         });
 
+        it("should surface a structured error payload via causeErrors and additionalDetails", async () => {
+            const errorData = { success: false, safReturns: { safReturnCode: 8 } };
+            const rpcResponseStructuredError: RpcResponse = {
+                jsonrpc: "2.0",
+                error: { code: 1, message: "Command execution failed", data: errorData },
+                id: 1,
+            };
+            const request: CommandRequest = { command: "ping" };
+            const writeMock = vi.fn();
+            const client: ZSshClient = new (ZSshClient as any)();
+            (client as any).mSshStream = { stdin: { write: writeMock } };
+            const response = client.request(request);
+            (client as any).processResponses(`${JSON.stringify(rpcResponseStructuredError)}\n`);
+            await expect(response).rejects.toMatchObject({
+                message: rpcResponseStructuredError.error?.message,
+                causeErrors: errorData,
+                additionalDetails: JSON.stringify(errorData),
+            });
+        });
+
+        it("should keep a string error data as-is in additionalDetails", async () => {
+            const rpcResponseStringError: RpcResponse = {
+                jsonrpc: "2.0",
+                error: { code: 1, message: "Command execution failed", data: "plain text detail" },
+                id: 1,
+            };
+            const request: CommandRequest = { command: "ping" };
+            const writeMock = vi.fn();
+            const client: ZSshClient = new (ZSshClient as any)();
+            (client as any).mSshStream = { stdin: { write: writeMock } };
+            const response = client.request(request);
+            (client as any).processResponses(`${JSON.stringify(rpcResponseStringError)}\n`);
+            await expect(response).rejects.toMatchObject({
+                causeErrors: "plain text detail",
+                additionalDetails: "plain text detail",
+            });
+        });
+
         it("should send request that times out", async () => {
             const request: CommandRequest = { command: "ping" };
             const writeMock = vi.fn();
