@@ -6,6 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- Added detection of available disk space on the z/OS Unix deployment directory in the `ZSshUtils.installServer` method, giving the user the opportunity to cancel deployment if they have less than the recommended amount of available space. [#1088](https://github.com/zowe/zowex/pull/1088)
 - Fixed server deploy/setup failing with "SSH setup cancelled" when connecting with a private key that requires a passphrase, even after entering the correct passphrase. [#1094](https://github.com/zowe/zowex/pull/1094)
 - Added a `certificates` client API for managing ESM (RACF or equivalent) key rings and digital certificates, exposing the following functions: `createKeyring`, `deleteKeyring`, `refreshDigtcert`, `deleteCertificate`, `listCertificates`, `exportCertificate`, `importCertificate`, `showCertificate`, `listRings`, `countRing`, `connectCertificate`, `setDefaultCertificate`, `trustCertificate`, and `renameCertificate`. [#1079](https://github.com/zowe/zowex/pull/1079)
 - Added recognition of Language Environment load failures. `CEE3561S` and `CEE3501S` error codes now produce an actionable error naming the required z/OS release and Language Environment APARs, with `errorCode: "ELERUNTIME"`, instead of a generic "Error starting Zowe server." Startup output is now accumulated before it is classified, so a diagnostic split across reads is still recognized. [#871](https://github.com/zowe/zowex/issues/871)
