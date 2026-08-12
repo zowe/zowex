@@ -334,15 +334,12 @@ describe("ZSshUtils", () => {
 
         it("should call onError when mkdir fails and handle retry if onError returns true", async () => {
             const sftpMock = { fastPut: vi.fn((_l, _r, _o, cb) => cb()), unlink: vi.fn((_p, cb) => cb()) };
-            let callCount = 0;
             const sshMock = {
-                execCommand: vi.fn().mockImplementation(async () => {
-                    callCount++;
-                    if (callCount === 2) {
-                        return { code: 1, stderr: "temporary error", stdout: "" };
-                    }
-                    return { code: 0, stderr: "", stdout: "" };
-                }),
+                execCommand: vi
+                    .fn()
+                    .mockResolvedValueOnce({ code: 0, stderr: "", stdout: "" })
+                    .mockResolvedValueOnce({ code: 1, stderr: "temporary error", stdout: "" })
+                    .mockResolvedValue({ code: 0, stderr: "", stdout: "" }),
             };
             setupSftpMocks(sftpMock, sshMock);
 
@@ -403,15 +400,11 @@ describe("ZSshUtils", () => {
 
         it("should call onError when rm -rf fails during uninstall and handle retry if onError returns true", async () => {
             const sftpMock = {};
-            let callCount = 0;
             const sshMock = {
-                execCommand: vi.fn().mockImplementation(async () => {
-                    callCount++;
-                    if (callCount === 1) {
-                        return { code: 1, stderr: "temporary error", stdout: "" };
-                    }
-                    return { code: 0, stdout: "" };
-                }),
+                execCommand: vi
+                    .fn()
+                    .mockResolvedValueOnce({ code: 1, stderr: "temporary error", stdout: "" })
+                    .mockResolvedValue({ code: 0, stderr: "", stdout: "" }),
             };
             setupSftpMocks(sftpMock, sshMock, { mockGetBinDir: false, mockExistsSync: false });
 
@@ -422,15 +415,14 @@ describe("ZSshUtils", () => {
         });
 
         it("should call onError when fastPut fails and handle retry if onError returns true", async () => {
-            let fastPutCallCount = 0;
-            const fastPutMock = vi.fn((_local: string, _remote: string, _opts: any, cb: (err?: Error) => void) => {
-                fastPutCallCount++;
-                if (fastPutCallCount === 1) {
+            const fastPutMock = vi
+                .fn()
+                .mockImplementationOnce((_local: string, _remote: string, _opts: any, cb: (err?: Error) => void) => {
                     cb(new Error("fastPut temp error"));
-                } else {
+                })
+                .mockImplementation((_local: string, _remote: string, _opts: any, cb: (err?: Error) => void) => {
                     cb();
-                }
-            });
+                });
             const unlinkMock = vi.fn((_path: string, cb: (err?: Error) => void) => cb());
             const sftpMock = { fastPut: fastPutMock, unlink: unlinkMock };
             const sshMock = { execCommand: vi.fn().mockResolvedValue({ code: 0, stdout: "", stderr: "" }) };
