@@ -29,6 +29,9 @@ export interface ISshCallbacks {
      * If "available" is -1, it means we were not able to parse the output of the df command
      * and do not know the amount of available space.
      * @returns true if we should attempt deployment anyway.
+     *
+     * If this callback is not provided, the installServer method will continue even if insufficient space
+     * is detected or if we are unable to detect the amount of available space.
      */
     onInsufficientSpaceWarning?: (available: number, recommended: number) => Promise<boolean>;
 }
@@ -383,6 +386,15 @@ export class ZSshUtils {
 
         return response;
     }
+
+    /**
+     * Asynchronously deploy the SSH server to the specified path
+     * @param session - pre-established SSH session
+     * @param serverPath the USS directory to deploy the SSH server to
+     * @param options  optional object providing callbacks to respond to different events during deployment.
+     *                 See docs on the ISshCallbacks type.
+     * @returns true if the deployment was completed successfully
+     */
     public static async installServer(
         session: SshSession,
         serverPath: string,
