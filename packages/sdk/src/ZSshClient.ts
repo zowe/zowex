@@ -25,6 +25,7 @@ import type {
 } from "./doc";
 import { RpcClientApi } from "./RpcClientApi";
 import { RpcStreamManager } from "./RpcStreamManager";
+import { matchLeRuntimeFailure } from "./SshErrors";
 import { type Client, type ClientChannel, createClient } from "./ssh-rs";
 import { ZSshUtils } from "./ZSshUtils";
 
@@ -44,6 +45,10 @@ export class ZSshClient extends RpcClientApi implements Disposable {
     private mDisconnectHandled = false;
     private mPartialStderr = "";
     private mPartialStdout = "";
+    // Non-JSON output seen while waiting for the server's ready banner. Accumulated because a
+    // multi-line diagnostic (e.g. a CEE3561S load failure) can arrive split across chunks, and no
+    // single chunk would then match.
+    private mStartupOutput = "";
     private readonly mRequestMap: Map<number, ExistingClientRequest> = new Map();
     private mRequestId = 0;
 
@@ -375,6 +380,7 @@ export class ZSshClient extends RpcClientApi implements Disposable {
         try {
             response = JSON.parse(data);
         } catch {
+            this.mStartupOutput += data;
             const errMsg = Logger.getAppLogger().error("Error starting Zowe server: %s\n%s", command, data);
             if (data.includes("FSUM7351")) {
                 throw new ImperativeError({
@@ -388,11 +394,22 @@ export class ZSshClient extends RpcClientApi implements Disposable {
                 this.mErrHandler(new Error(errMsg));
                 return;
             }
+            // Language Environment could not load the binary, so the server never started. Match on
+            // the accumulated output: the message can be split across chunks.
+            const leFailure = matchLeRuntimeFailure(this.mStartupOutput);
+            if (leFailure != null) {
+                throw new ImperativeError({
+                    msg: leFailure,
+                    errorCode: "ELERUNTIME",
+                    additionalDetails: this.mStartupOutput,
+                });
+            }
             throw new ImperativeError({ msg: `Error starting Zowe server: ${command}`, additionalDetails: data });
         }
         if (response?.status === "ready") {
             stream.stderr.on("data", this.onErrData.bind(this));
             stream.stdout.on("data", this.onOutData.bind(this));
+            this.mStartupOutput = "";
             Logger.getAppLogger().debug("Client is ready");
             return response.data;
         }
@@ -474,11 +491,19 @@ export class ZSshClient extends RpcClientApi implements Disposable {
 
         if (response.error != null) {
             Logger.getAppLogger().error(`Error for response ID: ${response.id}\n${JSON.stringify(response.error)}`);
+            const { data } = response.error;
             this.mRequestMap.get(response.id).rpc.reject(
                 new ImperativeError({
                     msg: response.error.message,
                     errorCode: response.error.code.toString(),
-                    additionalDetails: response.error.data,
+                    // The server may attach a structured error payload (e.g. the safReturns SAF/ESM
+                    // codes from a failed certificate command) as an object instead of a string. Keep
+                    // the raw value available via causeErrors, and stringify it for additionalDetails
+                    // since that field is typed as a string.
+                    ...(data !== undefined && {
+                        causeErrors: data,
+                        additionalDetails: typeof data === "string" ? data : JSON.stringify(data),
+                    }),
                 }),
             );
         } else {

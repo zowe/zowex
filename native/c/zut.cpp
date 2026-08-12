@@ -25,6 +25,7 @@
 #include <string>
 #include <algorithm>
 #include <unistd.h>
+#include <sys/stat.h>
 #include "zut.hpp"
 #include "zlogger.hpp"
 #include "zutm.h"
@@ -1255,6 +1256,52 @@ std::string zut_read_input(std::istream &input_stream)
   std::istreambuf_iterator<char> end;
   data.assign(begin, end);
   return data;
+}
+
+int zut_write_file_private(const std::string &path, const std::string &data, std::string &error)
+{
+  int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+  if (fd == -1)
+  {
+    error = "could not open '" + path + "': " + strerror(errno);
+    return RTNCD_FAILURE;
+  }
+
+  // O_CREAT's mode only applies when the file is newly created, so an existing
+  // file with looser permissions needs to be tightened explicitly.
+  if (fchmod(fd, S_IRUSR | S_IWUSR) == -1)
+  {
+    error = "could not set permissions on '" + path + "': " + strerror(errno);
+    close(fd);
+    return RTNCD_FAILURE;
+  }
+
+  const char *buf = data.data();
+  size_t remaining = data.size();
+  while (remaining > 0)
+  {
+    ssize_t written = write(fd, buf, remaining);
+    if (written == -1)
+    {
+      if (errno == EINTR)
+      {
+        continue;
+      }
+      error = "could not write to '" + path + "': " + strerror(errno);
+      close(fd);
+      return RTNCD_FAILURE;
+    }
+    buf += written;
+    remaining -= static_cast<size_t>(written);
+  }
+
+  if (close(fd) == -1)
+  {
+    error = "could not close '" + path + "': " + strerror(errno);
+    return RTNCD_FAILURE;
+  }
+
+  return RTNCD_SUCCESS;
 }
 
 int zut_convert_date(const unsigned char *date_ptr, std::string &out_str)

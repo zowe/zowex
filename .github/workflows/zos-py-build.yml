@@ -51,6 +51,9 @@ jobs:
                 user: "${{ secrets.SSH_MARIST_ZNP_ID }}"
                 password: "${{ secrets.SSH_MARIST_ZNP_PASS }}"
               deployDir: "/ZOWE/tmp/zowex"
+              # Keep in step with zos-build.yml: Open XL C/C++ 2.1 is the newest compiler IBM
+              # supports on z/OS 2.5, our minimum supported release. See
+              # native/c/compat/README.md and https://github.com/zowe/zowex/issues/871.
               preBuildCmd: "export PATH=/usr/lpp/IBM/cnw/v2r1/openxl/bin:$PATH"
           EOF
 

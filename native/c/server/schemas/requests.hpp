@@ -37,6 +37,112 @@ ZJSON_SCHEMA(DatasetAttributes,
     FIELD_OPTIONAL(vol, STRING)
 );
 
+struct CreateKeyringRequest {};
+ZJSON_SCHEMA(CreateKeyringRequest,
+    FIELD_REQUIRED(owner, STRING),
+    FIELD_REQUIRED(keyring, STRING)
+);
+
+struct DeleteKeyringRequest {};
+ZJSON_SCHEMA(DeleteKeyringRequest,
+    FIELD_REQUIRED(owner, STRING),
+    FIELD_REQUIRED(keyring, STRING)
+);
+
+struct RefreshDigtcertRequest {};
+
+struct DeleteCertificateRequest {};
+ZJSON_SCHEMA(DeleteCertificateRequest,
+    FIELD_REQUIRED(owner, STRING),
+    FIELD_OPTIONAL(keyring, STRING),
+    FIELD_OPTIONAL(database, BOOL),
+    FIELD_REQUIRED(label, STRING),
+    FIELD_OPTIONAL(skipRefresh, BOOL)
+);
+
+struct ListCertificatesRequest {};
+ZJSON_SCHEMA(ListCertificatesRequest,
+    FIELD_REQUIRED(owner, STRING),
+    FIELD_REQUIRED(keyring, STRING),
+    FIELD_OPTIONAL(label, STRING),
+    FIELD_OPTIONAL(usage, STRING),
+    FIELD_OPTIONAL(labelOnly, BOOL),
+    FIELD_OPTIONAL(ownerOnly, BOOL),
+    FIELD_OPTIONAL(maxEntries, NUMBER)
+);
+
+struct ExportCertificateRequest {};
+ZJSON_SCHEMA(ExportCertificateRequest,
+    FIELD_REQUIRED(owner, STRING),
+    FIELD_REQUIRED(keyring, STRING),
+    FIELD_REQUIRED(label, STRING),
+    FIELD_OPTIONAL(format, STRING),
+    FIELD_OPTIONAL(file, STRING),
+    FIELD_OPTIONAL(password, STRING)
+);
+
+struct ImportCertificateRequest {};
+ZJSON_SCHEMA(ImportCertificateRequest,
+    FIELD_REQUIRED(owner, STRING),
+    FIELD_REQUIRED(keyring, STRING),
+    FIELD_REQUIRED(label, STRING),
+    FIELD_REQUIRED(usage, STRING),
+    FIELD_REQUIRED(file, STRING),
+    FIELD_REQUIRED(password, STRING),
+    FIELD_OPTIONAL(skipRefresh, BOOL)
+);
+
+struct ShowCertificateRequest {};
+ZJSON_SCHEMA(ShowCertificateRequest,
+    FIELD_REQUIRED(owner, STRING),
+    FIELD_REQUIRED(keyring, STRING),
+    FIELD_REQUIRED(label, STRING)
+);
+
+struct ListRingsRequest {};
+ZJSON_SCHEMA(ListRingsRequest,
+    FIELD_REQUIRED(owner, STRING),
+    FIELD_OPTIONAL(keyring, STRING)
+);
+
+struct ConnectCertificateRequest {};
+ZJSON_SCHEMA(ConnectCertificateRequest,
+    FIELD_REQUIRED(owner, STRING),
+    FIELD_REQUIRED(keyring, STRING),
+    FIELD_OPTIONAL(fromRing, STRING),
+    FIELD_OPTIONAL(fromDatabase, BOOL),
+    FIELD_REQUIRED(label, STRING),
+    FIELD_OPTIONAL(usage, STRING),
+    FIELD_OPTIONAL(default, BOOL)
+);
+
+struct SetDefaultCertificateRequest {};
+ZJSON_SCHEMA(SetDefaultCertificateRequest,
+    FIELD_REQUIRED(owner, STRING),
+    FIELD_REQUIRED(keyring, STRING),
+    FIELD_REQUIRED(label, STRING)
+);
+
+struct TrustCertificateRequest {};
+ZJSON_SCHEMA(TrustCertificateRequest,
+    FIELD_REQUIRED(owner, STRING),
+    FIELD_REQUIRED(label, STRING),
+    FIELD_REQUIRED(status, STRING)
+);
+
+struct RenameCertificateRequest {};
+ZJSON_SCHEMA(RenameCertificateRequest,
+    FIELD_REQUIRED(owner, STRING),
+    FIELD_REQUIRED(label, STRING),
+    FIELD_REQUIRED(newLabel, STRING)
+);
+
+struct CountRingRequest {};
+ZJSON_SCHEMA(CountRingRequest,
+    FIELD_REQUIRED(owner, STRING),
+    FIELD_REQUIRED(keyring, STRING)
+);
+
 struct IssueConsoleCmdRequest {};
 ZJSON_SCHEMA(IssueConsoleCmdRequest,
     FIELD_REQUIRED(commandText, STRING),
@@ -81,7 +187,8 @@ ZJSON_SCHEMA(ListDatasetsRequest,
     FIELD_OPTIONAL(responseTimeout, NUMBER),
     FIELD_OPTIONAL(start, STRING),
     FIELD_REQUIRED(pattern, STRING),
-    FIELD_OPTIONAL(attributes, BOOL)
+    FIELD_OPTIONAL(attributes, BOOL),
+    FIELD_OPTIONAL(exactMatch, BOOL)
 );
 
 struct ListDsMembersRequest {};

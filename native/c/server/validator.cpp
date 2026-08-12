@@ -11,8 +11,8 @@
 
 #include "validator.hpp"
 #include "../zjson.hpp"
+#include <set>
 #include <string_view>
-#include <unordered_set>
 
 using std::string;
 
@@ -102,8 +102,7 @@ ValidationResult validate_schema(const zjson::Value &params,
   }
 
   const auto &obj = params.as_object();
-  std::unordered_set<std::string_view> seen_fields;
-  seen_fields.reserve(field_count);
+  std::set<std::string_view> seen_fields;
 
   auto get_field_path = [&parent_field](std::string_view name) {
     return parent_field.empty() ? std::string(name) : parent_field + "." + std::string(name);

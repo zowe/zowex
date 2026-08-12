@@ -426,6 +426,44 @@ describe("ZSshClient", () => {
             expect(writeMock.mock.calls[0]).toEqual([`${JSON.stringify(rpcRequest)}\n`]);
         });
 
+        it("should surface a structured error payload via causeErrors and additionalDetails", async () => {
+            const errorData = { success: false, safReturns: { safReturnCode: 8 } };
+            const rpcResponseStructuredError: RpcResponse = {
+                jsonrpc: "2.0",
+                error: { code: 1, message: "Command execution failed", data: errorData },
+                id: 1,
+            };
+            const request: CommandRequest = { command: "ping" };
+            const writeMock = vi.fn();
+            const client: ZSshClient = new (ZSshClient as any)();
+            (client as any).mSshStream = { stdin: { write: writeMock } };
+            const response = client.request(request);
+            (client as any).processResponses(`${JSON.stringify(rpcResponseStructuredError)}\n`);
+            await expect(response).rejects.toMatchObject({
+                message: rpcResponseStructuredError.error?.message,
+                causeErrors: errorData,
+                additionalDetails: JSON.stringify(errorData),
+            });
+        });
+
+        it("should keep a string error data as-is in additionalDetails", async () => {
+            const rpcResponseStringError: RpcResponse = {
+                jsonrpc: "2.0",
+                error: { code: 1, message: "Command execution failed", data: "plain text detail" },
+                id: 1,
+            };
+            const request: CommandRequest = { command: "ping" };
+            const writeMock = vi.fn();
+            const client: ZSshClient = new (ZSshClient as any)();
+            (client as any).mSshStream = { stdin: { write: writeMock } };
+            const response = client.request(request);
+            (client as any).processResponses(`${JSON.stringify(rpcResponseStringError)}\n`);
+            await expect(response).rejects.toMatchObject({
+                causeErrors: "plain text detail",
+                additionalDetails: "plain text detail",
+            });
+        });
+
         it("should send request that times out", async () => {
             const request: CommandRequest = { command: "ping" };
             const writeMock = vi.fn();
@@ -515,6 +553,38 @@ describe("ZSshClient", () => {
                 },
             };
             await expect((client as any).execAsync()).rejects.toThrow("Error starting Zowe server");
+        });
+
+        it("should handle a Language Environment load failure from Zowe server", async () => {
+            const sshStream = { stderr: new EventEmitter(), stdout: new EventEmitter() };
+            const client: ZSshClient = new (ZSshClient as any)();
+            (client as any).mSshClient = {
+                exec: function (_command: string, callback: ClientCallback) {
+                    callback(undefined, sshStream as any);
+                    sshStream.stderr.emit(
+                        "data",
+                        "CEE3561S The external function _ZNSt5__1_e13__hash_memoryEPKvm was not found in DLL CRTEQCXE.",
+                    );
+                    return this;
+                },
+            };
+            await expect((client as any).execAsync()).rejects.toMatchObject({ errorCode: "ELERUNTIME" });
+        });
+
+        it("should detect a load failure split across multiple stderr chunks", async () => {
+            const sshStream = { stderr: new EventEmitter(), stdout: new EventEmitter() };
+            const client: ZSshClient = new (ZSshClient as any)();
+            (client as any).mErrHandler = vi.fn();
+            (client as any).mSshClient = {
+                exec: function (_command: string, callback: ClientCallback) {
+                    callback(undefined, sshStream as any);
+                    // z/OS can split the message across reads; neither half matches on its own.
+                    sshStream.stderr.emit("data", "CEE3561S The external function _ZNSt5__1_e13__hash");
+                    sshStream.stderr.emit("data", "_memoryEPKvm was not found in DLL CRTEQCXE.");
+                    return this;
+                },
+            };
+            await expect((client as any).execAsync()).rejects.toMatchObject({ errorCode: "ELERUNTIME" });
         });
 
         it("should process stderr data from Zowe server", async () => {

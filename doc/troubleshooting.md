@@ -42,3 +42,60 @@ Note 2: Depending on your z/OS configuration, you may need to replace `*` with y
 Update your `config.yaml` to include this property:
 
 - `goBuildEnv: 'GOINSECURE="*" GOPROXY=direct GIT_SSL_NO_VERIFY=true'  # Allow fetching Go dependencies`
+
+## CEE3561S ... was not found in DLL CRTEQCXE
+
+```
+CEE3561S External function _ZNSt5__1_e13__hash_memoryEPKvm was not found in DLL CRTEQCXE
+```
+
+`zowex` links dynamically against the C++ runtime (libc++) that IBM ships **inside Language Environment**, in the DLL
+`CRTEQCXE`. This message means the system running the binary does not export a function the binary needs, so z/OS
+cannot load it. It happens before `main()`, which is why `zowex` cannot report anything useful itself.
+
+The deciding factor is the **Language Environment maintenance (PTF) level** of the system running the binary, not just
+its z/OS release — a system at a supported release can still be missing the required service. Three things contribute:
+
+| Lever | Effect |
+|---|---|
+| Open XL C/C++ level used to build | Determines which libc++ symbols the binary references. Dominant factor. Open XL 2.1 is supported on z/OS 2.4/2.5/3.1; **Open XL 2.2 requires z/OS 3.1+** and references a newer libc++. |
+| LE maintenance level on the target | Determines which libc++ symbols the target exports. |
+| `-mzos-target` (`ZosMinLevel`) | Only the LE **system-header** API level, via `__TARGET_LIB__`. Makes no link-step change and does **not** restrict libc++, so it will not resolve this message on its own. |
+
+### If you are running a released build
+
+Ask your system programmer to confirm Language Environment maintenance is applied:
+
+- **z/OS 2.5** — the LE C++ runtime service for Open XL C/C++ (the `PH45516` APAR family).
+- **z/OS 3.1** — the IBM Z Distribution for Zowe program directory lists `PH53938`, `PH60056`, `PH62468` and `PH68179`
+  as required for Language Environment.
+
+### If you are building it yourself
+
+Build with the Open XL level that matches your oldest target system. `.github/workflows/zos-build.yml` pins
+`/usr/lpp/IBM/cnw/v2r1/openxl/bin` (Open XL 2.1) for exactly this reason; put the same on your `PATH` via
+`preBuildCmd` in `config.yaml`.
+
+Then make the mismatch fail at **bind** time on your build host rather than at load time on someone else's system: copy
+the LE C++ side decks from a system at your oldest supported release and point `LDFLAGS` at those copies. A symbol that
+release does not export becomes an unresolved external during the bind. See
+[`native/c/compat/README.md`](../native/c/compat/README.md) for the member list and staging steps, and the commented
+`preBuildCmd` examples in `config.example.yaml`.
+
+To see what the binary imports today:
+
+```sh
+npm run z:imports
+```
+
+That writes `listings/runtime-imports.txt`. It reports; it does not gate.
+
+## Every compile fails with: error: unknown argument '-mzos-target=...'
+
+Your Open XL C/C++ level does not support the option. Clang treats an unknown `-m` argument as an error, not a warning,
+so this breaks every compile. Open XL 2.1 and later accept it, and the project requires 2.1 — so this usually means the
+wrong compiler is on your `PATH`. Check that first.
+
+If you genuinely need to build without it, drop `-mzos-target` from `TARGET_FLAGS` in `native/c/toolchain.mk`. That only
+removes the system-header API pin; it does not change which libc++ symbols the binary references, so it does not affect
+the `CEE3561S` class of failure above. Note Open XL 2.x also rejects target levels older than `zosv2r4`.

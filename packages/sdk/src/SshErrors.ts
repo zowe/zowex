@@ -339,7 +339,76 @@ export const SshErrors: Record<string, ISshErrorDefinition> = {
             "If you recently updated your client, the server may need to be redeployed.",
         ],
     },
+    // Language Environment runtime failures. These happen while z/OS loads the server binary, before
+    // it runs, so the server can never report them itself.
+    CEE3561S: {
+        summary:
+            "The z/OS Language Environment C++ runtime on this system does not provide a function the Zowe server binary requires, so the server cannot be loaded.",
+        matches: ["CEE3561S", /was not found in DLL/],
+        tips: [
+            "This depends on the Language Environment maintenance (PTF) level, not just the z/OS release. A system at a supported release can still be missing the required service.",
+            "The Zowe server requires z/OS 2.5 or later.",
+            "On z/OS 2.5, ask your system programmer to confirm the Language Environment C++ runtime service for Open XL C/C++ is applied (the PH45516 APAR family).",
+            "On z/OS 3.1, the IBM Z Distribution for Zowe program directory lists APARs PH53938, PH60056, PH62468 and PH68179 as required for Language Environment.",
+            "Include your z/OS release and Language Environment maintenance level when reporting this, along with the full CEE3561S message.",
+        ],
+        resources: [
+            {
+                href: "https://www.ibm.com/docs/en/zos/2.5.0?topic=cee-cee3561s",
+                title: "IBM z/OS Language Environment Runtime Messages - CEE3561S",
+            },
+            {
+                href: "https://github.com/zowe/zowex/issues/871",
+                title: "zowe/zowex#871 - Language Environment runtime requirements",
+            },
+        ],
+    },
+    CEE3501S: {
+        summary: "z/OS could not find a module the Zowe server binary depends on, so the server cannot be loaded.",
+        matches: ["CEE3501S", /module .* was not found/],
+        tips: [
+            "The server's shared libraries are not reachable. Verify LIBPATH includes the directory the server was installed to.",
+            "Confirm the server installation completed and was not partially extracted.",
+            "Reinstall the server to restore any missing files.",
+        ],
+        resources: [
+            {
+                href: "https://www.ibm.com/docs/en/zos/2.5.0?topic=cee-cee3501s",
+                title: "IBM z/OS Language Environment Runtime Messages - CEE3501S",
+            },
+        ],
+    },
 };
+
+/**
+ * Language Environment failures that stop z/OS from loading the server binary at all. The server
+ * never reaches `main()` in these cases, so it cannot report them itself - the client has to
+ * recognize them from whatever z/OS wrote to the SSH session.
+ *
+ * Ordered most specific first.
+ */
+const LeRuntimeFailures = ["CEE3561S", "CEE3501S"] as const;
+
+/**
+ * Checks output captured while starting or verifying the server for a Language Environment load
+ * failure.
+ *
+ * @param output Combined stdout/stderr text. Pass the accumulated output rather than a single chunk:
+ *               these messages can be split across reads.
+ * @returns A user-facing summary of the failure, or `undefined` if this is not an LE load failure.
+ */
+export function matchLeRuntimeFailure(output: string): string | undefined {
+    for (const code of LeRuntimeFailures) {
+        const definition = SshErrors[code];
+        const matched = definition.matches.some((pattern) =>
+            typeof pattern === "string" ? output.includes(pattern) : pattern.test(output),
+        );
+        if (matched) {
+            return definition.summary;
+        }
+    }
+    return undefined;
+}
 
 /**
  * Common patterns that indicate SSH private key authentication failures

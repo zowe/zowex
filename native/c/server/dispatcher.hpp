@@ -17,7 +17,7 @@
 #include "builder.hpp"
 #include <string>
 #include <vector>
-#include <unordered_map>
+#include <map>
 
 // Forward declarations
 struct RpcNotification;
@@ -50,7 +50,7 @@ public:
   void clear();
 
   // Get the builders map (for accessing validators)
-  const std::unordered_map<std::string, CommandBuilder> &get_builders() const
+  const std::map<std::string, CommandBuilder> &get_builders() const
   {
     return m_commands;
   }
@@ -59,7 +59,7 @@ private:
   // Private constructor for singleton
   CommandDispatcher() = default;
 
-  std::unordered_map<std::string, CommandBuilder> m_commands;
+  std::map<std::string, CommandBuilder> m_commands;
 };
 
 #endif
