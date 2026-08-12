@@ -395,6 +395,42 @@ describe("AbstractConfigManager", async () => {
                         expect(createZoweSchemaSpy).not.toHaveBeenCalled();
                         expect(result).toBeUndefined();
                     });
+
+                    it("should keep privateKey on a new profile after a correct passphrase is entered", async () => {
+                        const expectedPrivateKey = "/path/to/id_dsa";
+                        const profileWithName = {
+                            user: "user1",
+                            name: "nameValue",
+                            port: 222,
+                            privateKey: expectedPrivateKey,
+                            hostname: "example1.com",
+                        };
+                        vi.spyOn(testManager, "showCustomMenu").mockResolvedValueOnce({
+                            label: "$(plus) Add New SSH Host...",
+                        });
+                        vi.spyOn(testManager, "showInputBox")
+                            .mockResolvedValueOnce(
+                                `ssh ${profileWithName.user}@${profileWithName.hostname} -p ${profileWithName.port} -i ${profileWithName.privateKey}`,
+                            )
+                            .mockResolvedValueOnce("correctPassphrase");
+
+                        vi.spyOn(testManager as any, "getNewProfileName").mockReturnValue(profileWithName);
+                        vi.spyOn(testManager as any, "attemptConnection")
+                            .mockRejectedValueOnce("but no passphrase given")
+                            .mockResolvedValueOnce(true);
+                        const setSpy = vi.spyOn(testManager as any, "setProfile").mockImplementation(() => {});
+
+                        const result = await testManager.promptForProfile();
+
+                        expect(result?.profile?.privateKey).toBe(expectedPrivateKey);
+                        expect(result?.profile?.keyPassphrase).toBe("correctPassphrase");
+                        expect(setSpy).toHaveBeenCalledWith(
+                            expect.objectContaining({
+                                privateKey: expectedPrivateKey,
+                                keyPassphrase: "correctPassphrase",
+                            }),
+                        );
+                    });
                 });
 
                 describe("custom SSH host input", () => {
@@ -1040,7 +1076,7 @@ describe("AbstractConfigManager", async () => {
             ).toBeUndefined();
         });
 
-        it("should handle passphrase errors and return keyPassphrase", async () => {
+        it("should handle passphrase errors and return keyPassphrase and privateKey", async () => {
             vi.spyOn(testManager, "showInputBox").mockResolvedValueOnce("goodPass");
             vi.spyOn(testManager as any, "attemptConnection")
                 .mockRejectedValueOnce("but no passphrase given")
@@ -1051,10 +1087,10 @@ describe("AbstractConfigManager", async () => {
                     { name: "ssh1", hostname: "lpar1.com", port: 22, privateKey: "/path/to/id_rsa", user: "user1" },
                     true,
                 ),
-            ).toStrictEqual({ keyPassphrase: "goodPass" });
+            ).toStrictEqual({ keyPassphrase: "goodPass", privateKey: "/path/to/id_rsa" });
         });
 
-        it("should retry passphrase on integrity check failed", async () => {
+        it("should retry passphrase on integrity check failed and preserve privateKey on success", async () => {
             const msgSpy = vi.spyOn(testManager, "showMessage");
             vi.spyOn(testManager, "showInputBox").mockResolvedValueOnce("badPass").mockResolvedValueOnce("goodPass");
             vi.spyOn(testManager as any, "attemptConnection")
@@ -1067,7 +1103,7 @@ describe("AbstractConfigManager", async () => {
                     { name: "ssh1", hostname: "lpar1.com", port: 22, privateKey: "/path/to/id_rsa", user: "user1" },
                     true,
                 ),
-            ).toStrictEqual({ keyPassphrase: "goodPass" });
+            ).toStrictEqual({ keyPassphrase: "goodPass", privateKey: "/path/to/id_rsa" });
 
             expect(msgSpy).toHaveBeenCalledWith(
                 expect.stringContaining("Passphrase Authentication Failed"),
