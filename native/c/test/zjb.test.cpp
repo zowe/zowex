@@ -22,6 +22,7 @@
 using namespace ztst;
 
 void sleep_on_status(std::string status, std::string jobid);
+void wait_for_status(std::string status, std::string jobid);
 
 void zjb_tests()
 {
@@ -132,23 +133,34 @@ void zjb_tests()
                   ZJB zjb = {0};
                   std::string jobid;
 
-                  int rc = zjb_submit(&zjb, jcl, jobid);
+                  const std::string asa_jcl =
+                  "//ASASPOOL JOB IZUACCT\n"
+                  "//STEP01   EXEC PGM=IEBGENER\n"
+                  "//SYSPRINT DD SYSOUT=*\n"
+                  "//SYSIN    DD DUMMY\n"
+                  "//SYSUT2   DD SYSOUT=*,DCB=(RECFM=FBA,LRECL=80)\n"
+                  "//SYSUT1   DD *\n"
+                  "1*** PAGE 1: HEADING ***\n"
+                  " THIS LINE IS SINGLE SPACED.\n"
+                  "0THIS LINE IS DOUBLE SPACED.\n"
+                  "/*\n";
+                  int rc = zjb_submit(&zjb, asa_jcl, jobid);
                   ExpectWithContext(rc, zjb.diag.e_msg).ToBe(RTNCD_SUCCESS);
 
                   std::string correlator = std::string(zjb.correlator, sizeof(zjb.correlator));
 
-                  sleep_on_status("INPUT", correlator);
-                  sleep_on_status("ACTIVE", correlator);
-
+                  sleep(5);
                   std::vector<ZJobDD> dds;
                   memset(&zjb, 0, sizeof(zjb));
                   rc = zjb_list_dds(&zjb, correlator, dds);
                   ExpectWithContext(rc, zjb.diag.e_msg).ToBe(RTNCD_SUCCESS);
                   Expect(dds.size()).ToBeGreaterThan(0);
 
-                  auto asa_dd = std::find_if(dds.begin(), dds.end(),
-                                              [](const ZJobDD &dd) -> bool
-                                              { return dd.is_asa; });
+                  auto asa_dd = std::find_if(dds.begin(), dds.end(), [](const ZJobDD &dd) { return dd.is_asa; });
+                  if (asa_dd == dds.end()) {
+                      std::string err_log;
+                      zjb_read_job_content_by_key(&zjb, correlator, 2, err_log);
+                  }
                   Expect(asa_dd != dds.end()).ToBe(true);
 
                   std::string content;
@@ -221,7 +233,7 @@ void sleep_on_status(std::string status, std::string jobid)
     }
     if (zjob.full_status == status)
     {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10 * 5)); // wait for job to exit INPUT
+      std::this_thread::sleep_for(std::chrono::milliseconds(10 * 5));
     }
     else
     {
