@@ -39,7 +39,7 @@
 #include <regex>
 #include <functional>
 
-#define Expect(x) expect((x), EXPECT_CONTEXT{__LINE__, __FILE__, "", false})
+#define Expect(x) expect((x), EXPECT_CONTEXT{__LINE__, __FILE__, "", true})
 #define ExpectWithContext(x, context) expect((x), EXPECT_CONTEXT{__LINE__, __FILE__, std::string(context), true})
 #define TestLog(message) Globals::get_instance().test_log(message)
 #define TrimChars(str) Globals::get_instance().trim_chars(str)
