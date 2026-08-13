@@ -144,12 +144,8 @@ void zjb_tests()
                   memset(&zjb, 0, sizeof(zjb));
                   rc = zjb_list_dds(&zjb, correlator, dds);
                   ExpectWithContext(rc, zjb.diag.e_msg).ToBe(RTNCD_SUCCESS);
-                  Expect(dds.size()).ToBeGreaterThan(0); // expect at least one DD returned
+                  Expect(dds.size()).ToBeGreaterThan(0);
 
-                  // JES-generated spool output (e.g. JESMSGLG) is dynamically
-                  // allocated and never catalogued, so it can only be detected
-                  // as ASA via JES's own DD metadata (ZJobDD::is_asa), not a
-                  // DSCB catalog lookup. At least one DD should report ASA.
                   auto asa_dd = std::find_if(dds.begin(), dds.end(),
                                               [](const ZJobDD &dd) -> bool
                                               { return dd.is_asa; });
@@ -161,9 +157,6 @@ void zjb_tests()
                   ExpectWithContext(rc, zjb.diag.e_msg).ToBe(RTNCD_SUCCESS);
                   Expect(content).Not().ToBe(""); // expect some content returned
 
-                  // The ASA carriage control byte should have been consumed to
-                  // produce line breaks, not left as a leading garbage byte on
-                  // each line (the bug this fix addresses).
                   Expect(content.find('\n') != std::string::npos).ToBe(true);
 
                   memset(&zjb, 0, sizeof(zjb));
