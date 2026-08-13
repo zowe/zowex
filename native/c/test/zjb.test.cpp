@@ -22,7 +22,6 @@
 using namespace ztst;
 
 void sleep_on_status(std::string status, std::string jobid);
-void wait_for_status(std::string status, std::string jobid);
 
 void zjb_tests()
 {
