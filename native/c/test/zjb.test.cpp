@@ -149,8 +149,7 @@ void zjb_tests()
 
                   std::string correlator = std::string(zjb.correlator, sizeof(zjb.correlator));
 
-                  // Workaround for CONVERSION status issue; remove once resolved: https://github.com/zowe/zowex/issues/1101
-                  sleep(5);
+                  sleep(1);
                   std::vector<ZJobDD> dds;
                   memset(&zjb, 0, sizeof(zjb));
                   rc = zjb_list_dds(&zjb, correlator, dds);
