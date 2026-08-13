@@ -561,6 +561,7 @@ int zjb_read_job_content_by_dsn(ZJB *zjb, const std::string &dsn, std::string &r
 
   zds.encoding_opts.data_type = zjb->encoding_opts.data_type;
   memcpy((void *)&zds.encoding_opts.codepage, (const void *)&zjb->encoding_opts.codepage, sizeof(zjb->encoding_opts.codepage));
+  memcpy((void *)&zds.encoding_opts.source_codepage, (const void *)&zjb->encoding_opts.source_codepage, sizeof(zjb->encoding_opts.source_codepage));
 
   ZDSReadOpts read_opts{.zds = &zds, .ddname = ddname, .dsname = dsn};
   rc = zds_read(read_opts, response);
