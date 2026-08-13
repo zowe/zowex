@@ -13,6 +13,7 @@
 #include "dispatcher.hpp"
 #include "schemas/requests.hpp"
 #include "schemas/responses.hpp"
+#include "../commands/certificates.hpp"
 #include "../commands/core.hpp"
 #include "../commands/ds.hpp"
 #include "../commands/job.hpp"
@@ -234,9 +235,56 @@ void register_system_commands(CommandDispatcher &dispatcher)
                                   .validate<ListLinklistRequest, ListLinklistResponse>());
 }
 
+void register_certificates_commands(CommandDispatcher &dispatcher)
+{
+  dispatcher.register_command("createKeyring",
+                              CommandBuilder(certificates::handle_create_ring)
+                                  .validate<CreateKeyringRequest, CreateKeyringResponse>());
+  dispatcher.register_command("deleteKeyring",
+                              CommandBuilder(certificates::handle_delete_ring)
+                                  .validate<DeleteKeyringRequest, DeleteKeyringResponse>());
+  dispatcher.register_command("refreshDigtcert",
+                              CommandBuilder(certificates::handle_refresh)
+                                  .validate<RefreshDigtcertRequest, RefreshDigtcertResponse>());
+  dispatcher.register_command("deleteCertificate",
+                              CommandBuilder(certificates::handle_cert_delete)
+                                  .validate<DeleteCertificateRequest, DeleteCertificateResponse>());
+  dispatcher.register_command("listCertificates",
+                              CommandBuilder(certificates::handle_cert_list)
+                                  .validate<ListCertificatesRequest, ListCertificatesResponse>());
+  dispatcher.register_command("exportCertificate",
+                              CommandBuilder(certificates::handle_cert_export)
+                                  .validate<ExportCertificateRequest, ExportCertificateResponse>());
+  dispatcher.register_command("importCertificate",
+                              CommandBuilder(certificates::handle_cert_import)
+                                  .validate<ImportCertificateRequest, ImportCertificateResponse>());
+  dispatcher.register_command("showCertificate",
+                              CommandBuilder(certificates::handle_cert_show)
+                                  .validate<ShowCertificateRequest, ShowCertificateResponse>());
+  dispatcher.register_command("listRings",
+                              CommandBuilder(certificates::handle_list_rings)
+                                  .validate<ListRingsRequest, ListRingsResponse>());
+  dispatcher.register_command("countRing",
+                              CommandBuilder(certificates::handle_ring_count)
+                                  .validate<CountRingRequest, CountRingResponse>());
+  dispatcher.register_command("connectCertificate",
+                              CommandBuilder(certificates::handle_cert_connect)
+                                  .validate<ConnectCertificateRequest, ConnectCertificateResponse>());
+  dispatcher.register_command("setDefaultCertificate",
+                              CommandBuilder(certificates::handle_cert_set_default)
+                                  .validate<SetDefaultCertificateRequest, SetDefaultCertificateResponse>());
+  dispatcher.register_command("trustCertificate",
+                              CommandBuilder(certificates::handle_cert_trust)
+                                  .validate<TrustCertificateRequest, TrustCertificateResponse>());
+  dispatcher.register_command("renameCertificate",
+                              CommandBuilder(certificates::handle_cert_rename)
+                                  .validate<RenameCertificateRequest, RenameCertificateResponse>());
+}
+
 void register_all_commands(CommandDispatcher &dispatcher)
 {
   register_core_commands(dispatcher);
+  register_certificates_commands(dispatcher);
   register_ds_commands(dispatcher);
   register_job_commands(dispatcher);
   register_system_commands(dispatcher);

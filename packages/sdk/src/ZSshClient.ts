@@ -32,6 +32,7 @@ import { ZSshUtils } from "./ZSshUtils";
 export class ZSshClient extends RpcClientApi implements Disposable {
     public static readonly DEFAULT_SERVER_PATH = "~/.zowe-server";
     public static readonly BIN_NAME = "zowex";
+    public static readonly REQUIRED_DEPLOY_SIZE_MB = 20;
     private static readonly DEFAULT_SERVER_STARTUP_TIMEOUT_S = 60;
     private mErrHandler: ClientOptions["onError"];
     private mResponseTimeout: number;
@@ -50,6 +51,7 @@ export class ZSshClient extends RpcClientApi implements Disposable {
     // single chunk would then match.
     private mStartupOutput = "";
     private readonly mRequestMap: Map<number, ExistingClientRequest> = new Map();
+    // biome-ignore lint/correctness/noUnusedPrivateClassMembers: Not unused, sent to SSH server
     private mRequestId = 0;
 
     private constructor() {
@@ -491,11 +493,19 @@ export class ZSshClient extends RpcClientApi implements Disposable {
 
         if (response.error != null) {
             Logger.getAppLogger().error(`Error for response ID: ${response.id}\n${JSON.stringify(response.error)}`);
+            const { data } = response.error;
             this.mRequestMap.get(response.id).rpc.reject(
                 new ImperativeError({
                     msg: response.error.message,
                     errorCode: response.error.code.toString(),
-                    additionalDetails: response.error.data,
+                    // The server may attach a structured error payload (e.g. the safReturns SAF/ESM
+                    // codes from a failed certificate command) as an object instead of a string. Keep
+                    // the raw value available via causeErrors, and stringify it for additionalDetails
+                    // since that field is typed as a string.
+                    ...(data !== undefined && {
+                        causeErrors: data,
+                        additionalDetails: typeof data === "string" ? data : JSON.stringify(data),
+                    }),
                 }),
             );
         } else {

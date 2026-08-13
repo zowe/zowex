@@ -12,15 +12,18 @@
 import type { ICommandDefinition } from "@zowe/imperative";
 import { SshSession } from "@zowe/zos-uss-for-zowe-sdk";
 import { Constants } from "../Constants";
+import { CertDefinition } from "../certificates/cert/Cert.definition";
+import { KeyringDefinition } from "../certificates/keyring/Keyring.definition";
 import { ViewSyslogDefinition } from "./view-syslog/ViewSyslog.definition";
 
 const SystemDefinition: ICommandDefinition = {
     name: "system",
     aliases: ["sys"],
     summary: "System-level operations",
-    description: "Perform system-level operations such as viewing the syslog",
+    description:
+        "Perform system-level operations such as viewing the syslog and managing ESM certificates and key rings.",
     type: "group",
-    children: [ViewSyslogDefinition],
+    children: [ViewSyslogDefinition, CertDefinition, KeyringDefinition],
     passOn: [
         {
             property: "options",
