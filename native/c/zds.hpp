@@ -160,6 +160,7 @@ struct ZDSReadOpts
   ZDS *zds = nullptr;
   std::string ddname;
   std::string dsname;
+  bool is_asa = false;
 };
 
 /**
