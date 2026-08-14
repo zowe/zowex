@@ -4,7 +4,7 @@ All notable changes to the Client code for "@zowe/zowex-for-zowe-sdk" are docume
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## Recent Changes
+## `0.8.0`
 
 - Added detection of available disk space on the z/OS Unix deployment directory in the `ZSshUtils.installServer` method, giving the user the opportunity to cancel deployment if they have less than the recommended amount of available space. [#1088](https://github.com/zowe/zowex/pull/1088)
 - Fixed server deploy/setup failing with "SSH setup cancelled" when connecting with a private key that requires a passphrase, even after entering the correct passphrase. [#1094](https://github.com/zowe/zowex/pull/1094)
