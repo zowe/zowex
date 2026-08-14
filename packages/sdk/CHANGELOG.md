@@ -4,6 +4,10 @@ All notable changes to the Client code for "@zowe/zowex-for-zowe-sdk" are docume
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## Recent Changes
+
+- Fixed the `SearchParser.parseSearchOutput` function silently dropping matches when searching a sequential data set [#1104](https://github.com/zowe/zowex/pull/1104)
+
 ## `0.8.0`
 
 - Added detection of available disk space on the z/OS Unix deployment directory in the `ZSshUtils.installServer` method, giving the user the opportunity to cancel deployment if they have less than the recommended amount of available space. [#1088](https://github.com/zowe/zowex/pull/1088)
@@ -13,7 +17,6 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 - Added a verification step to `installServer()` that runs the installed server binary and reports whether the remote system can load it, so a runtime mismatch surfaces during installation rather than on the next operation. The target system level from the `uname -srv` command is included in the error details. [#871](https://github.com/zowe/zowex/issues/871)
 - Added `exactMatch` property to the `ListDatasetsRequest` type. This option defaults to false for backwards compatibility, but can be set to true to avoid appending `.**` to the end of data set patterns. [#914](https://github.com/zowe/zowex/issues/914)
 - When a command fails, a structured error payload attached by the server (e.g. the `safReturns` SAF/ESM codes from certificate commands) is now delivered to SDK consumers via the `ImperativeError`'s `causeErrors`, instead of being flattened into the error text. [#1079](https://github.com/zowe/zowex/pull/1079)
-- Fixed the `SearchParser.parseSearchOutput` function silently dropping matches when searching a sequential data set [#1104](https://github.com/zowe/zowex/pull/1104)
 
 ## `0.7.1`
 
