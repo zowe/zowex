@@ -17,7 +17,8 @@ export interface SearchMatch {
 }
 
 export interface SearchMember {
-    name: string;
+    /** Absent when the search target is a sequential data set rather than a PDS member */
+    name?: string;
     matches: SearchMatch[];
 }
 
@@ -57,6 +58,17 @@ export function parseSearchOutput(output: string): SearchResult {
     let processOptions = "";
     let searchPattern = "";
 
+    // Closes out the section in progress
+    const closeCurrentMember = (): void => {
+        if (currentMember && (currentMember.name != null || currentMember.matches.length > 0)) {
+            const lastMatch = currentMember.matches.at(-1);
+            if (lastMatch) lastMatch.afterContext.push(...pendingContext);
+            members.push(currentMember);
+        }
+        pendingContext = [];
+        currentMember = null;
+    };
+
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
 
@@ -71,32 +83,21 @@ export function parseSearchOutput(output: string): SearchResult {
             dataset = dsMatch[1];
 
             if (line.includes("SOURCE SECTION")) {
-                const memParse = dsMatch[1].match(/^(.+)\(([^)]+)\)\s*$/); // Parse member name from dataset name if present
-                if (memParse) {
-                    if (currentMember) {
-                        const lastMatch = currentMember.matches.at(-1);
-                        if (lastMatch) lastMatch.afterContext.push(...pendingContext);
-                        members.push(currentMember);
-                    }
-                    pendingContext = [];
-                    currentMember = {
-                        name: memParse[2],
-                        matches: [],
-                    };
-                    continue;
-                }
+                // Parse member name from dataset name if present; sequential data sets have no member
+                const memParse = dsMatch[1].match(/^(.+)\(([^)]+)\)\s*$/);
+                closeCurrentMember();
+                currentMember = {
+                    name: memParse?.[2],
+                    matches: [],
+                };
+                continue;
             }
         }
 
         // Parse member header: " <member name>                    --------- STRING(S) FOUND -------------------"
         const memberMatch = line.match(/^\s+(\S+)\s+[-]+\s+STRING\(S\) FOUND\s+[-]+/);
         if (memberMatch) {
-            if (currentMember) {
-                const lastMatch = currentMember.matches.at(-1);
-                if (lastMatch) lastMatch.afterContext.push(...pendingContext);
-                members.push(currentMember);
-            }
-            pendingContext = [];
+            closeCurrentMember();
             currentMember = {
                 name: memberMatch[1],
                 matches: [],
@@ -107,13 +108,7 @@ export function parseSearchOutput(output: string): SearchResult {
         // parse summary
         const summaryMatch = line.match(/^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+:\d+)\s+(\d+)\s*$/);
         if (summaryMatch) {
-            if (currentMember) {
-                const lastMatch = currentMember.matches.at(-1);
-                if (lastMatch) lastMatch.afterContext.push(...pendingContext);
-                pendingContext = [];
-                members.push(currentMember);
-                currentMember = null;
-            }
+            closeCurrentMember();
             linesFound = parseInt(summaryMatch[1], 10);
             linesProcessed = parseInt(summaryMatch[2], 10);
             membersWithLines = parseInt(summaryMatch[3], 10);
@@ -160,11 +155,7 @@ export function parseSearchOutput(output: string): SearchResult {
         }
     }
 
-    if (currentMember) {
-        const lastMatch = currentMember.matches.at(-1);
-        if (lastMatch) lastMatch.afterContext.push(...pendingContext);
-        members.push(currentMember);
-    }
+    closeCurrentMember();
 
     return {
         dataset,
