@@ -1348,14 +1348,14 @@ int zusf_read_from_uss_file(ZUSF *zusf, const std::string &file, std::string &re
   in.close();
 
   // Use file tag encoding if available, otherwise fall back to provided encoding
-  std::string encoding_to_use;
+  std::string from_encoding;
   bool has_encoding = false;
 
   if (zusf->encoding_opts.data_type == eDataTypeText)
   {
     if (std::strlen(zusf->encoding_opts.codepage) > 0)
     {
-      encoding_to_use = std::string(zusf->encoding_opts.codepage);
+      from_encoding = std::string(zusf->encoding_opts.codepage);
       has_encoding = true;
     }
     else
@@ -1364,7 +1364,7 @@ int zusf_read_from_uss_file(ZUSF *zusf, const std::string &file, std::string &re
       int file_ccsid = zusf_get_file_ccsid(zusf, file);
       if (file_ccsid > 0 && file_ccsid != 1208 && file_ccsid != 65535)
       {
-        encoding_to_use = std::to_string(file_ccsid);
+        from_encoding = std::to_string(file_ccsid);
         has_encoding = true;
       }
     }
@@ -1373,15 +1373,15 @@ int zusf_read_from_uss_file(ZUSF *zusf, const std::string &file, std::string &re
   if (size > 0 && has_encoding)
   {
     std::string temp = response;
-    const auto source_encoding = std::strlen(zusf->encoding_opts.source_codepage) > 0 ? std::string(zusf->encoding_opts.source_codepage) : "UTF-8";
+    const auto target_encoding = std::strlen(zusf->encoding_opts.source_codepage) > 0 ? std::string(zusf->encoding_opts.source_codepage) : "UTF-8";
     try
     {
-      const auto bytes_with_encoding = zut_encode(temp, encoding_to_use, source_encoding, zusf->diag);
+      const auto bytes_with_encoding = zut_encode(temp, from_encoding, target_encoding, zusf->diag);
       temp = bytes_with_encoding;
     }
     catch (std::exception &e)
     {
-      ZDIAG_SET_MSG(&zusf->diag, "Failed to convert input data from %s to %s", encoding_to_use.c_str(), source_encoding.c_str());
+      ZDIAG_SET_MSG(&zusf->diag, "Failed to convert input data from %s to %s", from_encoding.c_str(), target_encoding.c_str());
       return RTNCD_FAILURE;
     }
     if (!temp.empty())
