@@ -84,7 +84,7 @@ export function parseSearchOutput(output: string): SearchResult {
 
             if (line.includes("SOURCE SECTION")) {
                 // Parse member name from dataset name if present; sequential data sets have no member
-                const memParse = dsMatch[1].match(/^(.+)\(([^)]+)\)\s*$/);
+                const memParse = dsMatch[1].match(/^([^()]+)\(([^)]+)\)\s*$/);
                 closeCurrentMember();
                 currentMember = {
                     name: memParse?.[2],
