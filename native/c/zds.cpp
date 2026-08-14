@@ -761,7 +761,15 @@ static std::string zds_resolve_dsname(const ZDSReadOpts &opts)
 
 static DscbAttributes zds_resolve_dscb(const ZDSReadOpts &opts)
 {
-  return opts.dsname.empty() ? DscbAttributes{} : zds_get_dscb_attributes(opts.dsname);
+  DscbAttributes attrs = opts.dsname.empty() ? DscbAttributes{} : zds_get_dscb_attributes(opts.dsname);
+  if (attrs.recfm.empty())
+  {
+    // Catalog lookup found nothing (e.g. an uncatalogued/dynamically
+    // allocated DD such as JES spool output) - fall back to the caller's
+    // hint, if any (e.g. JES's own DD metadata for spool output).
+    attrs.is_asa = opts.is_asa;
+  }
+  return attrs;
 }
 
 static std::string zds_resolve_write_target(const ZDSWriteOpts &opts)
