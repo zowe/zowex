@@ -678,6 +678,40 @@ int handle_data_set_list_members(InvocationContext &context)
   return (!warn && rc == RTNCD_WARNING) ? RTNCD_SUCCESS : rc;
 }
 
+int handle_data_set_resolve_alias(InvocationContext &context)
+{
+  int rc = 0;
+  std::string aliasDsn = context.get<std::string>("dsn", "");
+  unsigned int bpxwdynCode = 0;
+  std::string sysinDdName = "";
+  std::string bpxwdynResponse = "";
+  rc = zut_bpxwdyn_rtdd("alloc lrecl(80) recfm(f,b)", &bpxwdynCode, bpxwdynResponse, sysinDdName);
+  if (rc != 0)
+  {
+    context.error_stream() << "failed to allocate SYSIN dd for IDCAMS" << sysinDdName << std::endl;
+    return RTNCD_FAILURE;
+  }
+  context.error_stream() << "bpx response is: " << bpxwdynResponse << std::endl;
+  context.error_stream() << "unique dd name is " << sysinDdName << std::endl;
+  const auto result = obj();
+  std::string data = "LISTCAT ENTRIES('" + aliasDsn + "') ALL`";
+
+  ZDS idcamsSysinZds{};
+  ZDSWriteOpts write_opts{.zds = &idcamsSysinZds, .ddname = sysinDdName};
+  rc = zds_write(write_opts, data);
+  if (rc != 0)
+  {
+    context.error_stream() << "failed to write IDCAMS commands to dynamic dd " << sysinDdName << std::endl;
+    return RTNCD_FAILURE;
+  }
+
+  context.error_stream() << "write to dataset succeeded" << std::endl;
+
+  result->set("targetDsn", str("todo"));
+  context.set_object(result);
+  return rc;
+}
+
 int handle_data_set_write(InvocationContext &context)
 {
   int rc = 0;
@@ -1139,6 +1173,13 @@ void register_commands(parser::Command &root_command)
   ds_list_members_cmd->add_keyword_arg(RESPONSE_FORMAT_CSV);
   ds_list_members_cmd->set_handler(handle_data_set_list_members);
   data_set_cmd->add_command(ds_list_members_cmd);
+
+  // Resolve alias subcommand
+  auto ds_list_alias_cmd = command_ptr(new Command("resolve-alias", "Resolve a data set alias"));
+  ds_list_alias_cmd->add_alias("ra");
+  ds_list_alias_cmd->add_positional_arg(DSN);
+  ds_list_alias_cmd->set_handler(handle_data_set_resolve_alias);
+  data_set_cmd->add_command(ds_list_alias_cmd);
 
   // Write subcommand
   auto ds_write_cmd = command_ptr(new Command("write", "write to data set"));
