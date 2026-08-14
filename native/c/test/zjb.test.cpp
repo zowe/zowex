@@ -9,6 +9,7 @@
  *
  */
 
+#include <algorithm>
 #include <iostream>
 #include <stdexcept>
 
@@ -126,6 +127,54 @@ void zjb_tests()
                   ExpectWithContext(rc, zjb.diag.e_msg).ToBe(RTNCD_SUCCESS);
                 });
 
+             it("should detect ASA carriage control for spool DDs and read their content", [&]() -> void
+                {
+                  ZJB zjb = {0};
+                  std::string jobid;
+
+                  const std::string asa_jcl =
+                  "//ASASPOOL JOB IZUACCT\n"
+                  "//STEP01   EXEC PGM=IEBGENER\n"
+                  "//SYSPRINT DD SYSOUT=*\n"
+                  "//SYSIN    DD DUMMY\n"
+                  "//SYSUT2   DD SYSOUT=*,DCB=(RECFM=FBA,LRECL=80)\n"
+                  "//SYSUT1   DD *\n"
+                  "1*** PAGE 1: HEADING ***\n"
+                  " THIS LINE IS SINGLE SPACED.\n"
+                  "0THIS LINE IS DOUBLE SPACED.\n"
+                  "/*\n";
+                  int rc = zjb_submit(&zjb, asa_jcl, jobid);
+                  ExpectWithContext(rc, zjb.diag.e_msg).ToBe(RTNCD_SUCCESS);
+
+                  std::string correlator = std::string(zjb.correlator, sizeof(zjb.correlator));
+
+                  sleep(1);
+                  std::vector<ZJobDD> dds;
+                  memset(&zjb, 0, sizeof(zjb));
+                  rc = zjb_list_dds(&zjb, correlator, dds);
+                  ExpectWithContext(rc, zjb.diag.e_msg).ToBe(RTNCD_SUCCESS);
+                  Expect(dds.size()).ToBeGreaterThan(0);
+
+                  auto asa_dd = std::find_if(dds.begin(), dds.end(), [](const ZJobDD &dd) { return dd.is_asa; });
+                  if (asa_dd == dds.end()) {
+                      std::string err_log;
+                      zjb_read_job_content_by_key(&zjb, correlator, 2, err_log);
+                  }
+                  Expect(asa_dd != dds.end()).ToBe(true);
+
+                  std::string content;
+                  memset(&zjb, 0, sizeof(zjb));
+                  rc = zjb_read_job_content_by_key(&zjb, correlator, asa_dd->key, content);
+                  ExpectWithContext(rc, zjb.diag.e_msg).ToBe(RTNCD_SUCCESS);
+                  Expect(content).Not().ToBe(""); // expect some content returned
+
+                  Expect(content.find('\n') != std::string::npos).ToBe(true);
+
+                  memset(&zjb, 0, sizeof(zjb));
+                  rc = zjb_delete(&zjb, correlator);
+                  ExpectWithContext(rc, zjb.diag.e_msg).ToBe(RTNCD_SUCCESS);
+                });
+
               // https://github.com/zowe/zowex/issues/641
               xit("should be able to list and view SYSOUT files for INPUT jobs", [&]() -> void
                 {
@@ -183,7 +232,7 @@ void sleep_on_status(std::string status, std::string jobid)
     }
     if (zjob.full_status == status)
     {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10 * 5)); // wait for job to exit INPUT
+      std::this_thread::sleep_for(std::chrono::milliseconds(10 * 5));
     }
     else
     {

@@ -6,6 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- `c`: Stripped ASA control characters when reading spool files. [#114](https://github.com/zowe/zowex/issues/114)
 - `c`: Fixed `--local-encoding` being ignored when reading spool files. The source codepage was never copied to the `ZDS` struct passed to `zds_read`, so the conversion always fell back to the default source encoding (`UTF-8`). [#1097](https://github.com/zowe/zowex/pull/1097)
 - `c`: Fixed an issue where passing numeric values to the `encoding` or `local-encoding` arguments would result in an empty string, as their argument definitions did not enable string coercion. Now, values provided to these options are converted to strings to ensure proper codepage conversion. [#1095](https://github.com/zowe/zowex/issues/1095)
 - `c`: Added ESM (RACF or equivalent) certificate and key ring management to the `system` command group, migrating the `keyring-utilities` functionality (R_datalib and System SSL) into `zowex` as two subgroups: `system keyring create|delete|list|list-rings|count` and `system cert import|export|delete|show|connect|set-default|trust|rename|refresh`. [#1079](https://github.com/zowe/zowex/pull/1079)
@@ -297,3 +298,4 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## [Unreleased]
 
 - Initial release
+
