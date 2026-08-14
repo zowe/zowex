@@ -79,4 +79,45 @@ void zoweax_console_tests()
             Expect(response).ToContain("Error: could not activate console:");
 
         }); });
+
+  describe("APF authorization drop (ZUTNOAUT) tests", [&]() -> void
+           {
+        it("should run a non-privileged command from the APF-authorized binary", []() -> void
+        {
+            // exercises the live authorization drop (IEAVJAOF under IEAARR recovery);
+            // the pre-command hook fails closed, so a broken drop would exit non-zero
+            std::string response;
+            std::string command = zoweax_command + " version";
+            int rc = execute_command_with_output(command, response);
+
+            ExpectWithContext(rc, response).ToBe(0);
+            Expect(response).ToContain("Version:");
+        });
+
+        it("should run a non-privileged command from the unauthorized binary", []() -> void
+        {
+            std::string response;
+            std::string command = zowex_command + " version";
+            int rc = execute_command_with_output(command, response);
+
+            ExpectWithContext(rc, response).ToBe(0);
+            Expect(response).ToContain("Version:");
+        });
+
+        it("should drop authorization for the whole job step in an interactive session", []() -> void
+        {
+            // entering interactive mode runs the non-privileged root command, which
+            // drops JSCBAUTH for the job step; a console command in the same process
+            // must then fail with a TESTAUTH error even though the binary is
+            // APF-authorized, while non-privileged commands keep working
+            std::string response;
+            std::string command = "printf 'console issue DTIME\\nversion\\nquit\\n' | " +
+                                  zoweax_command + " --it";
+            int rc = execute_command_with_output(command, response);
+
+            ExpectWithContext(rc, response).ToBe(0);
+            Expect(response).ToContain("Error: could not activate console:");
+            Expect(response).ToContain("Not authorized");
+            Expect(response).ToContain("Version:");
+        }); });
 }
