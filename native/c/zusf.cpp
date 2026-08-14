@@ -1381,7 +1381,7 @@ int zusf_read_from_uss_file(ZUSF *zusf, const std::string &file, std::string &re
     }
     catch (std::exception &e)
     {
-      ZDIAG_SET_MSG(&zusf->diag, "Failed to convert input data from %s to %s", source_encoding.c_str(), encoding_to_use.c_str());
+      ZDIAG_SET_MSG(&zusf->diag, "Failed to convert input data from %s to %s", encoding_to_use.c_str(), source_encoding.c_str());
       return RTNCD_FAILURE;
     }
     if (!temp.empty())
