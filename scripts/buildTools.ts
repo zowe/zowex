@@ -40,59 +40,23 @@ const SAFE_ASSET = /^zbind_bin_dist[\w.-]*\.tar\.gz$/;
 const TARBALL = path.resolve(__dirname, "../dist/zbind_bin_dist.tar.gz");
 const OUTPUT = path.resolve(__dirname, "../dist/zbind_bin_dist.tar.gz");
 
-/**
- * Resolves an executable to an absolute path within a fixed set of trusted,
- * system-owned directories. Spawning by bare name lets the OS search a possibly
- * attacker-controlled PATH; resolving against a hardcoded directory list keeps
- * execution restricted to fixed, unwriteable locations.
- */
-function resolveExecutable(name: string): string | null {
-    const trustedDirs =
-        process.platform === "win32"
-            ? [path.join(process.env.SystemRoot ?? "C:\\Windows", "System32")]
-            : ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"];
-    const candidates = process.platform === "win32" ? [`${name}.exe`, `${name}.cmd`] : [name];
-    for (const dir of trustedDirs) {
-        for (const file of candidates) {
-            const full = path.join(dir, file);
-            if (fs.existsSync(full)) {
-                return full;
-            }
-        }
-    }
-    return null;
-}
-
-let ghBinPath: string | null = null;
-
-/**
- * Resolves the "gh" executable lazily to avoid throwing errors during SSH-only
- * tasks if GitHub CLI is not installed.
- */
-function getGhBin(): string {
-    if (ghBinPath === null) {
-        ghBinPath = resolveExecutable("gh");
-        if (ghBinPath === null) {
-            console.error('Required executable "gh" was not found in a trusted system directory.');
-            process.exit(1);
-        }
-    }
-    return ghBinPath;
-}
-
 /** Runs `gh` with the given args, returning trimmed stdout. */
 function gh(args: string[]): string {
-    return childProcess.execFileSync(getGhBin(), args, { encoding: "utf-8" }).trim();
+    try {
+        return childProcess.execFileSync("gh", args, { encoding: "utf-8" }).trim();
+    } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+            console.error('Required executable "gh" was not found on PATH. Install the GitHub CLI: https://cli.github.com/');
+            process.exit(1);
+        }
+        throw err;
+    }
 }
 
 /** Returns the short git commit hash, or "local" if it cannot be determined. */
 function getShortHash(): string {
-    const gitBin = resolveExecutable("git");
-    if (gitBin == null) {
-        return "local";
-    }
     try {
-        const hash = childProcess.execFileSync(gitBin, ["rev-parse", "--short", "HEAD"], { encoding: "utf-8" }).trim();
+        const hash = childProcess.execFileSync("git", ["rev-parse", "--short", "HEAD"], { encoding: "utf-8" }).trim();
         // Only accept a real short hash; anything else falls back to a safe literal.
         return /^[0-9a-f]{4,40}$/i.test(hash) ? hash : "local";
     } catch {
@@ -1896,7 +1860,7 @@ function postPrecompiledBindings(prNumber: string) {
         // Ensure the shared prerelease exists; create it only the first time.
         let releaseExists = true;
         try {
-            childProcess.execFileSync(getGhBin(), ["release", "view", RELEASE_TAG], { stdio: "ignore" });
+            childProcess.execFileSync("gh", ["release", "view", RELEASE_TAG], { stdio: "ignore" });
         } catch {
             releaseExists = false;
         }
