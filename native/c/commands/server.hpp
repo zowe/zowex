@@ -13,10 +13,10 @@
 #define COMMANDS_SERVER_HPP
 
 #include <atomic>
-#include <map>
 #include <memory>
 #include <mutex>
 #include <string>
+#include <thread>
 #include "../parser.hpp"
 
 class WorkerPool;
@@ -44,11 +44,12 @@ private:
   std::unique_ptr<WorkerPool> worker_pool;
   std::atomic<bool> shutdown_requested{false};
   std::once_flag shutdown_flag;
+  // Joined during shutdown so it cannot outlive worker_pool
+  std::thread worker_count_thread;
 
   static void signal_handler(int sig);
   void setup_signal_handlers();
   void request_shutdown();
-  std::map<std::string, std::string> load_checksums();
   void print_ready_message();
   void log_worker_count();
 
@@ -60,8 +61,14 @@ public:
   ~ZServer();
 
   static ZServer &get_instance();
-  void set_exec_dir(const std::string &dir) { exec_dir = dir; }
-  const std::string &get_exec_dir() const { return exec_dir; }
+  void set_exec_dir(const std::string &dir)
+  {
+    exec_dir = dir;
+  }
+  const std::string &get_exec_dir() const
+  {
+    return exec_dir;
+  }
   void run(const server::Options &opts);
 };
 

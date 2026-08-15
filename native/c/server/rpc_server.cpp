@@ -51,6 +51,12 @@ void RpcServer::process_request(const string &request_data)
 
     RpcRequest request = parse_result.value();
 
+    // A newly received ID supersedes any earlier request that timed out under it, so
+    // clear it from the abandoned list. Guards against a client that restarts its ID
+    // sequence while this server is still running, which would otherwise silently
+    // discard a legitimate response.
+    clear_abandoned(request.id);
+
     // Use CommandDispatcher singleton to handle the command
     CommandDispatcher &dispatcher = CommandDispatcher::get_instance();
 
@@ -97,6 +103,20 @@ void RpcServer::process_request(const string &request_data)
       {
         error_message = "Command execution failed (" + request.method + ")";
       }
+
+      // A handler may attach a structured error object (e.g. the SAF/ESM return,
+      // reason, and function codes from a failed certificate command) via
+      // context.set_object(). When present, that structured payload must survive
+      // to the JSON-RPC error's "data" field instead of being discarded in favor
+      // of the plain-text stderr detail, so RPC/SDK consumers can inspect it
+      // programmatically.
+      const auto &err_object = context.get_object();
+      if (err_object)
+      {
+        print_error(request.id, result, error_message, convert_ast_to_json(err_object));
+        return;
+      }
+
       const string *detail_ptr = error_data.empty() ? nullptr : &error_data;
       print_error(request.id, result, error_message, detail_ptr);
       return;
@@ -308,6 +328,15 @@ zjson::Value RpcServer::convert_ast_to_json(const ast::Node &ast_node)
 
 void RpcServer::print_response(const RpcResponse &response, MiddlewareContext *context)
 {
+  // A detached worker eventually finishes the request it was timed out on. The
+  // client already failed that ID, so emitting this would only surface a bogus
+  // "missing promise for response ID" error on the other end.
+  if (response.id.has_value() && is_abandoned(response.id.value()))
+  {
+    LOG_WARN("Discarding late response for abandoned request ID %d", response.id.value());
+    return;
+  }
+
   // Log errors to the log file
   if (response.error.has_value())
   {
@@ -338,7 +367,7 @@ void RpcServer::print_response(const RpcResponse &response, MiddlewareContext *c
   }
 
   auto &stream = response.error.has_value() ? std::cerr : std::cout;
-  std::lock_guard<std::mutex> lock(response_mutex);
+  std::lock_guard<std::mutex> lock(output_mutex());
   stream << json_string << std::endl;
 }
 
@@ -399,9 +428,62 @@ zjson::Value RpcServer::error_details_to_json(const ErrorDetails &error)
   return result.value_or(zjson::Value::create_object());
 }
 
+std::mutex &RpcServer::output_mutex()
+{
+  static std::mutex mutex;
+  return mutex;
+}
+
+std::mutex &RpcServer::abandoned_mutex()
+{
+  static std::mutex mutex;
+  return mutex;
+}
+
+std::set<int> &RpcServer::abandoned_ids()
+{
+  static std::set<int> ids;
+  return ids;
+}
+
+std::deque<int> &RpcServer::abandoned_order()
+{
+  static std::deque<int> order;
+  return order;
+}
+
+bool RpcServer::is_abandoned(int request_id)
+{
+  if (request_id < 0)
+    return false;
+
+  std::lock_guard<std::mutex> lock(abandoned_mutex());
+  return abandoned_ids().count(request_id) > 0;
+}
+
+void RpcServer::clear_abandoned(int request_id)
+{
+  if (request_id < 0)
+    return;
+
+  std::lock_guard<std::mutex> lock(abandoned_mutex());
+  if (abandoned_ids().erase(request_id) == 0)
+    return;
+
+  for (auto it = abandoned_order().begin(); it != abandoned_order().end(); ++it)
+  {
+    if (*it == request_id)
+    {
+      abandoned_order().erase(it);
+      break;
+    }
+  }
+}
+
 void RpcServer::send_notification(const RpcNotification &notification)
 {
   string json_string = serialize_json(zjson::to_value(notification).value());
+  std::lock_guard<std::mutex> lock(output_mutex());
   std::cout << json_string << std::endl;
 }
 
@@ -446,6 +528,24 @@ void RpcServer::send_timeout_error(const string &request_data, int64_t timeout_m
   // Send the error response
   print_error(request_id, RpcErrorCode::REQUEST_TIMEOUT, timeout_message);
 
+  // Mark the ID afterwards, so the timeout error itself is not filtered. The
+  // detached worker is still inside its stuck operation, so losing this race would
+  // at worst restore the old duplicate-response behaviour rather than swallow the
+  // error the client is waiting on.
+  if (request_id >= 0)
+  {
+    std::lock_guard<std::mutex> lock(abandoned_mutex());
+    if (abandoned_ids().insert(request_id).second)
+    {
+      abandoned_order().push_back(request_id);
+      while (abandoned_order().size() > kMaxAbandonedIds)
+      {
+        abandoned_ids().erase(abandoned_order().front());
+        abandoned_order().pop_front();
+      }
+    }
+  }
+
   LOG_WARN("Sent timeout error response for request ID %d (method: %s)", request_id, method.c_str());
 }
 
@@ -458,6 +558,20 @@ void RpcServer::print_error(int request_id, int code, const string &message, con
   }
 
   ErrorDetails error{code, message, error_data};
+
+  RpcResponse response;
+  response.jsonrpc = "2.0";
+  response.result = std::optional<zjson::Value>();
+  response.error = std::optional<ErrorDetails>(error);
+  // Use -1 as sentinel for null ID (per JSON-RPC spec for parse errors)
+  response.id = (request_id == -1) ? std::optional<int>() : std::optional<int>(request_id);
+
+  print_response(response);
+}
+
+void RpcServer::print_error(int request_id, int code, const string &message, const zjson::Value &data)
+{
+  ErrorDetails error{code, message, std::optional<zjson::Value>(data)};
 
   RpcResponse response;
   response.jsonrpc = "2.0";

@@ -14,7 +14,7 @@
 
 #include <string>
 #include <vector>
-#include <unordered_map>
+#include <map>
 #include <set>
 #include <functional>
 #include <stdexcept>
@@ -94,6 +94,18 @@ template <typename T>
 struct Serializable;
 template <typename T>
 struct Deserializable;
+
+// Key/value representation for a JSON object.
+//
+// Ordered (std::map), not hashed: std::hash<std::string> resolves to the out-of-line libc++ helper
+// std::__1_e::__hash_memory, which is not exported by CRTEQCXE on z/OS systems below the required
+// Language Environment maintenance level and fails with CEE3561S at load time. See zowex#871 and
+// doc/troubleshooting.md. Do not change this back to std::unordered_map without re-checking the
+// imported symbol report produced by `make runtime-imports`.
+//
+// Deliberately not named `Object`: that name is already an enumerator of Value::Type and would
+// shadow this alias inside every member of Value.
+using ObjectMap = std::map<std::string, Value>;
 
 // Attributes namespace with RenameAll implementation
 namespace attributes
@@ -322,7 +334,7 @@ public:
   static Value create_object()
   {
     Value result{};
-    result.data_ = std::unordered_map<std::string, Value>();
+    result.data_ = ObjectMap();
     return result;
   }
 
@@ -372,13 +384,13 @@ public:
 private:
   // Variant type for JSON values
   using ValueVariant = std::variant<
-      std::monostate,                        // Null
-      bool,                                  // Bool
-      long long,                             // Integer
-      double,                                // Float
-      std::string,                           // String
-      std::vector<Value>,                    // Array
-      std::unordered_map<std::string, Value> // Object
+      std::monostate,     // Null
+      bool,               // Bool
+      long long,          // Integer
+      double,             // Float
+      std::string,        // String
+      std::vector<Value>, // Array
+      ObjectMap           // Object
       >;
 
   ValueVariant data_;
@@ -404,9 +416,9 @@ private:
   {
     return std::get<std::vector<Value>>(data_);
   }
-  inline std::unordered_map<std::string, Value> &get_object()
+  inline ObjectMap &get_object()
   {
-    return std::get<std::unordered_map<std::string, Value>>(data_);
+    return std::get<ObjectMap>(data_);
   }
 
   inline const bool &get_bool() const
@@ -429,9 +441,9 @@ private:
   {
     return std::get<std::vector<Value>>(data_);
   }
-  inline const std::unordered_map<std::string, Value> &get_object() const
+  inline const ObjectMap &get_object() const
   {
-    return std::get<std::unordered_map<std::string, Value>>(data_);
+    return std::get<ObjectMap>(data_);
   }
 
 public:
@@ -641,7 +653,7 @@ public:
     return get_array();
   }
 
-  const std::unordered_map<std::string, Value> &as_object() const
+  const ObjectMap &as_object() const
   {
     if (!is_object())
       throw Error::invalid_type("object", type_name());
@@ -674,7 +686,7 @@ public:
   }
   inline bool is_object() const
   {
-    return std::holds_alternative<std::unordered_map<std::string, Value>>(data_);
+    return std::holds_alternative<ObjectMap>(data_);
   }
 
   // Object access by key
@@ -683,7 +695,7 @@ public:
     if (is_null())
     {
       // Convert null to empty object on first access
-      data_ = std::unordered_map<std::string, Value>();
+      data_ = ObjectMap();
     }
 
     if (!is_object())
@@ -1343,11 +1355,14 @@ inline std::string escape_json_string(const std::string &input)
       output += "\\t";
       break;
     default:
-      if (iscntrl(c))
+      if (iscntrl(static_cast<unsigned char>(c)))
       {
-        char buf[7];
-        snprintf(buf, sizeof(buf), "\\u%04x", static_cast<unsigned char>(c));
-        output += buf;
+        // Native control byte values do not correspond to the same Unicode code
+        // points on this EBCDIC platform (e.g. IBM-1047 NL 0x15 vs Unicode NAK
+        // U+0015), so echoing the byte's numeric value via \u00XX would misrepresent
+        // it to a spec-compliant JSON reader. Emit the Unicode replacement character
+        // instead of a specific, likely-wrong code point.
+        output += "\\ufffd";
       }
       else
       {
@@ -1397,26 +1412,37 @@ inline std::string unescape_json_string(const std::string &s)
       case 'u':
         if (i + 4 < s.length())
         {
-          try
+          std::string hex = s.substr(i + 1, 4);
+          char *endptr;
+          unsigned long val = std::strtoul(hex.c_str(), &endptr, 16);
+          bool valid_hex = endptr == hex.c_str() + 4;
+          if (valid_hex && val < 256 && iscntrl(static_cast<unsigned char>(val)))
           {
-            std::string hex = s.substr(i + 1, 4);
-            char *endptr;
-            unsigned long val = std::strtoul(hex.c_str(), &endptr, 16);
-            if (endptr != hex.c_str() && val < 256)
-            {
-              res += static_cast<char>(val);
-            }
-            else
-            {
-              // For values outside of single byte range, preserve original escape
-              res += "\\u" + hex;
-            }
-            i += 4;
+            // \n, \t, \r, \b, \f have named escapes and are handled above, where
+            // they are deliberately mapped to this platform's native control byte
+            // rather than the Unicode code point. A \u00XX escape for the same code
+            // point (named or not) has no such platform-specific mapping to fall
+            // back on: e.g. U+0015 is Unicode NAK, but on this EBCDIC platform (IBM-1047)
+            // byte 0x15 is NL, not NAK, so there is no reliable value to substitute -
+            // reject outright rather than guess.
+            throw Error::invalid_value("JSON string contains a disallowed control character escape: \\u" + hex);
           }
-          catch (...)
+          else if (valid_hex && val < 256)
           {
-            res += "\\u"; // Malformed, just append what we can
+            res += static_cast<char>(val);
           }
+          else
+          {
+            // Either the hex digits themselves are malformed (should already
+            // be rejected as invalid JSON before this text is reached), or the
+            // escape names a code point above the single-byte range (U+0100
+            // and above, including either half of a surrogate pair). This
+            // decoder only ever produces single native bytes, so there is no
+            // correct value to substitute here - reject rather than silently
+            // keeping the escape text as if it had been decoded successfully.
+            throw Error::invalid_value("JSON string contains an unsupported \\u escape: \\u" + hex);
+          }
+          i += 4;
         }
         else
         {
@@ -1442,199 +1468,159 @@ inline std::string unescape_json_string(const std::string &s)
 // Maximum allowed JSON nesting depth to prevent stack overflow
 static constexpr int MAX_JSON_DEPTH = 64;
 
+// Note: this function intentionally does not catch its own exceptions. Any
+// failure - a failed HWTJ call, a malformed number, a disallowed control
+// character, exceeding MAX_JSON_DEPTH - propagates all the way to from_str's
+// try/catch, which normalizes it into a zstd::expected failure and performs
+// cleanup (ZJSMTERM). A single malformed field fails the whole parse rather
+// than being silently dropped, matching how from_value<T> already treats
+// errors one layer up (e.g. numeric overflow).
 inline Value json_handle_to_value(JSON_INSTANCE *instance, KEY_HANDLE *key_handle, int depth = 0)
 {
-  try
+  // Check depth limit to prevent unbounded recursion
+  if (depth >= MAX_JSON_DEPTH)
   {
-    // Check depth limit to prevent unbounded recursion
-    if (depth >= MAX_JSON_DEPTH)
-    {
-      ZLOG_WARN("JSON parsing depth limit reached: %d", depth);
-      return Value();
-    }
+    throw Error(Error::Custom, "JSON exceeds maximum nesting depth of " + std::to_string(MAX_JSON_DEPTH));
+  }
 
-    int type = 0;
-    int rc = ZJSNGJST(instance, key_handle, &type);
+  int type = 0;
+  int rc = ZJSNGJST(instance, key_handle, &type);
+  if (rc != 0)
+  {
+    throw Error(Error::Custom, "Failed to determine JSON value type");
+  }
+
+  switch (type)
+  {
+  case HWTJ_NULL_TYPE:
+    return Value();
+
+  case HWTJ_BOOLEAN_TYPE:
+  {
+    char bool_val = 0;
+    rc = ZJSMGBOV(instance, key_handle, &bool_val);
     if (rc != 0)
     {
-      return Value(); // Return null on error
+      throw Error(Error::Custom, "Failed to read JSON boolean value");
+    }
+    return Value(bool_val == HWTJ_TRUE);
+  }
+
+  case HWTJ_NUMBER_TYPE:
+  {
+    char *value_ptr = 0;
+    int value_length = 0;
+    rc = ZJSMGVAL(instance, key_handle, &value_ptr, &value_length);
+    if (rc != 0)
+    {
+      throw Error(Error::Custom, "Failed to read JSON number value");
+    }
+    std::string str_val(value_ptr, value_length);
+    if (str_val.find('.') != std::string::npos || str_val.find('e') != std::string::npos || str_val.find('E') != std::string::npos)
+    {
+      char *endptr = nullptr;
+      double num_val = std::strtod(str_val.c_str(), &endptr);
+      if (endptr == str_val.c_str() || *endptr != '\0')
+      {
+        throw Error::invalid_value("Malformed JSON number: " + str_val);
+      }
+      return Value(num_val);
+    }
+    else
+    {
+      char *endptr = nullptr;
+      long long int_val = std::strtoll(str_val.c_str(), &endptr, 10);
+      if (endptr == str_val.c_str() || *endptr != '\0')
+      {
+        throw Error::invalid_value("Malformed JSON number: " + str_val);
+      }
+      return Value(int_val);
+    }
+  }
+
+  case HWTJ_STRING_TYPE:
+  {
+    char *value_ptr = 0;
+    int value_length = 0;
+    rc = ZJSMGVAL(instance, key_handle, &value_ptr, &value_length);
+    if (rc != 0)
+    {
+      throw Error(Error::Custom, "Failed to read JSON string value");
+    }
+    std::string raw_str(value_ptr, value_length);
+    return Value(unescape_json_string(raw_str));
+  }
+
+  case HWTJ_ARRAY_TYPE:
+  {
+    Value result = Value::create_array();
+
+    int num_entries = 0;
+    rc = ZJSMGNUE(instance, key_handle, &num_entries);
+    if (rc != 0)
+    {
+      throw Error(Error::Custom, "Failed to determine JSON array size");
     }
 
-    switch (type)
+    for (int i = 0; i < num_entries; i++)
     {
-    case HWTJ_NULL_TYPE:
-      return Value();
-
-    case HWTJ_BOOLEAN_TYPE:
-    {
-      char bool_val = 0;
-      rc = ZJSMGBOV(instance, key_handle, &bool_val);
+      KEY_HANDLE element_handle = {0};
+      rc = ZJSMGAEN(instance, key_handle, &i, &element_handle);
       if (rc != 0)
       {
-        return Value();
+        throw Error(Error::Custom, "Failed to read JSON array element at index " + std::to_string(i));
       }
-      return Value(bool_val == HWTJ_TRUE);
+      Value element = json_handle_to_value(instance, &element_handle, depth + 1);
+      result.add_to_array(element);
+    }
+    return result;
+  }
+
+  case HWTJ_OBJECT_TYPE:
+  {
+    Value result = Value::create_object();
+
+    int num_entries = 0;
+    rc = ZJSMGNUE(instance, key_handle, &num_entries);
+    if (rc != 0)
+    {
+      throw Error(Error::Custom, "Failed to determine JSON object size");
     }
 
-    case HWTJ_NUMBER_TYPE:
+    for (int i = 0; i < num_entries; i++)
     {
-      char *value_ptr = 0;
-      int value_length = 0;
-      rc = ZJSMGVAL(instance, key_handle, &value_ptr, &value_length);
-      if (rc != 0)
-      {
-        return Value();
-      }
-      try
-      {
-        std::string str_val(value_ptr, value_length);
-        if (str_val.find('.') != std::string::npos || str_val.find('e') != std::string::npos || str_val.find('E') != std::string::npos)
-        {
-          char *endptr = nullptr;
-          double num_val = std::strtod(str_val.c_str(), &endptr);
-          if (endptr == str_val.c_str() || *endptr != '\0')
-          {
-            return Value();
-          }
-          return Value(num_val);
-        }
-        else
-        {
-          char *endptr = nullptr;
-          long long int_val = std::strtoll(str_val.c_str(), &endptr, 10);
-          if (endptr == str_val.c_str() || *endptr != '\0')
-          {
-            return Value();
-          }
-          return Value(int_val);
-        }
-      }
-      catch (...)
-      {
-        return Value();
-      }
-    }
+      char key_buffer[256] = {0};
+      char *key_buffer_ptr = key_buffer;
+      int key_buffer_length = sizeof(key_buffer);
+      KEY_HANDLE value_handle = {0};
+      int actual_length = 0;
+      std::vector<char> dynamic_buffer;
 
-    case HWTJ_STRING_TYPE:
-    {
-      char *value_ptr = 0;
-      int value_length = 0;
-      rc = ZJSMGVAL(instance, key_handle, &value_ptr, &value_length);
-      if (rc != 0)
+      rc = ZJSMGOEN(instance, key_handle, &i, &key_buffer_ptr, &key_buffer_length, &value_handle, &actual_length);
+      if (rc == HWTJ_BUFFER_TOO_SMALL)
       {
-        return Value();
-      }
-      std::string raw_str(value_ptr, value_length);
-      return Value(unescape_json_string(raw_str));
-    }
-
-    case HWTJ_ARRAY_TYPE:
-    {
-      Value result = Value::create_array();
-
-      int num_entries = 0;
-      rc = ZJSMGNUE(instance, key_handle, &num_entries);
-      if (rc != 0)
-      {
-        return result; // Return empty array
-      }
-
-      for (int i = 0; i < num_entries; i++)
-      {
-        KEY_HANDLE element_handle = {0};
-        rc = ZJSMGAEN(instance, key_handle, &i, &element_handle);
-        if (rc == 0)
-        {
-          try
-          {
-            Value element = json_handle_to_value(instance, &element_handle, depth + 1);
-            result.add_to_array(element);
-          }
-          catch (...)
-          {
-            // Skip problematic array elements
-            ZLOG_WARN("Failed to parse JSON array element at index %d to Value", i);
-            continue;
-          }
-        }
-      }
-      return result;
-    }
-
-    case HWTJ_OBJECT_TYPE:
-    {
-      Value result = Value::create_object();
-
-      int num_entries = 0;
-      rc = ZJSMGNUE(instance, key_handle, &num_entries);
-      if (rc != 0)
-      {
-        return result; // Return empty object
-      }
-
-      for (int i = 0; i < num_entries; i++)
-      {
-        char key_buffer[256] = {0};
-        char *key_buffer_ptr = key_buffer;
-        int key_buffer_length = sizeof(key_buffer);
-        KEY_HANDLE value_handle = {0};
-        int actual_length = 0;
+        // Allocate larger buffer for long keys
+        dynamic_buffer.resize(actual_length);
+        key_buffer_ptr = &dynamic_buffer[0];
+        key_buffer_length = actual_length;
 
         rc = ZJSMGOEN(instance, key_handle, &i, &key_buffer_ptr, &key_buffer_length, &value_handle, &actual_length);
-        if (rc == 0)
-        {
-          try
-          {
-            std::string key_name(key_buffer_ptr, actual_length);
-            Value value = json_handle_to_value(instance, &value_handle, depth + 1);
-            result.add_to_object(key_name, value);
-          }
-          catch (...)
-          {
-            // Skip problematic object fields
-            ZLOG_WARN("Failed to parse JSON object field at index %d to Value", i);
-            continue;
-          }
-        }
-        else if (rc == HWTJ_BUFFER_TOO_SMALL)
-        {
-          // Allocate larger buffer for long keys
-          std::vector<char> dynamic_buffer(actual_length);
-          key_buffer_ptr = &dynamic_buffer[0];
-          key_buffer_length = actual_length;
-
-          rc = ZJSMGOEN(instance, key_handle, &i, &key_buffer_ptr, &key_buffer_length, &value_handle, &actual_length);
-          if (rc == 0)
-          {
-            try
-            {
-              std::string key_name(key_buffer_ptr, actual_length);
-              Value value = json_handle_to_value(instance, &value_handle, depth + 1);
-              result.add_to_object(key_name, value);
-            }
-            catch (...)
-            {
-              // Skip problematic object fields
-              ZLOG_WARN("Failed to parse JSON object field at index %d to Value", i);
-              continue;
-            }
-          }
-        }
       }
-      return result;
-    }
 
-    default:
-      return Value();
+      if (rc != 0)
+      {
+        throw Error(Error::Custom, "Failed to read JSON object field at index " + std::to_string(i));
+      }
+
+      std::string key_name(key_buffer_ptr, actual_length);
+      Value value = json_handle_to_value(instance, &value_handle, depth + 1);
+      result.add_to_object(key_name, value);
     }
+    return result;
   }
-  catch (const std::exception &e)
-  {
-    return Value();
-  }
-  catch (...)
-  {
-    return Value();
+
+  default:
+    throw Error(Error::Custom, "Unknown JSON value type encountered during parsing");
   }
 }
 
@@ -2342,7 +2328,7 @@ void serialize_field(const T &obj, Value &result, const Field<T, FieldType> &fie
 }
 
 template <typename T, typename FieldType>
-bool deserialize_field(T &obj, const std::unordered_map<std::string, Value> &object, const Field<T, FieldType> &field)
+bool deserialize_field(T &obj, const ObjectMap &object, const Field<T, FieldType> &field)
 {
   if (field.skip_deserializing)
   {
@@ -2420,13 +2406,13 @@ void serialize_fields(const T &obj, Value &result, Fields... fields)
 }
 
 template <typename T>
-bool deserialize_fields_impl(T &obj, const std::unordered_map<std::string, Value> &object)
+bool deserialize_fields_impl(T &, const ObjectMap &)
 {
   return true;
 }
 
 template <typename T, typename Field, typename... Fields>
-bool deserialize_fields_impl(T &obj, const std::unordered_map<std::string, Value> &object, Field field, Fields... fields)
+bool deserialize_fields_impl(T &obj, const ObjectMap &object, Field field, Fields... fields)
 {
   if (!deserialize_field(obj, object, field))
   {
@@ -2436,7 +2422,7 @@ bool deserialize_fields_impl(T &obj, const std::unordered_map<std::string, Value
 }
 
 template <typename T, typename... Fields>
-bool deserialize_fields(T &obj, const std::unordered_map<std::string, Value> &object, Fields... fields)
+bool deserialize_fields(T &obj, const ObjectMap &object, Fields... fields)
 {
   return deserialize_fields_impl(obj, object, fields...);
 }
@@ -2486,7 +2472,7 @@ bool has_flattened_field(Fields... fields)
 }
 
 template <typename T, typename... Fields>
-zstd::expected<bool, Error> validate_no_unknown_fields(const std::unordered_map<std::string, Value> &object, Fields... fields)
+zstd::expected<bool, Error> validate_no_unknown_fields(const ObjectMap &object, Fields... fields)
 {
   // Check if any field is flattened - if so, we cannot reliably validate unknown fields
   if (has_flattened_field(fields...))

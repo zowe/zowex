@@ -14,6 +14,7 @@
 
 #include "../extend/plugin.hpp"
 #include "../zjson.hpp"
+#include <map>
 #include <memory>
 #include <optional>
 #include <sstream>
@@ -98,7 +99,7 @@ public:
   void set_pending_notification(const RpcNotification &notification);
 
   // Get large data map
-  std::unordered_map<std::string, std::string> &get_large_data()
+  std::map<std::string, std::string> &get_large_data()
   {
     return m_large_data;
   }
@@ -111,7 +112,7 @@ private:
   std::stringstream m_output_stream;
   std::stringstream m_error_stream;
   std::unique_ptr<RpcNotification> m_pending_notification;
-  std::unordered_map<std::string, std::string> m_large_data;
+  std::map<std::string, std::string> m_large_data;
 };
 
 #endif

@@ -22,6 +22,9 @@ extern "C"
 
   void *ZMTLLOAD(const char *);
   int ZMTLDEL(const char *);
+  int ZMTLJAOF();
+  int ZMTLPST();
+  int ZMTLTAUT();
 
 #if defined(__cplusplus)
 }

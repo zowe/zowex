@@ -11,6 +11,10 @@
 
 .INCLUDE: ../toolchain.mk
 
+# System SSL (GSKCMS) 64-bit side-deck: resolves the gsk_* symbols referenced by
+# zkr.o (linked into the runner for the certificates tests). Mirrors ../makefile.
+GSKCMS_SIDEDECK=/usr/lib/GSKCMS64.x
+
 BIND=ld
 
 # https://www.ibm.com/docs/en/zos/3.1.0?topic=bor-binder-options
@@ -106,6 +110,8 @@ build-out/zutcall24.o \
 build-out/zds.test.o \
 build-out/zds.o \
 build-out/zdsm.o \
+build-out/zkr.test.o \
+build-out/zkr.o \
 build-out/zam.o \
 build-out/zam24.o \
 build-out/zjb.test.o \
@@ -130,6 +136,7 @@ build-out/zowex.job.submit.test.o \
 build-out/zowex.job.manage.test.o \
 build-out/zowex.test.o \
 build-out/zowex.tso.test.o \
+build-out/zowex.plugin.test.o \
 build-out/zoweax.console.test.o \
 build-out/zutils.o \
 build-out/parser.test.o \
@@ -141,12 +148,15 @@ build-out/zjsonm.o \
 build-out/zowex.server.test.o \
 build-out/zowex.uss.server.test.o \
 build-out/zowex.ds.server.test.o \
+build-out/zowex.cert.server.test.o \
 build-out/zowex.job.server.test.o \
 build-out/server.worker.test.o \
 build-out/server_validator.o \
 build-out/server.validator.test.o \
-build-out/server_logger.test.o
-	$(CXX) $(CPP_BND_FLAGS) -o $@ $^
+build-out/server_logger.test.o \
+build-out/plugin.test.o \
+build-out/plugin.o
+	$(CXX) $(CPP_BND_FLAGS) -o $@ $^ $(GSKCMS_SIDEDECK)
 
 build-out/zut.o:
 	ln -sf ../../build-out/zut.o build-out/zut.o
@@ -165,6 +175,9 @@ build-out/zds.o:
 
 build-out/zdsm.o:
 	ln -sf ../../build-out/zdsm.o build-out/zdsm.o
+
+build-out/zkr.o:
+	ln -sf ../../build-out/zkr.o build-out/zkr.o
 
 build-out/zam.o:
 	ln -sf ../../build-out/zam.o build-out/zam.o
@@ -193,6 +206,9 @@ build-out/zusf.o:
 build-out/server_validator.o:
 	ln -sf ../../build-out/server/validator.o build-out/server_validator.o
 
+build-out/plugin.o: ../extend/plugin.cpp
+	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
+
 build-out/zowex.ds.test.o: zowex.ds.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
@@ -215,6 +231,9 @@ build-out/zowex.job.manage.test.o: zowex.job.manage.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
 build-out/zowex.tso.test.o: zowex.tso.test.cpp
+	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
+
+build-out/zowex.plugin.test.o: zowex.plugin.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
 build-out/zoweax.console.test.o: zoweax.console.test.cpp
@@ -248,6 +267,9 @@ build-out/zjb.test.o: zjb.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
 build-out/zds.test.o: zds.test.cpp
+	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
+
+build-out/zkr.test.o: zkr.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
 build-out/zcn.test.o: zcn.test.cpp
@@ -301,6 +323,9 @@ build-out/zowex.uss.server.test.o: zowex.uss.server.test.cpp
 build-out/zowex.ds.server.test.o: zowex.ds.server.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
+build-out/zowex.cert.server.test.o: zowex.cert.server.test.cpp
+	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
+
 build-out/zowex.job.server.test.o: zowex.job.server.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
@@ -317,6 +342,9 @@ build-out/server.validator.test.o: server/validator.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
 build-out/server_logger.test.o: server_logger.test.cpp
+	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
+
+build-out/plugin.test.o: plugin.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
 #

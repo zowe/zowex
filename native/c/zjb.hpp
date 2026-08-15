@@ -41,6 +41,7 @@ struct ZJobDD
   std::string procstep;
   unsigned char token[80];
   int key;
+  bool is_asa = false;
 };
 
 /**

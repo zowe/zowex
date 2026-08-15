@@ -22,7 +22,29 @@
 #include <cstddef>
 #include <set>
 
-#include <unordered_map>
+// Ordered containers, not hashed: std::hash<std::string> resolves to the out-of-line libc++ helper
+// std::__1_e::__hash_memory, absent from CRTEQCXE on z/OS systems below the required Language
+// Environment maintenance level (CEE3561S at load time). See zowex#871 and doc/troubleshooting.md.
+#include <map>
+
+// Binary compatibility contract between zowex and out-of-tree plug-ins.
+//
+// Bump this on any change to the layout of a type that crosses the dlopen boundary - notably
+// ast::ObjMap, ast::Ast, plugin::ArgumentMap, plugin::Io, plugin::InvocationContext and
+// plugin::PluginManager. Accessors such as InvocationContext::get<T>() are inlined *into* the
+// plug-in, so a plug-in compiled against a different layout reads the wrong member offsets;
+// zowex rejects such a plug-in at load time rather than letting it corrupt memory.
+//
+// Version 1 was the implicit, unversioned contract before this constant existed. A plug-in that
+// does not export zowex_plugin_abi_version() reports as version 0 and is rejected.
+constexpr unsigned int ZOWEX_PLUGIN_ABI_VERSION = 2u;
+
+// Plug-ins must expand this once, in the same translation unit as register_plugin().
+#define ZOWEX_PLUGIN_DECLARE_ABI()                   \
+  extern "C" unsigned int zowex_plugin_abi_version() \
+  {                                                  \
+    return ZOWEX_PLUGIN_ABI_VERSION;                 \
+  }
 
 template <typename Interface>
 class Factory
@@ -38,11 +60,11 @@ namespace ast
 {
 struct Ast;
 
-typedef std::shared_ptr<Ast> Node;
-typedef std::shared_ptr<std::string> StringPtr;
-typedef std::shared_ptr<std::vector<Node>> VecPtr;
-typedef std::unordered_map<std::string, Node> ObjMap;
-typedef std::shared_ptr<ObjMap> ObjPtr;
+using Node = std::shared_ptr<Ast>;
+using StringPtr = std::shared_ptr<std::string>;
+using VecPtr = std::shared_ptr<std::vector<Node>>;
+using ObjMap = std::map<std::string, Node>;
+using ObjPtr = std::shared_ptr<ObjMap>;
 
 struct Ast
 {
@@ -773,7 +795,7 @@ struct ArgGetter<std::vector<std::string>>
   }
 };
 
-typedef std::unordered_map<std::string, Argument> ArgumentMap;
+using ArgumentMap = std::map<std::string, Argument>;
 
 class Io
 {
@@ -1207,6 +1229,13 @@ public:
     return m_server_commands;
   }
 
+  // Names of plug-in top-level commands refused during registration because they
+  // would shadow a built-in verb or collide with another plug-in.
+  const std::vector<std::string> &get_rejected_command_names() const
+  {
+    return m_rejected_command_names;
+  }
+
   PluginManager(const PluginManager &) = delete;
   PluginManager &operator=(const PluginManager &) = delete;
 
@@ -1215,6 +1244,7 @@ private:
   void record_loaded_plugin(void *plugin_handle, const std::string &plugin_identifier);
   bool is_display_name_in_use(const std::string &name) const;
   void discard_command_providers_from(std::size_t start_index);
+  void load_plugin_file(const std::string &plugin_path, const std::string &entry_name);
 
   std::vector<std::unique_ptr<CommandProvider>> m_command_providers;
   std::set<parser::command_ptr> m_server_commands;
@@ -1225,6 +1255,7 @@ private:
   bool m_registration_rejected;
   std::string m_duplicate_display_name;
   std::size_t m_provider_snapshot;
+  std::vector<std::string> m_rejected_command_names;
 };
 
 inline PluginManager::PluginManager()

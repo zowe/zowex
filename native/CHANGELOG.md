@@ -4,9 +4,27 @@ All notable changes to the native code for "zowex" are documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## Recent Changes
+## `0.8.0`
 
+- `c`: Stripped ASA control characters when reading spool files. [#114](https://github.com/zowe/zowex/issues/114)
+- `c`: Fixed `--local-encoding` being ignored when reading spool files. The source codepage was never copied to the `ZDS` struct passed to `zds_read`, so the conversion always fell back to the default source encoding (`UTF-8`). [#1097](https://github.com/zowe/zowex/pull/1097)
+- `c`: Fixed an issue where passing numeric values to the `encoding` or `local-encoding` arguments would result in an empty string, as their argument definitions did not enable string coercion. Now, values provided to these options are converted to strings to ensure proper codepage conversion. [#1095](https://github.com/zowe/zowex/issues/1095)
+- `c`: Added ESM (RACF or equivalent) certificate and key ring management to the `system` command group, migrating the `keyring-utilities` functionality (R_datalib and System SSL) into `zowex` as two subgroups: `system keyring create|delete|list|list-rings|count` and `system cert import|export|delete|show|connect|set-default|trust|rename|refresh`. [#1079](https://github.com/zowe/zowex/pull/1079)
+- **Breaking:** `c`: Changed the plug-in SDK types `ast::ObjMap` and `plugin::ArgumentMap` from `std::unordered_map` to `std::map`, and added the `ZOWEX_PLUGIN_ABI_VERSION` constant with a matching load-time check. Plug-ins must now be rebuilt against the current `extend/plugin.hpp` and must expand `ZOWEX_PLUGIN_DECLARE_ABI()` alongside `register_plugin()`; a plug-in built against an earlier header is rejected at load time with a diagnostic instead of being loaded with mismatched type layouts. [#871](https://github.com/zowe/zowex/issues/871)
+- `c`: Replaced the string-keyed `std::unordered_map`/`std::unordered_set` containers in `zjson.hpp` and the JSON-RPC server with the ordered `std::map`/`std::set`, removing the binary's dependency on the out-of-line libc++ symbol `std::__1_e::__hash_memory`. That symbol is absent from `CRTEQCXE` on z/OS systems below the required Language Environment maintenance level, where it caused `CEE3561S` at load time. JSON object members are now emitted in alphabetical key order rather than hash order; member order was never part of the API contract. [#871](https://github.com/zowe/zowex/issues/871)
+- `c`: Pinned the build to Open XL C/C++ 2.1, since 2.2 requires z/OS 3.1+ and references a newer libc++ than a z/OS 2.5 system can provide. Added a declared minimum supported z/OS level, `ZosMinLevel=zosv2r5` in `native/c/toolchain.mk`, passed to the compiler as `-mzos-target`. `make runtime-imports` (`npm run z:imports`) reports the LE/libc++ symbols the binary imports, and `npm run lint:compat` rejects string-keyed hash containers at the source level. [#871](https://github.com/zowe/zowex/issues/871)
+- `c`: Added `--exact-match` option to the `zowex ds list` command. This option defaults to false for backwards compatibility, but can be set to true to avoid appending `.**` to the end of data set patterns. [#914](https://github.com/zowe/zowex/issues/914)
+
+## `0.7.1`
+
+- `c`: Fixed `zowex server` resource leaks that could exhaust a z/OS LPAR after a request timed out or a connection dropped. The shutdown signal handler no longer calls into the worker pool or logger, which could deadlock and leave the process running forever; the number of live force-detached worker threads is now bounded, and the server exits when the limit is exceeded so the system can reclaim them; late responses from a detached worker are discarded instead of being sent for an ID the client already failed; notifications are serialized with responses so concurrent writes cannot corrupt the JSON stream; and worker initializer threads are drained before the pool is destroyed. [#537](https://github.com/zowe/zowex/issues/537)
+- `c`: Fixed an issue with `zowex ds list-members` when reading PDS directory blocks. [#1070] (https://github.com/zowe/zowex/pull/1070)
+
+## `0.7.0`
+
+- `c`: `zowex` plug-in loading is now opt-in: plug-ins are only loaded when the `ZOWEX_PLUGINS_DIR` environment variable is explicitly set, replacing the previous implicit `<exec_dir>/plugins` fallback. Added directory- and file-level ownership/permission checks before a plug-in is loaded, and rejected a plug-in command from registering if its name or an alias collides with a built-in verb or another plug-in's command. [#1074](https://github.com/zowe/zowex/pull/1074)
 - `c`: Added support to return information for current linklist. [#1061](https://github.com/zowe/zowex/pull/1061)
+- `c`: Made handling of control bytes (`0x0`-`0x1f`) in JSON safer. Now when an object is serialized, control bytes are replaced with the Unicode substitution character, and when a string is deserialized, control bytes are rejected as invalid. [#1078](https://github.com/zowe/zowex/pull/1078)
 - `python`: Added `package_precompiled.py` tool to package precompiled binary assets (equivalent to Python wheels) into `zbind_bin_dist.tar.gz` for instant compiler-free installation.
 - `python`: Added `package_zbind.py` tool to package a clean, self-contained source-based distribution bundle (`zbind_src_dist.tar.gz`) containing all necessary headers, sources, and objects to build the bindings on any z/OS host without SWIG.
 - `python`: Fixed compilation of Python bindings on z/OS by passing required Language Environment feature macros `_EXT` and `_OPEN_SYS_FILE_EXT` to the compiler in `setup.py`.
@@ -283,3 +301,4 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## [Unreleased]
 
 - Initial release
+

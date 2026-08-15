@@ -783,6 +783,58 @@ void zowex_ds_tests()
                              Expect(response).Not().ToContain(ds + ".T00");
                            });
 
+                        it("should match descendant data sets by default",
+                           [&]() -> void
+                           {
+                             std::string ds = _ds.back();
+                             _create_ds(ds);
+                             _create_ds(ds + ".T00");
+                             _ds.push_back(ds + ".T00");
+
+                             // Without --exact-match the pattern gains a trailing
+                             // ".**", so descendants are matched too.
+                             std::string response;
+                             std::string command = zowex_command + " data-set list " + ds;
+                             int rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain(ds);
+                             Expect(response).ToContain(ds + ".T00");
+                           });
+
+                        it("should match only the given data set with --exact-match",
+                           [&]() -> void
+                           {
+                             std::string ds = _ds.back();
+                             _create_ds(ds);
+                             _create_ds(ds + ".T00");
+                             _ds.push_back(ds + ".T00");
+
+                             // With --exact-match the pattern is used verbatim, so
+                             // the descendant is excluded.
+                             std::string response;
+                             std::string command = zowex_command + " data-set list " + ds + " --exact-match";
+                             int rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain(ds);
+                             Expect(response).Not().ToContain(ds + ".T00");
+                           });
+
+                        it("should warn when --exact-match finds no exact match",
+                           [&]() -> void
+                           {
+                             std::string ds = _ds.back();
+                             _create_ds(ds + ".T00");
+                             _ds.push_back(ds + ".T00");
+
+                             // The parent qualifier only exists as a prefix of the
+                             // child, so an exact match must find nothing.
+                             std::string response;
+                             std::string command = zowex_command + " data-set list " + ds + " --exact-match";
+                             int rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(RTNCD_WARNING);
+                             Expect(response).ToContain("Warning: no matching results found");
+                           });
+
                         it("should warn when listing a non-existent data set",
                            [&]() -> void
                            {

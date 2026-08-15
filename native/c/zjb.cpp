@@ -33,6 +33,7 @@
 #include "zjbtype.h"
 #include "zdstype.h"
 #include "zdyn.h"
+#include "dcbd.h"
 #include "ihapsa.h"
 #include "cvt.h"
 #include "zdbg.h"
@@ -515,6 +516,7 @@ int zjb_read_job_content_by_dsn(ZJB *zjb, const std::string &dsn, std::string &r
 
   std::string parsed_jobid;
   int parsed_key = 0;
+  bool dd_is_asa = false;
 
   // parse dsn for jobid and key - if found, attempt to get the token for the dsn
   memset(zjb->token, 0, sizeof(zjb->token));
@@ -539,6 +541,7 @@ int zjb_read_job_content_by_dsn(ZJB *zjb, const std::string &dsn, std::string &r
       {
         ddname = dd.dsn;
         memcpy(zjb->token, dd.token, sizeof(dd.token));
+        dd_is_asa = dd.is_asa;
         found = true;
         break;
       }
@@ -561,8 +564,9 @@ int zjb_read_job_content_by_dsn(ZJB *zjb, const std::string &dsn, std::string &r
 
   zds.encoding_opts.data_type = zjb->encoding_opts.data_type;
   memcpy((void *)&zds.encoding_opts.codepage, (const void *)&zjb->encoding_opts.codepage, sizeof(zjb->encoding_opts.codepage));
+  memcpy((void *)&zds.encoding_opts.source_codepage, (const void *)&zjb->encoding_opts.source_codepage, sizeof(zjb->encoding_opts.source_codepage));
 
-  ZDSReadOpts read_opts{.zds = &zds, .ddname = ddname, .dsname = dsn};
+  ZDSReadOpts read_opts{.zds = &zds, .ddname = ddname, .dsname = dsn, .is_asa = dd_is_asa};
   rc = zds_read(read_opts, response);
   memcpy(&zjb->diag, &zds.diag, sizeof(ZDIAG));
 
@@ -826,6 +830,7 @@ int zjb_list_dds(ZJB *zjb, const std::string &jobid, std::vector<ZJobDD> &jobDDs
     zjobdd.dsn = dsn;
     zjobdd.jobid = std::string(jobid);
     zjobdd.key = sysoutInfoNext[i].stvsdsky;
+    zjobdd.is_asa = (sysoutInfoNext[i].stvsrecf & dcbrecca) != 0;
 
     jobDDs.push_back(zjobdd);
   }
