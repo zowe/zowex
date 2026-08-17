@@ -590,3 +590,20 @@ int ZUTCVTD(const char *ptr, char *time)
   }
   return rc;
 }
+
+typedef int (*IDCAMS)(void *) ATTRIBUTE(amode31);
+#pragma prolog(ZUTIDCAM, " ZWEPROLG NEWDSA=(YES,4) ")
+#pragma epilog(ZUTIDCAM, " ZWEEPILG ")
+int ZUTIDCAM(const char *parms)
+{
+  int rc = 0;
+
+  PARMS p = {0};
+  p.len = sprintf(p.parms, "%.*s", (int)(sizeof(p.parms) - 1), parms);
+
+  IDCAMS idcams = (IDCAMS)load_module31("IDCAMS");
+  rc = idcams(&p);
+  delete_module("IDCAMS");
+
+  return rc;
+}

@@ -12,6 +12,7 @@
 #ifndef _OPEN_SYS_ITOA_EXT
 #define _OPEN_SYS_ITOA_EXT
 #include "ztype.h"
+#include "zutm.h"
 #include <cctype>
 #endif
 #ifndef _POSIX_SOURCE
@@ -4314,39 +4315,50 @@ static int zds_write_member_bpam_streamed(ZDS *zds, const std::string &dsn, cons
   return handle_truncation_result(zds, rc, truncation);
 }
 
-int zds_idcams(const std::string &sysInData, std::string &idcamsOutput, std::string &error)
+int zds_idcams(const std::string &sysInData, std::string &output, std::string &error)
 {
   unsigned int bpxwdynCode = 0;
   int rc = 0;
   ZDIAG diag{};
   std::string sysinDdName = "";
+  std::string sysprintDdName = "";
   std::string bpxwdynResponse = "";
 
-  // Perform dynalloc
-  std::vector<std::string> dds;
-  dds.reserve(2);
-  dds.push_back("alloc dd(sysin)");
-  dds.push_back("alloc dd(sysprint)");
-
-  rc = zut_loop_dynalloc(diag, dds);
-  if (0 != rc)
+  // list of DDs to free later
+  std::vector<std::string> free_dds;
+  free_dds.reserve(2);
+  // Perform dynalloc for sysin and sysprint DDs
+  rc = zut_bpxwdyn_rtdd("alloc lrecl(80) recfm(f,b)", &bpxwdynCode, bpxwdynResponse, sysinDdName);
+  if (rc != 0)
   {
-    error += "Error: allocation failed: " + std::string(diag.e_msg) + "\n";
-    zut_free_dynalloc_dds(diag, dds);
+    error += "failed to allocate SYSIN dd for IDCAMS\n";
     return RTNCD_FAILURE;
   }
+  free_dds.push_back("free " + sysinDdName);
+
+  rc = zut_bpxwdyn_rtdd("alloc lrecl(80) recfm(f,b)", &bpxwdynCode, bpxwdynResponse, sysprintDdName);
+  if (rc != 0)
+  {
+    error += "failed to allocate SYSPRINT dd for IDCAMS\n";
+    zut_loop_dynalloc(diag, free_dds);
+    return RTNCD_FAILURE;
+  }
+  free_dds.push_back("free " + sysprintDdName);
 
   ZDS idcamsSysinZds{};
-  ZDSWriteOpts write_opts{.zds = &idcamsSysinZds, .ddname = "SYSIN"};
+  ZDSWriteOpts write_opts{.zds = &idcamsSysinZds, .ddname = sysinDdName};
   rc = zds_write(write_opts, sysInData);
   if (rc != 0)
   {
     error += "failed to write IDCAMS commands to sysin\n";
-    zut_free_dynalloc_dds(diag, dds);
+    zut_loop_dynalloc(diag, free_dds);
     return RTNCD_FAILURE;
   }
 
+  // todo build remap DD statements, add struct for parameters.
+  // rc = ZUTIDCAM();
+
   error += "write to dataset succeeded\n";
-  zut_free_dynalloc_dds(diag, dds);
+  zut_loop_dynalloc(diag, free_dds);
   return rc;
 }
