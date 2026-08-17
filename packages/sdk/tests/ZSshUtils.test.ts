@@ -10,12 +10,18 @@
  */
 
 import * as fs from "node:fs";
-import { Logger } from "@zowe/imperative";
+import { ImperativeError, Logger } from "@zowe/imperative";
 import { type ISshSession, SshSession } from "@zowe/zos-uss-for-zowe-sdk";
 import { NodeSSH } from "node-ssh";
-import { ZSshClient } from "../src";
 import { SshErrors } from "../src/SshErrors";
 import { ZSshUtils } from "../src/ZSshUtils";
+
+vi.mock("../src/ZSshConstants", () => ({
+    BUNDLED_SSH_SERVER_VERSION: "1.2.1",
+}));
+
+import { ZSshClient } from "../src";
+import { BUNDLED_SSH_SERVER_VERSION } from "../src/ZSshConstants";
 
 vi.mock("node:fs", { spy: true });
 
@@ -37,43 +43,81 @@ function setupSftpMocks(
 
 describe("ZSshUtils", () => {
     describe("checkIfOutdated", () => {
-        it("should return false for dev builds without remote checksums", async () => {
-            const readFileSyncSpy = vi.spyOn(fs, "readFileSync");
-            const isOutdated = await ZSshUtils.checkIfOutdated();
-            expect(isOutdated).toBe(false);
-            expect(readFileSyncSpy).not.toHaveBeenCalled();
-        });
-
         it.each([
+            // compared against mocked zowex binary version: 1.2.1
             {
-                desc: "matching checksums with different order",
-                fileContent: "123 abc\n456 def",
-                remote: { def: "456", abc: "123" },
+                desc: "versions match exactly- not outdated",
+                remoteVersion: BUNDLED_SSH_SERVER_VERSION,
                 expected: false,
             },
             {
-                desc: "different checksums",
-                fileContent: "123 abc\n456 def",
-                remote: { abc: "789", def: "456" },
+                desc: "remote version is lower by major version - outdated",
+                remoteVersion: "0.9.1",
                 expected: true,
             },
             {
-                desc: "same checksums and local file added",
-                fileContent: "123 abc\n456 def\n789 ghi",
-                remote: { abc: "123", def: "456" },
+                desc: "remote version is lower by minor version - outdated",
+                remoteVersion: "1.1.19",
                 expected: true,
             },
             {
-                desc: "same checksums and local file removed",
-                fileContent: "123 abc",
-                remote: { abc: "123", def: "456" },
+                desc: "remote version is lower by patch version - outdated",
+                remoteVersion: "1.2.0",
                 expected: true,
             },
-        ])("should return $expected for $desc", async ({ fileContent, remote, expected }) => {
-            const readFileSyncSpy = vi.spyOn(fs, "readFileSync").mockReturnValueOnce(fileContent);
-            const isOutdated = await ZSshUtils.checkIfOutdated(remote);
+            {
+                desc: "older patch version also with suffix - outdated",
+                remoteVersion: `1.2.0-aefdab`,
+                expected: true,
+            },
+            {
+                desc: "remote version is not a valid semver string - outdated",
+                remoteVersion: "footballbaseball",
+                expected: true,
+            },
+            {
+                desc: "remote version is undefined - outdated",
+                remoteVersion: undefined,
+                expected: true,
+            },
+            {
+                desc: "matching versions with different git hash - suffix is discarded - not outdated",
+                remoteVersion: `${BUNDLED_SSH_SERVER_VERSION}-aefdab`,
+                expected: false,
+            },
+            {
+                desc: "remote version is an empty string - outdated",
+                remoteVersion: "",
+                expected: true,
+            },
+            {
+                desc: "remote version is newer by major version - not outdated",
+                remoteVersion: "2.0.0",
+                expected: false,
+            },
+            {
+                desc: "remote version is newer by minor version - not outdated",
+                remoteVersion: "1.3.0",
+                expected: false,
+            },
+            {
+                desc: "remote version is newer by patch version - not outdated",
+                remoteVersion: "1.2.19",
+                expected: false,
+            },
+            {
+                desc: "remote version is newer but a prerelease - not outdated",
+                remoteVersion: "1.3.0-SNAPSHOT",
+                expected: false,
+            },
+            {
+                desc: "remote version is newer with a suffix - not outdated",
+                remoteVersion: "1.3.0+afeb102",
+                expected: false,
+            },
+        ])("should return $expected for $desc", ({ remoteVersion, expected }) => {
+            const isOutdated = ZSshUtils.checkIfOutdated(remoteVersion);
             expect(isOutdated).toBe(expected);
-            expect(readFileSyncSpy).toHaveBeenCalled();
         });
     });
 
@@ -93,6 +137,8 @@ describe("ZSshUtils", () => {
                 info: vi.fn(),
                 trace: vi.fn(),
             } as any);
+
+            vi.spyOn(ZSshUtils, "getAvailableMb").mockResolvedValue({ mb: 9999, stderr: "" });
         });
 
         it("should upload via SFTP and extract server", async () => {
@@ -106,6 +152,74 @@ describe("ZSshUtils", () => {
             expect(result).toBe(true);
             expect(fastPutMock).toHaveBeenCalledTimes(1);
             expect(unlinkMock).toHaveBeenCalledTimes(1);
+            // The install is only complete once the binary is confirmed to load on the target
+            expect(sshMock.execCommand).toHaveBeenCalledWith("./zowex --version", { cwd: "./.zowe-server" });
+        });
+
+        describe("installServer binary verification", () => {
+            const CEE3561S =
+                "CEE3561S The external function _ZNSt5__1_e13__hash_memoryEPKvm was not found in DLL CRTEQCXE.";
+
+            function mocksFailingVerify(verifyResult: { code: number; stdout?: string; stderr?: string }) {
+                const sftpMock = {
+                    fastPut: vi.fn((_l: string, _r: string, _o: any, cb: (err?: Error) => void) => cb()),
+                    unlink: vi.fn((_p: string, cb: (err?: Error) => void) => cb()),
+                };
+                const sshMock = {
+                    execCommand: vi.fn().mockImplementation(async (command: string) => {
+                        if (command.includes("--version")) return { code: 0, stdout: "", stderr: "", ...verifyResult };
+                        if (command.startsWith("uname")) return { code: 0, stdout: "OS/390 27.00 04", stderr: "" };
+                        return { code: 0, stdout: "", stderr: "" };
+                    }),
+                };
+                setupSftpMocks(sftpMock, sshMock);
+                return sshMock;
+            }
+
+            it("throws ELERUNTIME when the binary cannot be loaded by Language Environment", async () => {
+                mocksFailingVerify({ code: 1, stderr: CEE3561S });
+
+                await expect(
+                    ZSshUtils.installServer(new SshSession(fakeSession), "~/.zowe-server"),
+                ).rejects.toMatchObject({
+                    errorCode: "ELERUNTIME",
+                    mDetails: expect.objectContaining({
+                        msg: expect.stringContaining("Language Environment"),
+                    }),
+                });
+            });
+
+            it("includes the target system level in the details of a load failure", async () => {
+                mocksFailingVerify({ code: 1, stderr: CEE3561S });
+
+                await expect(
+                    ZSshUtils.installServer(new SshSession(fakeSession), "~/.zowe-server"),
+                ).rejects.toMatchObject({
+                    mDetails: expect.objectContaining({
+                        additionalDetails: expect.stringContaining("OS/390 27.00 04"),
+                    }),
+                });
+            });
+
+            it("routes a load failure through onError with the verify context", async () => {
+                mocksFailingVerify({ code: 1, stderr: CEE3561S });
+                const onError = vi.fn().mockResolvedValue(false);
+
+                const result = await ZSshUtils.installServer(new SshSession(fakeSession), "~/.zowe-server", {
+                    onError,
+                });
+
+                expect(result).toBe(false);
+                expect(onError).toHaveBeenCalledWith(expect.objectContaining({ errorCode: "ELERUNTIME" }), "verify");
+            });
+
+            it("reports EDEPLOYFAIL when the binary fails for a reason unrelated to the runtime", async () => {
+                mocksFailingVerify({ code: 126, stderr: "EDC5111I Permission denied." });
+
+                await expect(
+                    ZSshUtils.installServer(new SshSession(fakeSession), "~/.zowe-server"),
+                ).rejects.toMatchObject({ errorCode: "EDEPLOYFAIL" });
+            });
         });
 
         it("should report progress during SFTP upload", async () => {
@@ -220,15 +334,12 @@ describe("ZSshUtils", () => {
 
         it("should call onError when mkdir fails and handle retry if onError returns true", async () => {
             const sftpMock = { fastPut: vi.fn((_l, _r, _o, cb) => cb()), unlink: vi.fn((_p, cb) => cb()) };
-            let callCount = 0;
             const sshMock = {
-                execCommand: vi.fn().mockImplementation(async () => {
-                    callCount++;
-                    if (callCount === 1) {
-                        return { code: 1, stderr: "temporary error", stdout: "" };
-                    }
-                    return { code: 0, stderr: "", stdout: "" };
-                }),
+                execCommand: vi
+                    .fn()
+                    .mockResolvedValueOnce({ code: 0, stderr: "", stdout: "" })
+                    .mockResolvedValueOnce({ code: 1, stderr: "temporary error", stdout: "" })
+                    .mockResolvedValue({ code: 0, stderr: "", stdout: "" }),
             };
             setupSftpMocks(sftpMock, sshMock);
 
@@ -236,7 +347,8 @@ describe("ZSshUtils", () => {
             const result = await ZSshUtils.installServer(new SshSession(fakeSession), "~/.zowe-server", { onError });
             expect(result).toBe(true);
             expect(onError).toHaveBeenCalledOnce();
-            expect(sshMock.execCommand).toHaveBeenCalledTimes(3);
+            // last time is the -v check
+            expect(sshMock.execCommand).toHaveBeenCalledTimes(6);
         });
 
         it("should call onError when mkdir fails and return false if onError returns false", async () => {
@@ -288,15 +400,11 @@ describe("ZSshUtils", () => {
 
         it("should call onError when rm -rf fails during uninstall and handle retry if onError returns true", async () => {
             const sftpMock = {};
-            let callCount = 0;
             const sshMock = {
-                execCommand: vi.fn().mockImplementation(async () => {
-                    callCount++;
-                    if (callCount === 1) {
-                        return { code: 1, stderr: "temporary error", stdout: "" };
-                    }
-                    return { code: 0, stdout: "" };
-                }),
+                execCommand: vi
+                    .fn()
+                    .mockResolvedValueOnce({ code: 1, stderr: "temporary error", stdout: "" })
+                    .mockResolvedValue({ code: 0, stderr: "", stdout: "" }),
             };
             setupSftpMocks(sftpMock, sshMock, { mockGetBinDir: false, mockExistsSync: false });
 
@@ -307,15 +415,14 @@ describe("ZSshUtils", () => {
         });
 
         it("should call onError when fastPut fails and handle retry if onError returns true", async () => {
-            let fastPutCallCount = 0;
-            const fastPutMock = vi.fn((_local: string, _remote: string, _opts: any, cb: (err?: Error) => void) => {
-                fastPutCallCount++;
-                if (fastPutCallCount === 1) {
+            const fastPutMock = vi
+                .fn()
+                .mockImplementationOnce((_local: string, _remote: string, _opts: any, cb: (err?: Error) => void) => {
                     cb(new Error("fastPut temp error"));
-                } else {
+                })
+                .mockImplementation((_local: string, _remote: string, _opts: any, cb: (err?: Error) => void) => {
                     cb();
-                }
-            });
+                });
             const unlinkMock = vi.fn((_path: string, cb: (err?: Error) => void) => cb());
             const sftpMock = { fastPut: fastPutMock, unlink: unlinkMock };
             const sshMock = { execCommand: vi.fn().mockResolvedValue({ code: 0, stdout: "", stderr: "" }) };
@@ -485,9 +592,6 @@ describe("ZSshUtils", () => {
         });
 
         it("should execute real sftp helper method successfully", async () => {
-            // Restore sftp mock to test the real sftp method
-            vi.restoreAllMocks();
-
             // Re-mock fs.existsSync and Logger
             vi.spyOn(fs, "existsSync").mockReturnValue(true);
             vi.spyOn(Logger, "getAppLogger").mockReturnValue({
@@ -518,8 +622,187 @@ describe("ZSshUtils", () => {
             expect(execCommandSpy).toHaveBeenCalled();
             expect(disposeSpy).toHaveBeenCalled();
         });
+
+        it("should cancel the deployment if insufficient space detected and the onInsufficientSpaceWarning callback returns false", async () => {
+            vi.spyOn(ZSshUtils, "getAvailableMb").mockResolvedValue({ mb: 1, stderr: "" });
+            const sshMock = {
+                execCommand: vi.fn().mockResolvedValue({ code: 0, stderr: "", stdout: "" }),
+            };
+            const fastPutMock = vi.fn((_local: string, _remote: string, _opts: any, cb: (err?: Error) => void) => cb());
+            const unlinkMock = vi.fn((_path: string, cb: (err?: Error) => void) => cb());
+            const sftpMock = { fastPut: fastPutMock, unlink: unlinkMock };
+            setupSftpMocks(sftpMock, sshMock);
+
+            const result = await ZSshUtils.installServer(new SshSession(fakeSession), "~/.zowe-server", {
+                onInsufficientSpaceWarning: async () => {
+                    return false;
+                },
+            });
+            expect(result).toBe(false);
+            expect(fastPutMock).not.toHaveBeenCalled();
+        });
+
+        it("should continue the deployment if insufficient space detected and the onInsufficientSpaceWarning callback is not provided", async () => {
+            vi.spyOn(ZSshUtils, "getAvailableMb").mockResolvedValue({ mb: 1, stderr: "" });
+            const sshMock = {
+                execCommand: vi.fn().mockResolvedValue({ code: 0, stderr: "", stdout: "" }),
+            };
+            const fastPutMock = vi.fn((_local: string, _remote: string, _opts: any, cb: (err?: Error) => void) => cb());
+            const unlinkMock = vi.fn((_path: string, cb: (err?: Error) => void) => cb());
+            const sftpMock = { fastPut: fastPutMock, unlink: unlinkMock };
+            setupSftpMocks(sftpMock, sshMock);
+
+            const result = await ZSshUtils.installServer(new SshSession(fakeSession), "~/.zowe-server", {
+                onInsufficientSpaceWarning: undefined,
+            });
+            expect(result).toBe(true);
+            expect(fastPutMock).toHaveBeenCalled();
+        });
+
+        it("should continue the deployment if insufficient space detected and the onInsufficientSpaceWarning callback returns true", async () => {
+            vi.spyOn(ZSshUtils, "getAvailableMb").mockResolvedValue({ mb: 1, stderr: "" });
+            const sshMock = {
+                execCommand: vi.fn().mockResolvedValue({ code: 0, stderr: "", stdout: "" }),
+            };
+            const fastPutMock = vi.fn((_local: string, _remote: string, _opts: any, cb: (err?: Error) => void) => cb());
+            const unlinkMock = vi.fn((_path: string, cb: (err?: Error) => void) => cb());
+            const sftpMock = { fastPut: fastPutMock, unlink: unlinkMock };
+            setupSftpMocks(sftpMock, sshMock);
+
+            const result = await ZSshUtils.installServer(new SshSession(fakeSession), "~/.zowe-server", {
+                onInsufficientSpaceWarning: async () => {
+                    return true;
+                },
+            });
+            expect(result).toBe(true);
+            expect(fastPutMock).toHaveBeenCalled();
+        });
+
+        it("should attempt post-failure cleanup if a step of the deployment throws an error", async () => {
+            const sshMock = {
+                execCommand: vi.fn().mockResolvedValue({ code: 0, stderr: "", stdout: "" }),
+            };
+            const fastPutMock = vi.fn((_local: string, _remote: string, _opts: any, cb: (err?: Error) => void) => cb());
+            const rmdirMock = vi.fn((_path: string, cb: (err?: Error) => void) => cb());
+            const sftpMock = {
+                fastPut: fastPutMock,
+                unlink: vi.fn((_path: string, cb: (err?: Error) => void) => cb()),
+                rmdir: rmdirMock,
+            };
+            setupSftpMocks(sftpMock, sshMock);
+            const expectedDeployDir = "/my/subdir/";
+            // if the deploy dir did not exist before we started deploying, post-failure cleanup should try to delete it
+            vi.spyOn(ZSshUtils, "getAvailableMb").mockImplementation(async (_ssh, _dir) => {
+                throw new Error("Eek!");
+            });
+            // only the first call should return false  so that when we do the cleanup, we
+            // simulate having created the deployment directory
+            vi.spyOn(ZSshUtils, "pathExists")
+                .mockResolvedValueOnce({ exists: false, stderr: "" })
+                .mockResolvedValue({ exists: true, stderr: "" });
+            const result = await ZSshUtils.installServer(new SshSession(fakeSession), expectedDeployDir, {});
+            expect(result).toBe(false);
+            expect(fastPutMock).not.toHaveBeenCalled();
+            expect(rmdirMock).toHaveBeenCalledWith(expectedDeployDir, expect.anything());
+        });
+
+        it("should NOT attempt post-failure cleanup if a step of the deployment throws a password expired error", async () => {
+            const sshMock = {
+                execCommand: vi.fn().mockResolvedValue({ code: 0, stderr: "", stdout: "" }),
+            };
+            const fastPutMock = vi.fn((_local: string, _remote: string, _opts: any, cb: (err?: Error) => void) => cb());
+            const unlinkMock = vi.fn((_path: string, cb: (err?: Error) => void) => cb());
+            const sftpMock = { fastPut: fastPutMock, unlink: unlinkMock };
+            setupSftpMocks(sftpMock, sshMock);
+            const expectedDeployDir = "/my/subdir/";
+            // if the deploy dir did not exist before we started deploying, post-failure cleanup should try to delete it
+            const passwordErr = new ImperativeError({ msg: "bad pass", errorCode: "EPASSWD_EXPIRED" });
+            vi.spyOn(ZSshUtils, "getAvailableMb").mockImplementation(async (_ssh, _dir) => {
+                throw passwordErr;
+            });
+            vi.spyOn(ZSshUtils, "pathExists")
+                .mockResolvedValueOnce({ exists: false, stderr: "" })
+                .mockResolvedValue({ exists: true, stderr: "" });
+            await expect(ZSshUtils.installServer(new SshSession(fakeSession), expectedDeployDir, {})).rejects.toThrow(
+                passwordErr,
+            );
+        });
     });
 
+    describe("getAvailableMb", () => {
+        it("should parse a properly formatted 80 MB available correctly", async () => {
+            const expectedMb = 80;
+            const sshMock = {
+                execCommand: vi.fn().mockResolvedValue({
+                    code: 0,
+                    stderr: "",
+                    stdout:
+                        " Mounted on     Filesystem                Avail/Total    Files      Status\n" +
+                        `/u/users       (EXAMPLE.USER.ZFS)        ${expectedMb}/8120160 4294919164 Available`,
+                }),
+            };
+            const result = await ZSshUtils.getAvailableMb(sshMock as NodeSSH, "/u/users");
+            expect(result.mb).toEqual(expectedMb);
+            expect(result.stderr).toEqual("");
+        });
+        it("should parse a properly formatted 80 MB available correctly even if the USS directory contains spaces and parens", async () => {
+            const expectedMb = 80;
+            const sshMock = {
+                execCommand: vi.fn().mockResolvedValue({
+                    code: 0,
+                    stderr: "",
+                    stdout:
+                        " Mounted on     Filesystem                Avail/Total    Files      Status\n" +
+                        `/u/users/space man/my (excellent) dir       (EXAMPLE.USER.ZFS)        ${expectedMb}/8120160 4294919164 Available`,
+                }),
+            };
+            const result = await ZSshUtils.getAvailableMb(sshMock as NodeSSH, "/u/users");
+            expect(result.mb).toEqual(expectedMb);
+            expect(result.stderr).toEqual("");
+        });
+        it("should parse a properly formatted 40 MB available correctly even if the headers are in another language", async () => {
+            const expectedMb = 40;
+            const sshMock = {
+                execCommand: vi.fn().mockResolvedValue({
+                    code: 0,
+                    stderr: "",
+                    stdout:
+                        " Directorio montado en     Sistema de archivos                Avail/Total    Archivos      Estado\n" +
+                        `/u/users       (EXAMPLE.USER.ZFS)        ${expectedMb}/73828 4294919164 Available`,
+                }),
+            };
+            const result = await ZSshUtils.getAvailableMb(sshMock as NodeSSH, "/u/users");
+            expect(result.mb).toEqual(expectedMb);
+            expect(result.stderr).toEqual("");
+        });
+
+        it("should return -1 MB if the df command fails to execute", async () => {
+            const expectedErr = "Bonk!";
+            const sshMock = {
+                execCommand: vi.fn().mockResolvedValue({
+                    code: 1,
+                    stderr: expectedErr,
+                    stdout: "",
+                }),
+            };
+            const result = await ZSshUtils.getAvailableMb(sshMock as NodeSSH, "/u/users");
+            expect(result.mb).toEqual(-1);
+            expect(result.stderr).toEqual(expectedErr);
+        });
+        it("should return -1 MB if the df command returns an unknown format", async () => {
+            const expectedErr = "Bonk!";
+            const sshMock = {
+                execCommand: vi.fn().mockResolvedValue({
+                    code: 0,
+                    stderr: expectedErr,
+                    stdout: "Someone made a fake df command. Eek!",
+                }),
+            };
+            const result = await ZSshUtils.getAvailableMb(sshMock as NodeSSH, "/u/users");
+            expect(result.mb).toEqual(-1);
+            expect(result.stderr).toEqual(expectedErr);
+        });
+    });
     describe("buildSession", () => {
         it("should build session with password when private key is not provided", () => {
             const profile = {

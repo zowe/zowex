@@ -9,6 +9,7 @@
  *
  */
 
+export * as certificates from "./certificates";
 export * from "./common";
 export * as console from "./console";
 export * as core from "./core";

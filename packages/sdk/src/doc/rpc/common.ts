@@ -110,6 +110,31 @@ export interface ListDatasetOptions {
     start?: string;
 }
 
+// Certificate / key ring types
+
+export interface CertificateInfo {
+    /**
+     * Certificate label
+     */
+    label: string;
+    /**
+     * Owning user ID
+     */
+    owner: string;
+    /**
+     * Usage: PERSONAL, CERTAUTH, or OTHER
+     */
+    usage: string;
+    /**
+     * Trust status: TRUST, HIGHTRUST, NOTRUST, or UNKNOWN
+     */
+    status: string;
+    /**
+     * Whether this certificate is the default in the ring
+     */
+    default: boolean;
+}
+
 // Dataset-related types
 
 export interface Dataset {

@@ -12,6 +12,10 @@
 OUT_DIR=build-out
 OUT_DIR_SWIG=$(OUT_DIR)/swig
 
+# System SSL (GSKCMS) 64-bit definition side-deck. Required to resolve the
+# gsk_* certificate/key APIs used by libzkr (certificates command group).
+GSKCMS_SIDEDECK=/usr/lib/GSKCMS64.x
+
 .INCLUDE: toolchain.mk
 
 MACLIBS= -I../asmmac $(MACLIBS_BASE)
@@ -28,9 +32,10 @@ CPP_BND_FLAGS_AUTH=$(CPP_BND_DEBUG_FLAGS_AUTH) $(DEBUGGER_FLAGS)
 C_FLAGS+=$(DEBUGGER_FLAGS)
 DLL_BND_FLAGS=$(DLL_BND_DEBUG_FLAGS) $(DEBUGGER_FLAGS)
 CPP_FLAGS+=$(DEBUGGER_FLAGS) $(OTHER_C_FLAGS)
-MTL_FLAGS+=$(DEBUGGER_FLAGS) $(OTHER_C_FLAGS)
-MTL_FLAGS64+=$(DEBUGGER_FLAGS) $(OTHER_C_FLAGS)
+# Metal C (xlc) rejects full `-g` (GONUMBER/TEST conflict with METAL/INLINE) and the
+# clang-only `-H -dM`; use `-g1` like the RELEASE/dev builds.
 ASM_FLAGS+=--verbose
+ADD_GIT_HASH=TRUE
 .ELSIF $(BuildType) == RELEASE
 CPP_BND_FLAGS=$(CPP_BND_BASE_FLAGS)
 CPP_BND_FLAGS_AUTH=$(CPP_BND_BASE_FLAGS_AUTH)
@@ -38,8 +43,7 @@ DLL_BND_FLAGS=$(DLL_BND_BASE_FLAGS)
 C_FLAGS+=$(RELEASE_FLAGS)
 CPP_FLAGS+=$(RELEASE_FLAGS)
 ASM_FLAGS+=--noverbose
-MTL_FLAGS+=-g1
-MTL_FLAGS64+=-g1
+ADD_GIT_HASH=FALSE
 .ELSE
 CPP_BND_FLAGS=$(CPP_BND_BASE_FLAGS)
 CPP_BND_FLAGS_AUTH=$(CPP_BND_BASE_FLAGS_AUTH)
@@ -47,10 +51,16 @@ DLL_BND_FLAGS=$(DLL_BND_BASE_FLAGS)
 C_FLAGS+=-g1
 CPP_FLAGS+=-g1
 ASM_FLAGS+=--noverbose
+ADD_GIT_HASH=TRUE
+.END
+
+.IF $(IsPullRequest) == TRUE
+ADD_GIT_HASH=TRUE
+.END
+
 # Still investigating why we need `-g1` for the MetalC flags :'(
 MTL_FLAGS+=-g1
 MTL_FLAGS64+=-g1
-.END
 
 # Apply LOG_FLAGS to all relevant compilation flags if logging is enabled
 .IF DEFINED(LOG_FLAGS)
@@ -60,7 +70,8 @@ MTL_FLAGS+=$(LOG_FLAGS)
 MTL_FLAGS64+=$(LOG_FLAGS)
 .END
 
-COMMAND_OBJS = $(OUT_DIR)/commands/console.o \
+COMMAND_OBJS = $(OUT_DIR)/commands/certificates.o \
+	$(OUT_DIR)/commands/console.o \
 	$(OUT_DIR)/commands/core.o \
 	$(OUT_DIR)/commands/ds.o \
 	$(OUT_DIR)/commands/job.o \
@@ -81,10 +92,10 @@ SERVER_OBJS = $(OUT_DIR)/server/builder.o \
 
 SWIG_EXTENDER_OBJS = $(OUT_DIR_SWIG)/zut.o $(OUT_DIR_SWIG)/zds.o $(OUT_DIR_SWIG)/zjb.o $(OUT_DIR_SWIG)/zcn.o $(OUT_DIR_SWIG)/zusf.o $(OUT_DIR_SWIG)/ztso.o
 
-all: libzut.so libzut.a libzds.so libzds.a libzusf.so libzusf.a libzcn.so libzcn.a libzjb.so libzjb.a zowex zoweax
+all: libzut.so libzut.a libzds.so libzds.a libzusf.so libzusf.a libzcn.so libzcn.a libzjb.so libzjb.a libzkr.so libzkr.a zowex zoweax
 swig-extenders: $(OUT_DIR_SWIG) $(SWIG_EXTENDER_OBJS)
 tests:
-	 $(MAKE) -c test
+	$(MAKE) -c test
 
 #
 # Out directories
@@ -189,6 +200,25 @@ $(OUT_DIR)/libzds.a: $(OUT_DIR)/zds.o $(OUT_DIR)/zdsm.o $(OUT_DIR)/zam.o $(OUT_D
 	ar -rv $@ $^
 
 libzds.a: $(OUT_DIR) $(OUT_DIR)/libzds.a
+
+#
+# Certificates / key rings (R_datalib + System SSL GSKCMS)
+#
+$(OUT_DIR)/zkr.o: zkr.cpp
+	@echo 'Building $(OUT_DIR)/zkr.o'
+	$(CXX) $(CPP_FLAGS) -o $@ $^
+
+$(OUT_DIR)/libzkr.so: $(OUT_DIR)/zkr.o
+	@echo 'Building $(OUT_DIR)/libzkr.so'
+	$(CXX) $(DLL_BND_FLAGS) -o $@ $^ $(GSKCMS_SIDEDECK)
+
+libzkr.so: $(OUT_DIR) $(OUT_DIR)/libzkr.so
+
+$(OUT_DIR)/libzkr.a: $(OUT_DIR)/zkr.o
+	@echo 'Building $(OUT_DIR)/libzkr.a'
+	ar -rv $@ $^
+
+libzkr.a: $(OUT_DIR) $(OUT_DIR)/libzkr.a
 
 #
 # Jobs
@@ -353,23 +383,33 @@ $(OUT_DIR)/extend/plugin.o: extend/plugin.cpp
 #
 # Test CLI
 #
-$(OUT_DIR)/zowex: $(OUT_DIR)/zowex.o $(OUT_DIR)/extend/plugin.o $(COMMAND_OBJS) $(SERVER_OBJS) $(OUT_DIR)/zjsonm.o $(OUT_DIR)/libzcn.a $(OUT_DIR)/libzut.a $(OUT_DIR)/libzjb.a $(OUT_DIR)/libzds.a $(OUT_DIR)/libzusf.a $(OUT_DIR)/libztso.a
-	@echo 'Building zowex'
-	$(CXX) $(CPP_BND_FLAGS) -o $@ $^
+$(OUT_DIR)/zowex: $(OUT_DIR)/zowex.o $(OUT_DIR)/extend/plugin.o $(COMMAND_OBJS) $(SERVER_OBJS) $(OUT_DIR)/zjsonm.o $(OUT_DIR)/libzcn.a $(OUT_DIR)/libzut.a $(OUT_DIR)/libzjb.a $(OUT_DIR)/libzds.a $(OUT_DIR)/libzusf.a $(OUT_DIR)/libztso.a $(OUT_DIR)/libzkr.a
+	@echo 'Building zowex (z/OS target level: $(ZosMinLevel))'
+	$(CXX) $(CPP_BND_FLAGS) -o $@ $^ $(GSKCMS_SIDEDECK)
 
 zowex: $(OUT_DIR) $(OUT_DIR)/zowex
 
-$(OUT_DIR)/zoweax: $(OUT_DIR)/zowex.o $(OUT_DIR)/extend/plugin.o $(COMMAND_OBJS) $(SERVER_OBJS) $(OUT_DIR)/zjsonm.o $(OUT_DIR)/libzcn.a $(OUT_DIR)/libzut.a $(OUT_DIR)/libzjb.a $(OUT_DIR)/libzds.a $(OUT_DIR)/libzusf.a $(OUT_DIR)/libztso.a
-	@echo 'Building zoweax'
-	$(CXX) $(CPP_BND_FLAGS_AUTH) -o $@ $^
+$(OUT_DIR)/zoweax: $(OUT_DIR)/zowex.o $(OUT_DIR)/extend/plugin.o $(COMMAND_OBJS) $(SERVER_OBJS) $(OUT_DIR)/zjsonm.o $(OUT_DIR)/libzcn.a $(OUT_DIR)/libzut.a $(OUT_DIR)/libzjb.a $(OUT_DIR)/libzds.a $(OUT_DIR)/libzusf.a $(OUT_DIR)/libztso.a $(OUT_DIR)/libzkr.a
+	@echo 'Building zoweax (z/OS target level: $(ZosMinLevel))'
+	$(CXX) $(CPP_BND_FLAGS_AUTH) -o $@ $^ $(GSKCMS_SIDEDECK)
 	extattr +ap $@
 
 zoweax: $(OUT_DIR) $(OUT_DIR)/zoweax
 
 $(OUT_DIR)/zowex.o: zowex.cpp
 	@echo 'Building $(OUT_DIR)/zowex.o'
-	@if [ -f ../package.json ]; then \
+	@echo 'Add git hash? ${ADD_GIT_HASH}'
+	@if [ -f ../package.json ] && [ "${ADD_GIT_HASH}" = "TRUE" ]; then \
+		GIT_HASH=$$(grep '"gitHash"' ../package.json | sed 's/.*"gitHash"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/'); \
+		echo "Extracted git hash: $$GIT_HASH"; \
+	else \
+		echo "ADD_GIT_HASH is not TRUE, or package.json not found, building without GIT_HASH"; \
+		GIT_HASH=""; \
+	fi \
+	&& if [ -f ../package.json ]; then \
 		PACKAGE_VERSION=$$(grep '"version"' ../package.json | sed 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/'); \
+		PACKAGE_VERSION="$$PACKAGE_VERSION$$GIT_HASH"; \
+		echo "Git hash is $$GIT_HASH for build type '${BuildType}'";  \
 		echo "Extracted version: $$PACKAGE_VERSION"; \
 		$(CXX) $(CPP_FLAGS) -DPACKAGE_VERSION="\"$$PACKAGE_VERSION\"" -c $^ -o $@; \
 	else \
@@ -380,6 +420,16 @@ $(OUT_DIR)/zowex.o: zowex.cpp
 #
 # TODO(Kelosky): makefile for chdsect (must have ADATA in data set)
 #
+
+#
+# Runtime import report
+#
+# Lists the external symbols zowex/zoweax import from DLLs. Informational: the floor is enforced at
+# bind time by LDFLAGS, not here. Kept out of `all` so incremental builds and `npm run z:watch` stay
+# fast. See compat/README.md.
+#
+runtime-imports: zowex zoweax
+	sh tools/report_runtime_imports.sh $(ZosMinLevel)
 
 #
 # Misc targets

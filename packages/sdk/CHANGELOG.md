@@ -4,8 +4,27 @@ All notable changes to the Client code for "@zowe/zowex-for-zowe-sdk" are docume
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## Recent Changes
+## `0.8.0`
 
+- Added detection of available disk space on the z/OS Unix deployment directory in the `ZSshUtils.installServer` method, giving the user the opportunity to cancel deployment if they have less than the recommended amount of available space. [#1088](https://github.com/zowe/zowex/pull/1088)
+- Fixed server deploy/setup failing with "SSH setup cancelled" when connecting with a private key that requires a passphrase, even after entering the correct passphrase. [#1094](https://github.com/zowe/zowex/pull/1094)
+- Added a `certificates` client API for managing ESM (RACF or equivalent) key rings and digital certificates, exposing the following functions: `createKeyring`, `deleteKeyring`, `refreshDigtcert`, `deleteCertificate`, `listCertificates`, `exportCertificate`, `importCertificate`, `showCertificate`, `listRings`, `countRing`, `connectCertificate`, `setDefaultCertificate`, `trustCertificate`, and `renameCertificate`. [#1079](https://github.com/zowe/zowex/pull/1079)
+- Added recognition of Language Environment load failures. `CEE3561S` and `CEE3501S` error codes now produce an actionable error naming the required z/OS release and Language Environment APARs, with `errorCode: "ELERUNTIME"`, instead of a generic "Error starting Zowe server." Startup output is now accumulated before it is classified, so a diagnostic split across reads is still recognized. [#871](https://github.com/zowe/zowex/issues/871)
+- Added a verification step to `installServer()` that runs the installed server binary and reports whether the remote system can load it, so a runtime mismatch surfaces during installation rather than on the next operation. The target system level from the `uname -srv` command is included in the error details. [#871](https://github.com/zowe/zowex/issues/871)
+- Added `exactMatch` property to the `ListDatasetsRequest` type. This option defaults to false for backwards compatibility, but can be set to true to avoid appending `.**` to the end of data set patterns. [#914](https://github.com/zowe/zowex/issues/914)
+- When a command fails, a structured error payload attached by the server (e.g. the `safReturns` SAF/ESM codes from certificate commands) is now delivered to SDK consumers via the `ImperativeError`'s `causeErrors`, instead of being flattened into the error text. [#1079](https://github.com/zowe/zowex/pull/1079)
+
+## `0.7.1`
+
+- Fixed SSH connection softlocks and resource leaks when a connection drops or stalls during startup: the `ZSshClient.create` function now rejects when the connection closes before the server is ready or when a `serverStartupTimeout` (default 60s) elapses, cleans up the SSH connection on startup failure, rejects pending requests fast when the connection closes, and supports the `keepAliveCountMax` option (default 3). [#1076](https://github.com/zowe/zowex/pull/1076)
+- Fixed requests hanging until the response timeout when the Zowe Remote SSH server process ended while the SSH transport stayed healthy. `ZSshClient` now watches the server channel for the lifetime of the client and rejects requests written to a channel that is no longer writable. [#1076](https://github.com/zowe/zowex/pull/1076)
+- Fixed socket errors raised while tearing down a closed client being reported through the `onError` handler, which surfaced spurious errors to callers during a normal disconnect. [#1076](https://github.com/zowe/zowex/pull/1076)
+
+## `0.7.0`
+
+- **Breaking:** Updated the `checkIfOutdated()` utility to compare version numbers with semantic versioning rather than comparing checksums of the `zowex` program. Its parameter is changed to accept the version number of `zowex` on the remote system rather than checksums, and it is no longer an `async` method. [#1073](https://github.com/zowe/zowex/pull/1073/)
+- **Breaking:** Removed the `checksums.asc` file from `zowex` server pax files and removed the `serverChecksums` getter method from the `ZSshClient` class. [#1073](https://github.com/zowe/zowex/pull/1073/)
+- Added `serverVersion` getter method to the `ZSshClient` class. [#1073](https://github.com/zowe/zowex/pull/1073/)
 - Added support to list link list data sets. [#1061](https://github.com/zowe/zowex/pull/1061)
 
 ## `0.6.1`

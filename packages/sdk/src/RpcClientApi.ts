@@ -10,7 +10,19 @@
  */
 
 import type { IRpcClient } from "./doc/client";
-import type { CommandRequest, CommandResponse, console, core, ds, jobs, system, tool, tso, uss } from "./doc/rpc";
+import type {
+    CommandRequest,
+    CommandResponse,
+    certificates,
+    console,
+    core,
+    ds,
+    jobs,
+    system,
+    tool,
+    tso,
+    uss,
+} from "./doc/rpc";
 import type { ProgressCallback } from "./doc/types";
 
 export abstract class RpcClientApi implements IRpcClient {
@@ -18,6 +30,44 @@ export abstract class RpcClientApi implements IRpcClient {
         request: ReqT,
         progressCallback?: (percent: number) => void,
     ): Promise<RespT>;
+
+    public certificates = {
+        createKeyring: this.rpc<certificates.CreateKeyringRequest, certificates.CreateKeyringResponse>("createKeyring"),
+        deleteKeyring: this.rpc<certificates.DeleteKeyringRequest, certificates.DeleteKeyringResponse>("deleteKeyring"),
+        refreshDigtcert: this.rpc<certificates.RefreshDigtcertRequest, certificates.RefreshDigtcertResponse>(
+            "refreshDigtcert",
+        ),
+        deleteCertificate: this.rpc<certificates.DeleteCertificateRequest, certificates.DeleteCertificateResponse>(
+            "deleteCertificate",
+        ),
+        listCertificates: this.rpc<certificates.ListCertificatesRequest, certificates.ListCertificatesResponse>(
+            "listCertificates",
+        ),
+        exportCertificate: this.rpc<certificates.ExportCertificateRequest, certificates.ExportCertificateResponse>(
+            "exportCertificate",
+        ),
+        importCertificate: this.rpc<certificates.ImportCertificateRequest, certificates.ImportCertificateResponse>(
+            "importCertificate",
+        ),
+        showCertificate: this.rpc<certificates.ShowCertificateRequest, certificates.ShowCertificateResponse>(
+            "showCertificate",
+        ),
+        listRings: this.rpc<certificates.ListRingsRequest, certificates.ListRingsResponse>("listRings"),
+        countRing: this.rpc<certificates.CountRingRequest, certificates.CountRingResponse>("countRing"),
+        connectCertificate: this.rpc<certificates.ConnectCertificateRequest, certificates.ConnectCertificateResponse>(
+            "connectCertificate",
+        ),
+        setDefaultCertificate: this.rpc<
+            certificates.SetDefaultCertificateRequest,
+            certificates.SetDefaultCertificateResponse
+        >("setDefaultCertificate"),
+        trustCertificate: this.rpc<certificates.TrustCertificateRequest, certificates.TrustCertificateResponse>(
+            "trustCertificate",
+        ),
+        renameCertificate: this.rpc<certificates.RenameCertificateRequest, certificates.RenameCertificateResponse>(
+            "renameCertificate",
+        ),
+    };
 
     public console = {
         issueCmd: this.rpc<console.IssueConsoleCmdRequest, console.IssueConsoleCmdResponse>("consoleCommand"),

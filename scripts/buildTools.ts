@@ -393,7 +393,7 @@ class WatchUtils {
 
                 const cwd = inDir ?? deployDirs.cDir;
                 const envSetup = preBuildCmd ? `${preBuildCmd}\n` : "";
-                const cmd = `${envSetup}cd ${cwd}\nmake\nexit $?\n`;
+                const cmd = `${envSetup}cd ${cwd}\nmake ${BUILD_TYPE_FLAG()}\nexit $?\n`;
                 stream.write(cmd);
 
                 let outText = "";
@@ -613,6 +613,10 @@ function BUILD_TYPE_FLAG() {
     if (DEBUG_MODE()) return "-DBuildType=DEBUG";
     if (process.env.CI != null) return "-DBuildType=RELEASE";
     return "";
+}
+
+function IS_PULL_REQUEST_FLAG() {
+    return process.env.GITHUB_EVENT_NAME === "pull_request" ? "-DIsPullRequest=TRUE" : "";
 }
 
 // ANSI escape codes for terminal formatting
@@ -1102,21 +1106,18 @@ async function artifacts(connection: Client, packageAll: boolean) {
     const artifactPaths = ["c/build-out/zowex", packageAll && "c/build-out/zoweax"].filter(Boolean);
     const artifactNames = artifactPaths.map((file) => path.basename(file)).sort(localeCompare);
     const localDir = packageAll ? "dist" : "packages/sdk/bin";
-    const localFiles = ["server.pax.Z", "checksums.asc"];
-    const [paxFile, checksumFile] = localFiles;
+    const localFiles = ["server.pax.Z"];
+    const [paxFile] = localFiles;
     const prePaxCmds = artifactPaths.map(
         (file) => `cp ../${file} ${path.basename(file)} && chmod 700 ${path.basename(file)}`,
     );
     const postPaxCmd = `rm ${artifactNames.join(" ")} && rmdir ../bin`;
-    const e2aPipe = (file: string) => `iconv -f IBM-1047 -t ISO8859-1 > ${file} && chtag -tc ISO8859-1 ${file}`;
     await runCommandInShell(
         connection,
         [
             `cd ${deployDirs.root} && mkdir -p bin dist && cd bin`,
             ...prePaxCmds,
-            `_BPXK_AUTOCVT=OFF sha256 -r ${artifactNames.join(" ")} | ${e2aPipe(checksumFile)}`,
-            `pax -wvz -o saveext -f ../dist/${paxFile} ${artifactNames.join(" ")} ${checksumFile}`,
-            `mv ${checksumFile} ../dist/${checksumFile}`,
+            `pax -wvz -o saveext -f ../dist/${paxFile} ${artifactNames.join(" ")}`,
             postPaxCmd,
         ].join("\n"),
         { stepName: "Packaging artifacts" },
@@ -1257,8 +1258,8 @@ async function upload(connection: Client, sshProfile: IProfile) {
             if (args[1] == null) {
                 const packageJson = JSON.parse(fs.readFileSync(path.resolve(__dirname, "../package.json"), "utf-8"));
                 try {
-                    const gitHash = childProcess.execSync("git rev-parse --short HEAD").toString().trim();
-                    packageJson.version += `+${gitHash}`;
+                    const gitHash = childProcess.execSync(`git rev-parse --short HEAD`).toString().trim();
+                    packageJson.gitHash = `+${gitHash}`;
                 } catch {}
                 pendingUploads.push(
                     uploadFile(
@@ -1284,9 +1285,13 @@ async function upload(connection: Client, sshProfile: IProfile) {
 }
 
 async function build(connection: Client) {
-    const response = await runCommandInShell(connection, `cd ${deployDirs.cDir} && make ${BUILD_TYPE_FLAG()}\n`, {
-        stepName: "Building native/c",
-    });
+    const response = await runCommandInShell(
+        connection,
+        `cd ${deployDirs.cDir} && make ${BUILD_TYPE_FLAG()} ${IS_PULL_REQUEST_FLAG()}\n`,
+        {
+            stepName: "Building native/c",
+        },
+    );
     DEBUG_MODE() && console.log(response);
     console.log("Build complete!");
 }
@@ -1321,6 +1326,24 @@ async function test(connection: Client) {
     });
     console.log("\nTesting complete!");
     await retrieve(connection, [`c/test/test-results.xml`], "native", false, true);
+}
+
+/**
+ * Lists the LE/libc++ symbols the built binaries import and downloads the report.
+ *
+ * Informational, not a gate: the floor is enforced at bind time by pointing LDFLAGS at side decks
+ * captured from a system at the minimum supported release. See native/c/compat/README.md.
+ */
+async function reportRuntimeImports(connection: Client) {
+    try {
+        await runCommandInShell(connection, `cd ${deployDirs.cDir} && make runtime-imports ${BUILD_TYPE_FLAG()}\n`, {
+            streamOutput: true,
+            stepName: "Listing runtime imports",
+        });
+    } finally {
+        // Retrieve the report even on failure - that is exactly when it is needed.
+        await retrieve(connection, ["c/build-out/runtime-imports.txt"], "listings", true, true);
+    }
 }
 
 async function buildChdsect(connection: Client, sftpcon: SFTPWrapper, target: string) {
@@ -1598,6 +1621,9 @@ async function main() {
                 break;
             case "delete":
                 await rmdir(sshClient, config.sshProfile as IProfile);
+                break;
+            case "imports":
+                await reportRuntimeImports(sshClient);
                 break;
             case "make":
                 await make(sshClient);

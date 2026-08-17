@@ -328,16 +328,16 @@ void test_optional_types()
                 std::optional<std::string>(), // empty - should include as null
                 std::optional<int>()          // empty - should skip due to attribute
             };
-            
+
             auto json_result = zjson::to_string(obj);
             Expect(json_result.has_value()).ToBe(true);
-            
+
             std::string json_str = json_result.value();
-            
+
             // Should include include_null as null
             bool has_include_null = json_str.find("include_null") != std::string::npos;
             Expect(has_include_null).ToBe(true);
-            
+
             // Should NOT include skip_if_none field
             bool has_skip_if_none = json_str.find("skip_if_none") != std::string::npos;
             Expect(has_skip_if_none).ToBe(false);
@@ -349,13 +349,13 @@ void test_optional_types()
                 std::optional<std::string>("present_value"),
                 std::optional<int>(42)
             };
-            
+
             auto json_result = zjson::to_string(obj);
             Expect(json_result.has_value()).ToBe(true);
-            
+
             auto restored_result = zjson::from_str<OptionalBehaviorStruct>(json_result.value());
             Expect(restored_result.has_value()).ToBe(true);
-            
+
             OptionalBehaviorStruct restored = restored_result.value();
             Expect(restored.include_null.has_value()).ToBe(true);
             Expect(restored.include_null.value()).ToBe(std::string("present_value"));
@@ -427,6 +427,48 @@ void test_basic_api()
             const auto &error = result.error();
             std::string error_msg = error.what();
             Expect(error_msg.length() > 0).ToBe(true);
+        });
+
+        it("should reject a control character escape when it is the entire parsed value", []() {
+            // A bare JSON string value containing a disallowed control character
+            // escape must fail the whole parse rather than silently producing a
+            // null/partial value.
+            std::string json = "\"bad\\u0001value\"";
+            auto result = zjson::from_str<zjson::Value>(json);
+            Expect(result.has_value()).ToBe(false);
+        });
+
+        it("should reject a control character escape nested inside an object field", []() {
+            // Previously, a bad nested string field was silently dropped from the
+            // object and the rest of the request still parsed. It must now fail
+            // the whole parse instead.
+            std::string json = "{\"dataset\": \"MY.DATA\\u0001SET\", \"member\": \"OK\"}";
+            auto result = zjson::from_str<zjson::Value>(json);
+            Expect(result.has_value()).ToBe(false);
+        });
+
+        it("should reject a control character escape nested inside an array element", []() {
+            std::string json = "[\"fine\", \"also fine\", \"bad\\u000Bvalue\"]";
+            auto result = zjson::from_str<zjson::Value>(json);
+            Expect(result.has_value()).ToBe(false);
+        });
+
+        it("should fail the whole parse when JSON nesting exceeds the depth limit", []() {
+            // Build JSON nested well past MAX_JSON_DEPTH (64). Previously this
+            // silently truncated to a null value at the depth limit; it must now
+            // fail the whole parse.
+            const int depth = 66;
+            std::string json;
+            for (int i = 0; i < depth; i++) {
+                json += "{\"a\":";
+            }
+            json += "1";
+            for (int i = 0; i < depth; i++) {
+                json += "}";
+            }
+
+            auto result = zjson::from_str<zjson::Value>(json);
+            Expect(result.has_value()).ToBe(false);
         });
 
         it("should support chained access patterns", []() {
@@ -606,18 +648,18 @@ void test_serialization_round_trips()
            {
         it("should serialize and deserialize SimpleStruct correctly", []() {
             SimpleStruct original{42, "test_name"};
-            
+
             // Serialize to JSON
             auto json_result = zjson::to_string(original);
             Expect(json_result.has_value()).ToBe(true);
-            
+
             std::string json_str = json_result.value();
             Expect(json_str.length() > 0).ToBe(true);
-            
+
             // Deserialize back
             auto struct_result = zjson::from_str<SimpleStruct>(json_str);
             Expect(struct_result.has_value()).ToBe(true);
-            
+
             SimpleStruct restored = struct_result.value();
             Expect(restored.id).ToBe(original.id);
             Expect(restored.name).ToBe(original.name);
@@ -625,21 +667,21 @@ void test_serialization_round_trips()
 
         it("should handle pretty printing correctly", []() {
             SimpleStruct original{123, "pretty_test"};
-            
+
             auto pretty_result = zjson::to_string_pretty(original);
             Expect(pretty_result.has_value()).ToBe(true);
-            
+
             std::string pretty_json = pretty_result.value();
             Expect(pretty_json.length() > 0).ToBe(true);
-            
+
             // Should contain newlines and spaces for formatting
             bool has_newlines = pretty_json.find('\n') != std::string::npos;
             Expect(has_newlines).ToBe(true);
-            
+
             // Should still be parseable
             auto parsed_result = zjson::from_str<SimpleStruct>(pretty_json);
             Expect(parsed_result.has_value()).ToBe(true);
-            
+
             SimpleStruct restored = parsed_result.value();
             Expect(restored.id).ToBe(original.id);
             Expect(restored.name).ToBe(original.name);
@@ -650,13 +692,13 @@ void test_serialization_round_trips()
                 std::optional<int>(42),
                 std::optional<std::string>("test_string")
             };
-            
+
             auto json_result = zjson::to_string(original);
             Expect(json_result.has_value()).ToBe(true);
-            
+
             auto restored_result = zjson::from_str<TestOptional>(json_result.value());
             Expect(restored_result.has_value()).ToBe(true);
-            
+
             TestOptional restored = restored_result.value();
             Expect(restored.opt_int.has_value()).ToBe(true);
             Expect(restored.opt_int.value()).ToBe(42);
@@ -669,60 +711,86 @@ void test_serialization_round_trips()
                 std::optional<int>(),        // empty
                 std::optional<std::string>() // empty
             };
-            
+
             auto json_result = zjson::to_string(original);
             Expect(json_result.has_value()).ToBe(true);
-            
+
             auto restored_result = zjson::from_str<TestOptional>(json_result.value());
             Expect(restored_result.has_value()).ToBe(true);
-            
+
             TestOptional restored = restored_result.value();
             Expect(restored.opt_int.has_value()).ToBe(false);
             Expect(restored.opt_string.has_value()).ToBe(false);
         });
 
-        it("should properly escape and unescape all EBCDIC characters (0-255)", []() {
+        it("should escape a control character without a named JSON escape using the Unicode replacement character", []() {
+            // 0x01 (SOH) has no named JSON escape (unlike backspace/formfeed/newline/cr/tab).
+            // Its native byte value does not correspond to the same Unicode code point on
+            // this EBCDIC platform, so echoing its raw numeric value as a generic
+            // code-point escape would misrepresent it to a spec-compliant JSON reader.
+            // It should be replaced with the Unicode replacement character instead.
+            std::string input = "A";
+            input += static_cast<char>(0x01);
+            input += "B";
+
+            SimpleStruct original{42, input};
+
+            auto json_result = zjson::to_string(original);
+            Expect(json_result.has_value()).ToBe(true);
+
+            std::string json_str = json_result.value();
+            Expect(json_str.find("\\u0001") != std::string::npos).ToBe(false);
+            Expect(json_str.find("\\ufffd") != std::string::npos).ToBe(true);
+
+            // The Unicode replacement character (U+FFFD) is outside the single-byte
+            // range this decoder can represent, so re-parsing this repo's own output
+            // through its own strict unescape_json_string correctly fails rather than
+            // silently keeping the escape text. A standard, permissive JSON parser
+            // (e.g. the SDK client's JSON.parse) would decode it without issue - this
+            // decoder is intentionally stricter about what it accepts as input.
+            auto restored_result = zjson::from_str<SimpleStruct>(json_str);
+            Expect(restored_result.has_value()).ToBe(false);
+        });
+
+        it("should escape all EBCDIC characters (0-255) to a form with no raw control bytes", []() {
             // Build a string containing all EBCDIC characters from 0 to 255
             std::string all_chars;
             all_chars.reserve(256);
             for (int i = 0; i < 256; i++) {
                 all_chars += static_cast<char>(i);
             }
-            
+
             SimpleStruct original{42, all_chars};
-            
+
             // Serialize to JSON
             auto json_result = zjson::to_string(original);
             Expect(json_result.has_value()).ToBe(true);
-            
+
             std::string json_str = json_result.value();
-            
-            // Verify that control and special characters are properly escaped
-            bool has_escaped_chars = json_str.find("\\u0000") != std::string::npos;
-            has_escaped_chars &= json_str.find("\\n") != std::string::npos;
+
+            // Verify that named escapes and quote/backslash are still present.
+            // Control characters without a named escape are no longer echoed via a
+            // numeric code-point escape (see the test above), so an old-style
+            // byte-value escape must not appear.
+            bool has_escaped_chars = json_str.find("\\n") != std::string::npos;
             has_escaped_chars &= json_str.find("\\t") != std::string::npos;
             has_escaped_chars &= json_str.find("\\\"") != std::string::npos;
             has_escaped_chars &= json_str.find("\\\\") != std::string::npos;
             Expect(has_escaped_chars).ToBe(true);
-            
-            // Deserialize back - all characters should be preserved
-            auto restored_result = zjson::from_str<SimpleStruct>(json_str);
-            Expect(restored_result.has_value()).ToBe(true);
-            
-            SimpleStruct restored = restored_result.value();
-            Expect(restored.id).ToBe(original.id);
-            
-            // Verify all 256 characters are preserved exactly
-            Expect(restored.name.size()).ToBe(256);
-            
-            for (int i = 0; i < 256; i++) {
-                unsigned char original_char = static_cast<unsigned char>(original.name[i]);
-                unsigned char restored_char = static_cast<unsigned char>(restored.name[i]);
-                Expect(restored_char).ToBe(original_char);
+            Expect(json_str.find("\\u0000") != std::string::npos).ToBe(false);
+            Expect(json_str.find("\\ufffd") != std::string::npos).ToBe(true);
+
+            // No raw control byte survives serialization: every control character,
+            // named-escape or not, is represented as printable escape text (e.g. the
+            // two characters backslash and 'n', not an actual newline byte).
+            for (unsigned char c : json_str) {
+                Expect(iscntrl(c)).ToBe(false);
             }
-            
-            // Verify the entire string matches
-            Expect(restored.name).ToBe(original.name);
+
+            // This text is not expected to round-trip through this repo's own strict
+            // decoder - see "should reject a control character escape..." and the
+            // Unicode replacement character test above for why re-parsing it
+            // correctly fails rather than silently accepting lossy data back in.
         });
 
         it("should handle large string serialization and deserialization", []() {
@@ -732,48 +800,48 @@ void test_serialization_round_trips()
             const size_t target_size = 16 * 1024 * 1024 - 1;
             const std::string pattern = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqrstuvwxyz"; // 62 bytes
             const size_t repeats = target_size / pattern.length();
-            
+
             std::string large_string;
             large_string.reserve(target_size);
-            
+
             for (size_t i = 0; i < repeats; ++i) {
                 large_string += pattern;
             }
-            
+
             // Add any remaining bytes to reach exact size
             size_t remaining = target_size - large_string.length();
             if (remaining > 0) {
                 large_string += pattern.substr(0, remaining);
             }
-            
+
             Expect(large_string.length()).ToBe(target_size);
-            
+
             SimpleStruct original{99, large_string};
-            
+
             // Test serialization
             auto json_result = zjson::to_string(original);
             Expect(json_result.has_value()).ToBe(true);
-            
+
             std::string json_str = json_result.value();
-            
+
             // Test deserialization
             auto restored_result = zjson::from_str<SimpleStruct>(json_str);
             Expect(restored_result.has_value()).ToBe(true);
-            
+
             SimpleStruct restored = restored_result.value();
-            
+
             // Verify the ID matches
             Expect(restored.id).ToBe(original.id);
-            
+
             // Verify the string length matches exactly
             Expect(restored.name.length()).ToBe(target_size);
             Expect(restored.name.size()).ToBe(large_string.size());
-            
+
             // Verify the start of the string (first 100 bytes)
             std::string original_start = large_string.substr(0, 100);
             std::string restored_start = restored.name.substr(0, 100);
             Expect(restored_start).ToBe(original_start);
-            
+
             // Verify the end of the string using the ORIGINAL string's length as reference
             // This ensures we're checking the actual end, not a truncated position
             std::string original_end = large_string.substr(large_string.length() - 100);
@@ -810,16 +878,16 @@ void test_field_attributes()
            {
         it("should skip fields marked with zjson_skip", []() {
             AttributeTestStruct original{"testuser", "secret123", 12345, "Test User", 3000};
-            
+
             auto json_result = zjson::to_string(original);
             Expect(json_result.has_value()).ToBe(true);
-            
+
             std::string json_str = json_result.value();
-            
+
             // Password field should not appear in JSON
             bool has_password = json_str.find("password") != std::string::npos;
             Expect(has_password).ToBe(false);
-            
+
             // Other fields should be present
             bool has_username = json_str.find("username") != std::string::npos;
             Expect(has_username).ToBe(true);
@@ -827,18 +895,18 @@ void test_field_attributes()
 
         it("should rename fields correctly", []() {
             AttributeTestStruct original{"testuser", "secret", 12345, "Test User", 3000};
-            
+
             auto json_result = zjson::to_string(original);
             Expect(json_result.has_value()).ToBe(true);
-            
+
             std::string json_str = json_result.value();
-            
+
             // Should use renamed fields
             bool has_userId = json_str.find("userId") != std::string::npos;
             bool has_displayName = json_str.find("displayName") != std::string::npos;
             Expect(has_userId).ToBe(true);
             Expect(has_displayName).ToBe(true);
-            
+
             // Should not have original field names
             bool has_user_id = json_str.find("user_id") != std::string::npos;
             bool has_display_name = json_str.find("display_name") != std::string::npos;
@@ -849,10 +917,10 @@ void test_field_attributes()
         it("should use default values for missing fields", []() {
             // JSON without default_port field
             std::string json_without_port = R"({"username":"testuser","userId":12345,"displayName":"Test User"})";
-            
+
             auto result = zjson::from_str<AttributeTestStruct>(json_without_port);
             Expect(result.has_value()).ToBe(true);
-            
+
             AttributeTestStruct restored = result.value();
             Expect(restored.username).ToBe(std::string("testuser"));
             Expect(restored.user_id).ToBe(12345);
@@ -871,17 +939,17 @@ void test_value_conversions()
            {
         it("should convert typed objects to Value using to_value", []() {
             SimpleStruct obj{42, "test_name"};
-            
+
             auto value_result = zjson::to_value(obj);
             Expect(value_result.has_value()).ToBe(true);
-            
+
             zjson::Value value = value_result.value();
             Expect(value.is_object()).ToBe(true);
-            
+
             // Should be able to access fields dynamically
             int64_t id = value["id"].as_int64();
             std::string name = value["name"].as_string();
-            
+
             Expect(id).ToBe(42);
             Expect(name).ToBe(std::string("test_name"));
         });
@@ -891,10 +959,10 @@ void test_value_conversions()
             zjson::Value value = zjson::Value::create_object();
             value.add_to_object("id", zjson::Value(123));
             value.add_to_object("name", zjson::Value("converted_name"));
-            
+
             auto struct_result = zjson::from_value<SimpleStruct>(value);
             Expect(struct_result.has_value()).ToBe(true);
-            
+
             SimpleStruct obj = struct_result.value();
             Expect(obj.id).ToBe(123);
             Expect(obj.name).ToBe(std::string("converted_name"));
@@ -902,15 +970,15 @@ void test_value_conversions()
 
         it("should handle round-trip conversion: object -> Value -> object", []() {
             SimpleStruct original{999, "round_trip_test"};
-            
+
             // Object -> Value
             auto value_result = zjson::to_value(original);
             Expect(value_result.has_value()).ToBe(true);
-            
+
             // Value -> Object
             auto object_result = zjson::from_value<SimpleStruct>(value_result.value());
             Expect(object_result.has_value()).ToBe(true);
-            
+
             SimpleStruct restored = object_result.value();
             Expect(restored.id).ToBe(original.id);
             Expect(restored.name).ToBe(original.name);
@@ -920,7 +988,7 @@ void test_value_conversions()
             auto int_result = zjson::to_value(42);
             Expect(int_result.has_value()).ToBe(true);
             Expect(int_result.value().as_int64()).ToBe(42);
-            
+
             auto str_result = zjson::to_value(std::string("hello"));
             Expect(str_result.has_value()).ToBe(true);
             Expect(str_result.value().as_string()).ToBe(std::string("hello"));
@@ -931,10 +999,10 @@ void test_value_conversions()
             zjson::Value int_val(42);
             Expect(int_val.is_integer()).ToBe(true);
             Expect(int_val.is_double()).ToBe(false);
-            
+
             zjson::Value max_i64(9223372036854775807LL);
             Expect(max_i64.is_integer()).ToBe(true);
-            
+
             // Floats stored as f64 (double)
             zjson::Value float_val(3.14);
             Expect(float_val.is_double()).ToBe(true);
@@ -945,10 +1013,10 @@ void test_value_conversions()
             long long max_i64 = 9223372036854775807LL;
             zjson::Value obj = zjson::Value::create_object();
             obj["maxInt"] = zjson::Value(max_i64);
-            
+
             auto json_result = zjson::to_string(obj);
             Expect(json_result.has_value()).ToBe(true);
-            
+
             auto parsed = zjson::from_str(json_result.value());
             Expect(parsed.has_value()).ToBe(true);
             Expect(parsed.value()["maxInt"].is_integer()).ToBe(true);
@@ -960,7 +1028,7 @@ void test_value_conversions()
             zjson::Value small_u64(1000ULL);
             Expect(small_u64.is_integer()).ToBe(true);
             Expect(small_u64.as_uint64()).ToBe(1000ULL);
-            
+
             // u64 values > i64::MAX stored as f64 (precision loss acceptable)
             zjson::Value large_u64(18446744073709551615ULL);
             Expect(large_u64.is_double()).ToBe(true);
@@ -970,11 +1038,11 @@ void test_value_conversions()
             // i64 -> f64 conversion
             zjson::Value int_val(42);
             Expect(int_val.as_double()).ToBe(42.0);
-            
+
             // f64 -> i64 conversion (whole numbers only)
             zjson::Value whole_double(100.0);
             Expect(whole_double.as_int64()).ToBe(100);
-            
+
             // f64 with fraction -> i64 should error
             zjson::Value fractional(3.14);
             try {
@@ -1022,13 +1090,13 @@ void test_complex_nested_structures()
         it("should serialize and deserialize nested objects", []() {
             Address addr{"123 Main St", "Boston", "USA"};
             Person person{"John Doe", 30, addr};
-            
+
             auto json_result = zjson::to_string(person);
             Expect(json_result.has_value()).ToBe(true);
-            
+
             auto person_result = zjson::from_str<Person>(json_result.value());
             Expect(person_result.has_value()).ToBe(true);
-            
+
             Person restored = person_result.value();
             Expect(restored.name).ToBe(std::string("John Doe"));
             Expect(restored.age).ToBe(30);
@@ -1039,18 +1107,18 @@ void test_complex_nested_structures()
 
         it("should handle arrays of complex objects", []() {
             Address hq{"456 Corporate Blvd", "Seattle", "USA"};
-            
+
             Person emp1{"Alice Smith", 28, {"111 First St", "Boston", "USA"}};
             Person emp2{"Bob Jones", 35, {"222 Second Ave", "Seattle", "USA"}};
-            
+
             Company company{"Tech Corp", {emp1, emp2}, hq};
-            
+
             auto json_result = zjson::to_string_pretty(company);
             Expect(json_result.has_value()).ToBe(true);
-            
+
             auto company_result = zjson::from_str<Company>(json_result.value());
             Expect(company_result.has_value()).ToBe(true);
-            
+
             Company restored = company_result.value();
             Expect(restored.name).ToBe(std::string("Tech Corp"));
             Expect(restored.employees.size()).ToBe(2);
@@ -1060,20 +1128,20 @@ void test_complex_nested_structures()
         });
 
         it("should support deep nested access with dynamic indexing", []() {
-            Company company{"Test Corp", 
-                          {{"John", 30, {"123 St", "Boston", "USA"}}}, 
+            Company company{"Test Corp",
+                          {{"John", 30, {"123 St", "Boston", "USA"}}},
                           {"456 HQ Ave", "Seattle", "USA"}};
-            
+
             auto value_result = zjson::to_value(company);
             Expect(value_result.has_value()).ToBe(true);
-            
+
             zjson::Value root = value_result.value();
-            
+
             // Deep chained access
             std::string emp_name = root["employees"][0]["name"].as_string();
             std::string emp_city = root["employees"][0]["address"]["city"].as_string();
             std::string hq_country = root["headquarters"]["country"].as_string();
-            
+
             Expect(emp_name).ToBe(std::string("John"));
             Expect(emp_city).ToBe(std::string("Boston"));
             Expect(hq_country).ToBe(std::string("USA"));
@@ -1111,26 +1179,26 @@ void test_large_struct_support()
             large.f21 = 21; large.f22 = 22; large.f23 = 23; large.f24 = 24;
             large.f25 = 25; large.f26 = 26; large.f27 = 27; large.f28 = 28;
             large.f29 = 29; large.f30 = 30; large.f31 = 31; large.f32 = 32;
-            
+
             // Test serialization
             auto json_result = zjson::to_string(large);
             Expect(json_result.has_value()).ToBe(true);
-            
+
             std::string json_str = json_result.value();
-            
+
             // Should contain all fields
             bool has_f1 = json_str.find("f1") != std::string::npos;
             bool has_f17 = json_str.find("f17") != std::string::npos;  // Test new macro range
             bool has_f32 = json_str.find("f32") != std::string::npos;
-            
+
             Expect(has_f1).ToBe(true);
             Expect(has_f17).ToBe(true);
             Expect(has_f32).ToBe(true);
-            
+
             // Test deserialization
             auto restored_result = zjson::from_str<LargeStruct>(json_str);
             Expect(restored_result.has_value()).ToBe(true);
-            
+
             LargeStruct restored = restored_result.value();
             Expect(restored.f1).ToBe(std::string("field1"));
             Expect(restored.f17).ToBe(std::string("field17"));  // Test new macro range
@@ -1140,7 +1208,7 @@ void test_large_struct_support()
         it("should validate serializable trait works for large structs", []() {
             bool is_serializable = zjson::Serializable<LargeStruct>::value;
             bool is_deserializable = zjson::Deserializable<LargeStruct>::value;
-            
+
             Expect(is_serializable).ToBe(true);
             Expect(is_deserializable).ToBe(true);
         }); });
@@ -1247,26 +1315,26 @@ void test_container_attributes()
            {
         it("should apply camelCase rename_all transformation", []() {
             CamelCaseStruct obj{"john_doe", 123, "John Doe"};
-            
+
             auto json_result = zjson::to_string(obj);
             Expect(json_result.has_value()).ToBe(true);
-            
+
             std::string json_str = json_result.value();
-            
+
             // Should use camelCase field names
             bool has_userName = json_str.find("userName") != std::string::npos;
             bool has_userId = json_str.find("userId") != std::string::npos;
             bool has_displayName = json_str.find("displayName") != std::string::npos;
-            
+
             Expect(has_userName).ToBe(true);
             Expect(has_userId).ToBe(true);
             Expect(has_displayName).ToBe(true);
-            
+
             // Should NOT use original field names
             bool has_user_name = json_str.find("user_name") != std::string::npos;
             bool has_user_id = json_str.find("user_id") != std::string::npos;
             bool has_display_name = json_str.find("display_name") != std::string::npos;
-            
+
             Expect(has_user_name).ToBe(false);
             Expect(has_user_id).ToBe(false);
             Expect(has_display_name).ToBe(false);
@@ -1274,17 +1342,17 @@ void test_container_attributes()
 
         it("should apply PascalCase rename_all transformation", []() {
             PascalCaseStruct obj{"John", "Doe", 5};
-            
+
             auto json_result = zjson::to_string(obj);
             Expect(json_result.has_value()).ToBe(true);
-            
+
             std::string json_str = json_result.value();
-            
+
             // Should use PascalCase field names
             bool has_FirstName = json_str.find("FirstName") != std::string::npos;
             bool has_LastName = json_str.find("LastName") != std::string::npos;
             bool has_UserCount = json_str.find("UserCount") != std::string::npos;
-            
+
             Expect(has_FirstName).ToBe(true);
             Expect(has_LastName).ToBe(true);
             Expect(has_UserCount).ToBe(true);
@@ -1292,17 +1360,17 @@ void test_container_attributes()
 
         it("should apply kebab-case rename_all transformation", []() {
             KebabCaseStruct obj{"test_user", "test@example.com", 3600};
-            
+
             auto json_result = zjson::to_string(obj);
             Expect(json_result.has_value()).ToBe(true);
-            
+
             std::string json_str = json_result.value();
-            
+
             // Should use kebab-case field names
             bool has_user_name = json_str.find("user-name") != std::string::npos;
             bool has_email_address = json_str.find("email-address") != std::string::npos;
             bool has_session_timeout = json_str.find("session-timeout") != std::string::npos;
-            
+
             Expect(has_user_name).ToBe(true);
             Expect(has_email_address).ToBe(true);
             Expect(has_session_timeout).ToBe(true);
@@ -1310,17 +1378,17 @@ void test_container_attributes()
 
         it("should apply UPPERCASE rename_all transformation", []() {
             UppercaseStruct obj{"testuser", "secret123", 100};
-            
+
             auto json_result = zjson::to_string(obj);
             Expect(json_result.has_value()).ToBe(true);
-            
+
             std::string json_str = json_result.value();
-            
+
             // Should use UPPERCASE field names
             bool has_USER_NAME = json_str.find("USER_NAME") != std::string::npos;
             bool has_API_KEY = json_str.find("API_KEY") != std::string::npos;
             bool has_MAX_CONNECTIONS = json_str.find("MAX_CONNECTIONS") != std::string::npos;
-            
+
             Expect(has_USER_NAME).ToBe(true);
             Expect(has_API_KEY).ToBe(true);
             Expect(has_MAX_CONNECTIONS).ToBe(true);
@@ -1328,17 +1396,17 @@ void test_container_attributes()
 
         it("should apply lowercase rename_all transformation", []() {
             LowercaseStruct obj{"TESTUSER", "SECRET123", 100};
-            
+
             auto json_result = zjson::to_string(obj);
             Expect(json_result.has_value()).ToBe(true);
-            
+
             std::string json_str = json_result.value();
-            
+
             // Should use lowercase field names
             bool has_user_name = json_str.find("user_name") != std::string::npos;
             bool has_api_key = json_str.find("api_key") != std::string::npos;
             bool has_max_connections = json_str.find("max_connections") != std::string::npos;
-            
+
             Expect(has_user_name).ToBe(true);
             Expect(has_api_key).ToBe(true);
             Expect(has_max_connections).ToBe(true);
@@ -1346,17 +1414,17 @@ void test_container_attributes()
 
         it("should apply snake_case rename_all transformation", []() {
             SnakeCaseStruct obj{"testUser", "testEmail", 1800};
-            
+
             auto json_result = zjson::to_string(obj);
             Expect(json_result.has_value()).ToBe(true);
-            
+
             std::string json_str = json_result.value();
-            
+
             // Should use snake_case field names (camelCase -> snake_case)
             bool has_user_name = json_str.find("userName") != std::string::npos;
             bool has_email_address = json_str.find("emailAddress") != std::string::npos;
             bool has_session_timeout = json_str.find("sessionTimeout") != std::string::npos;
-            
+
             Expect(has_user_name).ToBe(true);
             Expect(has_email_address).ToBe(true);
             Expect(has_session_timeout).ToBe(true);
@@ -1364,17 +1432,17 @@ void test_container_attributes()
 
         it("should apply SCREAMING_SNAKE_CASE rename_all transformation", []() {
             ScreamingSnakeCaseStruct obj{"testuser", "secret", 50};
-            
+
             auto json_result = zjson::to_string(obj);
             Expect(json_result.has_value()).ToBe(true);
-            
+
             std::string json_str = json_result.value();
-            
+
             // Should use SCREAMING_SNAKE_CASE field names
             bool has_USER_NAME = json_str.find("USER_NAME") != std::string::npos;
             bool has_API_KEY = json_str.find("API_KEY") != std::string::npos;
             bool has_MAX_CONNECTIONS = json_str.find("MAX_CONNECTIONS") != std::string::npos;
-            
+
             Expect(has_USER_NAME).ToBe(true);
             Expect(has_API_KEY).ToBe(true);
             Expect(has_MAX_CONNECTIONS).ToBe(true);
@@ -1382,17 +1450,17 @@ void test_container_attributes()
 
         it("should apply SCREAMING-KEBAB-CASE rename_all transformation", []() {
             ScreamingKebabCaseStruct obj{"testuser", "secret", 50};
-            
+
             auto json_result = zjson::to_string(obj);
             Expect(json_result.has_value()).ToBe(true);
-            
+
             std::string json_str = json_result.value();
-            
+
             // Should use SCREAMING-KEBAB-CASE field names
             bool has_USER_NAME = json_str.find("USER-NAME") != std::string::npos;
             bool has_API_KEY = json_str.find("API-KEY") != std::string::npos;
             bool has_MAX_CONNECTIONS = json_str.find("MAX-CONNECTIONS") != std::string::npos;
-            
+
             Expect(has_USER_NAME).ToBe(true);
             Expect(has_API_KEY).ToBe(true);
             Expect(has_MAX_CONNECTIONS).ToBe(true);
@@ -1401,10 +1469,10 @@ void test_container_attributes()
         it("should deserialize with renamed fields correctly", []() {
             // Test round-trip with camelCase
             std::string camel_json = R"({"userName":"test","userId":42,"displayName":"Test User"})";
-            
+
             auto result = zjson::from_str<CamelCaseStruct>(camel_json);
             Expect(result.has_value()).ToBe(true);
-            
+
             CamelCaseStruct restored = result.value();
             Expect(restored.user_name).ToBe(std::string("test"));
             Expect(restored.user_id).ToBe(42);
@@ -1416,12 +1484,12 @@ void test_container_attributes()
             std::string valid_json = R"({"name":"test","id":123})";
             auto valid_result = zjson::from_str<StrictValidationStruct>(valid_json);
             Expect(valid_result.has_value()).ToBe(true);
-            
+
             // JSON with extra fields should fail
             std::string invalid_json = R"({"name":"test","id":123,"extra_field":"should_fail"})";
             auto invalid_result = zjson::from_str<StrictValidationStruct>(invalid_json);
             Expect(invalid_result.has_value()).ToBe(false);
-            
+
             // Should be unknown field error
             auto error = invalid_result.error();
             Expect(error.kind() == zjson::Error::UnknownField).ToBe(true);
@@ -1433,7 +1501,7 @@ void test_container_attributes()
             std::string json_with_extra = R"({"id":123,"name":"test","extra_field":"ignored"})";
             auto result = zjson::from_str<SimpleStruct>(json_with_extra);
             Expect(result.has_value()).ToBe(true);
-            
+
             SimpleStruct restored = result.value();
             Expect(restored.id).ToBe(123);
             Expect(restored.name).ToBe(std::string("test"));
@@ -1442,16 +1510,16 @@ void test_container_attributes()
         it("should use 'none' transformation by default (no rename_all)", []() {
             // SimpleStruct doesn't have ZJSON_RENAME_ALL, so should use original field names
             SimpleStruct obj{42, "test"};
-            
+
             auto json_result = zjson::to_string(obj);
             Expect(json_result.has_value()).ToBe(true);
-            
+
             std::string json_str = json_result.value();
-            
+
             // Should use original field names (no transformation)
             bool has_id = json_str.find("id") != std::string::npos;
             bool has_name = json_str.find("name") != std::string::npos;
-            
+
             Expect(has_id).ToBe(true);
             Expect(has_name).ToBe(true);
         }); });
@@ -1471,21 +1539,21 @@ void test_struct_flattening()
             config.connection.port = 5432;
             config.database_name = "myapp";
             config.ssl_enabled = true;
-            
+
             auto json_result = zjson::to_string(config);
             Expect(json_result.has_value()).ToBe(true);
-            
+
             std::string json_str = json_result.value();
-            
+
             // Should contain flattened fields directly, not nested
             bool has_host = json_str.find("\"host\"") != std::string::npos;
             bool has_port = json_str.find("\"port\"") != std::string::npos;
             bool has_database_name = json_str.find("\"database_name\"") != std::string::npos;
             bool has_ssl_enabled = json_str.find("\"ssl_enabled\"") != std::string::npos;
-            
+
             // Should NOT contain nested "connection" object
             bool has_connection = json_str.find("\"connection\"") != std::string::npos;
-            
+
             Expect(has_host).ToBe(true);
             Expect(has_port).ToBe(true);
             Expect(has_database_name).ToBe(true);
@@ -1495,10 +1563,10 @@ void test_struct_flattening()
 
         it("should deserialize flattened JSON back to nested struct", []() {
             std::string json_str = R"({"host":"db.example.com","port":3306,"database_name":"production","ssl_enabled":false})";
-            
+
             auto result = zjson::from_str<DatabaseConfig>(json_str);
             Expect(result.has_value()).ToBe(true);
-            
+
             DatabaseConfig config = result.value();
             Expect(config.connection.host).ToBe(std::string("db.example.com"));
             Expect(config.connection.port).ToBe(3306);
@@ -1512,15 +1580,15 @@ void test_struct_flattening()
             original.connection.port = 9999;
             original.database_name = "test_db";
             original.ssl_enabled = true;
-            
+
             // Serialize
             auto json_result = zjson::to_string(original);
             Expect(json_result.has_value()).ToBe(true);
-            
+
             // Deserialize
             auto restored_result = zjson::from_str<DatabaseConfig>(json_result.value());
             Expect(restored_result.has_value()).ToBe(true);
-            
+
             DatabaseConfig restored = restored_result.value();
             Expect(restored.connection.host).ToBe(original.connection.host);
             Expect(restored.connection.port).ToBe(original.connection.port);

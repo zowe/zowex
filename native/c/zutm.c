@@ -8,6 +8,7 @@
  * Copyright Contributors to the Zowe Project.
  *
  */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -25,6 +26,7 @@
 #include "csvdlaa.h"
 #include "zwto.h"
 #include "zdbg.h"
+#include "zrecovery.h"
 
 #define ZUT_BPXWDYN_SERVICE_FAILURE -2
 
@@ -548,12 +550,36 @@ int ZUTSSIQ(ZDIAG *diag, JQRY_HEADER **area, const char *filter)
   return rc;
 }
 
-#pragma prolog(ZUTNOAUT, " ZWEPROLG NEWDSA=(YES,1) ")
+#pragma prolog(ZUTNOAUT, " ZWEPROLG NEWDSA=(YES,4) ")
 #pragma epilog(ZUTNOAUT, " ZWEEPILG ")
 int ZUTNOAUT()
 {
-  auth_off();
-  return 0;
+  if (0 != test_auth())
+  {
+    return RTNCD_SUCCESS; // not APF-authorized; nothing to relinquish
+  }
+
+  int rc = RTNCD_SUCCESS;
+  ZRCVY_ENV zenv = {0};
+
+  if (0 == enable_recovery(&zenv))
+  {
+    rc = auth_off();
+  }
+  else
+  {
+    rc = RTNCD_FAILURE; // abend in elevated window; retry restored problem state & key
+  }
+
+  disable_recovery(&zenv);
+
+  // fail closed - confirm authorization was actually relinquished
+  if (RTNCD_SUCCESS == rc && 0 == test_auth())
+  {
+    rc = RTNCD_FAILURE;
+  }
+
+  return rc;
 }
 
 #pragma prolog(ZUTMSREL, " ZWEPROLG NEWDSA=(YES,4) ")

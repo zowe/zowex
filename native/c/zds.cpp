@@ -761,7 +761,15 @@ static std::string zds_resolve_dsname(const ZDSReadOpts &opts)
 
 static DscbAttributes zds_resolve_dscb(const ZDSReadOpts &opts)
 {
-  return opts.dsname.empty() ? DscbAttributes{} : zds_get_dscb_attributes(opts.dsname);
+  DscbAttributes attrs = opts.dsname.empty() ? DscbAttributes{} : zds_get_dscb_attributes(opts.dsname);
+  if (attrs.recfm.empty())
+  {
+    // Catalog lookup found nothing (e.g. an uncatalogued/dynamically
+    // allocated DD such as JES spool output) - fall back to the caller's
+    // hint, if any (e.g. JES's own DD metadata for spool output).
+    attrs.is_asa = opts.is_asa;
+  }
+  return attrs;
 }
 
 static std::string zds_resolve_write_target(const ZDSWriteOpts &opts)
@@ -2467,6 +2475,7 @@ int zds_list_members(ZDS *zds, std::string dsn, std::vector<ZDSMem> &members, co
   const auto formatted_dsn = "//'" + dsn + "'";
 
   int total_entries = 0;
+  bool corrupt_directory_block = false;
 
   if (0 == zds->max_entries)
     zds->max_entries = ZDS_DEFAULT_MAX_MEMBER_ENTRIES;
@@ -2508,12 +2517,28 @@ int zds_list_members(ZDS *zds, std::string dsn, std::vector<ZDSMem> &members, co
 
   while (fread(&rec, sizeof(rec), 1, fp))
   {
+    if (rec.count > RECLEN)
+    {
+      if (!corrupt_directory_block)
+      {
+        ZDIAG_SET_MSG(&zds->diag, "Corrupt PDS directory block encountered for '%s': used-count %hu exceeds %d bytes; results may be incomplete", dsn.c_str(), rec.count, RECLEN);
+        zds->diag.detail_rc = ZDS_RSNCD_TRUNCATION_WARNING;
+        corrupt_directory_block = true;
+      }
+      rec.count = RECLEN;
+    }
+
     unsigned char *data = nullptr;
     data = (unsigned char *)&rec;
     data += sizeof(rec.count); // increment past halfword length
     int len = sizeof(RECORD_ENTRY);
     for (int i = 0; i < rec.count; i = i + len)
     {
+      if (i + (int)sizeof(RECORD_ENTRY) > rec.count)
+      {
+        break;
+      }
+
       RECORD_ENTRY entry{};
       memcpy(&entry, data, sizeof(entry));
       long long int end = 0xFFFFFFFFFFFFFFFF; // indicates end of entries
@@ -2564,7 +2589,8 @@ int zds_list_members(ZDS *zds, std::string dsn, std::vector<ZDSMem> &members, co
           mem.name = std::string(name);
           int user_data_len = info * 2; // convert halfwords to bytes
 
-          if (show_attributes && user_data_len >= sizeof(ISPF_STATS))
+          if (show_attributes && user_data_len >= (int)sizeof(ISPF_STATS) &&
+              i + (int)sizeof(entry) + user_data_len <= rec.count)
           {
             const ISPF_STATS *stats = reinterpret_cast<const ISPF_STATS *>(data + sizeof(entry));
             mem.stats_valid = is_valid_ispf_stats(stats, user_data_len);
@@ -2610,7 +2636,7 @@ int zds_list_members(ZDS *zds, std::string dsn, std::vector<ZDSMem> &members, co
   }
 
   fclose(fp);
-  return 0;
+  return corrupt_directory_block ? RTNCD_WARNING : RTNCD_SUCCESS;
 }
 
 ZNP_PACK_ON
