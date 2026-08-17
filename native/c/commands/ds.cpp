@@ -682,31 +682,17 @@ int handle_data_set_resolve_alias(InvocationContext &context)
 {
   int rc = 0;
   std::string aliasDsn = context.get<std::string>("dsn", "");
-  unsigned int bpxwdynCode = 0;
-  std::string sysinDdName = "";
-  std::string bpxwdynResponse = "";
-  rc = zut_bpxwdyn_rtdd("alloc lrecl(80) recfm(f,b)", &bpxwdynCode, bpxwdynResponse, sysinDdName);
-  if (rc != 0)
-  {
-    context.error_stream() << "failed to allocate SYSIN dd for IDCAMS" << sysinDdName << std::endl;
-    return RTNCD_FAILURE;
-  }
-  context.error_stream() << "bpx response is: " << bpxwdynResponse << std::endl;
-  context.error_stream() << "unique dd name is " << sysinDdName << std::endl;
   const auto result = obj();
-  std::string data = "LISTCAT ENTRIES('" + aliasDsn + "') ALL`";
-
-  ZDS idcamsSysinZds{};
-  ZDSWriteOpts write_opts{.zds = &idcamsSysinZds, .ddname = sysinDdName};
-  rc = zds_write(write_opts, data);
+  std::string idcamsOutput = "";
+  std::string idcamsInput = "LISTCAT ENTRIES('" + aliasDsn + "') ALL`";
+  std::string idcamsError = "";
+  rc = zds_idcams(idcamsInput, idcamsOutput, idcamsError);
+  context.error_stream() << "TODO idcams err string: " << idcamsError << std::endl;
   if (rc != 0)
   {
-    context.error_stream() << "failed to write IDCAMS commands to dynamic dd " << sysinDdName << std::endl;
+    context.error_stream() << "Error: " << idcamsError << std::endl;
     return RTNCD_FAILURE;
   }
-
-  context.error_stream() << "write to dataset succeeded" << std::endl;
-
   result->set("targetDsn", str("todo"));
   context.set_object(result);
   return rc;

@@ -4313,3 +4313,40 @@ static int zds_write_member_bpam_streamed(ZDS *zds, const std::string &dsn, cons
   rc = zds_close_output_bpam(zds, ioc);
   return handle_truncation_result(zds, rc, truncation);
 }
+
+int zds_idcams(const std::string &sysInData, std::string &idcamsOutput, std::string &error)
+{
+  unsigned int bpxwdynCode = 0;
+  int rc = 0;
+  ZDIAG diag{};
+  std::string sysinDdName = "";
+  std::string bpxwdynResponse = "";
+
+  // Perform dynalloc
+  std::vector<std::string> dds;
+  dds.reserve(2);
+  dds.push_back("alloc dd(sysin)");
+  dds.push_back("alloc dd(sysprint)");
+
+  rc = zut_loop_dynalloc(diag, dds);
+  if (0 != rc)
+  {
+    error += "Error: allocation failed: " + std::string(diag.e_msg) + "\n";
+    zut_free_dynalloc_dds(diag, dds);
+    return RTNCD_FAILURE;
+  }
+
+  ZDS idcamsSysinZds{};
+  ZDSWriteOpts write_opts{.zds = &idcamsSysinZds, .ddname = "SYSIN"};
+  rc = zds_write(write_opts, sysInData);
+  if (rc != 0)
+  {
+    error += "failed to write IDCAMS commands to sysin\n";
+    zut_free_dynalloc_dds(diag, dds);
+    return RTNCD_FAILURE;
+  }
+
+  error += "write to dataset succeeded\n";
+  zut_free_dynalloc_dds(diag, dds);
+  return rc;
+}

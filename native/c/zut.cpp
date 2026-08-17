@@ -40,6 +40,8 @@
 #include <_Nascii.h>
 #include "csvapfaa.h"
 #include "iefjsqry.h"
+#include "zdstype.h"
+#include "zds.hpp"
 
 void zut_strip_final_newline(std::string &input)
 {
