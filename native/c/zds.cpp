@@ -301,6 +301,7 @@ static int copy_sequential(ZDS *zds, const std::string &dsn1, const std::string 
                     "IEBGENER failed with RC=%d. SYSPRINT: %s",
                     rc, truncated_detail);
     }
+
     zut_free_dynalloc_dds(zds->diag, dds);
     return RTNCD_FAILURE;
   }
@@ -4345,8 +4346,8 @@ int zds_idcams(const std::string &sysInData, std::string &output, std::string &e
   }
   free_dds.push_back("free " + sysprintDdName);
 
-  ZDS idcamsSysinZds{};
-  ZDSWriteOpts write_opts{.zds = &idcamsSysinZds, .ddname = sysinDdName};
+  ZDS sysinZds{};
+  ZDSWriteOpts write_opts{.zds = &sysinZds, .ddname = sysinDdName};
   rc = zds_write(write_opts, sysInData);
   if (rc != 0)
   {
@@ -4354,11 +4355,23 @@ int zds_idcams(const std::string &sysInData, std::string &output, std::string &e
     zut_loop_dynalloc(diag, free_dds);
     return RTNCD_FAILURE;
   }
-
-  // todo build remap DD statements, add struct for parameters.
-  // rc = ZUTIDCAM();
-
   error += "write to dataset succeeded\n";
+
+  rc = ZUTIDCAM(sysinDdName.c_str(), sysprintDdName.c_str());
+  if (rc != 0)
+  {
+    error += "IDCAMS returned nonzero RC: " + std::to_string(rc);
+    zut_loop_dynalloc(diag, free_dds);
+    return rc;
+  }
+  ZDS sysprintZds{};
+  ZDSReadOpts ropts{.zds = &sysprintZds, .ddname = sysprintDdName};
+  rc = zds_read(ropts, output);
+  if (rc != 0)
+  {
+    error += "Failed to read from IDCAMS SYSPRINT DD '" + sysprintDdName + "'";
+  }
+  error += "Succeeded in reading output from  IDCAMS sysprint TODO remove";
   zut_loop_dynalloc(diag, free_dds);
   return rc;
 }

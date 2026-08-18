@@ -693,6 +693,7 @@ int handle_data_set_resolve_alias(InvocationContext &context)
     context.error_stream() << "Error: " << idcamsError << std::endl;
     return RTNCD_FAILURE;
   }
+  context.error_stream() << "Idcams output: " << idcamsOutput << std::endl;
   result->set("targetDsn", str("todo"));
   context.set_object(result);
   return rc;

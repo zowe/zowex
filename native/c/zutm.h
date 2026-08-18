@@ -153,7 +153,7 @@ extern "C"
   int ZUTEDSCT();
   int ZUTSYMBP(SYMBOL_DATA *);
   int ZUTSRCH(const char *);
-  int ZUTIDCAM(const char *);
+  int ZUTIDCAM(const char *, const char *);
   int ZUTRUN(ZDIAG *, const char *, const char *);
   void ZUTDBGMG(const char *);
   unsigned char ZUTMGKEY();
