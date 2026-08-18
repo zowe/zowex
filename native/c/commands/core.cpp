@@ -15,6 +15,7 @@
 #include "../zutm.h"
 #include <dirent.h>
 #include <algorithm>
+#include <mutex>
 #include <set>
 #include <vector>
 
@@ -222,8 +223,11 @@ Command &setup_root_command(char *argv[])
       return true;
     }
 
-    ZUTNOAUT(); 
-    return true; });
+    // Serialize against concurrent callers and fail closed: never run a
+    // non-privileged command while the job step is still APF-authorized
+    static std::mutex noaut_mutex;
+    std::lock_guard<std::mutex> lock(noaut_mutex);
+    return 0 == ZUTNOAUT(); });
   auto &root_command = g_arg_parser->get_root_command();
 
   root_command.add_keyword_arg("interactive",

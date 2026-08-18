@@ -20,6 +20,8 @@
 #include "ihapsa.h"
 #include "ikjtcb.h"
 #include "iezjscb.h"
+#include "cvt.h"
+#include "ihaecvt.h"
 #endif
 
 #define MAX_PARM_LENGTH 100 + 1
@@ -288,17 +290,48 @@ typedef struct psa PSA;
 typedef struct tcb TCB;
 typedef struct iezjscb IEZJSCB;
 
-static void auth_off()
-{
 #if defined(__IBM_METAL__)
-  PSA *psa = (PSA *)0;
-  TCB *PTR32 tcb = (TCB * PTR32) psa->psatold;
-  unsigned int ujjscb = 0;
-  memcpy(&ujjscb, &tcb->tcbjscb, sizeof(tcb->tcbjscb));
-  IEZJSCB *PTR32 jscb = (IEZJSCB * PTR32)(ujjscb & 0x00FFFFFF);
+#define IEAVJAOF(ep, rc)                                      \
+  __asm(                                                      \
+      "*                                                  \n" \
+      " LLGF 15,%1        -> IEAVJAOF                     \n" \
+      " SLGR 1,1          R1 = 0                          \n" \
+      " BASSM 14,15       Call IEAVJAOF                   \n" \
+      " ST   15,%0        Save RC                         \n" \
+      "*                                                    " \
+      : "=m"(rc)                                              \
+      : "m"(ep)                                               \
+      : "r0", "r1", "r14", "r15");
+#else
+#define IEAVJAOF(ep, rc)
+#endif
 
+/**
+ * @brief Turn off JSCBAUTH (relinquish job step APF authorization) via the
+ * IEAVJAOF system service located through ECVTJAOF. IEAVJAOF requires
+ * supervisor state and key 0; callers should establish recovery (e.g.
+ * enable_recovery) around this call so an abend in the elevated window
+ * cannot percolate in supervisor state / key 0.
+ *
+ * @return 0 on success, non-zero if the service is unavailable or failed
+ */
+static int auth_off()
+{
+  int rc = RTNCD_SUCCESS;
+#if defined(__IBM_METAL__)
   if (0 == test_auth())
   {
+    PSA *psa = (PSA *)0;
+    struct cvt *PTR32 cvt_a = (struct cvt * PTR32) psa->flccvt;
+    struct ecvt *PTR32 ecvt_a = (struct ecvt * PTR32) cvt_a->cvtecvt;
+    void *PTR32 jaof = ecvt_a->ecvtjaof;
+
+    if (0 == jaof)
+    {
+      return RTNCD_FAILURE; // service unavailable; caller must not proceed unauthorized
+    }
+
+    int service_rc = 0;
     PSW psw = {0};
     get_psw(&psw);
     int mode_switch = psw.data.bits.p ? 1 : 0;
@@ -309,14 +342,20 @@ static void auth_off()
       mode_sup();
     }
     set_key(&key_zero);
-    jscb->jscbopts &= (0xFF - jscbauth);
+    IEAVJAOF(jaof, service_rc);
     set_key(&key);
     if (mode_switch)
     {
       mode_prob();
     }
+
+    if (0 != service_rc)
+    {
+      rc = RTNCD_FAILURE;
+    }
   }
 #endif
+  return rc;
 }
 
 /**
