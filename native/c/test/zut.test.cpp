@@ -222,7 +222,7 @@ void zut_tests()
                            []() -> void
                            {
                              ZLOG_DEBUG("zut.test: it allocate sysout");
-                             std::string cmd = "ALLOC SYSIN";
+                             std::string cmd = "ALLOC SYSOUT";
                              unsigned int code = 0;
                              std::string dsname = "";
                              std::string resp = "";
