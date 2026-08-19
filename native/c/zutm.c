@@ -623,7 +623,7 @@ struct idcamsDdNameList
   char sysin[8];
   char sysprint[8];
 };
-typedef int (*IDCAMS)(void *PTR32, void *PTR32) ATTRIBUTE(amode31);
+typedef int (*IDCAMS)(unsigned int, unsigned int) ATTRIBUTE(amode31);
 #pragma prolog(ZUTIDCAM, " ZWEPROLG NEWDSA=(YES,8) ")
 #pragma epilog(ZUTIDCAM, " ZWEEPILG ")
 int ZUTIDCAM(const char *sysinDdName, const char *sysprintDdName)
@@ -631,22 +631,25 @@ int ZUTIDCAM(const char *sysinDdName, const char *sysprintDdName)
   int rc = 0;
 
   unsigned short options = 0;
-  struct idcamsDdNameList ddnameList = {0};
-  ddnameList.len = sizeof(ddnameList._unused);
+  struct idcamsDdNameList ddNameList = {0};
+  ddNameList.len = sizeof(ddNameList._unused) + sizeof(ddNameList.sysin) + sizeof(ddNameList.sysprint);
 
   // DD name replacements should be padded with blanks
-  memset(ddnameList.sysin, ' ', sizeof(ddnameList.sysin));
-  memset(ddnameList.sysprint, ' ', sizeof(ddnameList.sysprint));
-  memcpy(ddnameList.sysin, sysinDdName,
-         strlen(sysinDdName) > sizeof(ddnameList.sysin) ? sizeof(ddnameList.sysin) : strlen(sysinDdName));
-  memcpy(ddnameList.sysprint, sysprintDdName,
-         strlen(sysprintDdName) > sizeof(ddnameList.sysprint) ? sizeof(ddnameList.sysprint) : strlen(sysprintDdName));
+  memset(ddNameList.sysin, ' ', sizeof(ddNameList.sysin));
+  memset(ddNameList.sysprint, ' ', sizeof(ddNameList.sysprint));
+  memcpy(ddNameList.sysin, sysinDdName,
+         strlen(sysinDdName) > sizeof(ddNameList.sysin) ? sizeof(ddNameList.sysin) : strlen(sysinDdName));
+  memcpy(ddNameList.sysprint, sysprintDdName,
+         strlen(sysprintDdName) > sizeof(ddNameList.sysprint) ? sizeof(ddNameList.sysprint) : strlen(sysprintDdName));
 
   // IDCAMS must be entered in 31-bit mode. https://www.ibm.com/docs/en/zos/3.1.0?topic=commands-invoking-access-method-services-from-your-program
   IDCAMS idcams = (IDCAMS)load_module31("IDCAMS");
   // www.ibm.com/docs/en/zos/3.1.0?topic=instructions-load-call-macro
   // ddnameList is the current last entry so set the high order bit to indicate the last
-  rc = idcams(&options, (void *PTR32)((unsigned int)(uintptr_t)&ddnameList | 0x80000000U));
+  unsigned int parm_list[2];
+  parm_list[0] = (unsigned int)(uintptr_t)&options;
+  parm_list[1] = (unsigned int)(uintptr_t)&ddNameList | 0x80000000U;
+  rc = idcams(parm_list[0], parm_list[1]);
   delete_module("IDCAMS");
 
   return rc;

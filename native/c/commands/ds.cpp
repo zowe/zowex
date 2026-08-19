@@ -682,18 +682,18 @@ int handle_data_set_resolve_alias(InvocationContext &context)
 {
   int rc = 0;
   std::string aliasDsn = context.get<std::string>("dsn", "");
+  std::transform(aliasDsn.begin(), aliasDsn.end(), aliasDsn.begin(), ::toupper);
   const auto result = obj();
   std::string idcamsOutput = "";
-  std::string idcamsInput = "LISTCAT ENTRIES('" + aliasDsn + "') ALL`";
+  // must prepend control statements with a space on each line's zeroth character
+  std::string idcamsInput = " LISTCAT ENTRIES('" + aliasDsn + "') ALL\n";
   std::string idcamsError = "";
   rc = zds_idcams(idcamsInput, idcamsOutput, idcamsError);
-  context.error_stream() << "TODO idcams err string: " << idcamsError << std::endl;
   if (rc != 0)
   {
     context.error_stream() << "Error: " << idcamsError << std::endl;
     return RTNCD_FAILURE;
   }
-  context.error_stream() << "Idcams output: " << idcamsOutput << std::endl;
   result->set("targetDsn", str("todo"));
   context.set_object(result);
   return rc;

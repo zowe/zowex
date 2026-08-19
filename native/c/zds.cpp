@@ -4355,23 +4355,22 @@ int zds_idcams(const std::string &sysInData, std::string &output, std::string &e
     zut_loop_dynalloc(diag, free_dds);
     return RTNCD_FAILURE;
   }
-  error += "write to dataset succeeded\n";
 
   rc = ZUTIDCAM(sysinDdName.c_str(), sysprintDdName.c_str());
+  ZDS sysprintZds{};
+  ZDSReadOpts ropts{.zds = &sysprintZds, .ddname = sysprintDdName};
+  int sysprintReadRc = zds_read(ropts, output);
+  if (sysprintReadRc != 0)
+  {
+    error += "Failed to read from IDCAMS SYSPRINT DD '" + sysprintDdName + "'\n";
+  }
   if (rc != 0)
   {
     error += "IDCAMS returned nonzero RC: " + std::to_string(rc);
     zut_loop_dynalloc(diag, free_dds);
     return rc;
   }
-  ZDS sysprintZds{};
-  ZDSReadOpts ropts{.zds = &sysprintZds, .ddname = sysprintDdName};
-  rc = zds_read(ropts, output);
-  if (rc != 0)
-  {
-    error += "Failed to read from IDCAMS SYSPRINT DD '" + sysprintDdName + "'";
-  }
-  error += "Succeeded in reading output from  IDCAMS sysprint TODO remove";
+
   zut_loop_dynalloc(diag, free_dds);
   return rc;
 }
