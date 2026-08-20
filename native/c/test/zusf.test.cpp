@@ -1703,8 +1703,8 @@ void zusf_tests()
                     out << "invalid utf8: \xff\xfe\xfd";
                     out.close();
                   }
-                  strcpy(zusf.encoding_opts.source_codepage, "UTF-8");
-                  strcpy(zusf.encoding_opts.codepage, "IBM-1047");
+                  strcpy(zusf.encoding_opts.codepage, "UTF-8");
+                  strcpy(zusf.encoding_opts.source_codepage, "IBM-1047");
                   zusf.encoding_opts.data_type = eDataTypeText;
 
                   std::string content;
