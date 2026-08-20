@@ -85,6 +85,7 @@ jobs:
         if: ${{ env.TRAIN == 'Release' }}
         uses: zowe-actions/octorelease@v1
         env:
+          ALLOW_MAJOR_VERSION: ${{ vars.ALLOW_MAJOR_VERSION }}
           GIT_COMMITTER_NAME: ${{ secrets.ZOWE_ROBOT_USER }}
           GIT_COMMITTER_EMAIL: ${{ secrets.ZOWE_ROBOT_EMAIL }}
           GIT_CREDENTIALS: x-access-token:${{ secrets.ZOWE_ROBOT_TOKEN }}
