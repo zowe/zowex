@@ -115,4 +115,48 @@ describe("parseSearchOutput", () => {
         expect(result.members[1].name).toBe("MEMBER2");
         expect(result.members[1].matches[0].afterContext).toContain("Some context in member 2");
     });
+
+    it("should parse a sequential (non-PDS) data set search with no member name", () => {
+        const output = [
+            "\f  ASMFSUPC    -     MVS FILE/LINE/WORD/BYTE/SFOR COMPARE UTILITY- V1R6M0  (2021/11/01)  2026/04/21   8.53    PAGE     1",
+            " LINE-#  SOURCE SECTION                    SRCH DSN: IBMUSER.SEQ",
+            "",
+            "      3  //IEFBR14$ JOB (IZUACCT),'mainframer',REGION=0M                        JOB00730",
+            "\f  ASMFSUPC    -     MVS FILE/LINE/WORD/BYTE/SFOR COMPARE UTILITY- V1R6M0  (2021/11/01)  2026/04/21   8.53    PAGE     2",
+            "     SEARCH-FOR SUMMARY SECTION            SRCH DSN: IBMUSER.SEQ",
+            "",
+            "LINES-FOUND  LINES-PROC  DATASET-W/LNS  DATASET-WO/LNS  COMPARE-COLS  LONGEST-LINE",
+            "        1           50            1              0           1:80           80",
+            "",
+            "THE FOLLOWING PROCESS STATEMENTS (USING COLUMNS 1:72) WERE PROCESSED:",
+            "    SRCHFOR 'ief'",
+            "",
+            "",
+        ].join("\n");
+
+        const result = parseSearchOutput(output);
+
+        expect(result.dataset).toBe("IBMUSER.SEQ");
+        expect(result.members).toHaveLength(1);
+        expect(result.members[0].name).toBeUndefined();
+        expect(result.members[0].matches.map((m) => m.lineNumber)).toEqual([3]);
+        expect(result.summary.linesFound).toBe(1);
+    });
+
+    it("should not create an empty section for a full-PDS scan's leading banner line", () => {
+        const output = [
+            "\f  ASMFSUPC    -     MVS FILE/LINE/WORD/BYTE/SFOR COMPARE UTILITY- V1R6M0  (2021/11/01)  2026/04/21   8.53    PAGE     1",
+            " LINE-#  SOURCE SECTION                    SRCH DSN: IBMUSER.JCL",
+            "",
+            "",
+            " IEFBR14                     --------- STRING(S) FOUND -------------------",
+            "",
+            "      4  //EXEC     EXEC PGM=IEFBR14",
+        ].join("\n");
+
+        const result = parseSearchOutput(output);
+
+        expect(result.members).toHaveLength(1);
+        expect(result.members[0].name).toBe("IEFBR14");
+    });
 });

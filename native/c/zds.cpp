@@ -932,7 +932,7 @@ int zds_read(const ZDSReadOpts &opts, std::string &response)
     }
     catch (std::exception &e)
     {
-      ZDIAG_SET_MSG(&zds->diag, "Failed to convert input data from %s to %s", source_encoding.c_str(), zds->encoding_opts.codepage);
+      ZDIAG_SET_MSG(&zds->diag, "Failed to convert input data from %s to %s", zds->encoding_opts.codepage, source_encoding.c_str());
       return RTNCD_FAILURE;
     }
     if (!temp.empty())
