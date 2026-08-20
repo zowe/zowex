@@ -6,6 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- `c`: Preserve LRECL on PS write operations. [#1109](https://github.com/zowe/zowex/issues/1109)
 - `c`: Flipped to and from encoding arguments in error message to be accurate. [#1106](https://github.com/zowe/zowex/pull/1106)
 
 ## `0.8.0`

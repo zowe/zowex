@@ -1471,6 +1471,49 @@ void zowex_ds_tests()
                              ExpectWithContext(rc, response).ToBe(0);
                              Expect(response).ToContain("Wrote data to '" + ds + "'");
                            });
+                        it("should preserve LRECL and BLKSIZE when writing to a sequential data set",
+                           [&]() -> void
+                           {
+                             std::string ds = _ds.back();
+                             _create_ds(ds, "--dsorg PS --recfm FB --lrecl 133 --blksize 13300");
+
+                             std::string response;
+                             std::string random_string = get_random_string(80, false);
+                             std::string command = "echo " + random_string + " | " + zowex_command + " data-set write " + ds;
+                             int rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain("Wrote data to '" + ds + "'");
+
+                             // Writing must not alter the data set's DCB attributes
+                             command = zowex_command + " data-set list " + ds + " -a --rfc";
+                             rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             std::vector<std::string> tokens = parse_rfc_response(response, ",");
+                             Expect(tokens[4]).ToBe("FB");    // recfm
+                             Expect(tokens[5]).ToBe("133");   // lrecl
+                             Expect(tokens[6]).ToBe("13300"); // blksize
+                           });
+                        it("should preserve LRECL when writing to a variable-length sequential data set",
+                           [&]() -> void
+                           {
+                             std::string ds = get_random_ds();
+                             _ds.push_back(ds);
+                             _create_ds(ds, "--dsorg PS --recfm VB --lrecl 259 --blksize 263");
+
+                             std::string response;
+                             std::string random_string = get_random_string(80, false);
+                             std::string command = "echo " + random_string + " | " + zowex_command + " data-set write " + ds;
+                             int rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain("Wrote data to '" + ds + "'");
+
+                             command = zowex_command + " data-set list " + ds + " -a --rfc";
+                             rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             std::vector<std::string> tokens = parse_rfc_response(response, ",");
+                             Expect(tokens[4]).ToBe("VB");  // recfm
+                             Expect(tokens[5]).ToBe("259"); // lrecl
+                           });
                         it("should overwrite content in a sequential data set",
                            [&]() -> void
                            {
