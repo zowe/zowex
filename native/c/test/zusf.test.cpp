@@ -1693,6 +1693,29 @@ void zusf_tests()
                   // Verify error message was set but encoding preserved
                   Expect(std::strlen(zusf.diag.e_msg)).ToBeGreaterThan(0);
                 });
+                it("should report from=file encoding, to=local encoding when iconv fails on read",
+                [&]() -> void
+                {
+                  ZUSF zusf{};
+                  const std::string test_file = "/tmp/zusf_iconv_fail_" + get_random_string(8) + ".txt";
+                  {
+                    std::ofstream out(test_file, std::ios::binary);
+                    out << "invalid utf8: \xff\xfe\xfd";
+                    out.close();
+                  }
+                  strcpy(zusf.encoding_opts.source_codepage, "UTF-8");
+                  strcpy(zusf.encoding_opts.codepage, "IBM-1047");
+                  zusf.encoding_opts.data_type = eDataTypeText;
+
+                  std::string content;
+                  int rc = zusf_read_from_uss_file(&zusf, test_file, content);
+
+                  Expect(rc).ToBe(RTNCD_FAILURE);
+                  const std::string msg(zusf.diag.e_msg);
+                  Expect(msg).ToContain("from UTF-8 to IBM-1047");
+
+                  unlink(test_file.c_str());
+                });
            });
 
   describe("zusf_move_uss_file_or_dir tests",
