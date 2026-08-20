@@ -624,7 +624,7 @@ struct idcamsDdNameList
   char sysprint[8];
 };
 typedef int (*IDCAMS)(unsigned int, unsigned int) ATTRIBUTE(amode31);
-#pragma prolog(ZUTIDCAM, " ZWEPROLG NEWDSA=(YES,8) ")
+#pragma prolog(ZUTIDCAM, " ZWEPROLG NEWDSA=(YES,4) ")
 #pragma epilog(ZUTIDCAM, " ZWEEPILG ")
 int ZUTIDCAM(const char *sysinDdName, const char *sysprintDdName)
 {

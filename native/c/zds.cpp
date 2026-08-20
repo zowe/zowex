@@ -4324,10 +4324,9 @@ int zds_idcams(const std::string &sysInData, std::string &output, std::string &e
   std::string sysinDdName = "";
   std::string sysprintDdName = "";
   std::string bpxwdynResponse = "";
-
-  // list of DDs to free later
   std::vector<std::string> free_dds;
   free_dds.reserve(2);
+
   // Perform dynalloc for sysin and sysprint DDs
   rc = zut_bpxwdyn_rtdd("alloc lrecl(80) recfm(f,b)", &bpxwdynCode, bpxwdynResponse, sysinDdName);
   if (rc != 0)

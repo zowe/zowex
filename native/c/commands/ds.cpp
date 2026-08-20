@@ -10,6 +10,7 @@
  */
 
 #include <cstdio>
+#include <regex>
 #ifndef _OPEN_SYS_FILE_EXT
 #define _OPEN_SYS_FILE_EXT 1
 #endif
@@ -688,14 +689,36 @@ int handle_data_set_resolve_alias(InvocationContext &context)
   // must prepend control statements with a space on each line's zeroth character
   std::string idcamsInput = " LISTCAT ENTRIES('" + aliasDsn + "') ALL\n";
   std::string idcamsError = "";
+  std::string failMsg = "Could not determine the target data set for the specified alias. Ensure the alias exists and is cataloged.\n";
   rc = zds_idcams(idcamsInput, idcamsOutput, idcamsError);
   if (rc != 0)
   {
-    context.error_stream() << "Error: " << idcamsError << std::endl;
+    context.error_stream() << "Error: "
+                           << idcamsOutput << std::endl
+                           << idcamsError << std::endl;
+    context.error_stream() << failMsg;
     return RTNCD_FAILURE;
   }
-  result->set("targetDsn", str("todo"));
+
+  // Example output excerpt:
+  // ASSOCIATIONS
+  //     NONVSAM--CHRIS.PUBLIC.CNTL
+  static const std::regex resolvedDsPattern(R"(ASSOCIATIONS[\s\S]+VSAM-{2,}(\S+))");
+  std::smatch mv;
+
+  if (std::regex_search(idcamsOutput, mv, resolvedDsPattern))
+  {
+    const std::string targetDsn = mv[1].str();
+    context.output_stream() << "Alias '" + aliasDsn + "' resolved to data set '" + targetDsn + "'" << std::endl;
+    result->set("targetDsn", str(targetDsn));
+  }
+  else
+  {
+    context.output_stream() << failMsg;
+    result->set("targetDsn", str(""));
+  }
   context.set_object(result);
+
   return rc;
 }
 

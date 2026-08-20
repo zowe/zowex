@@ -359,7 +359,7 @@ int zdsReadDynalloc(const std::string &, const std::string &, const std::string 
 int zds_read_streamed(const ZDSReadOpts &opts, const std::string &pipe, size_t *content_len, uint32_t *etag_checksum = nullptr);
 
 /**
- * @brief Invoke the IDCAMS program
+ * @brief Invoke the IDCAMS program and receive its SYSPRINT output.
  * https://www.ibm.com/docs/en/zos-basic-skills?topic=management-access-method-services-idcams-commands
  * @param sysInData string data to write to the SYSIN DD for IDCAMS. Consists of commands to pass to IDCAMS.
  * @param output output from the SYSPRINT DD of IDCAMS will be written here.
