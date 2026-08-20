@@ -1908,6 +1908,34 @@ void zds_tests()
                              Expect(content_default).ToBe(content_explicit);
                            });
 
+                        it("should report from=file encoding, to=local encoding when iconv fails on read",
+                           [&]() -> void
+                           {
+                             std::string dsn = get_random_ds(3);
+                             created_dsns.push_back(dsn);
+                             ZDS zds = {0};
+                             create_seq(&zds, dsn);
+
+                             ZDS write_zds{};
+                             write_zds.encoding_opts.data_type = eDataTypeBinary;
+                             const std::string invalid_utf8 = "invalid utf8: \xff\xfe\xfd";
+                             ZDSWriteOpts write_opts{.zds = &write_zds, .dsname = dsn};
+                             int wrc = zds_write(write_opts, invalid_utf8);
+                             ExpectWithContext(wrc, write_zds.diag.e_msg).ToBe(0);
+
+                             ZDS read_zds{};
+                             strcpy(read_zds.encoding_opts.codepage, "UTF-8");
+                             strcpy(read_zds.encoding_opts.source_codepage, "IBM-1047");
+                             read_zds.encoding_opts.data_type = eDataTypeText;
+                             ZDSReadOpts read_opts{.zds = &read_zds, .dsname = dsn};
+                             std::string content;
+                             int rc = zds_read(read_opts, content);
+
+                             Expect(rc).ToBe(RTNCD_FAILURE);
+                             const std::string msg(read_zds.diag.e_msg);
+                             Expect(msg).ToContain("from UTF-8 to IBM-1047");
+                           });
+
                         it("should produce a consistent etag after write and read",
                            [&]() -> void
                            {
