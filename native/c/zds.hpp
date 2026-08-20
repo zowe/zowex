@@ -93,14 +93,9 @@ struct DS_ATTRIBUTES
 struct DscbAttributes
 {
   std::string recfm;
-  int lrecl;
-  int blksize;
-  bool is_asa;
-
-  DscbAttributes()
-      : recfm(""), lrecl(0), blksize(0), is_asa(false)
-  {
-  }
+  int lrecl = 0;
+  int blksize = 0;
+  bool is_asa = false;
 };
 
 #ifdef SWIG
