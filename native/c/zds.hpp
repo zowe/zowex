@@ -94,10 +94,11 @@ struct DscbAttributes
 {
   std::string recfm;
   int lrecl;
+  int blksize;
   bool is_asa;
 
   DscbAttributes()
-      : recfm(""), lrecl(0), is_asa(false)
+      : recfm(""), lrecl(0), blksize(0), is_asa(false)
   {
   }
 };

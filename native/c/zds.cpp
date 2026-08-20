@@ -673,9 +673,28 @@ static DscbAttributes zds_get_dscb_attributes(const std::string &dsn)
 
   attrs.recfm = datasets[0].recfm;
   attrs.lrecl = datasets[0].lrecl;
+  attrs.blksize = datasets[0].blksize;
   attrs.is_asa = attrs.recfm.find('A') != std::string::npos;
 
   return attrs;
+}
+
+static std::string zds_build_text_write_flags(const DscbAttributes &attrs)
+{
+  if (attrs.recfm.empty())
+  {
+    return "w,recfm=*";
+  }
+  std::string flags = "w,recfm=" + attrs.recfm;
+  if (attrs.lrecl > 0)
+  {
+    flags += ",lrecl=" + std::to_string(attrs.lrecl);
+  }
+  if (attrs.blksize > 0)
+  {
+    flags += ",blksize=" + std::to_string(attrs.blksize);
+  }
+  return flags;
 }
 
 /**
@@ -1474,12 +1493,11 @@ static int zds_write_sequential(ZDS *zds, const std::string &dsn, const std::str
   const bool isTextMode = zds->encoding_opts.data_type != eDataTypeBinary;
   std::string dsname = dsn;
   TruncationTracker truncation;
-  // Build fopen flags with actual recfm from DSCB
+  // Build fopen flags with actual recfm/lrecl/blksize from DSCB
   // Use text mode - the C runtime handles ASA control characters and record boundaries
-  const std::string recfm_flag = attrs.recfm.empty() ? "*" : attrs.recfm;
   const std::string fopen_flags = zds->encoding_opts.data_type == eDataTypeBinary
                                       ? "wb"
-                                      : "w,recfm=" + recfm_flag;
+                                      : zds_build_text_write_flags(attrs);
 
   {
     FileGuard fp(dsname.c_str(), fopen_flags.c_str());
@@ -3949,12 +3967,11 @@ static int zds_write_sequential_streamed(ZDS *zds, const std::string &dsn, const
   const bool isTextMode = zds->encoding_opts.data_type != eDataTypeBinary;
   const int max_len = get_effective_lrecl_from_attrs(attrs);
 
-  // Build fopen flags with actual recfm from DSCB
+  // Build fopen flags with actual recfm/lrecl/blksize from DSCB
   // Use text mode - the C runtime handles ASA control characters and record boundaries
-  const std::string recfm_flag = attrs.recfm.empty() ? "*" : attrs.recfm;
   const std::string fopen_flags = zds->encoding_opts.data_type == eDataTypeBinary
                                       ? "wb"
-                                      : "w,recfm=" + recfm_flag;
+                                      : zds_build_text_write_flags(attrs);
 
   // Track truncated lines for text mode
   TruncationTracker truncation;
