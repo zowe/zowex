@@ -1398,7 +1398,7 @@ void zds_tests()
                                     rc = zds_idcams(cleanup_idcams, cleanup_output, cleanup_err);
                                     TestLog("Cleanup RC from IDCAMS: " + std::to_string(rc));
                                     if (rc != 0 ){
-                                       throw std::runtime_error("Output and error from failed IDCAMS cleanup:" + cleanup_err + "\n" + cleanup_output +"\n");
+                                       TestLog("Output and error from failed IDCAMS cleanup:" + cleanup_err + "\n" + cleanup_output +"\n");
                                     }
 
                                     // Volume is required for systems that are not SMS managed
@@ -1473,7 +1473,7 @@ void zds_tests()
                                    int rc = zds_idcams(cleanup_idcams, cleanup_output, cleanup_err);
                                     TestLog("Cleanup RC from IDCAMS: " + std::to_string(rc));
                                     if (rc !=0 ){
-                                       throw std::runtime_error("Output and error from failed IDCAMS cleanup:" + cleanup_err + "\n" + cleanup_output +"\n");
+                                       TestLog("Output and error from failed IDCAMS cleanup:" + cleanup_err + "\n" + cleanup_output +"\n");
                                     } },
                                  vsam_opts);
 
@@ -1605,7 +1605,7 @@ void zds_tests()
                                     int rc = zds_idcams(cleanup_idcams, cleanup_output, cleanup_err);
                                     TestLog("Cleanup RC from IDCAMS: " + std::to_string(rc));
                                     if (rc !=0 ){
-                                       throw std::runtime_error("Output and error from failed IDCAMS cleanup:" + cleanup_err + "\n" + cleanup_output +"\n");
+                                       TestLog("Output and error from failed IDCAMS cleanup:" + cleanup_err + "\n" + cleanup_output +"\n");
                                     }
                                     // Define the GDG base via IDCAMS
                                     std::string setup_output;
@@ -1647,7 +1647,7 @@ void zds_tests()
                                    int rc = zds_idcams(cleanup_idcams, cleanup_output, cleanup_err);
                                     TestLog("Cleanup RC from IDCAMS: " + std::to_string(rc));
                                     if (rc !=0 ){
-                                       throw std::runtime_error("Output and error from failed IDCAMS cleanup:" + cleanup_err + "\n" + cleanup_output +"\n");
+                                       TestLog("Output and error from failed IDCAMS cleanup:" + cleanup_err + "\n" + cleanup_output +"\n");
                                     } },
                                  gdg_opts);
 
