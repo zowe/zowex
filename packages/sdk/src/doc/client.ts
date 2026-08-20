@@ -66,6 +66,13 @@ export interface ClientOptions {
     serverStartupTimeout?: number;
 
     /**
+     * Path to the ssh-agent's UNIX socket (or named pipe on Windows) to use for ssh-agent-based
+     * user authentication, or `"pageant"` to use Pageant on Windows.
+     * When set, takes priority over `privateKey`/`password` configured on the session.
+     */
+    agent?: string;
+
+    /**
      * Use experimental native SSH client for improved performance
      * (default: false)
      */
