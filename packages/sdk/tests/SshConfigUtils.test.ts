@@ -239,4 +239,53 @@ Host server
         expect(result).toHaveLength(1);
         expect(result[0].privateKey).toBe(normalize("/var/lib/ssh/key"));
     });
+
+    it("should parse IdentityAgent using a literal socket path", async () => {
+        const configContent = `
+Host server
+    HostName example.com
+    IdentityAgent /run/user/1000/ssh-agent.sock
+`;
+        mockReadFileSync.mockReturnValue(configContent);
+
+        const result = await SshConfigUtils.migrateSshConfig();
+        expect(result[0].identityAgent).toBe(normalize("/run/user/1000/ssh-agent.sock"));
+    });
+
+    it("should expand ~ in IdentityAgent", async () => {
+        const configContent = `
+Host server
+    HostName example.com
+    IdentityAgent ~/.ssh/agent.sock
+`;
+        mockReadFileSync.mockReturnValue(configContent);
+
+        const result = await SshConfigUtils.migrateSshConfig();
+        expect(result[0].identityAgent).toBe(normalize(join("/home/dir", ".ssh", "agent.sock")));
+    });
+
+    it("should resolve IdentityAgent SSH_AUTH_SOCK to the environment variable's value", async () => {
+        const configContent = `
+Host server
+    HostName example.com
+    IdentityAgent SSH_AUTH_SOCK
+`;
+        mockReadFileSync.mockReturnValue(configContent);
+        vi.stubEnv("SSH_AUTH_SOCK", "/tmp/ssh-agent.sock");
+
+        const result = await SshConfigUtils.migrateSshConfig();
+        expect(result[0].identityAgent).toBe("/tmp/ssh-agent.sock");
+    });
+
+    it("should leave agent unset when IdentityAgent is none", async () => {
+        const configContent = `
+Host server
+    HostName example.com
+    IdentityAgent none
+`;
+        mockReadFileSync.mockReturnValue(configContent);
+
+        const result = await SshConfigUtils.migrateSshConfig();
+        expect(result[0]).not.toHaveProperty("identityAgent");
+    });
 });

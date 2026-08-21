@@ -218,6 +218,9 @@ describe("Client", () => {
     });
 
     it("should connect using a unix-socket agent successfully", async () => {
+        // resolveAgentSpec branches on process.platform, so pin it to a POSIX value here —
+        // otherwise this test would fail whenever it actually runs on Windows.
+        const platformSpy = vi.spyOn(process, "platform", "get").mockReturnValue("linux");
         const client = new Client();
         mockUnauthClient.authenticateWithAgent.mockResolvedValue(mockAuthClient);
 
@@ -235,6 +238,7 @@ describe("Client", () => {
             kind: "unix-socket",
             path: "/tmp/ssh-agent.sock",
         });
+        platformSpy.mockRestore();
     });
 
     it("should connect using pageant agent successfully", async () => {

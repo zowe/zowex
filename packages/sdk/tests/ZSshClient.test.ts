@@ -384,9 +384,9 @@ describe("ZSshClient", () => {
             expect(createClientMock).toHaveBeenCalledWith(true);
         });
 
-        it("should respect agent option", async () => {
+        it("should respect identityAgent option", async () => {
             setupMockSshClient();
-            await ZSshClient.create(new SshSession(fakeSession), { agent: "/tmp/ssh-agent.sock" });
+            await ZSshClient.create(new SshSession(fakeSession), { identityAgent: "/tmp/ssh-agent.sock" });
             expect(ZSshUtils.buildSshConfig).toHaveBeenCalledWith(
                 expect.anything(),
                 expect.objectContaining({ agent: "/tmp/ssh-agent.sock" }),

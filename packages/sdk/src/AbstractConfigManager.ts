@@ -167,6 +167,7 @@ export abstract class AbstractConfigManager {
                     keyPassphrase: foundProfile?.profile?.keyPassphrase,
                     user: foundProfile?.profile?.user,
                     password: foundProfile?.profile?.password,
+                    identityAgent: foundProfile?.profile?.identityAgent,
                 });
 
                 if (validConfig === undefined) {
@@ -221,8 +222,12 @@ export abstract class AbstractConfigManager {
             this.selectedProfile.privateKey = this.selectedProfile.keyPassphrase = undefined;
             this.selectedProfile = { ...this.selectedProfile, ...this.validationResult };
         }
-        // If no private key or password is on the profile then there is no possible validation combination, thus return
-        if (!this.selectedProfile?.privateKey && !this.selectedProfile?.password) {
+        // If no private key, password, or identity agent is on the profile then there is no possible validation combination, thus return
+        if (
+            !this.selectedProfile?.privateKey &&
+            !this.selectedProfile?.password &&
+            !this.selectedProfile?.identityAgent
+        ) {
             this.showMessage("SSH setup cancelled.", MESSAGE_TYPE.WARNING);
             return;
         }
@@ -243,6 +248,7 @@ export abstract class AbstractConfigManager {
                 handshakeTimeout: this.selectedProfile.handshakeTimeout,
                 port: this.selectedProfile.port,
                 keyPassphrase: this.selectedProfile.keyPassphrase,
+                identityAgent: this.selectedProfile.identityAgent,
             },
         };
     }
@@ -406,7 +412,11 @@ export abstract class AbstractConfigManager {
                 configModifications.user = userModification;
             }
 
-            if ((!privateKeyPath || !readFileSync(path.normalize(privateKeyPath), "utf-8")) && !newConfig.password) {
+            if (
+                (!privateKeyPath || !readFileSync(path.normalize(privateKeyPath), "utf-8")) &&
+                !newConfig.password &&
+                !newConfig.identityAgent
+            ) {
                 const passwordPrompt = askForPassword && (await this.promptForPassword(newConfig, configModifications));
                 return passwordPrompt ? { ...configModifications, ...passwordPrompt } : undefined;
             }
@@ -507,6 +517,8 @@ export abstract class AbstractConfigManager {
                 privateKey: config.privateKey ? readFileSync(path.normalize(config.privateKey), "utf8") : undefined,
                 passphrase: config.privateKey ? config.keyPassphrase : undefined,
                 readyTimeout: config.handshakeTimeout || this.getClientSetting("handshakeTimeout") || 30000,
+                // ssh2's ConnectConfig field is named "agent"; ISshConfigExt calls it identityAgent for clarity.
+                agent: config.identityAgent,
             };
 
             // Attempt connection
@@ -627,6 +639,7 @@ export abstract class AbstractConfigManager {
                 port: selectedConfig.port || 22,
                 keyPassphrase: selectedConfig.keyPassphrase,
                 password: selectedConfig.password,
+                identityAgent: selectedConfig.identityAgent,
             },
             //if user, password, or KP is defined, make them secure
             secure: ["user", "password", "keyPassphrase"].filter((key) => selectedConfig[key as keyof ISshConfigExt]),

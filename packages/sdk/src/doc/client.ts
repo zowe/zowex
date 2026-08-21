@@ -70,7 +70,7 @@ export interface ClientOptions {
      * user authentication, or `"pageant"` to use Pageant on Windows.
      * When set, takes priority over `privateKey`/`password` configured on the session.
      */
-    agent?: string;
+    identityAgent?: string;
 
     /**
      * Use experimental native SSH client for improved performance

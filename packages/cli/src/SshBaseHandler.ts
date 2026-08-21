@@ -70,6 +70,7 @@ export abstract class SshBaseHandler implements ICommandHandler {
                 const testSession = this.createPasswordSession(session, password);
                 using _testClient = await ZSshClient.create(testSession, {
                     serverPath: commandParameters.arguments.serverPath,
+                    identityAgent: commandParameters.arguments.identityAgent,
                     numWorkers: 1,
                 });
                 // If we get here, the password is valid
@@ -111,6 +112,7 @@ export abstract class SshBaseHandler implements ICommandHandler {
         try {
             using client = await ZSshClient.create(session, {
                 serverPath: commandParameters.arguments.serverPath,
+                identityAgent: commandParameters.arguments.identityAgent,
                 numWorkers: 1,
             });
 
@@ -148,6 +150,7 @@ export abstract class SshBaseHandler implements ICommandHandler {
                     // Retry the connection with password
                     using client = await ZSshClient.create(passwordSession, {
                         serverPath: commandParameters.arguments.serverPath,
+                        identityAgent: commandParameters.arguments.identityAgent,
                         numWorkers: 1,
                     });
 

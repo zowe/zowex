@@ -140,7 +140,8 @@ export class ZSshClient extends RpcClientApi implements Disposable {
                 const keepAliveMsec = opts.keepAliveInterval != null ? opts.keepAliveInterval * 1000 : 30e3;
                 client.mSshClient.connect(
                     ZSshUtils.buildSshConfig(session, {
-                        agent: opts.agent,
+                        // ssh2's ConnectConfig field is named "agent"; ClientOptions calls it identityAgent for clarity.
+                        agent: opts.identityAgent,
                         keepaliveInterval: keepAliveMsec,
                         keepaliveCountMax: opts.keepAliveCountMax ?? 3,
                     }),
