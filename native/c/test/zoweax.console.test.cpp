@@ -79,7 +79,7 @@ void zoweax_console_tests()
             int rc = execute_command_with_output(command, response);
 
             ExpectWithContext(rc, response).Not().ToBe(0);
-            Expect(response).ToContain("unknown command or group: console");
+            Expect(response).ToContain("unexpected argument: console");
 
         }); });
 
@@ -92,7 +92,7 @@ void zoweax_console_tests()
             int rc = execute_command_with_output(command, response);
 
             ExpectWithContext(rc, response).Not().ToBe(0);
-            Expect(response).ToContain("unknown command or group: data-set");
+            Expect(response).ToContain("unexpected argument: data-set");
         });
 
         it("should not include the RPC server", []() -> void
@@ -102,7 +102,7 @@ void zoweax_console_tests()
             int rc = execute_command_with_output(command, response);
 
             ExpectWithContext(rc, response).Not().ToBe(0);
-            Expect(response).ToContain("unknown command or group: server");
+            Expect(response).ToContain("unexpected argument: server");
         });
 
         it("should not include plug-in commands", []() -> void
@@ -112,7 +112,7 @@ void zoweax_console_tests()
             int rc = execute_command_with_output(command, response);
 
             ExpectWithContext(rc, response).Not().ToBe(0);
-            Expect(response).ToContain("unknown command or group: plugins");
+            Expect(response).ToContain("unexpected argument: plugins");
         });
 
         it("should list only console and version in root help", []() -> void
