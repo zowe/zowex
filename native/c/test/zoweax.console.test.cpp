@@ -69,15 +69,60 @@ void zoweax_console_tests()
             ExpectWithContext(rc, response).ToBe(0);
         });
 
-        it("should fail when using a non-APF authorized binary", []() -> void
+        it("should not exist in the unauthorized zowex binary", []() -> void
         {
             std::string response;
             std::string command = zowex_command + " console issue \"D T\"";
             int rc = execute_command_with_output(command, response);
 
             ExpectWithContext(rc, response).Not().ToBe(0);
-            Expect(response).ToContain("Error: could not activate console:");
+            Expect(response).ToContain("unexpected argument: console");
 
+        }); });
+
+  describe("minimal authorized binary tests", [&]() -> void
+           {
+        it("should not include data set commands", []() -> void
+        {
+            std::string response;
+            std::string command = zoweax_command + " data-set list";
+            int rc = execute_command_with_output(command, response);
+
+            ExpectWithContext(rc, response).Not().ToBe(0);
+            Expect(response).ToContain("unexpected argument: data-set");
+        });
+
+        it("should not include the RPC server", []() -> void
+        {
+            std::string response;
+            std::string command = zoweax_command + " server";
+            int rc = execute_command_with_output(command, response);
+
+            ExpectWithContext(rc, response).Not().ToBe(0);
+            Expect(response).ToContain("unexpected argument: server");
+        });
+
+        it("should not include plug-in commands", []() -> void
+        {
+            std::string response;
+            std::string command = zoweax_command + " plugins list";
+            int rc = execute_command_with_output(command, response);
+
+            ExpectWithContext(rc, response).Not().ToBe(0);
+            Expect(response).ToContain("unexpected argument: plugins");
+        });
+
+        it("should list only console and version in root help", []() -> void
+        {
+            std::string response;
+            std::string command = zoweax_command;
+            int rc = execute_command_with_output(command, response);
+
+            ExpectWithContext(rc, response).ToBe(0);
+            Expect(response).ToContain("console");
+            Expect(response).ToContain("version");
+            Expect(response).Not().ToContain("data-set");
+            Expect(response).Not().ToContain("plugins");
         }); });
 
   describe("APF authorization drop (ZUTNOAUT) tests", [&]() -> void

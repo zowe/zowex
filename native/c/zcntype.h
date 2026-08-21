@@ -31,6 +31,13 @@ ZNP_PACK_ON
 
 #define ZCN_EYE "ZCN"
 
+// AUTHCMDX= (see "MGCRE" in z/OS MVS Authorized Assembler Services Reference);
+#define ZCN_AUTHCMDX_NONE 0x0000
+#define ZCN_AUTHCMDX_MASTER 0x8000
+#define ZCN_AUTHCMDX_SYS 0x4000
+#define ZCN_AUTHCMDX_IO 0x2000
+#define ZCN_AUTHCMDX_CONS 0x1000
+
 // NOTE(Kelosky): struct is padded to nearest double word boundary; ensure proper alignment for fields
 typedef struct
 {
@@ -45,11 +52,13 @@ typedef struct
 
   char console_name[8]; // console name used, upper cased/padded/truncated
 
-  int16_t unused;       // non-zero if reply found in control
+  uint16_t authcmdx;    // optional MGCRE AUTHCMDX command-authority override; 0 = ESM/console-attribute path (see ZCN_AUTHCMDX_*)
   int16_t reply_id_len; // non-zero if reply found in control
   int timeout;          // timeout in seconds
 
   char reply_id[8]; // if reply_id_len is non-zero
+
+  char cart[8]; // command and response token (CART) correlating a command to its responses; set per request by zcn_put
 
   int32_t id;
   uint32_t alet;

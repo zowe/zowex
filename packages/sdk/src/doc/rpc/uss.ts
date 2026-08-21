@@ -264,6 +264,10 @@ export interface IssueUssCmdResponse extends common.CommandResponse {
      * Data returned from the UNIX command
      */
     data: string;
+    /**
+     * Stderr output from the UNIX command, if it produced any
+     */
+    stderr?: string;
 }
 
 export interface MoveFileRequest extends common.CommandRequest<"moveFile"> {
