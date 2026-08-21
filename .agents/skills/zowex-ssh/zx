@@ -151,7 +151,7 @@ _rpc(){
   fi
 }
 
-# ---- CLI passthrough (for tool/console/non-RPC system ops) ----------------
+# ---- CLI passthrough (for tool/non-RPC system ops) -------------------------
 _cli(){
   _load_cfg
   local q=""; for a in "$@"; do q+=" $(printf '%q' "$a")"; done
@@ -511,8 +511,25 @@ tool)
   esac;;
 
 console)
+  # consoleCommand RPC: the server spawns the APF-authorized zoweax binary per
+  # request (next to zowex, on PATH, or via ZOWEAX_PATH on the remote host)
   [[ $# -ge 1 ]]||die "zx console '<cmd>' [--cn <name>] [--timeout <s>] [--no-wait]"
-  _cli console issue "$@";;
+  need jq
+  cn="" ct="" cw="" cmd=""
+  while [[ $# -gt 0 ]]; do case "$1" in
+    --cn|--console-name) [[ $# -ge 2 ]]||die "--cn requires a value"; cn=$2; shift 2;;
+    --timeout)           [[ $# -ge 2 ]]||die "--timeout requires a value"; ct=$2; shift 2;;
+    --no-wait)           cw=false; shift;;
+    *) cmd="${cmd:+$cmd }$1"; shift;;
+  esac; done
+  [[ -n "$cmd" ]]||die "zx console '<cmd>' [--cn <name>] [--timeout <s>] [--no-wait]"
+  [[ -z "$ct" || "$ct" =~ ^[0-9]+$ ]]||die "--timeout must be a number of seconds"
+  p="{\"commandText\":$(_j "$cmd")"
+  [[ -n "$cn" ]]&&p+=",\"consoleName\":$(_j "$cn")"
+  [[ -n "$ct" ]]&&p+=",\"timeout\":$ct"
+  [[ -n "$cw" ]]&&p+=",\"wait\":$cw"
+  p+="}"
+  _rpc consoleCommand "$p" | _out _pp_data_text;;
 
 # ========================================================================= #
 ""|help) sed -n '2,/^set -euo/p' "$0" | sed '$d';;

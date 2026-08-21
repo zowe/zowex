@@ -11,6 +11,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <ctime>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -27,6 +28,7 @@ int zcn_activate(ZCN *zcn, const std::string &console_name)
   zcn->diag.detail_rc = 0;
 
   memcpy(zcn->eye, ZCN_EYE, sizeof(zcn->eye));
+  memset(zcn->cart, 0x00, sizeof(zcn->cart));
 
   zut_uppercase_pad_truncate(zcn->console_name, console_name, sizeof(zcn->console_name));
 
@@ -53,6 +55,13 @@ int zcn_put(ZCN *zcn, const std::string &command)
   int rc = 0;
   zcn->diag.detail_rc = 0;
 
+  // unique cart
+  static unsigned int cart_seq = 0;
+  char cart_buf[sizeof(zcn->cart) + 1] = {0};
+  const unsigned int cart_val = ((unsigned int)time(nullptr) ^ (++cart_seq << 8)) & 0xFFFFFFu;
+  snprintf(cart_buf, sizeof(cart_buf), "ZC%06X", cart_val);
+  memcpy(zcn->cart, cart_buf, sizeof(zcn->cart));
+
   char *command31 = (char *)__malloc31(command.length() + 1);
   if (command31 == nullptr)
   {
@@ -72,6 +81,11 @@ int zcn_get(ZCN *zcn, std::string &response)
 {
   int rc = 0;
   zcn->diag.detail_rc = 0;
+
+  // For callers that get without a prior put on this control block, fall
+  // back to the historical fixed token so the request is still well-formed
+  if ('\0' == zcn->cart[0])
+    memcpy(zcn->cart, "ZOWECART", sizeof(zcn->cart));
 
   // user caller buffer size if provided
   if (0 == zcn->buffer_size)

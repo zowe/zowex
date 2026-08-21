@@ -270,5 +270,29 @@ void zowex_server_tests()
 
                   Expect(buildDate.length()).ToBeGreaterThanOrEqualTo(11); // MMM DD YYYY at minimum
                 });
+
+             it("should execute consoleCommand via zoweax and return output",
+                []() -> void
+                {
+                  ServerHandle server = start_server(zowex_server_command, true);
+                  write_to_server(server, "{\"jsonrpc\":\"2.0\",\"method\":\"consoleCommand\",\"params\":{\"commandText\":\"D T\"},\"id\":1}\n");
+                  std::string response = read_line_from_server(server);
+                  stop_server(server);
+
+                  Expect(response).ToContain("\"success\":true");
+                  Expect(response).ToContain("IEE136I");
+                });
+
+             it("should return an error when zoweax cannot be found",
+                []() -> void
+                {
+                  ServerHandle server = start_server("ZOWEAX_PATH=/nonexistent/zoweax " + zowex_server_command, true);
+                  write_to_server(server, "{\"jsonrpc\":\"2.0\",\"method\":\"consoleCommand\",\"params\":{\"commandText\":\"D T\"},\"id\":1}\n");
+                  std::string response = read_line_from_server(server);
+                  stop_server(server);
+
+                  Expect(response).Not().ToContain("\"success\":true");
+                  Expect(response).ToContain("zoweax");
+                });
            });
 }

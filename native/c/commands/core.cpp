@@ -30,6 +30,7 @@ std::shared_ptr<ArgumentParser> g_arg_parser;
 namespace
 {
 std::string g_version("unknown");
+std::string g_program_name("zowex");
 plugin::PluginManager *g_plugin_manager = nullptr;
 } // namespace
 
@@ -98,7 +99,7 @@ int interactive_mode(const plugin::InvocationContext &context)
 
 int handle_version(plugin::InvocationContext &context)
 {
-  context.output_stream() << "Zowe Remote SSH CLI (zowex)" << std::endl;
+  context.output_stream() << "Zowe Remote SSH CLI (" << g_program_name << ")" << std::endl;
   context.output_stream() << "Version: " << g_version << std::endl;
   context.output_stream() << "Build Date: " << BUILD_DATE << " " << BUILD_TIME << std::endl;
   context.output_stream() << "Copyright Contributors to the Zowe Project." << std::endl;
@@ -213,8 +214,12 @@ int execute_command(int argc, char *argv[])
   return result.exit_code;
 }
 
-Command &setup_root_command(char *argv[])
+Command &setup_root_command(char *argv[], bool include_plugin_commands)
 {
+  const std::string arg0(argv[0]);
+  const auto last_slash = arg0.find_last_of('/');
+  g_program_name = last_slash != std::string::npos ? arg0.substr(last_slash + 1) : arg0;
+
   g_arg_parser = std::make_shared<ArgumentParser>(argv[0], "Zowe Remote SSH CLI");
   g_arg_parser->add_pre_command_hook([](const Command &command, bool is_help_request)
                                      {
@@ -246,11 +251,16 @@ Command &setup_root_command(char *argv[])
     version_cmd->set_handler(handle_version);
     root_command.add_command(version_cmd); // Should provide more info here, if command is enhanced later.
 
-    auto plugins_cmd = command_ptr(new Command("plugins", "plug-in management commands"));
-    auto list_cmd = command_ptr(new Command("list", "list available plug-ins"));
-    list_cmd->set_handler(handle_plugins_list);
-    plugins_cmd->add_command(list_cmd);
-    root_command.add_command(plugins_cmd);
+    // Plug-in support is excluded from minimal builds (e.g. the APF-authorized
+    // zoweax binary, which must not load or manage plug-ins)
+    if (include_plugin_commands)
+    {
+      auto plugins_cmd = command_ptr(new Command("plugins", "plug-in management commands"));
+      auto list_cmd = command_ptr(new Command("list", "list available plug-ins"));
+      list_cmd->set_handler(handle_plugins_list);
+      plugins_cmd->add_command(list_cmd);
+      root_command.add_command(plugins_cmd);
+    }
   }
 
   return root_command;

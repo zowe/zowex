@@ -20,6 +20,14 @@ export interface IssueConsoleCmdRequest extends common.CommandRequest<"consoleCo
      * Name of the console
      */
     consoleName?: string;
+    /**
+     * Timeout in seconds when waiting for responses
+     */
+    timeout?: number;
+    /**
+     * Whether to wait for command responses (default: true)
+     */
+    wait?: boolean;
 }
 
 export interface IssueConsoleCmdResponse extends common.CommandResponse {

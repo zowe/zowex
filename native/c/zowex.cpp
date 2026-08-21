@@ -15,7 +15,6 @@
 #include <dirent.h>
 #include <iostream>
 #include <string>
-#include "commands/console.hpp"
 #include "commands/core.hpp"
 #include "commands/ds.hpp"
 #include "commands/job.hpp"
@@ -78,7 +77,8 @@ int main(int argc, char *argv[])
       pm.load_plugins(plugins_dir);
     }
 
-    console::register_commands(root_cmd);
+    // Console lives only in the APF-authorized zoweax binary; it can never
+    // succeed here, and registering it would invite `extattr +ap zowex`
     ds::register_commands(root_cmd);
     job::register_commands(root_cmd);
     server::register_commands(root_cmd);

@@ -18,7 +18,7 @@ class PluginManager;
 
 namespace core
 {
-parser::Command &setup_root_command(char *argv[]);
+parser::Command &setup_root_command(char *argv[], bool include_plugin_commands = true);
 int execute_command(int argc, char *argv[]);
 int handle_version(plugin::InvocationContext &context);
 void set_plugin_manager(plugin::PluginManager *manager);

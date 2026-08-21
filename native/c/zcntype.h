@@ -51,6 +51,8 @@ typedef struct
 
   char reply_id[8]; // if reply_id_len is non-zero
 
+  char cart[8]; // command and response token (CART) correlating a command to its responses; set per request by zcn_put
+
   int32_t id;
   uint32_t alet;
 
