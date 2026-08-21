@@ -122,7 +122,7 @@ $zx stop
 
 | group | subcommands |
 |---|---|
-| `zx ds` | `list <pat>` · `members <dsn>` · `read <dsn>` · `write <dsn> <file>` · `get`/`put` (member or whole PDS) · `create` · `delete` · `copy` · `rename` |
+| `zx ds` | `list <pat>` · `members <dsn>` · `read <dsn>` · `write <dsn> <file>` · `get`/`put` `[--binary]` (member or whole PDS; default is text with EBCDIC conversion — pass `--binary` for byte-faithful transfer, e.g. load modules or tersed files) · `create` · `delete` · `copy` · `rename` |
 | `zx job` | `list [<owner> [<prefix>]]` · `submit <file>` · `status <id>` · `spools <id>` · `spool <id> <n>` · `jcl <id>` · `cancel`/`delete`/`hold`/`release <id>` |
 | `zx uss` | `ls` · **`get`/`put`** (sftp, binary-safe) · `read`/`write` (RPC, text) · `rm` · `mkdir` · `mv` · `cp` · `chmod` · `chown` · `chtag` · `sh '<cmd>'` |
 | `zx tso` | `'<cmd>'` |
