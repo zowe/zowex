@@ -383,6 +383,15 @@ describe("ZSshClient", () => {
             await ZSshClient.create(new SshSession(fakeSession), { useNativeSsh: true });
             expect(createClientMock).toHaveBeenCalledWith(true);
         });
+
+        it("should respect identityAgent option", async () => {
+            setupMockSshClient();
+            await ZSshClient.create(new SshSession(fakeSession), { identityAgent: "/tmp/ssh-agent.sock" });
+            expect(ZSshUtils.buildSshConfig).toHaveBeenCalledWith(
+                expect.anything(),
+                expect.objectContaining({ agent: "/tmp/ssh-agent.sock" }),
+            );
+        });
     });
 
     describe("dispose function", () => {

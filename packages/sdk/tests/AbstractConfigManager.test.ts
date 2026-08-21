@@ -284,6 +284,7 @@ describe("AbstractConfigManager", async () => {
                                 password: undefined,
                                 handshakeTimeout: undefined,
                                 keyPassphrase: undefined,
+                                identityAgent: undefined,
                             },
                         });
 
@@ -626,6 +627,22 @@ describe("AbstractConfigManager", async () => {
                     expect(result).toBeUndefined();
                     expect(validatePrivKeySpy).toHaveBeenCalledOnce();
                     expect(testManager.showMessage).toHaveBeenCalledWith("SSH setup cancelled.", MESSAGE_TYPE.WARNING);
+                });
+
+                it("should not cancel SSH setup when only an identityAgent is available", async () => {
+                    const mockProfileWithAgent = { ...mockProfileWithoutKey, identityAgent: "/tmp/ssh-agent.sock" };
+                    setupCommonMocks(mockProfileWithAgent as typeof mockProfileWithoutKey);
+                    vi.spyOn(testManager as any, "validateFoundPrivateKeys").mockImplementationOnce(() => {});
+                    vi.spyOn(testManager as any, "validateConfig").mockResolvedValue({});
+
+                    const result = await testManager.promptForProfile();
+
+                    expect(result).toBeDefined();
+                    expect(result?.profile?.identityAgent).toBe("/tmp/ssh-agent.sock");
+                    expect(testManager.showMessage).not.toHaveBeenCalledWith(
+                        "SSH setup cancelled.",
+                        MESSAGE_TYPE.WARNING,
+                    );
                 });
 
                 it("should handle selection of a migrated config", async () => {
@@ -1038,6 +1055,25 @@ describe("AbstractConfigManager", async () => {
             ).toBeUndefined();
         });
 
+        it("should attempt connection without prompting for a password when identityAgent is configured", async () => {
+            const showInputBoxSpy = vi.spyOn(testManager, "showInputBox");
+            const attemptConnectionSpy = vi.spyOn(testManager as any, "attemptConnection").mockResolvedValue(true);
+            expect(
+                await (testManager as any).validateConfig(
+                    {
+                        name: "ssh1",
+                        hostname: "lpar1.com",
+                        port: 22,
+                        user: "user1",
+                        identityAgent: "/tmp/ssh-agent.sock",
+                    },
+                    false,
+                ),
+            ).toStrictEqual({});
+            expect(attemptConnectionSpy).toHaveBeenCalled();
+            expect(showInputBoxSpy).not.toHaveBeenCalled();
+        });
+
         it("should handle invalid username and return new user", async () => {
             vi.spyOn(testManager, "showInputBox").mockResolvedValueOnce("goodUser");
             vi.spyOn(testManager as any, "attemptConnection")
@@ -1435,7 +1471,29 @@ describe("AbstractConfigManager", async () => {
                 privateKey: undefined,
                 passphrase: undefined,
                 readyTimeout: 5000,
+                agent: undefined,
             });
+
+            connectMock.mockRestore();
+            isConnectedMock.mockRestore();
+            execCommandMock.mockRestore();
+        });
+
+        it("should forward identityAgent to the connection configuration", async () => {
+            const connectMock = vi.spyOn(NodeSSH.prototype, "connect").mockResolvedValueOnce(undefined);
+            const isConnectedMock = vi.spyOn(NodeSSH.prototype, "isConnected").mockReturnValueOnce(true);
+            const execCommandMock = vi.spyOn(NodeSSH.prototype, "execCommand").mockImplementation(() => {
+                return { stdout: "" } as any;
+            });
+
+            await (testManager as any).attemptConnection({
+                name: "testProf",
+                hostname: "test.com",
+                user: "user1",
+                identityAgent: "/tmp/ssh-agent.sock",
+            });
+
+            expect(connectMock).toHaveBeenCalledWith(expect.objectContaining({ agent: "/tmp/ssh-agent.sock" }));
 
             connectMock.mockRestore();
             isConnectedMock.mockRestore();
@@ -1652,6 +1710,25 @@ describe("AbstractConfigManager", async () => {
                 }),
             );
             expect(mockTeamConfig.save).toHaveBeenCalled();
+        });
+
+        it("should store identityAgent as a non-secure property", async () => {
+            const config = {
+                user: "user1",
+                host: "example.com",
+                identityAgent: "/tmp/ssh-agent.sock",
+                name: "testProfile",
+            };
+
+            await (testManager as any).setProfile(config);
+
+            expect(mockConfigApi.profiles.set).toHaveBeenCalledWith(
+                "testProfile",
+                expect.objectContaining({
+                    properties: expect.objectContaining({ identityAgent: "/tmp/ssh-agent.sock" }),
+                    secure: ["user"],
+                }),
+            );
         });
 
         it("should mark both password and keyPassphrase as secure when both are present", async () => {

@@ -11,4 +11,4 @@ The SDK is compiled and saved in the `packages/sdk/lib` folder.
 
 ## Usage
 
-Refer to the `test.ts` file in this directory for an example of how to use the SDK.
+Refer to the `sample.ts` file in this directory for an example of how to use the SDK.
