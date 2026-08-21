@@ -9,5 +9,8 @@
  *
  */
 
-// Generated via generateConstants.ts
-export const BUNDLED_SSH_SERVER_VERSION = "0.8.1";
+#include <string>
+
+extern "C" {
+    int hello_ebcdic(std::string name, std::string& message);
+}

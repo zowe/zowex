@@ -9,5 +9,21 @@
  *
  */
 
-// Generated via generateConstants.ts
-export const BUNDLED_SSH_SERVER_VERSION = "0.8.1";
+#ifndef ZMETAL_H
+#define ZMETAL_H
+
+#if defined(__cplusplus) && defined(__MVS__)
+extern "OS"
+{
+#elif defined(__cplusplus)
+extern "C"
+{
+#endif
+
+int HELLO(const char* name, char* output, int* outsize);
+
+#if defined(__cplusplus)
+}
+#endif
+
+#endif

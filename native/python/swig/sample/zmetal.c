@@ -9,5 +9,12 @@
  *
  */
 
-// Generated via generateConstants.ts
-export const BUNDLED_SSH_SERVER_VERSION = "0.8.1";
+#include "zmetal.h"
+#include <stdio.h>
+
+#pragma prolog(HELLO, "&CCN_MAIN SETB 1 \n MYPROLOG")
+
+int HELLO(const char* name, char* output, int* outsize) {
+    snprintf(output, *outsize, "Hello, %s!", name);
+    return 0;
+}
