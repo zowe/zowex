@@ -6,12 +6,12 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
-- **Breaking:** `c`: `zowex` `console` command group is removed. [#1110](https://github.com/zowe/zowex/issues/1110)
-- **Breaking:** `c`: `zoweax` contains only the `console` command group and no longer supports plug-in loading. [#1110](https://github.com/zowe/zowex/issues/1110)
-- **Breaking:** `c`: Console commands are no longer issued with master authority. [#1110](https://github.com/zowe/zowex/issues/1110)
-- `c`: Console commands now use a unique CART instead of `ZOWECART`. [#1110](https://github.com/zowe/zowex/issues/1110)
-- `c`: Added the `consoleCommand` JSON-RPC method. [#1110](https://github.com/zowe/zowex/issues/1110)
-- `c`: The `version` command now reports the invoked binary's instead of always `zowex`. [#1110](https://github.com/zowe/zowex/issues/1110)
+- **Breaking:** `c`: `zowex` `console` command group is removed. [#1112](https://github.com/zowe/zowex/issues/1112)
+- **Breaking:** `c`: `zoweax` contains only the `console` command group and no longer supports plug-in loading. [#1112](https://github.com/zowe/zowex/issues/1112)
+- **Breaking:** `c`: Console commands are no longer issued with master authority. [#1112](https://github.com/zowe/zowex/issues/1112)
+- `c`: Console commands now use a unique CART instead of `ZOWECART`. [#1112](https://github.com/zowe/zowex/issues/1112)
+- `c`: Added the `consoleCommand` JSON-RPC method. [#1112](https://github.com/zowe/zowex/issues/1112)
+- `c`: The `version` command now reports the invoked binary's instead of always `zowex`. [#1112](https://github.com/zowe/zowex/issues/1112)
 - `c`: Preserve LRECL on PS write operations. [#1109](https://github.com/zowe/zowex/issues/1109)
 - `c`: Flipped to and from encoding arguments in error message to be accurate. [#1106](https://github.com/zowe/zowex/pull/1106)
 

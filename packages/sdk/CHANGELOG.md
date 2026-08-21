@@ -6,7 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
-- Enable console commands through JSON-RPC. [#1110](https://github.com/zowe/zowex/pull/1110)
+- Enable console commands through JSON-RPC. [#1112](https://github.com/zowe/zowex/pull/1110)
 
 ## `0.8.1`
 
