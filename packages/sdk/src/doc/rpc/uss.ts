@@ -265,7 +265,7 @@ export interface IssueUssCmdResponse extends common.CommandResponse {
      */
     data: string;
     /**
-     * Stderr output from the UNIX command, when it produced any
+     * Stderr output from the UNIX command, if it produced any
      */
     stderr?: string;
 }

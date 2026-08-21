@@ -68,6 +68,7 @@ int main(int argc, char *argv[])
   {
     auto &root_cmd = core::setup_root_command(argv);
     core::set_version(PACKAGE_VERSION);
+    core::set_program_name("zowex");
 
     plugin::PluginManager pm;
     core::set_plugin_manager(&pm);

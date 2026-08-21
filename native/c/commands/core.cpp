@@ -44,6 +44,11 @@ void set_version(const std::string &version)
   g_version = version;
 }
 
+void set_program_name(const std::string &name)
+{
+  program_name_ref() = name;
+}
+
 const std::string &get_version()
 {
   return g_version;
@@ -221,10 +226,6 @@ int execute_command(int argc, char *argv[])
 
 Command &setup_root_command(char *argv[], bool include_plugin_commands)
 {
-  const std::string arg0(argv[0]);
-  const auto last_slash = arg0.find_last_of('/');
-  program_name_ref() = last_slash != std::string::npos ? arg0.substr(last_slash + 1) : arg0;
-
   g_arg_parser = std::make_shared<ArgumentParser>(argv[0], "Zowe Remote SSH CLI");
   g_arg_parser->add_pre_command_hook([](const Command &command, bool is_help_request)
                                      {

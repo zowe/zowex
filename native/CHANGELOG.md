@@ -6,10 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
-- `c`: Fixed the JSON-RPC error path discarding all stderr detail past the first line when a structured object was attached (every `.read_stdout` command: `unixCommand`, `consoleCommand`, `readDataset`, `readFile`, `readSpool`, `getJcl`). The detail now survives in the error data's `details` field. [#1112](https://github.com/zowe/zowex/issues/1112)
-- `c`: `unixCommand` now returns child stderr on success in a new optional `stderr` response field instead of discarding it. [#1112](https://github.com/zowe/zowex/issues/1112)
-- `c`: The `console issue` default console name is now the user ID truncated to 7 characters plus a rotating digit (shared with the RPC path via `zcn_build_default_console_name`), avoiding activation collisions on repeated or concurrent use. [#1112](https://github.com/zowe/zowex/issues/1112)
-
+- `c`: `unixCommand` returns stderr in a new optional `stderr` response field. [#1112](https://github.com/zowe/zowex/issues/1112)
 - **Breaking:** `c`: `zowex` `console` command group is removed. [#1112](https://github.com/zowe/zowex/issues/1112)
 - **Breaking:** `c`: `zoweax` contains only the `console` command group and no longer supports plug-in loading. [#1112](https://github.com/zowe/zowex/issues/1112)
 - **Breaking:** `c`: Console commands are no longer issued with master authority. [#1112](https://github.com/zowe/zowex/issues/1112)

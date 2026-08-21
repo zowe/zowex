@@ -29,6 +29,7 @@ int main(int argc, char *argv[])
   {
     auto &root_cmd = core::setup_root_command(argv, false);
     core::set_version(PACKAGE_VERSION);
+    core::set_program_name("zoweax");
 
     console::register_commands(root_cmd);
 
