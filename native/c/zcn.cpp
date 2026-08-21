@@ -83,8 +83,6 @@ int zcn_get(ZCN *zcn, std::string &response)
   int rc = 0;
   zcn->diag.detail_rc = 0;
 
-  // For callers that get without a prior put on this control block, fall
-  // back to the historical fixed token so the request is still well-formed
   if ('\0' == zcn->cart[0])
     memcpy(zcn->cart, "ZOWECART", sizeof(zcn->cart));
 
