@@ -1,6 +1,6 @@
 # zoweax: installing and securing the APF-authorized console binary
 
-`zoweax` is the minimal APF-authorized companion to `zowex`. It contains only
+`zoweax` is the APF-authorized alternative to `zowex`. It contains only
 the `console` command group (plus `version`/help) and exists because z/OS
 extended MCS console services (MCSOPER/MGCRE/MCSOPMSG) require an authorized
 caller. Everything else — data sets, jobs, USS, TSO, the JSON-RPC server, and
@@ -27,11 +27,6 @@ audited step described below.
 | Fallback authority | Console `AUTH` attribute from the user's OPERPARM segment (default `INFO`) | With no OPERCMDS decision, only informational commands succeed |
 | Privilege drop | Pre-command hook (`ZUTNOAUT`) | Non-console commands (`version`, help, interactive) relinquish authorization before running, fail closed |
 
-Commands are **not** issued with master authority. Earlier releases issued
-every console command with `MGCRE AUTHCMDX=X'8000'` (master authority,
-bypassing per-command checking); as of the release that introduced
-`consoleCommand`, authority comes entirely from the ESM under the invoking
-user's identity, with the console attribute as fallback.
 
 ## Installation
 
@@ -202,24 +197,3 @@ TSS ADDTO(USERID) OPERPARM(AUTH(INFO))
 * Installer authority for extattr +ap
 TSS PERMIT(sysprog) IBMFAC(BPX.FILEATTR.APF) ACCESS(READ)
 ```
-
-## Auditing
-
-Every command issued through `zoweax` is attributed to the invoking SSH
-user's identity and correlated by a unique per-request CART. OPERCMDS
-authorization decisions are logged by the ESM (SMF type 80 for RACF) when the
-profiles are defined with auditing options, and the commands themselves
-appear in SYSLOG/OPERLOG attributed to the per-user console name — so "who
-issued what" is answerable from standard ESM and console records.
-
-## Troubleshooting
-
-| Symptom | Cause | Fix |
-| --- | --- | --- |
-| `-32601 Unrecognized command` for `consoleCommand` | Server predates the console RPC | Upgrade the deployed `zowex` |
-| `zoweax: command not found` in the RPC error | Not installed / not resolvable by the server process | Install per above; set `ZOWEAX_PATH`; remember the non-login-shell PATH caveat |
-| `Permission denied` executing zoweax | File mode/ownership | The owner/group/mode on the file is the access model — adjust deliberately |
-| `Not authorized` activating the console | Missing `extattr +ap`, attribute lost on upgrade, or NOSETUID mount | Re-run `extattr +ap`; check `ls -E`; check the mount |
-| `could not activate console` (other rc) | `MVS.MCSOPER.*` denial, invalid name, or name already active | Check ESM log; per-user names collide only across concurrent sessions |
-| Command runs but is rejected / no effect | OPERCMDS denial under the user's identity | Check the ESM violation log (e.g. `ICH408I`); grant the specific `MVS.<command>` profile |
-| Empty response with rc 0 | Command produced no response within the wait window | Increase `--timeout` / the RPC `timeout` field |
