@@ -118,9 +118,6 @@ MGCRE_MODEL(mgcre_model);
 #define MGCRE(id, message, cart, plist)
 #endif
 
-/* Variant used only when the caller explicitly set ZCN.authcmdx: issues the
-   command with an AUTHCMDX= command-authority override instead of leaving
-   authorization to the ESM / console authority attribute */
 #if defined(__IBM_METAL__)
 #define MGCRE_AUTHX(id, message, cart, authcmdx, plist)                 \
   __asm(                                                                \
@@ -171,6 +168,7 @@ int zcnm1put(ZCN *zcn, const char *command)
 
   unsigned short authcmdx = zcn->authcmdx;
   unsigned short *authcmdxp = &authcmdx;
+  (void)authcmdxp; // codeql
 
   strcpy(zcn->diag.service_name, "MGCRE");
 

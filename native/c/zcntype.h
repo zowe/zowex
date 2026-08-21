@@ -31,9 +31,12 @@ ZNP_PACK_ON
 
 #define ZCN_EYE "ZCN"
 
-// AUTHCMDX= (see "MGCRE" in z/OS MVS Authorized Assembler Services Reference
+// AUTHCMDX= (see "MGCRE" in z/OS MVS Authorized Assembler Services Reference);
 #define ZCN_AUTHCMDX_NONE 0x0000
 #define ZCN_AUTHCMDX_MASTER 0x8000
+#define ZCN_AUTHCMDX_SYS 0x4000
+#define ZCN_AUTHCMDX_IO 0x2000
+#define ZCN_AUTHCMDX_CONS 0x1000
 
 // NOTE(Kelosky): struct is padded to nearest double word boundary; ensure proper alignment for fields
 typedef struct
