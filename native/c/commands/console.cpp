@@ -25,7 +25,7 @@ int handle_console_issue(plugin::InvocationContext &context)
   ZCN &zcn = session.control_block();
 
   std::string console_name = context.get<std::string>("console-name", "");
-  if (console_name.empty() && (0 != zut_get_current_user(console_name) || console_name.empty()))
+  if (console_name.empty() && 0 != zcn_build_default_console_name(console_name))
   {
     console_name = "zowex";
   }
@@ -87,7 +87,7 @@ void register_commands(parser::Command &root_command)
     auto issue_cmd = command_ptr(new Command("issue", "issue a console command"));
     issue_cmd->add_keyword_arg("console-name",
                                make_aliases("--cn", "--console-name"),
-                               "extended console name (default: current user ID)",
+                               "extended console name (default: current user ID plus a digit)",
                                ArgType_Single, false);
     issue_cmd->add_keyword_arg("wait",
                                make_aliases("--wait"),

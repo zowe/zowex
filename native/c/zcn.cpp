@@ -10,10 +10,12 @@
  */
 
 #include <array>
+#include <atomic>
 #include <cstdio>
 #include <cstring>
 #include <ctime>
 #include <fstream>
+#include <unistd.h>
 #include <iostream>
 #include <string>
 #include <iomanip>
@@ -22,6 +24,25 @@
 #include "zcn.hpp"
 #include "zut.hpp"
 #include "zcntype.h"
+
+int zcn_build_default_console_name(std::string &name)
+{
+  name.clear();
+  int rc = zut_get_current_user(name);
+  if (0 != rc || name.empty())
+  {
+    name.clear();
+    return RTNCD_FAILURE;
+  }
+  if (name.length() > 7)
+  {
+    name.erase(7);
+  }
+
+  static std::atomic<unsigned int> console_seq(0);
+  name += std::to_string(((unsigned int)getpid() + console_seq++) % 10u);
+  return RTNCD_SUCCESS;
+}
 
 int zcn_activate(ZCN *zcn, const std::string &console_name)
 {

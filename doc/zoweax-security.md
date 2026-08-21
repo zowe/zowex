@@ -102,9 +102,9 @@ ssh user@host 'echo $PATH; command -v zoweax'
 Two resource families control console use, both in the **OPERCMDS** class:
 
 - `MVS.MCSOPER.<console-name>` — checked at console activation. The default
-  console name is the user's ID (CLI) or the user's ID plus a digit suffix
-  0-9 (JSON-RPC, to allow concurrent requests), so a generic
-  `MVS.MCSOPER.<userid>*` profile covers both.
+  console name (CLI and JSON-RPC alike) is the user's ID truncated to 7
+  characters plus a digit 0-9, so a generic `MVS.MCSOPER.<userid>*` profile
+  covers it.
 - `MVS.<command>.<qualifier>` — checked per command under the invoking user's
   identity. Profile names and required access levels for every MVS command
   are listed in *z/OS MVS System Commands*, "Command authorization" — e.g.

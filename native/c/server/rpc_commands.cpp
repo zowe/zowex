@@ -11,7 +11,6 @@
 
 #include "rpc_commands.hpp"
 #include "dispatcher.hpp"
-#include <atomic>
 #include <cstdlib>
 #include <unistd.h>
 #include "schemas/requests.hpp"
@@ -232,20 +231,6 @@ static int handle_console_command(plugin::InvocationContext &context)
   std::string console_name = context.get<std::string>("console-name", "");
   const long long timeout = context.get<long long>("timeout", 0);
   const bool wait = context.get<bool>("wait", true);
-
-  if (console_name.empty())
-  {
-    std::string user;
-    if (0 == zut_get_current_user(user) && !user.empty())
-    {
-      if (user.length() > 7)
-      {
-        user.erase(7);
-      }
-      static std::atomic<unsigned int> console_seq(0);
-      console_name = user + std::to_string(console_seq++ % 10);
-    }
-  }
 
   std::vector<std::string> args;
   args.emplace_back("console");
