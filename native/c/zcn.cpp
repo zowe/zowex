@@ -9,6 +9,7 @@
  *
  */
 
+#include <array>
 #include <cstdio>
 #include <cstring>
 #include <ctime>
@@ -57,10 +58,10 @@ int zcn_put(ZCN *zcn, const std::string &command)
 
   // unique cart
   static unsigned int cart_seq = 0;
-  char cart_buf[sizeof(zcn->cart) + 1] = {0};
+  std::array<char, sizeof(zcn->cart) + 1> cart_buf = {};
   const unsigned int cart_val = ((unsigned int)time(nullptr) ^ (++cart_seq << 8)) & 0xFFFFFFu;
-  snprintf(cart_buf, sizeof(cart_buf), "ZC%06X", cart_val);
-  memcpy(zcn->cart, cart_buf, sizeof(zcn->cart));
+  snprintf(cart_buf.data(), cart_buf.size(), "ZC%06X", cart_val);
+  memcpy(zcn->cart, cart_buf.data(), sizeof(zcn->cart));
 
   char *command31 = (char *)__malloc31(command.length() + 1);
   if (command31 == nullptr)

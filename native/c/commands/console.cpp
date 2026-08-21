@@ -25,13 +25,9 @@ int handle_console_issue(plugin::InvocationContext &context)
   ZCN &zcn = session.control_block();
 
   std::string console_name = context.get<std::string>("console-name", "");
-  if (console_name.empty())
+  if (console_name.empty() && (0 != zut_get_current_user(console_name) || console_name.empty()))
   {
-    // MVS.MCSOPER.<name> profiles
-    if (0 != zut_get_current_user(console_name) || console_name.empty())
-    {
-      console_name = "zowex";
-    }
+    console_name = "zowex";
   }
   const long long timeout = context.get<long long>("timeout", 0);
 

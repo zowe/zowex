@@ -248,21 +248,21 @@ static int handle_console_command(plugin::InvocationContext &context)
   }
 
   std::vector<std::string> args;
-  args.push_back("console");
-  args.push_back("issue");
-  args.push_back(command);
+  args.emplace_back("console");
+  args.emplace_back("issue");
+  args.emplace_back(command);
   if (!console_name.empty())
   {
-    args.push_back("--console-name");
-    args.push_back(console_name);
+    args.emplace_back("--console-name");
+    args.emplace_back(console_name);
   }
   if (timeout > 0)
   {
-    args.push_back("--timeout");
-    args.push_back(std::to_string(timeout));
+    args.emplace_back("--timeout");
+    args.emplace_back(std::to_string(timeout));
   }
-  args.push_back("--wait");
-  args.push_back(wait ? "true" : "false");
+  args.emplace_back("--wait");
+  args.emplace_back(wait ? "true" : "false");
 
   std::string out;
   std::string err;
