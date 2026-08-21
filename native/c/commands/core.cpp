@@ -256,8 +256,6 @@ Command &setup_root_command(char *argv[], bool include_plugin_commands)
     version_cmd->set_handler(handle_version);
     root_command.add_command(version_cmd); // Should provide more info here, if command is enhanced later.
 
-    // Plug-in support is excluded from minimal builds (e.g. the APF-authorized
-    // zoweax binary, which must not load or manage plug-ins)
     if (include_plugin_commands)
     {
       auto plugins_cmd = command_ptr(new Command("plugins", "plug-in management commands"));
