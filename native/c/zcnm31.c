@@ -141,10 +141,6 @@ int zcnm1put(ZCN *zcn, const char *command)
     char command[MGCRTEXT];
   } commandBuffer = {0};
 
-  /* Command authority is deliberately NOT overridden here (no AUTHCMDX=):
-     commands are authorized by the ESM (OPERCMDS class) under the issuing
-     user's identity, falling back to the console's authority attribute
-     (OPERPARM segment, default INFO) when no profile decision is made. */
 
   /* Use precision specifier %.*s as snprintf is unavailable in Metal C */
   commandBuffer.commandLen = sprintf(commandBuffer.command, "%.*s", (int)(sizeof(commandBuffer.command) - 1), command);
