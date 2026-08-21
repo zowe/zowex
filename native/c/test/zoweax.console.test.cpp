@@ -71,9 +71,6 @@ void zoweax_console_tests()
 
         it("should not exist in the unauthorized zowex binary", []() -> void
         {
-            // console lives only in zoweax; in zowex it could never pass
-            // TESTAUTH, and a "Not authorized" failure would invite users
-            // to extattr +ap the full zowex binary
             std::string response;
             std::string command = zowex_command + " console issue \"D T\"";
             int rc = execute_command_with_output(command, response);

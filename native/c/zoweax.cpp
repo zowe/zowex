@@ -21,17 +21,7 @@
 #endif
 
 /**
- * zoweax is the minimal APF-authorized companion to zowex.
- *
- * It links only the console command group plus the core version/help
- * handling. Everything else (data sets, jobs, USS, TSO, certificates,
- * the RPC server, and plug-in loading) lives in the unauthorized zowex
- * binary. Every line of code bound into an AC=1 module is APF integrity
- * surface, so nothing that does not require authorization belongs here.
- *
- * The pre-command hook installed by core::setup_root_command still drops
- * APF authorization (ZUTNOAUT) before any non-privileged command runs, so
- * even the version/help paths never execute authorized.
+ * zoweax is the minimal APF-authorized alternative to zowex.
  */
 int main(int argc, char *argv[])
 {
