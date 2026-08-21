@@ -62,8 +62,9 @@ void zowex_ds_tests()
                        ExpectWithContext(rc, response).ToBe(0);
                        Expect(response).ToContain("Data set '" + ds + "' deleted"); // ds deleted
                      }
-                     catch (...)
+                     catch (const std::exception &deleteErr)
                      {
+                       TestLog("Failed to delete: " + ds + ", error: " + deleteErr.what() + ". Verifying with data-set list command");
                        try
                        {
                          std::string response;
@@ -72,9 +73,9 @@ void zowex_ds_tests()
                          ExpectWithContext(rc, response).ToBe(0);
                          Expect(response).Not().ToContain(ds);
                        }
-                       catch (...)
+                       catch (const std::exception &listCheckErr)
                        {
-                         TestLog("Failed to delete: " + ds);
+                         TestLog("Failed to delete: " + ds + ", error: " + listCheckErr.what());
                        }
                      }
                    }
