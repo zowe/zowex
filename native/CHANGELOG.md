@@ -6,11 +6,11 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
-- **Breaking:** `c`: `zoweax` contains only the `console` command group and the core `version`/help handling, and no longer supports plug-in loading. [#1110](https://github.com/zowe/zowex/issues/1110)
-- **Breaking:** `c`: Removed the `console` command group from `zowex`; it lives only in the APF-authorized `zoweax` binary. In `zowex` it could never pass the authorization check, and its "Not authorized" failure invited marking the full `zowex` binary APF-authorized. [#1110](https://github.com/zowe/zowex/issues/1110)
-- **Breaking:** `c`: Console commands are no longer issued with master authority (`MGCRE AUTHCMDX=X'8000'`). [#1110](https://github.com/zowe/zowex/issues/1110)
+- **Breaking:** `c`: `zowex` `console` command group is removed. [#1110](https://github.com/zowe/zowex/issues/1110)
+- **Breaking:** `c`: `zoweax` contains only the `console` command group and no longer supports plug-in loading. [#1110](https://github.com/zowe/zowex/issues/1110)
+- **Breaking:** `c`: Console commands are no longer issued with master authority. [#1110](https://github.com/zowe/zowex/issues/1110)
 - `c`: Console commands now use a unique CART instead of `ZOWECART`. [#1110](https://github.com/zowe/zowex/issues/1110)
-- `c`: Added the `consoleCommand` JSON-RPC method. `zowex server` spawns the APF-authorized `zoweax` binary per request (located next to `zowex`, on `PATH`, or via `ZOWEAX_PATH`); the server itself never holds APF authorization. Added optional `timeout` and `wait` fields to the request. [#1110](https://github.com/zowe/zowex/issues/1110)
+- `c`: Added the `consoleCommand` JSON-RPC method. [#1110](https://github.com/zowe/zowex/issues/1110)
 - `c`: The `version` command now reports the invoked binary's instead of always `zowex`. [#1110](https://github.com/zowe/zowex/issues/1110)
 - `c`: Preserve LRECL on PS write operations. [#1109](https://github.com/zowe/zowex/issues/1109)
 - `c`: Flipped to and from encoding arguments in error message to be accurate. [#1106](https://github.com/zowe/zowex/pull/1106)

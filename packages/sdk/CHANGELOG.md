@@ -4,6 +4,10 @@ All notable changes to the Client code for "@zowe/zowex-for-zowe-sdk" are docume
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## Recent Changes
+
+- Enable console commands through JSON-RPC. [#1110](https://github.com/zowe/zowex/pull/1110)
+
 ## `0.8.1`
 
 - Fixed the `SearchParser.parseSearchOutput` function silently dropping matches when searching a sequential data set [#1104](https://github.com/zowe/zowex/pull/1104)
