@@ -10,6 +10,7 @@
  */
 
 #include <cstdio>
+#include <regex>
 #ifndef _OPEN_SYS_FILE_EXT
 #define _OPEN_SYS_FILE_EXT 1
 #endif
@@ -678,6 +679,49 @@ int handle_data_set_list_members(InvocationContext &context)
   return (!warn && rc == RTNCD_WARNING) ? RTNCD_SUCCESS : rc;
 }
 
+int handle_data_set_resolve_alias(InvocationContext &context)
+{
+  int rc = 0;
+  std::string aliasDsn = context.get<std::string>("dsn", "");
+  std::transform(aliasDsn.begin(), aliasDsn.end(), aliasDsn.begin(), ::toupper);
+  const auto result = obj();
+  std::string idcamsOutput = "";
+  // must prepend control statements with a space on each line's zeroth character
+  std::string idcamsInput = " LISTCAT ENTRIES('" + aliasDsn + "') ALL\n";
+  std::string idcamsError = "";
+  std::string failMsg = "Could not determine the target data set for the specified alias. Ensure the alias exists and is cataloged.\n";
+  rc = zds_idcams(idcamsInput, idcamsOutput, idcamsError);
+  if (rc != 0)
+  {
+    context.error_stream() << "Error: "
+                           << idcamsOutput << std::endl
+                           << idcamsError << std::endl;
+    context.error_stream() << failMsg;
+    return RTNCD_FAILURE;
+  }
+
+  // Example output excerpt:
+  // ASSOCIATIONS
+  //     NONVSAM--CHRIS.PUBLIC.CNTL
+  static const std::regex resolvedDsPattern(R"(ASSOCIATIONS[\s\S]+VSAM-{2,}(\S+))");
+  std::smatch mv;
+
+  if (std::regex_search(idcamsOutput, mv, resolvedDsPattern))
+  {
+    const std::string targetDsn = mv[1].str();
+    context.output_stream() << "Alias '" + aliasDsn + "' resolved to data set '" + targetDsn + "'" << std::endl;
+    result->set("targetDsn", str(targetDsn));
+  }
+  else
+  {
+    context.output_stream() << failMsg;
+    result->set("targetDsn", str(""));
+  }
+  context.set_object(result);
+
+  return rc;
+}
+
 int handle_data_set_write(InvocationContext &context)
 {
   int rc = 0;
@@ -1139,6 +1183,13 @@ void register_commands(parser::Command &root_command)
   ds_list_members_cmd->add_keyword_arg(RESPONSE_FORMAT_CSV);
   ds_list_members_cmd->set_handler(handle_data_set_list_members);
   data_set_cmd->add_command(ds_list_members_cmd);
+
+  // Resolve alias subcommand
+  auto ds_list_alias_cmd = command_ptr(new Command("resolve-alias", "Resolve a data set alias"));
+  ds_list_alias_cmd->add_alias("ra");
+  ds_list_alias_cmd->add_positional_arg(DSN);
+  ds_list_alias_cmd->set_handler(handle_data_set_resolve_alias);
+  data_set_cmd->add_command(ds_list_alias_cmd);
 
   // Write subcommand
   auto ds_write_cmd = command_ptr(new Command("write", "write to data set"));

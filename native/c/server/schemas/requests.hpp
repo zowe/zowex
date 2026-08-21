@@ -201,6 +201,11 @@ ZJSON_SCHEMA(ListDsMembersRequest,
     FIELD_OPTIONAL(pattern, STRING)
 );
 
+struct ResolveDsAliasRequest {};
+ZJSON_SCHEMA(ResolveDsAliasRequest,
+    FIELD_REQUIRED(dsname, STRING)
+);
+
 struct ReadDatasetRequest {};
 ZJSON_SCHEMA(ReadDatasetRequest,
     FIELD_OPTIONAL(stream, ANY),

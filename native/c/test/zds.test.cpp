@@ -14,6 +14,7 @@
 #include <sstream>
 #include <stdexcept>
 #include "../zbase64.h"
+#include <string>
 #include <vector>
 #include <thread>
 #include <chrono>
@@ -1382,20 +1383,23 @@ void zds_tests()
 
                         beforeAll([&]() -> void
                                   {
-                                    std::string cleanup_jcl;
-                                    cleanup_jcl += "//CLEANUP$ JOB IZUACCT\n";
-                                    cleanup_jcl += "//STEP1    EXEC PGM=IDCAMS\n";
-                                    cleanup_jcl += "//SYSPRINT DD SYSOUT=*\n";
-                                    cleanup_jcl += "//SYSIN    DD *\n";
-                                    cleanup_jcl += "  DELETE " + ksds_path_dsn + " PURGE\n";
-                                    cleanup_jcl += "  DELETE " + ksds_aix_dsn + " PURGE\n";
-                                    cleanup_jcl += "  DELETE " + ksds_dsn + " CLUSTER PURGE\n";
-                                    cleanup_jcl += "  DELETE " + esds_path_dsn + " PURGE\n";
-                                    cleanup_jcl += "  DELETE " + esds_aix_dsn + " PURGE\n";
-                                    cleanup_jcl += "  DELETE " + esds_dsn + " CLUSTER PURGE\n";
-                                    cleanup_jcl += "  SET MAXCC = 0\n";
-                                    cleanup_jcl += "/*\n";
-                                    submit_and_wait(cleanup_jcl, 200);
+                                    int rc =0;
+                                    std::string cleanup_idcams;
+                                    std::string cleanup_output;
+                                    std::string cleanup_err;
+                                    cleanup_idcams += "  DELETE " + ksds_path_dsn + " PURGE\n";
+                                    cleanup_idcams += "  DELETE " + ksds_aix_dsn + " PURGE\n";
+                                    cleanup_idcams += "  DELETE " + ksds_dsn + " CLUSTER PURGE\n";
+                                    cleanup_idcams += "  DELETE " + esds_path_dsn + " PURGE\n";
+                                    cleanup_idcams += "  DELETE " + esds_aix_dsn + " PURGE\n";
+                                    cleanup_idcams += "  DELETE " + esds_dsn + " CLUSTER PURGE\n";
+                                    cleanup_idcams += "  SET MAXCC = 0\n";
+                                    
+                                    rc = zds_idcams(cleanup_idcams, cleanup_output, cleanup_err);
+                                    TestLog("Cleanup RC from IDCAMS: " + std::to_string(rc));
+                                    if (rc != 0 ){
+                                       TestLog("Output and error from failed IDCAMS cleanup:" + cleanup_err + "\n" + cleanup_output +"\n");
+                                    }
 
                                     // Volume is required for systems that are not SMS managed
                                     ZDS zds = {0};
@@ -1403,72 +1407,74 @@ void zds_tests()
                                     created_dsns.push_back(temp_dsn);
                                     create_seq(&zds, temp_dsn);
                                     std::vector<ZDSEntry> entries;
-                                    int rc = zds_list_data_sets(&zds, temp_dsn, entries, true);
+                                    rc = zds_list_data_sets(&zds, temp_dsn, entries, true);
                                     if (rc != 0 || entries.empty())
                                       throw std::runtime_error("Failed to list data sets: " + std::string(zds.diag.e_msg));
                                     std::string vsam_vol = entries[0].volser;
 
-                                    std::string setup_jcl;
-                                    setup_jcl += "//VSAMSET$ JOB IZUACCT\n";
-                                    setup_jcl += "//STEP1    EXEC PGM=IDCAMS\n";
-                                    setup_jcl += "//SYSPRINT DD SYSOUT=*\n";
-                                    setup_jcl += "//SYSIN    DD *\n";
-                                    setup_jcl += "  DEFINE CLUSTER ( -\n";
-                                    setup_jcl += "    NAME(" + ksds_dsn + ") -\n";
-                                    setup_jcl += "    INDEXED -\n";
-                                    setup_jcl += "    KEYS(8 0) -\n";
-                                    setup_jcl += "    RECORDSIZE(80 80) -\n";
-                                    setup_jcl += "    TRACKS(5 5) -\n";
-                                    setup_jcl += "    VOLUMES(" + vsam_vol + ") -\n";
-                                    setup_jcl += "    SHAREOPTIONS(2 3) )\n";
-                                    setup_jcl += "  DEFINE AIX ( -\n";
-                                    setup_jcl += "    NAME(" + ksds_aix_dsn + ") -\n";
-                                    setup_jcl += "    RELATE(" + ksds_dsn + ") -\n";
-                                    setup_jcl += "    KEYS(8 32) -\n";
-                                    setup_jcl += "    RECORDSIZE(80 80) -\n";
-                                    setup_jcl += "    TRACKS(5 5) -\n";
-                                    setup_jcl += "    VOLUMES(" + vsam_vol + ") -\n";
-                                    setup_jcl += "    SHAREOPTIONS(2 3) -\n";
-                                    setup_jcl += "    UPGRADE )\n";
-                                    setup_jcl += "  DEFINE PATH ( -\n";
-                                    setup_jcl += "    NAME(" + ksds_path_dsn + ") -\n";
-                                    setup_jcl += "    PATHENTRY(" + ksds_aix_dsn + ") -\n";
-                                    setup_jcl += "    UPDATE )\n";
-                                    setup_jcl += "  DEFINE CLUSTER ( -\n";
-                                    setup_jcl += "    NAME(" + esds_dsn + ") -\n";
-                                    setup_jcl += "    NONINDEXED -\n";
-                                    setup_jcl += "    RECORDSIZE(80 80) -\n";
-                                    setup_jcl += "    TRACKS(5 5) -\n";
-                                    setup_jcl += "    VOLUMES(" + vsam_vol + ") -\n";
-                                    setup_jcl += "    SHAREOPTIONS(2 3) )\n";
-                                    setup_jcl += "  DEFINE AIX ( -\n";
-                                    setup_jcl += "    NAME(" + esds_aix_dsn + ") -\n";
-                                    setup_jcl += "    RELATE(" + esds_dsn + ") -\n";
-                                    setup_jcl += "    KEYS(8 0) -\n";
-                                    setup_jcl += "    RECORDSIZE(80 80) -\n";
-                                    setup_jcl += "    TRACKS(5 5) -\n";
-                                    setup_jcl += "    VOLUMES(" + vsam_vol + ") -\n";
-                                    setup_jcl += "    SHAREOPTIONS(2 3) -\n";
-                                    setup_jcl += "    UPGRADE )\n";
-                                    setup_jcl += "  DEFINE PATH ( -\n";
-                                    setup_jcl += "    NAME(" + esds_path_dsn + ") -\n";
-                                    setup_jcl += "    PATHENTRY(" + esds_aix_dsn + ") -\n";
-                                    setup_jcl += "    UPDATE )\n";
-                                    setup_jcl += "/*\n";
-                                    submit_and_wait(setup_jcl, 600, true); },
+                                    std::string setup_idcams;
+                                    std::string setup_output;
+                                    std::string setup_err;
+                                    setup_idcams += "  DEFINE CLUSTER ( -\n";
+                                    setup_idcams += "    NAME(" + ksds_dsn + ") -\n";
+                                    setup_idcams += "    INDEXED -\n";
+                                    setup_idcams += "    KEYS(8 0) -\n";
+                                    setup_idcams += "    RECORDSIZE(80 80) -\n";
+                                    setup_idcams += "    TRACKS(5 5) -\n";
+                                    setup_idcams += "    VOLUMES(" + vsam_vol + ") -\n";
+                                    setup_idcams += "    SHAREOPTIONS(2 3) )\n";
+                                    setup_idcams += "  DEFINE AIX ( -\n";
+                                    setup_idcams += "    NAME(" + ksds_aix_dsn + ") -\n";
+                                    setup_idcams += "    RELATE(" + ksds_dsn + ") -\n";
+                                    setup_idcams += "    KEYS(8 32) -\n";
+                                    setup_idcams += "    RECORDSIZE(80 80) -\n";
+                                    setup_idcams += "    TRACKS(5 5) -\n";
+                                    setup_idcams += "    VOLUMES(" + vsam_vol + ") -\n";
+                                    setup_idcams += "    SHAREOPTIONS(2 3) -\n";
+                                    setup_idcams += "    UPGRADE )\n";
+                                    setup_idcams += "  DEFINE PATH ( -\n";
+                                    setup_idcams += "    NAME(" + ksds_path_dsn + ") -\n";
+                                    setup_idcams += "    PATHENTRY(" + ksds_aix_dsn + ") -\n";
+                                    setup_idcams += "    UPDATE )\n";
+                                    setup_idcams += "  DEFINE CLUSTER ( -\n";
+                                    setup_idcams += "    NAME(" + esds_dsn + ") -\n";
+                                    setup_idcams += "    NONINDEXED -\n";
+                                    setup_idcams += "    RECORDSIZE(80 80) -\n";
+                                    setup_idcams += "    TRACKS(5 5) -\n";
+                                    setup_idcams += "    VOLUMES(" + vsam_vol + ") -\n";
+                                    setup_idcams += "    SHAREOPTIONS(2 3) )\n";
+                                    setup_idcams += "  DEFINE AIX ( -\n";
+                                    setup_idcams += "    NAME(" + esds_aix_dsn + ") -\n";
+                                    setup_idcams += "    RELATE(" + esds_dsn + ") -\n";
+                                    setup_idcams += "    KEYS(8 0) -\n";
+                                    setup_idcams += "    RECORDSIZE(80 80) -\n";
+                                    setup_idcams += "    TRACKS(5 5) -\n";
+                                    setup_idcams += "    VOLUMES(" + vsam_vol + ") -\n";
+                                    setup_idcams += "    SHAREOPTIONS(2 3) -\n";
+                                    setup_idcams += "    UPGRADE )\n";
+                                    setup_idcams += "  DEFINE PATH ( -\n";
+                                    setup_idcams += "    NAME(" + esds_path_dsn + ") -\n";
+                                    setup_idcams += "    PATHENTRY(" + esds_aix_dsn + ") -\n";
+                                    setup_idcams += "    UPDATE )\n";
+                                    rc = zds_idcams(setup_idcams, setup_output, setup_err);
+                                    TestLog("Setup RC from IDCAMS: " + std::to_string(rc));
+                                    if (rc !=0 ){
+                                      throw std::runtime_error("Output and error from failed IDCAMS setup:" + setup_err + "\n" + setup_output +"\n");
+                                    } },
                                   vsam_opts);
 
                         afterAll([ksds_dsn, esds_dsn, &submit_and_wait]() -> void
                                  {
-                                   std::string del_jcl;
-                                   del_jcl += "//VSAMDEL$ JOB IZUACCT\n";
-                                   del_jcl += "//STEP1    EXEC PGM=IDCAMS\n";
-                                   del_jcl += "//SYSPRINT DD SYSOUT=*\n";
-                                   del_jcl += "//SYSIN    DD *\n";
-                                   del_jcl += "  DELETE " + ksds_dsn + " CLUSTER PURGE\n";
-                                   del_jcl += "  DELETE " + esds_dsn + " CLUSTER PURGE\n";
-                                   del_jcl += "/*\n";
-                                   submit_and_wait(del_jcl, 200); },
+                                    std::string cleanup_output;
+                                    std::string cleanup_err;
+                                   std::string cleanup_idcams;
+                                   cleanup_idcams += "  DELETE " + ksds_dsn + " CLUSTER PURGE\n";
+                                   cleanup_idcams += "  DELETE " + esds_dsn + " CLUSTER PURGE\n";
+                                   int rc = zds_idcams(cleanup_idcams, cleanup_output, cleanup_err);
+                                    TestLog("Cleanup RC from IDCAMS: " + std::to_string(rc));
+                                    if (rc !=0 ){
+                                       TestLog("Output and error from failed IDCAMS cleanup:" + cleanup_err + "\n" + cleanup_output +"\n");
+                                    } },
                                  vsam_opts);
 
                         it("should report VS dsorg and *VSAM* volser for KSDS cluster",
@@ -1588,31 +1594,33 @@ void zds_tests()
                         beforeAll([&]() -> void
                                   {
                                     // Clean up any leftover data sets from previous test runs
-                                    std::string cleanup_jcl;
-                                    cleanup_jcl += "//GDGCLN$ JOB IZUACCT\n";
-                                    cleanup_jcl += "//STEP1    EXEC PGM=IDCAMS\n";
-                                    cleanup_jcl += "//SYSPRINT DD SYSOUT=*\n";
-                                    cleanup_jcl += "//SYSIN    DD *\n";
-                                    cleanup_jcl += "  DELETE " + gdg_gen1_dsn + " NONVSAM PURGE\n";
-                                    cleanup_jcl += "  DELETE " + gdg_base_dsn + " GDG PURGE\n";
-                                    cleanup_jcl += "  SET MAXCC = 0\n";
-                                    cleanup_jcl += "/*\n";
-                                    submit_and_wait(cleanup_jcl, 200);
 
+                                   std::string cleanup_output;
+                                   std::string cleanup_err;
+                                   std::string cleanup_idcams;
+                           
+                                    cleanup_idcams += "  DELETE " + gdg_gen1_dsn + " NONVSAM PURGE\n";
+                                    cleanup_idcams += "  DELETE " + gdg_base_dsn + " GDG PURGE\n";
+                                    cleanup_idcams += "  SET MAXCC = 0\n";
+                                    int rc = zds_idcams(cleanup_idcams, cleanup_output, cleanup_err);
+                                    TestLog("Cleanup RC from IDCAMS: " + std::to_string(rc));
+                                    if (rc !=0 ){
+                                       TestLog("Output and error from failed IDCAMS cleanup:" + cleanup_err + "\n" + cleanup_output +"\n");
+                                    }
                                     // Define the GDG base via IDCAMS
-                                    std::string setup_jcl;
-                                    setup_jcl += "//GDGSET$ JOB IZUACCT\n";
-                                    setup_jcl += "//STEP1    EXEC PGM=IDCAMS\n";
-                                    setup_jcl += "//SYSPRINT DD SYSOUT=*\n";
-                                    setup_jcl += "//SYSIN    DD *\n";
-                                    setup_jcl += "  DEFINE GDG ( -\n";
-                                    setup_jcl += "    NAME(" + gdg_base_dsn + ") -\n";
-                                    setup_jcl += "    LIMIT(5) -\n";
-                                    setup_jcl += "    NOEMPTY -\n";
-                                    setup_jcl += "    NOSCRATCH )\n";
-                                    setup_jcl += "/*\n";
-                                    submit_and_wait(setup_jcl, 200, true);
-
+                                    std::string setup_output;
+                                    std::string setup_err;
+                                    std::string setup_idcams;
+                                    setup_idcams += "  DEFINE GDG ( -\n";
+                                    setup_idcams += "    NAME(" + gdg_base_dsn + ") -\n";
+                                    setup_idcams += "    LIMIT(5) -\n";
+                                    setup_idcams += "    NOEMPTY -\n";
+                                    setup_idcams += "    NOSCRATCH )\n";
+                                    rc = zds_idcams(setup_idcams, setup_output, setup_err);
+                                    TestLog("Setup RC from IDCAMS: " + std::to_string(rc));
+                                    if (rc !=0 ){
+                                       throw std::runtime_error("Output and error from failed IDCAMS cleanup:" + setup_err + "\n" + setup_output +"\n");
+                                    }
                                     // Create one generation via IEBGENER
                                     std::string gen_jcl;
                                     gen_jcl += "//GDGGEN$ JOB IZUACCT\n";
@@ -1630,20 +1638,20 @@ void zds_tests()
 
                         afterAll([&]() -> void
                                  {
-                                   std::string del_jcl;
-                                   del_jcl += "//GDGDEL$ JOB IZUACCT\n";
-                                   del_jcl += "//STEP1    EXEC PGM=IDCAMS\n";
-                                   del_jcl += "//SYSPRINT DD SYSOUT=*\n";
-                                   del_jcl += "//SYSIN    DD *\n";
-                                   del_jcl += "  DELETE " + gdg_gen1_dsn + " NONVSAM PURGE\n";
-                                   del_jcl += "  DELETE " + gdg_base_dsn + " GDG PURGE\n";
-                                   del_jcl += "  SET MAXCC = 0\n";
-                                   del_jcl += "/*\n";
-                                   submit_and_wait(del_jcl, 200); },
+                                   std::string cleanup_idcams;
+                                   std::string cleanup_output;
+                                   std::string cleanup_err;
+                                   cleanup_idcams += "  DELETE " + gdg_gen1_dsn + " NONVSAM PURGE\n";
+                                   cleanup_idcams += "  DELETE " + gdg_base_dsn + " GDG PURGE\n";
+                                   cleanup_idcams += "  SET MAXCC = 0\n";
+                                   int rc = zds_idcams(cleanup_idcams, cleanup_output, cleanup_err);
+                                    TestLog("Cleanup RC from IDCAMS: " + std::to_string(rc));
+                                    if (rc !=0 ){
+                                       TestLog("Output and error from failed IDCAMS cleanup:" + cleanup_err + "\n" + cleanup_output +"\n");
+                                    } },
                                  gdg_opts);
 
-                        it("should report ZDS_VOLSER_GDG (?????\?) for a GDG base",
-                           [&]() -> void
+                        it("should report ZDS_VOLSER_GDG (?????\?) for a GDG base", [&]() -> void
                            {
                              ZDS zds = {0};
                              std::vector<ZDSEntry> entries;
@@ -1662,12 +1670,9 @@ void zds_tests()
                                }
                              }
                              Expect(found != nullptr).ToBe(true);
-                             Expect(found->volser).ToBe(std::string(ZDS_VOLSER_GDG));
-                           },
-                           gdg_opts);
+                             Expect(found->volser).ToBe(std::string(ZDS_VOLSER_GDG)); }, gdg_opts);
 
-                        it("should find GDG generations using a wildcard pattern",
-                           [&]() -> void
+                        it("should find GDG generations using a wildcard pattern", [&]() -> void
                            {
                              ZDS zds = {0};
                              std::vector<ZDSEntry> entries;
@@ -1683,24 +1688,18 @@ void zds_tests()
                                if (trimmed == gdg_gen1_dsn)
                                  found_gen1 = true;
                              }
-                             Expect(found_gen1).ToBe(true);
-                           },
-                           gdg_opts);
+                             Expect(found_gen1).ToBe(true); }, gdg_opts);
 
-                        it("should read content from a GDG generation by absolute name",
-                           [&]() -> void
+                        it("should read content from a GDG generation by absolute name", [&]() -> void
                            {
                              ZDS read_zds{};
                              ZDSReadOpts read_opts{.zds = &read_zds, .dsname = gdg_gen1_dsn};
                              std::string content;
                              const int rc = zds_read(read_opts, content);
                              ExpectWithContext(rc, read_zds.diag.e_msg).ToBe(0);
-                             Expect(content.find("GDG GENERATION ONE") != std::string::npos).ToBe(true);
-                           },
-                           gdg_opts);
+                             Expect(content.find("GDG GENERATION ONE") != std::string::npos).ToBe(true); }, gdg_opts);
 
-                        it("should read content from the most recent GDG generation via relative reference",
-                           [&]() -> void
+                        it("should read content from the most recent GDG generation via relative reference", [&]() -> void
                            {
                              const std::string relative_ref = gdg_base_dsn + "(0)";
                              ZDS read_zds{};
@@ -1708,9 +1707,7 @@ void zds_tests()
                              std::string content;
                              const int rc = zds_read(read_opts, content);
                              ExpectWithContext(rc, read_zds.diag.e_msg).ToBe(0);
-                             Expect(content.find("GDG GENERATION ONE") != std::string::npos).ToBe(true);
-                           },
-                           gdg_opts);
+                             Expect(content.find("GDG GENERATION ONE") != std::string::npos).ToBe(true); }, gdg_opts);
                       });
              describe("read",
                       [&]() -> void
@@ -2496,46 +2493,46 @@ void zds_tests()
                              Expect(sizeof(DCB_ABEND_PL)).ToBe(16);
                            });
 
-                       xit("should propagate abend when writing past max space of a PDS",
-                           [&]() -> void
-                           {
-                             ZDS zds = {0};
-                             DS_ATTRIBUTES attr{};
-                             attr.dsorg = "PO";
-                             attr.recfm = "FB";
-                             attr.lrecl = 80;
-                             attr.blksize = 6160;
-                             attr.alcunit = "TRACKS";
-                             attr.primary = 1;
-                             attr.secondary = 0;
-                             attr.dirblk = 1;
+                        xit("should propagate abend when writing past max space of a PDS",
+                            [&]() -> void
+                            {
+                              ZDS zds = {0};
+                              DS_ATTRIBUTES attr{};
+                              attr.dsorg = "PO";
+                              attr.recfm = "FB";
+                              attr.lrecl = 80;
+                              attr.blksize = 6160;
+                              attr.alcunit = "TRACKS";
+                              attr.primary = 1;
+                              attr.secondary = 0;
+                              attr.dirblk = 1;
 
-                             std::string ds = get_random_ds(3);
-                             created_dsns.push_back(ds);
+                              std::string ds = get_random_ds(3);
+                              created_dsns.push_back(ds);
 
-                             std::string response;
-                             int rc = zds_create_dsn(&zds, ds, attr, response);
-                             ExpectWithContext(rc, response).ToBe(0);
+                              std::string response;
+                              int rc = zds_create_dsn(&zds, ds, attr, response);
+                              ExpectWithContext(rc, response).ToBe(0);
 
-                             zds.encoding_opts.data_type = eDataTypeText;
-                             strcpy(zds.encoding_opts.codepage, "IBM-1047");
-                             strcpy(zds.encoding_opts.source_codepage, "IBM-1047");
+                              zds.encoding_opts.data_type = eDataTypeText;
+                              strcpy(zds.encoding_opts.codepage, "IBM-1047");
+                              strcpy(zds.encoding_opts.source_codepage, "IBM-1047");
 
-                             std::string large_data;
-                             large_data.reserve(81 * 1000);
-                             for (int i = 0; i < 1000; i++)
-                             {
-                               large_data += std::string(80, 'A') + "\n";
-                             }
+                              std::string large_data;
+                              large_data.reserve(81 * 1000);
+                              for (int i = 0; i < 1000; i++)
+                              {
+                                large_data += std::string(80, 'A') + "\n";
+                              }
 
-                             ZDSWriteOpts write_opts{.zds = &zds, .dsname = ds + "(M1)"};
+                              ZDSWriteOpts write_opts{.zds = &zds, .dsname = ds + "(M1)"};
 
-                             // This should fail with an abend. DCB abend exit runs as part of the member write process - no mocking available so we can't test the DCB exit itself,
-                             // this just verifies that the abend is percolated and handled by recovery
-                             Expect([&]()
-                                    { rc = zds_write(write_opts, large_data); })
-                                 .ToAbend();
-                           });
+                              // This should fail with an abend. DCB abend exit runs as part of the member write process - no mocking available so we can't test the DCB exit itself,
+                              // this just verifies that the abend is percolated and handled by recovery
+                              Expect([&]()
+                                     { rc = zds_write(write_opts, large_data); })
+                                  .ToAbend();
+                            });
 
                         // Skip this test because forcing DCB abends in tests seems fragile.
                         // On some systems, the DCB abend does not trigger. On others it
@@ -2543,89 +2540,93 @@ void zds_tests()
                         // immediately after the abend.
                         // uncomment when in a zvdt env
                         xit("should release ENQ after DCB abend during write",
-                           [&]() -> void
-                           {
-                             DS_ATTRIBUTES attr{};
-                             attr.dsorg = "PO";
-                             attr.recfm = "FB";
-                             attr.lrecl = 80;
-                             attr.blksize = 6160;
-                             attr.alcunit = "TRACKS";
-                             attr.primary = 5;
-                             attr.secondary = 0;
-                             attr.dirblk = 5;
+                            [&]() -> void
+                            {
+                              DS_ATTRIBUTES attr{};
+                              attr.dsorg = "PO";
+                              attr.recfm = "FB";
+                              attr.lrecl = 80;
+                              attr.blksize = 6160;
+                              attr.alcunit = "TRACKS";
+                              attr.primary = 5;
+                              attr.secondary = 0;
+                              attr.dirblk = 5;
 
-                             const std::string ds = get_random_ds(3);
-                             created_dsns.push_back(ds);
+                              const std::string ds = get_random_ds(3);
+                              created_dsns.push_back(ds);
 
-                             ZDS create_zds = {0};
-                             std::string response;
-                             int rc = zds_create_dsn(&create_zds, ds, attr, response);
-                             ExpectWithContext(rc, response).ToBe(0);
+                              ZDS create_zds = {0};
+                              std::string response;
+                              int rc = zds_create_dsn(&create_zds, ds, attr, response);
+                              ExpectWithContext(rc, response).ToBe(0);
 
-                             ZDS crash_zds{};
-                             crash_zds.encoding_opts.data_type = eDataTypeText;
-                             strcpy(crash_zds.encoding_opts.codepage, "IBM-1047");
-                             strcpy(crash_zds.encoding_opts.source_codepage, "IBM-1047");
+                              ZDS crash_zds{};
+                              crash_zds.encoding_opts.data_type = eDataTypeText;
+                              strcpy(crash_zds.encoding_opts.codepage, "IBM-1047");
+                              strcpy(crash_zds.encoding_opts.source_codepage, "IBM-1047");
 
-                             std::string large_data;
-                             large_data.reserve(81 * 1000);
-                             for (int i = 0; i < 1000; i++)
-                               large_data += std::string(80, 'A') + "\n";
+                              std::string large_data;
+                              large_data.reserve(81 * 1000);
+                              for (int i = 0; i < 1000; i++)
+                                large_data += std::string(80, 'A') + "\n";
 
-                             ZDSWriteOpts crash_opts{.zds = &crash_zds, .dsname = ds + "(M1)"};
-                             Expect([&]() { zds_write(crash_opts, large_data); }).ToAbend();
+                              ZDSWriteOpts crash_opts{.zds = &crash_zds, .dsname = ds + "(M1)"};
+                              Expect([&]()
+                                     { zds_write(crash_opts, large_data); })
+                                  .ToAbend();
 
-                             // After recovery, verify ENQ was released by writing to a different member.
-                             // ZDS_RTNCD_ENQ_ERROR (-14) would indicate the ENQ was not released.
-                             ZDS write_zds{};
-                             write_zds.encoding_opts.data_type = eDataTypeText;
-                             strcpy(write_zds.encoding_opts.codepage, "IBM-1047");
-                             strcpy(write_zds.encoding_opts.source_codepage, "IBM-1047");
-                             ZDSWriteOpts verify_opts{.zds = &write_zds, .dsname = ds + "(M2)"};
-                             const std::string small_data = "ENQ released\n";
-                             rc = zds_write(verify_opts, small_data);
-                             ExpectWithContext(rc, std::string(write_zds.diag.e_msg)).Not().ToBe(ZDS_RTNCD_ENQ_ERROR);
-                           });
+                              // After recovery, verify ENQ was released by writing to a different member.
+                              // ZDS_RTNCD_ENQ_ERROR (-14) would indicate the ENQ was not released.
+                              ZDS write_zds{};
+                              write_zds.encoding_opts.data_type = eDataTypeText;
+                              strcpy(write_zds.encoding_opts.codepage, "IBM-1047");
+                              strcpy(write_zds.encoding_opts.source_codepage, "IBM-1047");
+                              ZDSWriteOpts verify_opts{.zds = &write_zds, .dsname = ds + "(M2)"};
+                              const std::string small_data = "ENQ released\n";
+                              rc = zds_write(verify_opts, small_data);
+                              ExpectWithContext(rc, std::string(write_zds.diag.e_msg)).Not().ToBe(ZDS_RTNCD_ENQ_ERROR);
+                            });
 
                         // uncomment when in a zvdt env
                         xit("should release ENQ after forced S0C3 abend (EXRL) during BPAM write",
-                           [&]() -> void
-                           {
-                             DS_ATTRIBUTES attr{};
-                             attr.dsorg = "PO";
-                             attr.recfm = "FB";
-                             attr.lrecl = 80;
-                             attr.blksize = 800;
-                             attr.dirblk = 5;
-                             attr.primary = 1;
+                            [&]() -> void
+                            {
+                              DS_ATTRIBUTES attr{};
+                              attr.dsorg = "PO";
+                              attr.recfm = "FB";
+                              attr.lrecl = 80;
+                              attr.blksize = 800;
+                              attr.dirblk = 5;
+                              attr.primary = 1;
 
-                             const std::string ds = get_random_ds(3);
-                             created_dsns.push_back(ds);
+                              const std::string ds = get_random_ds(3);
+                              created_dsns.push_back(ds);
 
-                             ZDS create_zds = {0};
-                             std::string response;
-                             int rc = zds_create_dsn(&create_zds, ds, attr, response);
-                             ExpectWithContext(rc, response).ToBe(0);
+                              ZDS create_zds = {0};
+                              std::string response;
+                              int rc = zds_create_dsn(&create_zds, ds, attr, response);
+                              ExpectWithContext(rc, response).ToBe(0);
 
-                             // Open for BPAM write - this acquires the z/OS ENQ on the data set.
-                             // ioc->has_enq is the direct "is this locked" flag (see IO_CTRL in zamtypes.h).
-                             ZDS open_zds{};
-                             IO_CTRL *ioc = nullptr;
-                             rc = zds_open_output_bpam(&open_zds, ds + "(M1)", ioc);
-                             ExpectWithContext(rc, open_zds.diag.e_msg).ToBe(0);
-                             Expect(ioc->has_enq).ToBe(1);
+                              // Open for BPAM write - this acquires the z/OS ENQ on the data set.
+                              // ioc->has_enq is the direct "is this locked" flag (see IO_CTRL in zamtypes.h).
+                              ZDS open_zds{};
+                              IO_CTRL *ioc = nullptr;
+                              rc = zds_open_output_bpam(&open_zds, ds + "(M1)", ioc);
+                              ExpectWithContext(rc, open_zds.diag.e_msg).ToBe(0);
+                              Expect(ioc->has_enq).ToBe(1);
 
-                             // Force a S0C3 abend (EXRL 0,* = execute-type instruction targeting itself)
-                             // while the ENQ is held. ESTAE recovery must call deq_data_set before
-                             // returning to the test for ioc->has_enq to become 0.
-                             Expect([&]() { __asm(" EXRL 0,*"); }).ToAbend();
+                              // Force a S0C3 abend (EXRL 0,* = execute-type instruction targeting itself)
+                              // while the ENQ is held. ESTAE recovery must call deq_data_set before
+                              // returning to the test for ioc->has_enq to become 0.
+                              Expect([&]()
+                                     { __asm(" EXRL 0,*"); })
+                                  .ToAbend();
 
-                             // After recovery: has_enq == 0 means the recovery path properly DEQ'd.
-                             // has_enq == 1 means a forced crash leaves ENQ unreleased (bug).
-                             Expect(ioc->has_enq).ToBe(0);
-                           });
-                        
+                              // After recovery: has_enq == 0 means the recovery path properly DEQ'd.
+                              // has_enq == 1 means a forced crash leaves ENQ unreleased (bug).
+                              Expect(ioc->has_enq).ToBe(0);
+                            });
+
                         // uncomment when in a zvdt env
                         xit("should catch abend when writing past max space of a PDS",
                             [&]() -> void
