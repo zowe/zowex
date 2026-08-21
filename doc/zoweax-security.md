@@ -114,9 +114,12 @@ Two resource families control console use, both in the **OPERCMDS** class:
 When the ESM returns "no decision" (class inactive or no matching profile),
 z/OS falls back to the console's authority attribute, which comes from the
 user's **OPERPARM segment** (default `INFO` — informational commands only).
-There is deliberately no code-level way to request higher authority; sites
-that cannot use OPERCMDS profiles can raise a specific user's fallback
-authority via OPERPARM instead.
+Neither the `zoweax` CLI nor the `consoleCommand` RPC offers any way to
+request higher authority; sites that cannot use OPERCMDS profiles can raise
+a specific user's fallback authority via OPERPARM instead. (Programs linking
+`libzcn` directly — already APF-authorized code — may opt in to an explicit
+authority override via `ZCN.authcmdx` after performing their own SAF checks;
+see `zcntype.h`.)
 
 > The ACF2 and Top Secret examples below follow each product's documented
 > command patterns but **must be validated by an administrator of that ESM**

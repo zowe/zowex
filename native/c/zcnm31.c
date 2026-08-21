@@ -118,6 +118,28 @@ MGCRE_MODEL(mgcre_model);
 #define MGCRE(id, message, cart, plist)
 #endif
 
+/* Variant used only when the caller explicitly set ZCN.authcmdx: issues the
+   command with an AUTHCMDX= command-authority override instead of leaving
+   authorization to the ESM / console authority attribute */
+#if defined(__IBM_METAL__)
+#define MGCRE_AUTHX(id, message, cart, authcmdx, plist)                 \
+  __asm(                                                                \
+      "*                                                            \n" \
+      " LA 2,%1                                                     \n" \
+      "*                                                            \n" \
+      " MGCRE TEXT=(2),"                                                \
+      "CART=%2,"                                                        \
+      "AUTHCMDX=%3,"                                                    \
+      "CONSID=%0,"                                                      \
+      "MF=(E,%4)                                                    \n" \
+      "*                                                            \n" \
+      :                                                                 \
+      : "m"(id), "m"(message), "m"(cart), "m"(authcmdx), "m"(plist)     \
+      : "r0", "r1", "r2", "r14", "r15");
+#else
+#define MGCRE_AUTHX(id, message, cart, authcmdx, plist)
+#endif
+
 // MGCETXT	Command text - Table 2 "MGCRE mapping", structure "MGCETEXT" https://www.ibm.com/docs/en/zos/3.2.0?topic=rqe-mgcre-information
 #ifndef MGCRTEXT
 #define MGCRTEXT 126
@@ -147,6 +169,9 @@ int zcnm1put(ZCN *zcn, const char *command)
   char cart[8];
   memcpy(cart, zcn->cart, sizeof(cart));
 
+  unsigned short authcmdx = zcn->authcmdx;
+  unsigned short *authcmdxp = &authcmdx;
+
   strcpy(zcn->diag.service_name, "MGCRE");
 
   if (mode_switch)
@@ -154,7 +179,14 @@ int zcnm1put(ZCN *zcn, const char *command)
     mode_sup();
   }
   set_key(&key_zero);
-  MGCRE(zcn->id, commandBuffer, cart, dsa_mgcre_model);
+  if (0 != authcmdx)
+  {
+    MGCRE_AUTHX(zcn->id, commandBuffer, cart, authcmdxp, dsa_mgcre_model);
+  }
+  else
+  {
+    MGCRE(zcn->id, commandBuffer, cart, dsa_mgcre_model);
+  }
   set_key(&key);
   if (mode_switch)
   {
