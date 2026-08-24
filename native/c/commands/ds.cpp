@@ -714,6 +714,7 @@ int handle_data_set_resolve_alias(InvocationContext &context)
   {
     context.output_stream() << failMsg;
     result->set("targetDsn", str(""));
+    rc = RTNCD_FAILURE;
   }
   context.set_object(result);
 
