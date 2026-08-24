@@ -6,7 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes 
 
-- Added support for the `resolveDsAlias` RPC command. [#1108](https://github.com/zowe/zowex/pull/1108)
+- Added support for the `resolveDsAlias` RPC command which allows the caller to resolve data set aliases. [#1108](https://github.com/zowe/zowex/pull/1108)
 
 ## `0.9.0`
 
