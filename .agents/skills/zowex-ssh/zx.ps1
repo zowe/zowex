@@ -12,7 +12,7 @@ zx.ps1 - zowex-over-SSH client (Windows PowerShell 5.1+, also runs on PowerShell
   zx info                                  show config + session state
 
   zx ds   list <pattern> | members <dsn> | read <dsn> | write <dsn> <file>
-          | get <dsn[(m)]> <localdir|file> | put <localdir|file> <dsn[(m)]>
+          | get [--binary] <dsn[(m)]> <localdir|file> | put [--binary] <localdir|file> <dsn[(m)]>
           | create <dsn> [<attrs-json>] | delete <dsn> | copy <src> <dst> [--ow|-r] | rename <a> <b>
   zx job  list [<owner> [<prefix>]] | submit <file|/uss-path|DSN[(MBR)]> | status <id> | spools <id>
           | spool <id> <n> | jcl <id> | cancel|delete|hold|release <id>
@@ -476,7 +476,7 @@ function Skip-FirstLine([string]$s) {
   return (($lines[1..($lines.Count - 1)]) -join "`n")
 }
 
-# ---- CLI passthrough (for tool/console/non-RPC system ops) ----------------
+# ---- CLI passthrough (for tool/non-RPC system ops) ------------------------
 function Invoke-Cli([string[]]$CliArgs) {
   Load-Cfg
   $cmd = Quote-Sh $script:ZBin
@@ -598,6 +598,12 @@ function Out-Resp {
 }
 
 # ---- dataset/file transfer helpers ----------------------------------------
+# readDataset/writeDataset params; "encoding":"binary" skips EBCDIC conversion.
+function New-DsParams([string]$dsn, [bool]$binary) {
+  $h = @{ dsname = $dsn }
+  if ($binary) { $h['encoding'] = 'binary' }
+  return $h
+}
 function Get-FileB64([string]$path) {
   if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { Die "local file not found: $path" }
   return [Convert]::ToBase64String([IO.File]::ReadAllBytes((Get-FullPath $path)))
@@ -822,11 +828,19 @@ if [ -x ./zowex ]; then echo "HAVE $PWD"; else echo "NEED $PWD"; fi
       Out-Resp (Invoke-Rpc 'writeDataset' @{ dsname = $p[0]; data = (Get-FileB64 $p[1]) }) 'kv'
     }
     'get' {
-      Need-Args 2 'zx ds get <dsn[(member)]> <localdir-or-file>'
-      $dsn = [string]$p[0]
-      $dst = [string]$p[1]
+      # Default is text (EBCDIC conversion); --binary asks for a byte-faithful read.
+      # Leading position only: 'zx ds get --binary ...'.
+      $binary = $false
+      $ga = @($p)
+      if ($ga.Count -ge 1 -and $ga[0] -eq '--binary') {
+        $binary = $true
+        if ($ga.Count -gt 1) { $ga = @($ga[1..($ga.Count - 1)]) } else { $ga = @() }
+      }
+      if ($ga.Count -ne 2) { Die 'usage: zx ds get [--binary] <dsn[(member)]> <localdir-or-file>' }
+      $dsn = [string]$ga[0]
+      $dst = [string]$ga[1]
       if ($dsn -match '\(.*\)') {
-        Save-RespB64 (Invoke-Rpc 'readDataset' @{ dsname = $dsn }) (Get-FullPath $dst)
+        Save-RespB64 (Invoke-Rpc 'readDataset' (New-DsParams $dsn $binary)) (Get-FullPath $dst)
         Say "zx: $dsn -> $dst"
       } else {
         New-Dir $dst
@@ -839,7 +853,7 @@ if [ -x ./zowex ]; then echo "HAVE $PWD"; else echo "NEED $PWD"; fi
         foreach ($m in @($o.result.items)) {
           $mbr = $m.name
           if (-not $mbr) { continue }
-          Save-RespB64 (Invoke-Rpc 'readDataset' @{ dsname = "$dsn($mbr)" }) (Join-Path $dstDir $mbr)
+          Save-RespB64 (Invoke-Rpc 'readDataset' (New-DsParams "$dsn($mbr)" $binary)) (Join-Path $dstDir $mbr)
           $n++
           Say "zx: $dsn($mbr) -> $(Join-Path $dst $mbr)"
         }
@@ -847,16 +861,26 @@ if [ -x ./zowex ]; then echo "HAVE $PWD"; else echo "NEED $PWD"; fi
       }
     }
     'put' {
-      Need-Args 2 'zx ds put <localdir-or-file> <dsn[(member)]>'
-      $src = [string]$p[0]
-      $dsn = [string]$p[1]
+      # Default is text (EBCDIC conversion); --binary asks for a byte-faithful write.
+      # Leading position only: 'zx ds put --binary ...'.
+      $binary = $false
+      $pa = @($p)
+      if ($pa.Count -ge 1 -and $pa[0] -eq '--binary') {
+        $binary = $true
+        if ($pa.Count -gt 1) { $pa = @($pa[1..($pa.Count - 1)]) } else { $pa = @() }
+      }
+      if ($pa.Count -ne 2) { Die 'usage: zx ds put [--binary] <localdir-or-file> <dsn[(member)]>' }
+      $src = [string]$pa[0]
+      $dsn = [string]$pa[1]
       # Returns an error message, or $null on success. Prints nothing (the caller does).
-      function Write-Member([string]$file, [string]$target) {
-        return (Get-RpcError (Invoke-Rpc 'writeDataset' @{ dsname = $target; data = (Get-FileB64 $file) }))
+      function Write-Member([string]$file, [string]$target, [bool]$asBinary) {
+        $wp = New-DsParams $target $asBinary
+        $wp['data'] = (Get-FileB64 $file)
+        return (Get-RpcError (Invoke-Rpc 'writeDataset' $wp))
       }
       if (Test-Path -LiteralPath $src -PathType Leaf) {
         if ($dsn -notmatch '\(.*\)') { Die 'target DSN must include (member) when the source is a file' }
-        $err = Write-Member $src $dsn
+        $err = Write-Member $src $dsn $binary
         if ($err) { Die "$src -> $dsn  FAILED: $err" }
         Say "zx: $src -> $dsn"
       } elseif (Test-Path -LiteralPath $src -PathType Container) {
@@ -866,7 +890,7 @@ if [ -x ./zowex ]; then echo "HAVE $PWD"; else echo "NEED $PWD"; fi
         foreach ($f in (Get-ChildItem -LiteralPath $src -File)) {
           $mbr = $f.Name.Split('.')[0].ToUpperInvariant()
           if ($mbr.Length -gt 8) { $mbr = $mbr.Substring(0, 8) }
-          $err = Write-Member $f.FullName "$dsn($mbr)"
+          $err = Write-Member $f.FullName "$dsn($mbr)" $binary
           if ($err) { Note "$($f.Name) -> $dsn($mbr)  FAILED: $err"; $fail++ }
           else { Say "zx: $($f.Name) -> $dsn($mbr)"; $n++ }
         }
@@ -1043,8 +1067,37 @@ if [ -x ./zowex ]; then echo "HAVE $PWD"; else echo "NEED $PWD"; fi
 }
 
 'console' {
-  if ($rest.Count -lt 1) { Die "usage: zx console '<cmd>' [--cn <name>] [--timeout <s>] [--no-wait]" }
-  Invoke-Cli (@('console', 'issue') + $rest)
+  # consoleCommand RPC: the server spawns the APF-authorized zoweax binary per
+  # request (next to zowex, on PATH, or via ZOWEAX_PATH on the remote host)
+  $usage = "usage: zx console '<cmd>' [--cn <name>] [--timeout <s>] [--no-wait]"
+  if ($rest.Count -lt 1) { Die $usage }
+  $cn = ''
+  $ct = ''
+  $cw = $null
+  $words = @()
+  $i = 0
+  while ($i -lt $rest.Count) {
+    $a = [string]$rest[$i]
+    if ($a -eq '--cn' -or $a -eq '--console-name') {
+      if ($i + 1 -ge $rest.Count) { Die "$a requires a value" }
+      $cn = [string]$rest[$i + 1]; $i += 2
+    } elseif ($a -eq '--timeout') {
+      if ($i + 1 -ge $rest.Count) { Die '--timeout requires a value' }
+      $ct = [string]$rest[$i + 1]; $i += 2
+    } elseif ($a -eq '--no-wait') {
+      $cw = $false; $i += 1
+    } else {
+      $words += $a; $i += 1
+    }
+  }
+  $cmdText = ($words -join ' ')
+  if (-not $cmdText) { Die $usage }
+  if ($ct -and ($ct -notmatch '^\d+$')) { Die '--timeout must be a number of seconds' }
+  $cp = @{ commandText = $cmdText }
+  if ($cn) { $cp['consoleName'] = $cn }
+  if ($ct) { $cp['timeout'] = [int]$ct }
+  if ($null -ne $cw) { $cp['wait'] = $cw }
+  Out-Resp (Invoke-Rpc 'consoleCommand' $cp) 'text'
 }
 
 default { Die "unknown group '$grp' - run 'zx help'" }
