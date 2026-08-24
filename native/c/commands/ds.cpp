@@ -686,16 +686,14 @@ int handle_data_set_resolve_alias(InvocationContext &context)
   std::transform(aliasDsn.begin(), aliasDsn.end(), aliasDsn.begin(), ::toupper);
   const auto result = obj();
   std::string idcamsOutput = "";
-  // must prepend control statements with a space on each line's zeroth character
-  std::string idcamsInput = " LISTCAT ENTRIES('" + aliasDsn + "') ALL\n";
+  // must prepend control statements with a space on each line's first character
+  std::string idcamsInput = " LISTCAT -\n ENTRIES('" + aliasDsn + "') -\n ALL\n";
   std::string idcamsError = "";
   std::string failMsg = "Could not determine the target data set for the specified alias. Ensure the alias exists and is cataloged.\n";
   rc = zds_idcams(idcamsInput, idcamsOutput, idcamsError);
   if (rc != 0)
   {
-    context.error_stream() << "Error: "
-                           << idcamsOutput << std::endl
-                           << idcamsError << std::endl;
+    ZLOG_ERROR("Error resolving data set alias '%s': %s\n%s", aliasDsn, idcamsOutput, idcamsError);
     context.error_stream() << failMsg;
     return RTNCD_FAILURE;
   }

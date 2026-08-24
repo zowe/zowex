@@ -17,6 +17,7 @@ import { ListDataSetMembersDefinition } from "./data-set-members/DataSetMembers.
 import { ListJobsDefinition } from "./jobs/Jobs.definition";
 import { ListSpoolFilesDefinition } from "./spool-files/SpoolFiles.definition";
 import { ListUssFilesDefinition } from "./uss-files/UssFiles.definition";
+import { ListAliasDefinition } from "./alias/Alias.definition";
 
 const ListDefinition: ICommandDefinition = {
     name: "list",
@@ -25,6 +26,7 @@ const ListDefinition: ICommandDefinition = {
     description: "List data sets, data set members, uss files, jobs, spool files",
     type: "group",
     children: [
+        ListAliasDefinition,
         ListDataSetDefinition,
         ListDataSetMembersDefinition,
         ListUssFilesDefinition,

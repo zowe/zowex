@@ -2471,7 +2471,6 @@ void zds_tests()
                                             });
                                  });
                       });
-
              describe("DCB abend",
                       [&]() -> void
                       {

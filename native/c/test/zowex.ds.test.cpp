@@ -24,7 +24,6 @@
 #include "ztest.hpp"
 #include "zutils.hpp"
 #include "ztype.h"
-#include "zowex.test.hpp"
 #include "zowex.ds.test.hpp"
 #include "../zusf.hpp"
 #include "../zjb.hpp"
@@ -43,6 +42,7 @@ void _create_ds(const std::string &ds_name, const std::string &ds_options = "")
 void zowex_ds_tests()
 {
   std::vector<std::string> _ds;
+  std::vector<std::string> created_aliases;
   describe("data-set",
            [&]() -> void
            {
@@ -2108,5 +2108,101 @@ void zowex_ds_tests()
                                         Expect(matching_threads).ToBe(1); }, concurrent_opts);
                                  });
                       });
+             describe("resolve-alias",
+                      [&]() -> void
+                      {
+                        beforeEach([&]() -> void
+                                   { _ds.push_back(get_random_ds()); });
+                        it("should resolve an alias to a sequential data set",
+                           [&]() -> void
+                           {
+                             std::string target = _ds.back();
+                             _create_ds(target, "--dsorg PS");
+
+                             std::string alias_name = get_random_ds() + ".ALIAS";
+                             std::string makeAliasOutput;
+                             std::string makeAliasError;
+
+                             int rc = zds_idcams(
+                                 " DEFINE ALIAS (NAME(" + alias_name + ") -\n RELATE(" + target + "))\n", makeAliasOutput, makeAliasError);
+
+                             ExpectWithContext(rc, "Failed to create alias with rc " + std::to_string(rc) +
+                                                       ". Idcams output/error:" + makeAliasOutput + "\n" + makeAliasError)
+                                 .ToBe(0);
+
+                             created_aliases.push_back(alias_name);
+                             std::string response;
+                             std::string command = zowex_command + " data-set resolve-alias " + alias_name;
+                             rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain(target);
+                           });
+
+                        it("should resolve an alias to a PDS",
+                           [&]() -> void
+                           {
+                             std::string target = _ds.back();
+                             _create_ds(target, "--dsorg PO");
+
+                             std::string alias_name = get_random_ds() + ".ALIAS";
+                             std::string makeAliasOutput;
+                             std::string makeAliasError;
+
+                             int rc = zds_idcams(
+                                 " DEFINE ALIAS (NAME(" + alias_name + ") -\n RELATE(" + target + "))\n", makeAliasOutput, makeAliasError);
+
+                             ExpectWithContext(rc, "Failed to create alias with rc " + std::to_string(rc) +
+                                                       ". Idcams output/error:" + makeAliasOutput + "\n" + makeAliasError)
+                                 .ToBe(0);
+
+                             created_aliases.push_back(alias_name);
+                             std::string response;
+                             std::string command = zowex_command + " data-set resolve-alias " + alias_name;
+                             rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain(target);
+                           });
+
+                        it("should resolve an alias to a PDSE",
+                           [&]() -> void
+                           {
+                             std::string target = _ds.back();
+                             _create_ds(target, "--dsorg PO --dsntype LIBRARY --recfm F,B --dirblk 5");
+
+                             std::string alias_name = get_random_ds() + ".ALIAS";
+                             std::string makeAliasOutput;
+                             std::string makeAliasError;
+
+                             int rc = zds_idcams(
+                                 " DEFINE ALIAS (NAME(" + alias_name + ") -\n RELATE(" + target + "))\n", makeAliasOutput, makeAliasError);
+
+                             ExpectWithContext(rc, "Failed to create alias with rc " + std::to_string(rc) +
+                                                       ". Idcams output/error:" + makeAliasOutput + "\n" + makeAliasError)
+                                 .ToBe(0);
+
+                             created_aliases.push_back(alias_name);
+                             std::string response;
+                             std::string command = zowex_command + " data-set resolve-alias " + alias_name;
+                             rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain(target);
+                           });
+                      });
+
+             afterAll([&]() -> void
+                      {
+                                   std::string cleanup_idcams;
+                                   std::string cleanup_err;
+                                   std::string cleanup_output;
+                                                     for (const auto &alias : created_aliases)
+                   {
+                                   cleanup_idcams += "  DELETE -\n"+alias+" -\n ALIAS\n";
+                   }
+                                   cleanup_idcams += "  SET MAXCC = 0\n";
+                                   int rc = zds_idcams(cleanup_idcams, cleanup_output, cleanup_err);
+                                    TestLog("Cleanup RC from IDCAMS: " + std::to_string(rc));
+                                    if (rc !=0 ){
+                                       throw std::runtime_error("Output and error from failed IDCAMS cleanup:" + cleanup_err + "\n" + cleanup_output +"\n");
+                                    } });
            });
 }
