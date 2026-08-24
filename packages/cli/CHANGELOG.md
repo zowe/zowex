@@ -4,6 +4,10 @@ All notable changes to the Client code for "zowex-for-zowe-cli" are documented i
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## Recent Changes
+
+- Added the `zssh issue console-command` command. The `--console-name` option is now optional and defaults to the current user ID. [#1112](https://github.com/zowe/zowex/issues/1112)
+
 ## `0.8.0`
 
 - Added ESM (RACF or equivalent) certificate and key ring management to the `zssh system` command group over SSH: `zssh system keyring create|delete|list|list-rings|count` and `zssh system cert import|export|delete|show|connect|set-default|trust|rename|refresh`. [#1079](https://github.com/zowe/zowex/pull/1079)
