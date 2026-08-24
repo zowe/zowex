@@ -4,7 +4,7 @@ All notable changes to the native code for "zowex" are documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## Recent Changes
+## `0.9.0`
 
 - `c`: `unixCommand` returns stderr in a new optional `stderr` response field. [#1112](https://github.com/zowe/zowex/issues/1112)
 - **Breaking:** `c`: `zowex` `console` command group is removed. [#1112](https://github.com/zowe/zowex/issues/1112)
