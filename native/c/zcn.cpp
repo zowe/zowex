@@ -9,9 +9,13 @@
  *
  */
 
+#include <array>
+#include <atomic>
 #include <cstdio>
 #include <cstring>
+#include <ctime>
 #include <fstream>
+#include <unistd.h>
 #include <iostream>
 #include <string>
 #include <iomanip>
@@ -21,12 +25,32 @@
 #include "zut.hpp"
 #include "zcntype.h"
 
+int zcn_build_default_console_name(std::string &name)
+{
+  name.clear();
+  int rc = zut_get_current_user(name);
+  if (0 != rc || name.empty())
+  {
+    name.clear();
+    return RTNCD_FAILURE;
+  }
+  if (name.length() > 7)
+  {
+    name.erase(7);
+  }
+
+  static std::atomic<unsigned int> console_seq(0);
+  name += std::to_string(((unsigned int)getpid() + console_seq++) % 10u);
+  return RTNCD_SUCCESS;
+}
+
 int zcn_activate(ZCN *zcn, const std::string &console_name)
 {
   int rc = 0;
   zcn->diag.detail_rc = 0;
 
   memcpy(zcn->eye, ZCN_EYE, sizeof(zcn->eye));
+  memset(zcn->cart, 0x00, sizeof(zcn->cart));
 
   zut_uppercase_pad_truncate(zcn->console_name, console_name, sizeof(zcn->console_name));
 
@@ -53,6 +77,13 @@ int zcn_put(ZCN *zcn, const std::string &command)
   int rc = 0;
   zcn->diag.detail_rc = 0;
 
+  // unique cart
+  static unsigned int cart_seq = 0;
+  std::array<char, sizeof(zcn->cart) + 1> cart_buf = {};
+  const unsigned int cart_val = ((unsigned int)time(nullptr) ^ (++cart_seq << 8)) & 0xFFFFFFu;
+  snprintf(cart_buf.data(), cart_buf.size(), "ZC%06X", cart_val);
+  memcpy(zcn->cart, cart_buf.data(), sizeof(zcn->cart));
+
   char *command31 = (char *)__malloc31(command.length() + 1);
   if (command31 == nullptr)
   {
@@ -72,6 +103,9 @@ int zcn_get(ZCN *zcn, std::string &response)
 {
   int rc = 0;
   zcn->diag.detail_rc = 0;
+
+  if ('\0' == zcn->cart[0])
+    memcpy(zcn->cart, "ZOWECART", sizeof(zcn->cart));
 
   // user caller buffer size if provided
   if (0 == zcn->buffer_size)
