@@ -515,7 +515,8 @@ ZJSON_SCHEMA(WriteFileResponse,
 struct IssueUssCmdResponse {};
 ZJSON_SCHEMA(IssueUssCmdResponse,
     FIELD_REQUIRED(success, BOOL),
-    FIELD_REQUIRED(data, STRING)
+    FIELD_REQUIRED(data, STRING),
+    FIELD_OPTIONAL(stderr, STRING)
 );
 
 struct MoveFileResponse {};

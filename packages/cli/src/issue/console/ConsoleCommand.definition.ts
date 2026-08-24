@@ -36,9 +36,10 @@ export const ConsoleCommand: ICommandDefinition = {
         {
             name: "console-name",
             aliases: ["cn"],
-            description: "Specify the console name of the console to issue the command to.",
+            description:
+                "Specify the console name of the console to issue the command to. Defaults to the current user ID plus a digit.",
             type: "string",
-            required: true,
+            required: false,
         },
     ],
     profile: { optional: ["ssh"] },

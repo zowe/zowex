@@ -146,7 +146,9 @@ ZJSON_SCHEMA(CountRingRequest,
 struct IssueConsoleCmdRequest {};
 ZJSON_SCHEMA(IssueConsoleCmdRequest,
     FIELD_REQUIRED(commandText, STRING),
-    FIELD_OPTIONAL(consoleName, STRING)
+    FIELD_OPTIONAL(consoleName, STRING),
+    FIELD_OPTIONAL(timeout, NUMBER),
+    FIELD_OPTIONAL(wait, BOOL)
 );
 
 struct GetInfoRequest {};

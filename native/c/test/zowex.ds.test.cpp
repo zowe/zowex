@@ -1465,7 +1465,6 @@ void zowex_ds_tests()
                              ExpectWithContext(rc, response).ToBe(0);
                              Expect(response).ToContain("Wrote data to '" + ds + "'");
 
-                             // Writing must not alter the data set's DCB attributes
                              command = zowex_command + " data-set list " + ds + " -a --rfc";
                              rc = execute_command_with_output(command, response);
                              ExpectWithContext(rc, response).ToBe(0);

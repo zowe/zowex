@@ -534,6 +534,12 @@ int handle_uss_issue_cmd(InvocationContext &context)
       context.error_stream() << "  Details: " << stderr_response << std::endl;
     }
   }
+  else if (!stderr_response.empty())
+  {
+    const auto result = ast::obj();
+    result->set("stderr", ast::str(stderr_response));
+    context.set_object(result);
+  }
 
   context.output_stream() << stdout_response << '\n';
 
