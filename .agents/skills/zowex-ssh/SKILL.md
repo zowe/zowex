@@ -112,7 +112,7 @@ ssh "$ZX_HOST" "$ZX_BIN --help"
 
 If `pax -rvf` fails on the `.Z`, do `uncompress server.pax.Z && pax -rvf server.pax`.
 
-The CLI also exposes `console` / `tso` / `system` / `tool` subcommands — run `$ZX_BIN <cmd> --help` if you need one of those interactively. Only a subset is exposed via JSON-RPC (see §3). This CLI-only gap isn't limited to those four groups: `data-set copy` is CLI-only too (no `copyDataset` RPC — see §3's Datasets table). When in doubt whether a `zowex data-set`/`job`/`uss` verb has an RPC equivalent, check `$ZX_BIN data-set --help` against §3 rather than assuming parity.
+The CLI also exposes `tso` / `system` / `tool` subcommands — run `$ZX_BIN <cmd> --help` if you need one of those interactively. Only a subset is exposed via JSON-RPC (see §3; `tso` is RPC-backed, most of `system`/`tool` is CLI-only). Console is special: on servers newer than v0.8.0 the `console` CLI group exists only in the separate APF-authorized `zoweax` binary, and the `consoleCommand` RPC (see §3) is how `zowex server` reaches it. This CLI-only gap isn't limited to those groups: `data-set copy` is CLI-only too (no `copyDataset` RPC — see §3's Datasets table). When in doubt whether a `zowex data-set`/`job`/`uss` verb has an RPC equivalent, check `$ZX_BIN data-set --help` against §3 rather than assuming parity.
 
 ---
 
@@ -157,13 +157,13 @@ $zx = '.agents\skills\zowex-ssh\zx.ps1'   # or install the zx.cmd shim onto PATH
 
 | group | subcommands |
 |---|---|
-| `zx ds` | `list <pat>` · `members <dsn>` · `read <dsn>` · `write <dsn> <file>` · `get`/`put` (member or whole PDS) · `create` · `delete` · `copy` · `rename` |
+| `zx ds` | `list <pat>` · `members <dsn>` · `read <dsn>` · `write <dsn> <file>` · `get`/`put` `[--binary]` (member or whole PDS; default is text with EBCDIC conversion — pass `--binary` for byte-faithful transfer, e.g. load modules or tersed files) · `create` · `delete` · `copy` · `rename` |
 | `zx job` | `list [<owner> [<prefix>]]` · `submit <file>` · `status <id>` · `spools <id>` · `spool <id> <n>` · `jcl <id>` · `cancel`/`delete`/`hold`/`release <id>` |
 | `zx uss` | `ls` · **`get`/`put`** (sftp, binary-safe) · `read`/`write` (RPC, text) · `rm` · `mkdir` · `mv` · `cp` · `chmod` · `chown` · `chtag` · `sh '<cmd>'` |
 | `zx tso` | `'<cmd>'` |
 | `zx system` | `apf` · `linklist` · `proclib` · `syslog` (RPC) · `parmlib` · `subsystems` · `symbol <s>` (CLI) |
 | `zx tool` | `amblist <dsn> --cs '<stmts>'` · `run <pgm> [opts]` · `search <dsn> <str>` · `dynalloc` · `dsect` (all CLI) |
-| `zx console` | `'<cmd>' [--cn <n>] [--timeout <s>] [--no-wait]` (CLI; needs APF — fails `Not authorized - 4` from a plain USS dir) |
+| `zx console` | `'<cmd>' [--cn <n>] [--timeout <s>] [--no-wait]` (RPC `consoleCommand`, servers > v0.8.0; needs `zoweax` installed + APF-authorized on the host and ESM OPERCMDS grants for non-display commands) |
 | `zx rpc` | `<method> ['<params>']` — raw escape hatch |
 
 There is no `zx` group yet for the ESM certificate / key ring commands (`zowex system cert ...` / `zowex system keyring ...`, servers newer than v0.7.0) — drive them with `zx rpc <method>` (see §3's Certificates table) or CLI passthrough: `ssh "$ZX_HOST" "$ZX_BIN system keyring list-rings $USER"`.
@@ -287,6 +287,16 @@ authenticates once (§8).
 |---|---|
 | `tsoCommand` | `{"commandText":"<tso cmd>"}` — `result.data` is plain text |
 
+### Console
+
+**Server version gate:** `consoleCommand` exists only in servers **newer than v0.8.0** (zowex PR #1110). On older servers it returns `-32601 Unrecognized command`.
+
+| method | params |
+|---|---|
+| `consoleCommand` | `{"commandText":"<mvs cmd>","consoleName"?:"<name>","timeout"?:N,"wait"?:bool}` — `result.data` is plain text |
+
+The server spawns the APF-authorized **`zoweax`** binary per request (located next to `zowex`, on the server's `PATH`, or via `ZOWEAX_PATH` on the remote host) — the server itself never holds APF authorization. Prereqs on the host: `zoweax` installed and `extattr +ap`'d by a system programmer, and ESM OPERCMDS grants (`MVS.*` profiles, e.g. `MVS.REPLY.*` for WTOR replies) for anything beyond informational `D ...` displays. `consoleName` defaults to the SSH user's ID plus a digit suffix; console activation can be gated per user with `MVS.MCSOPER.<name>` profiles. Failures come back with actionable messages ("command not found" → zoweax not installed; "Not authorized" → not APF-authorized or ESM denied).
+
 ### Certificates / key rings (ESM)
 
 **Server version gate:** these methods exist only in servers **newer than v0.7.0** (zowex PR #1079). On older servers they return `-32601 Unrecognized command`. The caller's SSH user needs the corresponding ESM `IRR.DIGTCERT.*` / `RDATALIB` authority — without it, calls fail with a SAF diagnostic (see below), not an auth prompt.
@@ -315,7 +325,7 @@ Conventions shared by these methods:
 - Failures return `result.success:false` with `message`, `service`, and a structured `safReturns` object (`functionCode`, `safReturnCode`, `esmReturnCode`, `esmReasonCode`); GSK (System SSL) failures add `gskReturnCode`. Non-fatal SAF warnings (rc 4) succeed with a `warning` string.
 - `owner`, `keyring`, and `label` are case-sensitive (userids normally uppercase).
 
-`unixCommand` / `tsoCommand` are the escape hatches for anything not covered. There is **no JSON-RPC console method** (the `zowex console` CLI subcommand exists but isn't exposed over RPC) — use `unixCommand` with a host-side `opercmd`-equivalent if you need one, or fall back to `ssh "$ZX_HOST" "$ZX_BIN console issue ..."`.
+`unixCommand` / `tsoCommand` are the escape hatches for anything not covered. MVS console commands have their own method on servers newer than v0.8.0 — `consoleCommand` (see the Console table above). On older servers, run the APF-authorized companion binary directly on the host: `ssh "$ZX_HOST" "zoweax console issue ..."` (`zowex console issue` only exists on pre-v0.8.x binaries and requires the old fat `zoweax` there too).
 
 ---
 
