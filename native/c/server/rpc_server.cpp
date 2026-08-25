@@ -113,6 +113,10 @@ void RpcServer::process_request(const string &request_data)
       const auto &err_object = context.get_object();
       if (err_object)
       {
+        if (!error_data.empty() && err_object->is_object())
+        {
+          err_object->set("details", ast::str(error_data));
+        }
         print_error(request.id, result, error_message, convert_ast_to_json(err_object));
         return;
       }
