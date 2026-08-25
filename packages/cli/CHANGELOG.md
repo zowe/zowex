@@ -6,7 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes 
 
-- **Breaking** The `zowex` top level command group of this plugin has been renamed to `zo`. The `zssh` alias will still function. [#1119](https://github.com/zowe/zowex/pull/1119) 
+- The `zowex` top level command group of this plugin has been renamed to `zo`. `zowex` and `zssh` will still function as aliases. [#1119](https://github.com/zowe/zowex/pull/1119) 
 
 ## `0.9.0`
 

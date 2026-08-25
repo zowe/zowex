@@ -16,7 +16,7 @@ const config: IImperativeConfig = {
     rootCommandDescription: "Zowe Remote SSH Plug-in for Zowe CLI",
     productDisplayName: "z/OS SSH Plug-in",
     name: "zo",
-    pluginAliases: ["zssh"],
+    pluginAliases: ["zssh", "zowex"],
     pluginSummary: "z/OS Files and jobs via SSH",
     pluginFirstSteps: `
 If you do not have a Zowe team configuration, run the \`zowe config init\` command to create one.

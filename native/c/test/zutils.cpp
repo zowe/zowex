@@ -11,6 +11,7 @@
 
 #include "ztest.hpp"
 #include "zutils.hpp"
+#include "../zut.hpp"
 #include <vector>
 #include <string>
 #include <cstring>
