@@ -137,7 +137,7 @@ build-out/zo.job.manage.test.o \
 build-out/zo.test.o \
 build-out/zo.tso.test.o \
 build-out/zo.plugin.test.o \
-build-out/zoweax.console.test.o \
+build-out/zoa.console.test.o \
 build-out/zutils.o \
 build-out/parser.test.o \
 build-out/zlogger.test.o \
@@ -236,7 +236,7 @@ build-out/zo.tso.test.o: zo.tso.test.cpp
 build-out/zo.plugin.test.o: zo.plugin.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
-build-out/zoweax.console.test.o: zoweax.console.test.cpp
+build-out/zoa.console.test.o: zoa.console.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
 build-out/zo.test.o: zo.test.cpp
