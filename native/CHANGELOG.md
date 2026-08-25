@@ -6,7 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
-- **Breaking:** `c`: Rename the `zowex` binary to `zo`, and the `zoweax` binary to `zoa`.[#TODO](TODO)
+- **Breaking:** `c`: Rename the `zowex` binary to `zo`, and the `zoweax` binary to `zoa`. [#1119](https://github.com/zowe/zowex/pull/1119)
 
 ## `0.9.0`
 
