@@ -16,6 +16,15 @@ Consult the product's own documentation for anything beyond these paths:
 *z/OS Security Server RACF Command Language Reference*, *CA ACF2 for z/OS
 Administrator Guide*, *CA Top Secret for z/OS Command Functions Guide*.
 
+> **Site policy — warn the user before creating anything.** These paths
+> deliberately create accounts with non-expiring passwords (`NOINTERVAL`,
+> `PASSWORD(pw,0)`, `MAXDAYS(0)`/`NOPSWD-EXP`) so non-interactive SSH keeps
+> working. That very likely deviates from site password policy and can be
+> flagged by security audits. Say so up front, confirm the site's security
+> administration allows it (or that the user accepts the deviation on a test
+> system), and treat the account as temporary: remove it with the product's
+> removal steps below when testing ends.
+
 ---
 
 ## 1 - Identify the active ESM
