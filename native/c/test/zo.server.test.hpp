@@ -33,7 +33,7 @@ std::string make_rpc_request(const std::string &method, const std::string &param
 std::string make_rpc_request(const std::string &method, const std::string &params);
 
 extern const std::string zowex_dir;
-extern const std::string zowex_server_command;
+extern const std::string zo_server_command;
 
 void zo_server_tests();
 

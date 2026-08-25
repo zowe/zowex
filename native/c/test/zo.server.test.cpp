@@ -184,7 +184,7 @@ std::string make_rpc_request(const std::string &method, const std::string &param
 }
 
 const std::string zowex_dir = "./../build-out";
-const std::string zowex_server_command = zowex_dir + "/zo server";
+const std::string zo_server_command = zowex_dir + "/zo server";
 
 void zo_server_tests()
 {
@@ -195,7 +195,7 @@ void zo_server_tests()
              it("should print ready message on startup",
                 []() -> void
                 {
-                  ServerHandle server = start_server(zowex_server_command);
+                  ServerHandle server = start_server(zo_server_command);
                   std::string response = read_line_from_server(server);
                   stop_server(server);
 
@@ -205,7 +205,7 @@ void zo_server_tests()
              it("should print ready message with version",
                 []() -> void
                 {
-                  ServerHandle server = start_server(zowex_server_command);
+                  ServerHandle server = start_server(zo_server_command);
                   std::string response = read_line_from_server(server);
                   stop_server(server);
 
@@ -222,7 +222,7 @@ void zo_server_tests()
              it("should return error message for invalid JSON input",
                 []() -> void
                 {
-                  ServerHandle server = start_server(zowex_server_command, true);
+                  ServerHandle server = start_server(zo_server_command, true);
                   write_to_server(server, "invalid\n");
                   std::string response = read_line_from_server(server);
                   stop_server(server);
@@ -233,7 +233,7 @@ void zo_server_tests()
              it("should execute unixCommand and return output",
                 []() -> void
                 {
-                  ServerHandle server = start_server(zowex_server_command, true);
+                  ServerHandle server = start_server(zo_server_command, true);
                   write_to_server(server, "{\"jsonrpc\":\"2.0\",\"method\":\"unixCommand\",\"params\":{\"commandText\":\"whoami\"},\"id\":1}\n");
                   std::string response = read_line_from_server(server);
                   stop_server(server);
@@ -245,7 +245,7 @@ void zo_server_tests()
              it("should execute getInfo and return output",
                 []() -> void
                 {
-                  ServerHandle server = start_server(zowex_server_command, true);
+                  ServerHandle server = start_server(zo_server_command, true);
                   write_to_server(server, "{\"jsonrpc\":\"2.0\",\"method\":\"getInfo\",\"params\":{},\"id\":1}\n");
                   std::string response = read_line_from_server(server);
                   stop_server(server);
@@ -271,10 +271,10 @@ void zo_server_tests()
                   Expect(buildDate.length()).ToBeGreaterThanOrEqualTo(11); // MMM DD YYYY at minimum
                 });
 
-             it("should execute consoleCommand via zoweax and return output",
+             it("should execute consoleCommand via zoa and return output",
                 []() -> void
                 {
-                  ServerHandle server = start_server(zowex_server_command, true);
+                  ServerHandle server = start_server(zo_server_command, true);
                   write_to_server(server, "{\"jsonrpc\":\"2.0\",\"method\":\"consoleCommand\",\"params\":{\"commandText\":\"D T\"},\"id\":1}\n");
                   std::string response = read_line_from_server(server);
                   stop_server(server);
@@ -283,22 +283,22 @@ void zo_server_tests()
                   Expect(response).ToContain("IEE136I");
                 });
 
-             it("should return an error when zoweax cannot be found",
+             it("should return an error when zoa cannot be found",
                 []() -> void
                 {
-                  ServerHandle server = start_server("ZOWEAX_PATH=/nonexistent/zoweax " + zowex_server_command, true);
+                  ServerHandle server = start_server("ZOWEAX_PATH=/nonexistent/zoa " + zo_server_command, true);
                   write_to_server(server, "{\"jsonrpc\":\"2.0\",\"method\":\"consoleCommand\",\"params\":{\"commandText\":\"D T\"},\"id\":1}\n");
                   std::string response = read_line_from_server(server);
                   stop_server(server);
 
                   Expect(response).Not().ToContain("\"success\":true");
-                  Expect(response).ToContain("zoweax");
+                  Expect(response).ToContain("zoa");
                 });
 
              it("should preserve stderr detail in RPC error responses",
                 []() -> void
                 {
-                  ServerHandle server = start_server(zowex_server_command, true);
+                  ServerHandle server = start_server(zo_server_command, true);
                   write_to_server(server, "{\"jsonrpc\":\"2.0\",\"method\":\"unixCommand\",\"params\":{\"commandText\":\"echo ONLY_STDERR >&2; exit 7\"},\"id\":1}\n");
                   std::string response = read_line_from_server(server);
                   stop_server(server);
@@ -311,7 +311,7 @@ void zo_server_tests()
              it("should surface stderr from a successful unixCommand",
                 []() -> void
                 {
-                  ServerHandle server = start_server(zowex_server_command, true);
+                  ServerHandle server = start_server(zo_server_command, true);
                   write_to_server(server, "{\"jsonrpc\":\"2.0\",\"method\":\"unixCommand\",\"params\":{\"commandText\":\"echo THIS_IS_STDOUT; echo THIS_IS_STDERR >&2\"},\"id\":1}\n");
                   std::string response = read_line_from_server(server);
                   stop_server(server);

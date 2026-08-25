@@ -32,7 +32,7 @@ void zo_uss_server_tests()
 
              beforeAll([&]() -> void
                        {
-      server = start_server(zowex_server_command, true);
+      server = start_server(zo_server_command, true);
 
       // Create test directory with full permissions for all test operations
       std::string response;

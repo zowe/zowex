@@ -103,6 +103,6 @@ void zo_tests()
              zo_plugin_tests();
            });
 
-  describe("zoweax", []() -> void
+  describe("zoa", []() -> void
            { zoa_console_tests(); });
 }

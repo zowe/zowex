@@ -32,7 +32,7 @@ void zo_cert_server_tests()
     ServerHandle server;
 
     beforeAll([&]() -> void {
-      server = start_server(zowex_server_command, true);
+      server = start_server(zo_server_command, true);
     });
 
     afterAll([&]() -> void {

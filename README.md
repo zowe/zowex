@@ -54,7 +54,7 @@ See the [CLI readme](./packages/cli/README.md) for more details about using the 
 
 ### Native binaries
 
-To run the `zo` CLI on z/OS, connect to USS shell (OMVS) and `cd` to `c/build-out` inside the deploy directory. Then run `zo`. MVS console commands live in the separate APF-authorized `zoweax` binary (`zoweax console issue "D T"`) — see [doc/zoa-security.md](./doc/zoa-security.md) for how to install and secure it.
+To run the `zo` CLI on z/OS, connect to USS shell (OMVS) and `cd` to `c/build-out` inside the deploy directory. Then run `zo`. MVS console commands live in the separate APF-authorized `zoa` binary (`zoa console issue "D T"`) — see [doc/zoa-security.md](./doc/zoa-security.md) for how to install and secure it.
 
 See the [native readme](./native/README.md) for more details about building the native components.
 
