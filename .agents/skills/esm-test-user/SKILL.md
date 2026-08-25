@@ -78,6 +78,12 @@ LU       TESTUSER OMVS NORACF               /* verify UID / HOME / PROGRAM */
 Removal: `DELUSER TESTUSER`.
 
 Notes:
+- The GID is not set on the user — the UNIX group identity comes from the
+  default group's OMVS segment. Verify with `LG grp OMVS NORACF`; if the group
+  has no GID, assign one once with `ALTGROUP grp OMVS(GID(nnnn))`. Without it
+  the UNIX identity is incomplete and SSH login fails. (Sites with
+  `BPX.UNIQUE.USER` auto-assignment may not need explicit values; the explicit
+  form works everywhere.)
 - `PASS-INTERVAL` in `LU` output shows the expiry interval; `NOINTERVAL` sets it
   to none.
 - An account revoked by failed logons is cleared with
@@ -101,6 +107,9 @@ TSS LIST(TESTUSER) DATA(ALL)
 Removal: `TSS DELETE(TESTUSER)`.
 
 Notes:
+- The group ACID must carry a GID for the UNIX identity to be complete —
+  check `TSS LIST(grp)` and assign once with `TSS ADDTO(grp) GID(nnnn)` if
+  missing.
 - `PASSWORD(pw,0)` — the trailing `0` is the expiry interval and means never.
 - A DEPARTMENT is mandatory. Find one with `TSS LIST(deptname)`, or read the
   `OWNER(...)` value from `TSS WHOHAS OPERCMDS(MVS.)`.
@@ -142,7 +151,11 @@ The `ACF` command enters a subcommand environment and cannot be driven by
 /*
 ```
 
-Then rebuild the profile directory so the OMVS record takes effect:
+Broadcom documents OMVS profile updates as dynamically activated, so a
+directory rebuild is normally unnecessary for this record (see
+[USER profile records](https://techdocs.broadcom.com/us/en/ca-mainframe-software/security/ca-acf2-for-z-os/16-0/administrating/administer-records/user-profile-records.html)).
+It is cheap and harmless though — if the new user's SSH login fails with a
+UID/identity lookup error, run it before debugging further:
 
 ```
 F ACF2,REBUILD(USR),CLASS(P)
@@ -152,6 +165,8 @@ Removal: `SET LID` then `DELETE TESTUSER`, and `SET PROFILE(USER)
 DIVISION(OMVS)` then `DELETE TESTUSER`.
 
 Notes:
+- The group needs a GID as well for a complete UNIX identity — if missing:
+  `SET PROFILE(GROUP) DIVISION(OMVS)` then `INSERT grp GID(nnnn)`.
 - `MAXDAYS(0)` means the password does not expire.
 - The GSO `PSWDFRC` option forces a new password at next signon, which breaks
   non-interactive SSH. `CHANGE TESTUSER NOPSWD-EXP` clears the flag after the
