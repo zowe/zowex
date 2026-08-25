@@ -642,15 +642,16 @@ int ZUTIDCAM(const char *sysinDdName, const char *sysprintDdName)
   memcpy(ddNameList.sysprint, sysprintDdName,
          strlen(sysprintDdName) > sizeof(ddNameList.sysprint) ? sizeof(ddNameList.sysprint) : strlen(sysprintDdName));
 
+  char programName[8] = "IDCAMS";
   // IDCAMS must be entered in 31-bit mode. https://www.ibm.com/docs/en/zos/3.1.0?topic=commands-invoking-access-method-services-from-your-program
-  IDCAMS idcams = (IDCAMS)load_module31("IDCAMS");
+  IDCAMS idcams = (IDCAMS)load_module31(programName);
   // www.ibm.com/docs/en/zos/3.1.0?topic=instructions-load-call-macro
   // ddnameList is the current last entry so set the high order bit to indicate the last
   unsigned int parm_list[2];
   parm_list[0] = (unsigned int)(uintptr_t)&options;
   parm_list[1] = (unsigned int)(uintptr_t)&ddNameList | 0x80000000U;
   rc = idcams(parm_list[0], parm_list[1]);
-  delete_module("IDCAMS");
+  delete_module(programName);
 
   return rc;
 }
