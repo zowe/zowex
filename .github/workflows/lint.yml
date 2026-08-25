@@ -28,13 +28,5 @@ jobs:
       - name: Check for string-keyed hash containers
         run: npm run lint:compat
 
-      - name: Run Cpp-Linter
-        uses: cpp-linter/cpp-linter-action@v2
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        with:
-          ignore: c/chdsect
-          repo-root: native
-          style: file
-          tidy-checks: "-*"
-          version: 21
+      - name: Run lint:cpp
+        run: npm run lint:cpp
