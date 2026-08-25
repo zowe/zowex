@@ -40,7 +40,7 @@
 constexpr unsigned int ZOWEX_PLUGIN_ABI_VERSION = 2u;
 
 // Plug-ins must expand this once, in the same translation unit as register_plugin().
-#define ZOWEX_PLUGIN_DECLARE_ABI()                   \
+#define ZO_PLUGIN_DECLARE_ABI()                      \
   extern "C" unsigned int zowex_plugin_abi_version() \
   {                                                  \
     return ZOWEX_PLUGIN_ABI_VERSION;                 \

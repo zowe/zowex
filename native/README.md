@@ -6,7 +6,7 @@ The following sections relate to code in the `native/c` folder.
 
 ### Logging
 
-The C++ application includes a ZLogger singleton class for centralized logging. When `ZLOG_ENABLE` is defined during compilation, the logger automatically creates a `.zowex/logs/` directory in the current user's home directory and writes log output to `~/.zowex/logs/zowex.log`. Logs are written per-user (rather than to a location shared by all users of the binary, such as next to the executable) so that concurrent users of a shared zowex installation don't contend for the same log file. The `zowex server` daemon similarly writes its logs to `~/.zowex/logs/zowex_server.log`.
+The C++ application includes a ZLogger singleton class for centralized logging. When `ZLOG_ENABLE` is defined during compilation, the logger automatically creates a `.zowex/logs/` directory in the current user's home directory and writes log output to `~/.zowex/logs/zowex.log`. Logs are written per-user (rather than to a location shared by all users of the binary, such as next to the executable) so that concurrent users of a shared `zo` installation don't contend for the same log file. The `zo server` daemon similarly writes its logs to `~/.zowex/logs/zowex_server.log`.
 
 `ZLOG_ENABLE` is defined when building in debug mode with `make -DBuildType=DEBUG`. You can exclusively enable logging by passing it directly to the make command: `make -DZLOG_ENABLE=1`
 
@@ -46,11 +46,11 @@ The logger supports the following log levels (in order of verbosity):
 
 #### Configuration
 
-Set the log level for zowex using the `ZOWEX_LOG_LEVEL` environment variable:
+Set the log level for `zo` using the `ZOWEX_LOG_LEVEL` environment variable:
 
 ```bash
 # Start zowex in interactive mode with log level "TRACE"
-ZOWEX_LOG_LEVEL=TRACE ./zowex --it
+ZOWEX_LOG_LEVEL=TRACE ./zo --it
 ```
 
 To modify the log level programmatically in C++ code, use the `ZLogger::set_log_level` function. To change the log level in Metal C code, use the `ZLGSTLVL` function defined in `zlogger_metal.h`. Both functions take an integer from the enum `zlog_level_t` (also redefined as `LogLevel` in the C++ header file).
@@ -59,10 +59,10 @@ Override where log files are written using the `ZOWEX_LOGS_DIR` environment vari
 
 ```bash
 # Write logs to a custom directory instead of ~/.zowex/logs
-ZOWEX_LOGS_DIR=/tmp/my-zowex-logs ./zowex --it
+ZOWEX_LOGS_DIR=/tmp/my-zowex-logs ./zo --it
 ```
 
-The `zowex server` daemon rolls its log file over once it exceeds 100KB, keeping up to 10 generations (`zowex_server.log`, `zowex_server.log.1`, ..., `zowex_server.log.9`) in FIFO order — the oldest generation is dropped to make room for the newest, bounding total disk usage per user to roughly 1MB.
+The `zo server` daemon rolls its log file over once it exceeds 100KB, keeping up to 10 generations (`zowex_server.log`, `zowex_server.log.1`, ..., `zowex_server.log.9`) in FIFO order — the oldest generation is dropped to make room for the newest, bounding total disk usage per user to roughly 1MB.
 
 ### Testing
 
@@ -260,10 +260,10 @@ OR:
 
 - create a `.s` file in `asmchdr` folder, e.g. `asasymbp.s`
 - upload, e.g. `npm run z:upload asmchdr/asasymbp.s`
-- allocate output adata data set if none exists, e.g. `zowex data-set create-adata <hlq>.adata`
-- allocate output chdr data set if none exists, e.g. `zowex data-set create-vb <hlq>.chdr`
+- allocate output adata data set if none exists, e.g. `zo data-set create-adata <hlq>.adata`
+- allocate output chdr data set if none exists, e.g. `zo data-set create-vb <hlq>.chdr`
 - build `.s` file, e.g. `as -madata --gadata="//'<hlq>.USER(ASASYMBP)'" asasymbp.s`
-- convert the file via `ccnedsct`, e.g. `zowex tool ccnedsct --ad "<hlq>.adata(asasymbp)" --cd "<hlq>.chdr(asasymbp)"`
+- convert the file via `ccnedsct`, e.g. `zo tool ccnedsct --ad "<hlq>.adata(asasymbp)" --cd "<hlq>.chdr(asasymbp)"`
 - copy, download the `.h` file where needed, e.g. `zowe files download ds "<hlq>.chdr(asasymbp)" --file native/c/chdsect/asasymbp.h`
 
 ### Recovery
@@ -277,7 +277,7 @@ abend scenario and bypass any established `ESTAEX`.
 ### Debugging Metal C
 
 You can add temporary debugging messages within Metal C code which will issue `WTO` messages with a message prefix of `ZWEX0001I`. These messages may be used in development only
-and must not appear in distributed versions of `zowex`.
+and must not appear in distributed versions of `zo`.
 
 To see these debugging messages within z/OS UNIX, set the environment variable `export _BPXK_JOBLOG=STDERR`. Then add debug messages via `zwto_debug(...)` found within `zwto.h` in the same format as C `printf` format strings, e.g. `zwto_debug("return code was %d", rc);`.
 
@@ -311,4 +311,4 @@ You must ensure `zut_alloc_debug()` is called to allocate an output DD for log m
 
 ```
 
-By default, output is printed to `/tmp/zowex_debug_<PID>.txt` (where PID is the current `zowex` process ID) when using `ZUTDBGMG()`; however, you may provide a Metal C compatible alternative.
+By default, output is printed to `/tmp/zowex_debug_<PID>.txt` (where PID is the current `zo` process ID) when using `ZUTDBGMG()`; however, you may provide a Metal C compatible alternative.

@@ -435,7 +435,7 @@ void parser_tests()
              });
 
              it("rejects unexpected trailing positional arguments", []() {
-               ArgumentParser arg_parser("zowex", "command sample");
+               ArgumentParser arg_parser("zo", "command sample");
                Command &root = arg_parser.get_root_command();
 
                command_ptr job_cmd(new Command("job", "job operations"));
@@ -443,7 +443,7 @@ void parser_tests()
                job_cmd->add_command(list_cmd);
                root.add_command(job_cmd);
 
-               std::vector<std::string> raw = {"zowex", "job", "list", "extra"};
+               std::vector<std::string> raw = {"zo", "job", "list", "extra"};
                std::vector<char *> argv = to_argv(raw);
 
                ParseResult result;

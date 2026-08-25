@@ -1,13 +1,13 @@
 ---
 name: build-zowex-command
-description: Guides users through creating new zowex commands across the Zowe Remote SSH stack (native C++, server, SDK). Use when the user wants to add a new command, implement a zowex command, or add functionality to the native backend.
+description: Guides users through creating new zo commands across the Zowe Remote SSH stack (native C++, server, SDK). Use when the user wants to add a new command, implement a zo command, or add functionality to the native backend.
 ---
 
-# Building a New Zowex Command
+# Building a New Zo Command
 
 This skill guides the creation of a new command for the Zowe Remote SSH stack, covering the C++ implementation, middleware layer, and SDK.
 
-## 1. Native CLI Implementation (zowex)
+## 1. Native CLI Implementation (zo)
 
 Commands are loosely organized by command group in `native/c/commands/`.
 
@@ -24,7 +24,7 @@ For the command implementation:
 
 ### Register Command Group
 *(Only required if creating a new command group)*
-Update `native/c/zowex.cpp`:
+Update `native/c/zo.cpp`:
 1. `#include "commands/<group>.hpp"`
 2. Call `<group>::register_commands(arg_parser.get_root_command());` in `main()`.
 
@@ -32,7 +32,7 @@ Update `native/c/zowex.cpp`:
 *(Only required if creating a new command group)*
 Add `commands/<group>.o` to `COMMAND_OBJS` in `native/c/makefile`.
 
-## 2. Server Implementation (zowex server) [Optional]
+## 2. Server Implementation (zo server) [Optional]
 
 *(Optional: Not all commands need to be exposed through the server)*
 Expose the command via JSON-RPC over SSH.
@@ -73,7 +73,7 @@ Update `packages/sdk/src/RpcClientApi.ts`:
 
 1. Upload and build native code: `npm run z:upload && npm run z:build` (or `npm run z:rebuild`)
 2. Build SDK: `cd packages/sdk && npm run build`
-3. Test native locally on z/OS (`./zowex <command>`) or via a TypeScript SDK script.
+3. Test native locally on z/OS (`./zo <command>`) or via a TypeScript SDK script.
 
 ## Reference Implementation
 

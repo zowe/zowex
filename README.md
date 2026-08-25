@@ -22,7 +22,7 @@ An open-source, native protocol for z/OS mainframe operations via SSH with minim
 The server binary is built once and deployed to every target system, so the target's runtime level matters:
 
 - **z/OS 2.5 or later.**
-- **Current Language Environment maintenance.** `zowex` links dynamically against the C++ runtime (libc++) that ships
+- **Current Language Environment maintenance.** `zo` links dynamically against the C++ runtime (libc++) that ships
   inside Language Environment. A system at a supported z/OS release can still be missing the required service, in which
   case the server fails to load with `CEE3561S ... was not found in DLL CRTEQCXE`. Required APARs:
   - z/OS 2.5 - the Language Environment C++ runtime service for Open XL C/C++ (the `PH45516` APAR family)
@@ -54,7 +54,7 @@ See the [CLI readme](./packages/cli/README.md) for more details about using the 
 
 ### Native binaries
 
-To run the `zowex` CLI on z/OS, connect to USS shell (OMVS) and `cd` to `c/build-out` inside the deploy directory. Then run `zowex`. MVS console commands live in the separate APF-authorized `zoweax` binary (`zoweax console issue "D T"`) — see [doc/zoweax-security.md](./doc/zoweax-security.md) for how to install and secure it.
+To run the `zo` CLI on z/OS, connect to USS shell (OMVS) and `cd` to `c/build-out` inside the deploy directory. Then run `zo`. MVS console commands live in the separate APF-authorized `zoweax` binary (`zoweax console issue "D T"`) — see [doc/zoa-security.md](./doc/zoa-security.md) for how to install and secure it.
 
 See the [native readme](./native/README.md) for more details about building the native components.
 
@@ -66,7 +66,7 @@ Run `npm run z:rebuild` to rebuild server code after editing files in the `nativ
 
 Run `npm run build` to rebuild client code after editing files in the `packages` folder.
 
-To test server changes without having to download artifacts and re-deploy them each time, you can define `serverPath` property in your SSH profile in `zowe.config.json`. It should point to the `<deployDir>/c/build-out` folder that contains the `zowex` binary (which includes the embedded server via `zowex server`). See example below.
+To test server changes without having to download artifacts and re-deploy them each time, you can define `serverPath` property in your SSH profile in `zowe.config.json`. It should point to the `<deployDir>/c/build-out` folder that contains the `zo` binary (which includes the embedded server via `zo server`). See example below.
 
 ```json
   "profiles": {
@@ -110,7 +110,7 @@ We use a custom build tool for interacting with z/OS that defines the following 
 | `z:upload`    | Upload source files from `native` directory to z/OS <sup>1</sup>            |
 | `z:watch`     | Detect changes to files in `native` directory and upload/build <sup>2</sup> |
 
-1. To deploy a single file or directory: `npm run z:upload -- c/zowex.cpp`
+1. To deploy a single file or directory: `npm run z:upload -- c/zo.cpp`
 2. To watch server and client code at the same time: `npm run watch:all`
 
 > [!TIP]
@@ -141,8 +141,8 @@ graph LR
   other[&quot;My Custom App&quot;]-->sdk
   end
   subgraph z/OS Server
-  zowex["C++ CLI Binary (zowex)"]-->cpp
-  ioserver["C++ I/O Server (zowex server)"]-->cpp["C++ Libraries (Backend)"]
+  zo["C++ CLI Binary (zo)"]-->cpp
+  ioserver["C++ I/O Server (zo server)"]-->cpp["C++ Libraries (Backend)"]
   python["Python REST API (experimental)"]-->cpp
   sdk<-->|SSH|ioserver
   subgraph Mainframe Resources

@@ -91,7 +91,7 @@ SERVER_OBJS = $(OUT_DIR)/server/builder.o \
 
 SWIG_EXTENDER_OBJS = $(OUT_DIR_SWIG)/zut.o $(OUT_DIR_SWIG)/zds.o $(OUT_DIR_SWIG)/zjb.o $(OUT_DIR_SWIG)/zcn.o $(OUT_DIR_SWIG)/zusf.o $(OUT_DIR_SWIG)/ztso.o
 
-all: libzut.so libzut.a libzds.so libzds.a libzusf.so libzusf.a libzcn.so libzcn.a libzjb.so libzjb.a libzkr.so libzkr.a zowex zoweax
+all: libzut.so libzut.a libzds.so libzds.a libzusf.so libzusf.a libzcn.so libzcn.a libzjb.so libzjb.a libzkr.so libzkr.a zo zoa
 swig-extenders: $(OUT_DIR_SWIG) $(SWIG_EXTENDER_OBJS)
 tests:
 	$(MAKE) -c test
@@ -382,22 +382,22 @@ $(OUT_DIR)/extend/plugin.o: extend/plugin.cpp
 #
 # Test CLI
 #
-$(OUT_DIR)/zowex: $(OUT_DIR)/zowex.o $(OUT_DIR)/extend/plugin.o $(COMMAND_OBJS) $(SERVER_OBJS) $(OUT_DIR)/zjsonm.o $(OUT_DIR)/libzut.a $(OUT_DIR)/libzjb.a $(OUT_DIR)/libzds.a $(OUT_DIR)/libzusf.a $(OUT_DIR)/libztso.a $(OUT_DIR)/libzkr.a
-	@echo 'Building zowex (z/OS target level: $(ZosMinLevel))'
+$(OUT_DIR)/zo: $(OUT_DIR)/zo.o $(OUT_DIR)/extend/plugin.o $(COMMAND_OBJS) $(SERVER_OBJS) $(OUT_DIR)/zjsonm.o $(OUT_DIR)/libzut.a $(OUT_DIR)/libzjb.a $(OUT_DIR)/libzds.a $(OUT_DIR)/libzusf.a $(OUT_DIR)/libztso.a $(OUT_DIR)/libzkr.a
+	@echo 'Building zo (z/OS target level: $(ZosMinLevel))'
 	$(CXX) $(CPP_BND_FLAGS) -o $@ $^ $(GSKCMS_SIDEDECK)
 
-zowex: $(OUT_DIR) $(OUT_DIR)/zowex
+zo: $(OUT_DIR) $(OUT_DIR)/zo
 
-$(OUT_DIR)/zoweax: $(OUT_DIR)/zoweax.o $(OUT_DIR)/commands/console.o $(OUT_DIR)/commands/core.o $(OUT_DIR)/zjsonm.o $(OUT_DIR)/libzcn.a $(OUT_DIR)/libzut.a
-	@echo 'Building zoweax (z/OS target level: $(ZosMinLevel))'
+$(OUT_DIR)/zoa: $(OUT_DIR)/zoa.o $(OUT_DIR)/commands/console.o $(OUT_DIR)/commands/core.o $(OUT_DIR)/zjsonm.o $(OUT_DIR)/libzcn.a $(OUT_DIR)/libzut.a
+	@echo 'Building zoa (z/OS target level: $(ZosMinLevel))'
 	$(CXX) $(CPP_BND_FLAGS_AUTH) -o $@ $^
 	extattr +ap $@
 	extattr -s $@
 
-zoweax: $(OUT_DIR) $(OUT_DIR)/zoweax
+zoa: $(OUT_DIR) $(OUT_DIR)/zoa
 
-$(OUT_DIR)/zowex.o: zowex.cpp
-	@echo 'Building $(OUT_DIR)/zowex.o'
+$(OUT_DIR)/zo.o: zo.cpp
+	@echo 'Building $(OUT_DIR)/zo.o'
 	@echo 'Add git hash? ${ADD_GIT_HASH}'
 	@if [ -f ../package.json ] && [ "${ADD_GIT_HASH}" = "TRUE" ]; then \
 		GIT_HASH=$$(grep '"gitHash"' ../package.json | sed 's/.*"gitHash"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/'); \
@@ -417,8 +417,8 @@ $(OUT_DIR)/zowex.o: zowex.cpp
 		$(CXX) $(CPP_FLAGS) -c $^ -o $@; \
 	fi
 
-$(OUT_DIR)/zoweax.o: zoweax.cpp
-	@echo 'Building $(OUT_DIR)/zoweax.o'
+$(OUT_DIR)/zoa.o: zoa.cpp
+	@echo 'Building $(OUT_DIR)/zoa.o'
 	@echo 'Add git hash? ${ADD_GIT_HASH}'
 	@if [ -f ../package.json ] && [ "${ADD_GIT_HASH}" = "TRUE" ]; then \
 		GIT_HASH=$$(grep '"gitHash"' ../package.json | sed 's/.*"gitHash"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/'); \
@@ -445,11 +445,11 @@ $(OUT_DIR)/zoweax.o: zoweax.cpp
 #
 # Runtime import report
 #
-# Lists the external symbols zowex/zoweax import from DLLs. Informational: the floor is enforced at
+# Lists the external symbols zo/zoa import from DLLs. Informational: the floor is enforced at
 # bind time by LDFLAGS, not here. Kept out of `all` so incremental builds and `npm run z:watch` stay
 # fast. See compat/README.md.
 #
-runtime-imports: zowex zoweax
+runtime-imports: zo zoa
 	sh tools/report_runtime_imports.sh $(ZosMinLevel)
 
 #

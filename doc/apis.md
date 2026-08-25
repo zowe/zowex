@@ -93,7 +93,7 @@
 | Get MVS detect result    | ✅     | ❌  | ❌              | ❌              | ❌  | ➖             | ➖   |
 
 1. Requires the APF-authorized `zoweax` binary installed on the host and ESM
-   OPERCMDS authorization — see [zoweax-security.md](./zoweax-security.md).
+   OPERCMDS authorization — see [zoa-security.md](./zoa-security.md).
 
 ## TSO
 

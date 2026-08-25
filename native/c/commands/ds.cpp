@@ -1119,7 +1119,7 @@ void register_commands(parser::Command &root_command)
   ds_list_cmd->add_keyword_arg(WARN);
   ds_list_cmd->add_keyword_arg(RESPONSE_FORMAT_CSV);
   ds_list_cmd->set_handler(handle_data_set_list);
-  ds_list_cmd->add_example("List SYS1.* with all attributes", "zowex ds ls 'sys1.*' -a");
+  ds_list_cmd->add_example("List SYS1.* with all attributes", "zo ds ls 'sys1.*' -a");
   data_set_cmd->add_command(ds_list_cmd);
 
   // List-members subcommand

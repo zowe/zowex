@@ -1,11 +1,11 @@
 ---
 name: zowex-ssh
-description: Deploy and operate the zowex JSON-RPC server on a *remote* z/OS host over SSH, for end-user dataset/job/USS operations when that host has no working z/OSMF endpoint. Use when the user asks to "connect to <host> over ssh", "deploy zowex to <lpar>", or "use zowex on <lpar>" to work with a remote system's datasets, jobs, or USS files. Not for building/testing this repo's own native code — that uses `npm run z:rebuild` / `npm run z:test`.
+description: Deploy and operate the zo JSON-RPC server on a *remote* z/OS host over SSH, for end-user dataset/job/USS operations when that host has no working z/OSMF endpoint. Use when the user asks to "connect to <host> over ssh", "deploy zo to <lpar>", or "use zo on <lpar>" to work with a remote system's datasets, jobs, or USS files. Not for building/testing this repo's own native code — that uses `npm run z:rebuild` / `npm run z:test`.
 ---
 
-# zowex over SSH — deploy and operate
+# zo over SSH — deploy and operate
 
-This skill is an alternative to the `zowe` CLI (z/OSMF REST): it uses the **zowex** native backend driven over SSH stdio instead. Use it when the target z/OS system has SSH but no z/OSMF. It's for operating on a remote target host's datasets/jobs/USS — unrelated to building or testing this repo's own native code, which uses `npm run z:rebuild` / `npm run z:test`.
+This skill is an alternative to the `zowe` CLI (z/OSMF REST): it uses the **zo** native backend driven over SSH stdio instead. Use it when the target z/OS system has SSH but no z/OSMF. It's for operating on a remote target host's datasets/jobs/USS — unrelated to building or testing this repo's own native code, which uses `npm run z:rebuild` / `npm run z:test`.
 
 Everything below uses two shell variables you should set once per target:
 
@@ -25,7 +25,7 @@ export ZX_STATE=/tmp/zx-agent-$$.$UID   # unique per agent run; keep it short (s
 Do this at the very start of every session, before the first `zx`/`$zx` call — deploy included. Never call `zx reset` under a `ZX_STATE` a human or another agent might be using (see §7).
 
 **Local prereqs:** `ssh`, `sftp`, `jq`, `base64`, bash ≥3.2, and `curl` or `wget`. Run `.agents/skills/zowex-ssh/zx check` to verify. (`jq` is the only one not stock on macOS — if it's missing, ask the user to install it via their package manager, e.g. Homebrew on macOS, before continuing.)
-**Remote prereqs:** SSH login + a writable USS directory. The `zowex` binary is self-contained.
+**Remote prereqs:** SSH login + a writable USS directory. The `zo` binary is self-contained.
 **Bundle:** `zx deploy` will auto-download the latest `server.pax.Z` from [github.com/zowe/zowex/releases](https://github.com/zowe/zowex/releases) if it isn't found locally. Default save path is `~/.local/share/zx/server.pax.Z` (always user-writable, works whether `zx` is run directly or via a PATH symlink). Downloads automatically without prompting. To pin a specific version or path, set `ZX_PAX=/path/to/the.pax.Z`. Set `GITHUB_TOKEN` if the API is rate-limited on a shared corporate IP.
 
 ---
@@ -78,10 +78,10 @@ put server.pax.Z
 bye
 EOF
 
-# 1b. unpax on the host (extracts flat: ./zowex)
-ssh "$ZX_HOST" "cd $ZX_DIR && pax -rvf server.pax.Z && chmod +x zowex"
+# 1b. unpax on the host (extracts flat: ./zo)
+ssh "$ZX_HOST" "cd $ZX_DIR && pax -rvf server.pax.Z && chmod +x zo"
 
-ZX_BIN=$ZX_DIR/zowex
+ZX_BIN=$ZX_DIR/zo
 
 # 1c. verify
 ssh "$ZX_HOST" "$ZX_BIN --help"
@@ -89,13 +89,13 @@ ssh "$ZX_HOST" "$ZX_BIN --help"
 
 If `pax -rvf` fails on the `.Z`, do `uncompress server.pax.Z && pax -rvf server.pax`.
 
-The CLI also exposes `tso` / `system` / `tool` subcommands — run `$ZX_BIN <cmd> --help` if you need one of those interactively. Only a subset is exposed via JSON-RPC (see §3; `tso` is RPC-backed, most of `system`/`tool` is CLI-only). Console is special: on servers newer than v0.8.0 the `console` CLI group exists only in the separate APF-authorized `zoweax` binary, and the `consoleCommand` RPC (see §3) is how `zowex server` reaches it. This CLI-only gap isn't limited to those groups: `data-set copy` is CLI-only too (no `copyDataset` RPC — see §3's Datasets table). When in doubt whether a `zowex data-set`/`job`/`uss` verb has an RPC equivalent, check `$ZX_BIN data-set --help` against §3 rather than assuming parity.
+The CLI also exposes `tso` / `system` / `tool` subcommands — run `$ZX_BIN <cmd> --help` if you need one of those interactively. Only a subset is exposed via JSON-RPC (see §3; `tso` is RPC-backed, most of `system`/`tool` is CLI-only). Console is special: on servers newer than v0.8.0 the `console` CLI group exists only in the separate APF-authorized `zoweax` binary, and the `consoleCommand` RPC (see §3) is how `zo server` reaches it. This CLI-only gap isn't limited to those groups: `data-set copy` is CLI-only too (no `copyDataset` RPC — see §3's Datasets table). When in doubt whether a `zo data-set`/`job`/`uss` verb has an RPC equivalent, check `$ZX_BIN data-set --help` against §3 rather than assuming parity.
 
 ---
 
 ## 2 · Talking to the server
 
-`zowex server` reads **JSON-RPC 2.0** requests on **stdin** and writes JSON responses on **stdout**, one object per line. Auth is whatever SSH gave you — there is no in-band handshake.
+`zo server` reads **JSON-RPC 2.0** requests on **stdin** and writes JSON responses on **stdout**, one object per line. Auth is whatever SSH gave you — there is no in-band handshake.
 
 **Wire behavior (verified against v0.6.0):**
 - The server emits one **ready banner** line first: `{"status":"ready","message":"...","data":{"version":"..."}}`. Consume and discard it before reading responses.
@@ -131,7 +131,7 @@ $zx stop
 | `zx console` | `'<cmd>' [--cn <n>] [--timeout <s>] [--no-wait]` (RPC `consoleCommand`, servers > v0.8.0; needs `zoweax` installed + APF-authorized on the host and ESM OPERCMDS grants for non-display commands) |
 | `zx rpc` | `<method> ['<params>']` — raw escape hatch |
 
-There is no `zx` group yet for the ESM certificate / key ring commands (`zowex system cert ...` / `zowex system keyring ...`, servers newer than v0.7.0) — drive them with `zx rpc <method>` (see §3's Certificates table) or CLI passthrough: `ssh "$ZX_HOST" "$ZX_BIN system keyring list-rings $USER"`.
+There is no `zx` group yet for the ESM certificate / key ring commands (`zo system cert ...` / `zo system keyring ...`, servers newer than v0.7.0) — drive them with `zx rpc <method>` (see §3's Certificates table) or CLI passthrough: `ssh "$ZX_HOST" "$ZX_BIN system keyring list-rings $USER"`.
 
 **Output:** grouped commands pretty-print by default (lists → one per line, b64 → decoded, status → `key=value`). Add `-j`/`--json` anywhere (before or after the group) for raw JSON: `zx ds list "SYS1.*" -j` or `zx -j ds list "SYS1.*"`.
 
@@ -207,7 +207,7 @@ is currently exported.
 | `deleteDataset` | `{"dsname":"HLQ.OLD"}` |
 | `renameDataset` | `{"dsnameBefore":"A","dsnameAfter":"B"}` |
 
-**No `copyDataset` RPC** — at least as of server v0.6.0, `copyDataset` isn't wired over JSON-RPC (returns `-32601 Unrecognized command`) even though it exists as a CLI verb. `zx ds copy` calls the CLI directly instead (`zowex data-set copy <src> <dst> [--ow|-r]`, via SSH passthrough — see §2's CLI-vs-RPC note). If you're issuing raw RPC via `zx rpc` or `zx -j ds copy`-style JSON, don't rely on `copyDataset` — shell out to the CLI form instead.
+**No `copyDataset` RPC** — at least as of server v0.6.0, `copyDataset` isn't wired over JSON-RPC (returns `-32601 Unrecognized command`) even though it exists as a CLI verb. `zx ds copy` calls the CLI directly instead (`zo data-set copy <src> <dst> [--ow|-r]`, via SSH passthrough — see §2's CLI-vs-RPC note). If you're issuing raw RPC via `zx rpc` or `zx -j ds copy`-style JSON, don't rely on `copyDataset` — shell out to the CLI form instead.
 
 ### Jobs
 
@@ -253,13 +253,13 @@ is currently exported.
 |---|---|
 | `consoleCommand` | `{"commandText":"<mvs cmd>","consoleName"?:"<name>","timeout"?:N,"wait"?:bool}` — `result.data` is plain text |
 
-The server spawns the APF-authorized **`zoweax`** binary per request (located next to `zowex`, on the server's `PATH`, or via `ZOWEAX_PATH` on the remote host) — the server itself never holds APF authorization. Prereqs on the host: `zoweax` installed and `extattr +ap`'d by a system programmer, and ESM OPERCMDS grants (`MVS.*` profiles, e.g. `MVS.REPLY.*` for WTOR replies) for anything beyond informational `D ...` displays. `consoleName` defaults to the SSH user's ID plus a digit suffix; console activation can be gated per user with `MVS.MCSOPER.<name>` profiles. Failures come back with actionable messages ("command not found" → zoweax not installed; "Not authorized" → not APF-authorized or ESM denied).
+The server spawns the APF-authorized **`zoweax`** binary per request (located next to `zo`, on the server's `PATH`, or via `ZOWEAX_PATH` on the remote host) — the server itself never holds APF authorization. Prereqs on the host: `zoweax` installed and `extattr +ap`'d by a system programmer, and ESM OPERCMDS grants (`MVS.*` profiles, e.g. `MVS.REPLY.*` for WTOR replies) for anything beyond informational `D ...` displays. `consoleName` defaults to the SSH user's ID plus a digit suffix; console activation can be gated per user with `MVS.MCSOPER.<name>` profiles. Failures come back with actionable messages ("command not found" → zoweax not installed; "Not authorized" → not APF-authorized or ESM denied).
 
 ### Certificates / key rings (ESM)
 
 **Server version gate:** these methods exist only in servers **newer than v0.7.0** (zowex PR #1079). On older servers they return `-32601 Unrecognized command`. The caller's SSH user needs the corresponding ESM `IRR.DIGTCERT.*` / `RDATALIB` authority — without it, calls fail with a SAF diagnostic (see below), not an auth prompt.
 
-CLI equivalents live under `zowex system cert ...` and `zowex system keyring ...`.
+CLI equivalents live under `zo system cert ...` and `zo system keyring ...`.
 
 | method | params |
 |---|---|
@@ -283,7 +283,7 @@ Conventions shared by these methods:
 - Failures return `result.success:false` with `message`, `service`, and a structured `safReturns` object (`functionCode`, `safReturnCode`, `esmReturnCode`, `esmReasonCode`); GSK (System SSL) failures add `gskReturnCode`. Non-fatal SAF warnings (rc 4) succeed with a `warning` string.
 - `owner`, `keyring`, and `label` are case-sensitive (userids normally uppercase).
 
-`unixCommand` / `tsoCommand` are the escape hatches for anything not covered. MVS console commands have their own method on servers newer than v0.8.0 — `consoleCommand` (see the Console table above). On older servers, run the APF-authorized companion binary directly on the host: `ssh "$ZX_HOST" "zoweax console issue ..."` (`zowex console issue` only exists on pre-v0.8.x binaries and requires the old fat `zoweax` there too).
+`unixCommand` / `tsoCommand` are the escape hatches for anything not covered. MVS console commands have their own method on servers newer than v0.8.0 — `consoleCommand` (see the Console table above). On older servers, run the APF-authorized companion binary directly on the host: `ssh "$ZX_HOST" "zoweax console issue ..."` (`zo console issue` only exists on pre-v0.8.x binaries and requires the old fat `zoweax` there too).
 
 ---
 
@@ -337,7 +337,7 @@ zx uss sh 'cp -B "//'\''SYS1.LINKLIB(IEFBR14)'\''" /tmp/iefbr14.bin'
 zx uss get /tmp/iefbr14.bin
 ```
 
-For whole-PDS `ds get`, run `zx start` first — one persistent session is much faster than N one-shot SSH connects. `ds put` of a directory may hit zowex DEQ contention on rapid same-PDS writes; failures are reported per-member and the command exits non-zero if any failed.
+For whole-PDS `ds get`, run `zx start` first — one persistent session is much faster than N one-shot SSH connects. `ds put` of a directory may hit `zo` DEQ contention on rapid same-PDS writes; failures are reported per-member and the command exits non-zero if any failed.
 
 ---
 
@@ -348,12 +348,12 @@ For whole-PDS `ds get`, run `zx start` first — one persistent session is much 
 | password prompt on every `zx` call | `zx` already multiplexes its own ssh calls per `$ZX_STATE` (30min `ControlPersist`), so this is usually only about *manual/raw* `ssh` calls outside `zx`. Prefer `ssh-copy-id <host>` (a key). If the user specifically wants a long-lived multiplexed session across *all* ssh tools to that host, the fix is a host-wide, persistent change to `~/.ssh/config` (`ControlMaster auto` / `ControlPath` / `ControlPersist`) — it keeps an authenticated socket open for the persist duration, reusable by any local process as that user. That's a change outside this session's scope: confirm with the user and get their desired `ControlPersist` before editing `~/.ssh/config`, don't add it unprompted. |
 | `mkdir: ... EDC5134I Function not implemented` on deploy | parent dir is an automount root — `zx deploy` now `cd`s to the parent first to trigger the mount; if it still fails, the parent genuinely doesn't exist |
 | `pax: FSUM7108 cannot open` | wrong dir / no write perms — pick a different `ZX_DIR` |
-| `zowex: FSUM7351 not found` | `ZX_BIN` path wrong — re-run the `find` from step 1b |
-| `EDC5129I No such file or directory` on `zowex --help` | binary not tagged/executable — `chmod +x $ZX_BIN`; if it's a tag issue, `chtag -b $ZX_BIN` |
+| `zo: FSUM7351 not found` | `ZX_BIN` path wrong — re-run the `find` from step 1b |
+| `EDC5129I No such file or directory` on `zo --help` | binary not tagged/executable — `chmod +x $ZX_BIN`; if it's a tag issue, `chtag -b $ZX_BIN` |
 | server returns nothing then EOF | request wasn't newline-terminated, or JSON was malformed — `zx rpc` always appends `\n` |
 | `CEE3501S module not found` | LE runtime not in LIBPATH — prefix server start with `export LIBPATH=$ZX_DIR/c/build-out:$LIBPATH;` |
 | `CEE3561S ... was not found in DLL CRTEQCXE` | the target's Language Environment libc++ doesn't export a symbol the binary needs — a *maintenance level* problem, not just a z/OS release. Nothing to fix on the client side: the binary must be built with Open XL 2.1 (not 2.2) for a z/OS 2.5 target, or the target needs LE PTFs. See `doc/troubleshooting.md` |
-| every method returns auth-style errors | the SSH user lacks the needed ESM access; zowex itself does no auth |
+| every method returns auth-style errors | the SSH user lacks the needed ESM access; zo itself does no auth |
 | `ControlPath too long ('...' >= 104 bytes)` | Unix domain socket path limit (macOS: 104 bytes) — `$ZX_STATE/cm-%C` overflowed it. Use a short `ZX_STATE`, e.g. `/tmp/zx-<label>.$UID`, not a long nested path like a session scratch dir |
 | need password auth against a second host without disturbing an existing `zx` session/socket | give the second host its own `ZX_STATE` and prime its `ControlMaster` with `sshpass` — see §2c |
 

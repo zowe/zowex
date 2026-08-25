@@ -450,7 +450,7 @@ void PluginManager::load_plugin_file(const std::string &plugin_path, const std::
   {
     ZLOG_ERROR("Rejected plugin %s: reports plug-in ABI version %u, zowex requires %u. "
                "Rebuild the plug-in against the matching extend/plugin.hpp and expand "
-               "ZOWEX_PLUGIN_DECLARE_ABI() alongside register_plugin().",
+               "ZO_PLUGIN_DECLARE_ABI() alongside register_plugin().",
                plugin_path.c_str(),
                reported_abi,
                ZOWEX_PLUGIN_ABI_VERSION);

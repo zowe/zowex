@@ -1100,7 +1100,7 @@ function getDirs(next = "") {
 }
 
 async function artifacts(connection: Client, packageAll: boolean) {
-    const artifactPaths = ["c/build-out/zowex", packageAll && "c/build-out/zoweax"].filter(Boolean);
+    const artifactPaths = ["c/build-out/zo", packageAll && "c/build-out/zoa"].filter(Boolean);
     const artifactNames = artifactPaths.map((file) => path.basename(file)).sort(localeCompare);
     const localDir = packageAll ? "dist" : "packages/sdk/bin";
     const localFiles = ["server.pax.Z"];

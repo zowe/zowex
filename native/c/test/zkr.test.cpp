@@ -156,7 +156,7 @@ void zkr_tests()
                  []() -> void
                  {
                    std::string out;
-                   int rc = execute_command_with_output(zowex_command + " system cert --help", out);
+                   int rc = execute_command_with_output(zo_command + " system cert --help", out);
                    ExpectWithContext(rc, out).ToBe(0);
                    Expect(out).ToContain("import");
                    Expect(out).ToContain("connect");
@@ -168,7 +168,7 @@ void zkr_tests()
                  []() -> void
                  {
                    std::string out;
-                   int rc = execute_command_with_output(zowex_command + " system keyring --help", out);
+                   int rc = execute_command_with_output(zo_command + " system keyring --help", out);
                    ExpectWithContext(rc, out).ToBe(0);
                    Expect(out).ToContain("create");
                    Expect(out).ToContain("list-rings");
@@ -180,7 +180,7 @@ void zkr_tests()
                  {
                    std::string out;
                    int rc = execute_command_with_output(
-                       zowex_command + " system cert delete TESTUSER '*' -l LBL", out);
+                       zo_command + " system cert delete TESTUSER '*' -l LBL", out);
                    Expect(rc).Not().ToBe(0);
                    Expect(out).ToContain("--database");
                  });
@@ -190,7 +190,7 @@ void zkr_tests()
                  {
                    std::string out;
                    int rc = execute_command_with_output(
-                       zowex_command + " system cert delete TESTUSER -l LBL", out);
+                       zo_command + " system cert delete TESTUSER -l LBL", out);
                    Expect(rc).Not().ToBe(0);
                    Expect(out).ToContain("--database");
                  });
@@ -200,7 +200,7 @@ void zkr_tests()
                  {
                    std::string out;
                    int rc = execute_command_with_output(
-                       zowex_command + " system cert delete TESTUSER RING01 -l LBL --database", out);
+                       zo_command + " system cert delete TESTUSER RING01 -l LBL --database", out);
                    Expect(rc).Not().ToBe(0);
                    Expect(out).ToContain("not both");
                  });
@@ -210,7 +210,7 @@ void zkr_tests()
                  {
                    std::string out;
                    int rc = execute_command_with_output(
-                       zowex_command + " system cert connect TESTUSER RING02 -l LBL --from-ring '*'", out);
+                       zo_command + " system cert connect TESTUSER RING02 -l LBL --from-ring '*'", out);
                    Expect(rc).Not().ToBe(0);
                    Expect(out).ToContain("--from-database");
                  });
@@ -220,7 +220,7 @@ void zkr_tests()
                  {
                    std::string out;
                    int rc = execute_command_with_output(
-                       zowex_command + " system cert connect TESTUSER RING02 -l LBL", out);
+                       zo_command + " system cert connect TESTUSER RING02 -l LBL", out);
                    Expect(rc).Not().ToBe(0);
                    Expect(out).ToContain("--from-ring");
                  });
@@ -230,7 +230,7 @@ void zkr_tests()
                  {
                    std::string out;
                    int rc = execute_command_with_output(
-                       zowex_command + " system cert export TESTUSER RING01 -l LBL -F p12 -f /tmp/ignored.p12",
+                       zo_command + " system cert export TESTUSER RING01 -l LBL -F p12 -f /tmp/ignored.p12",
                        out);
                    Expect(rc).Not().ToBe(0);
                    Expect(out).ToContain("--password is required");
@@ -620,7 +620,7 @@ void zkr_tests()
                     // (both succeed -- an empty result is not an error).
                     std::string flt_out;
                     int flt_rc = execute_command_with_output(
-                        zowex_command + " system keyring list " + owner + " " + ring1 + " --label " + real_label,
+                        zo_command + " system keyring list " + owner + " " + ring1 + " --label " + real_label,
                         flt_out);
                     ExpectWithContext(flt_rc, flt_out).ToBe(0);
                     Expect(flt_out).ToContain(real_label);
@@ -632,7 +632,7 @@ void zkr_tests()
                     {
                       std::string miss_out;
                       int miss_rc = execute_command_with_output(
-                          zowex_command + " system keyring list " + owner + " " + ring1 + " --label " + lower_label,
+                          zo_command + " system keyring list " + owner + " " + ring1 + " --label " + lower_label,
                           miss_out);
                       ExpectWithContext(miss_rc, miss_out).ToBe(0);
                       Expect(miss_out).Not().ToContain("Certificate: ");
@@ -733,11 +733,11 @@ void zkr_tests()
                     // and the virtual ring (DataGetFirst/GetNext enumeration).
                     std::string out;
                     int crc = execute_command_with_output(
-                        zowex_command + " system keyring count " + owner + " " + ring1, out);
+                        zo_command + " system keyring count " + owner + " " + ring1, out);
                     ExpectWithContext(crc, out).ToBe(0);
                     Expect(out).ToContain("1 certificate(s)");
                     crc = execute_command_with_output(
-                        zowex_command + " system keyring count " + owner + " '*'", out);
+                        zo_command + " system keyring count " + owner + " '*'", out);
                     ExpectWithContext(crc, out).ToBe(0);
 
                     // p12 export with a passphrase (the gsk_export_key path; PEM

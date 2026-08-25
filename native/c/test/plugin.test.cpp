@@ -114,7 +114,9 @@ using RegistrationFn = std::function<void(RegistrationContext &)>;
 class LambdaProvider : public plugin::CommandProviderImpl
 {
 public:
-  explicit LambdaProvider(RegistrationFn fn) : m_fn(std::move(fn)) {}
+  explicit LambdaProvider(RegistrationFn fn) : m_fn(std::move(fn))
+  {
+  }
   void register_commands(CommandRegistrationContext &context) override
   {
     if (m_fn)
@@ -128,7 +130,9 @@ private:
 class LambdaProviderFactory : public plugin::CommandProvider
 {
 public:
-  explicit LambdaProviderFactory(RegistrationFn fn) : m_fn(std::move(fn)) {}
+  explicit LambdaProviderFactory(RegistrationFn fn) : m_fn(std::move(fn))
+  {
+  }
   std::unique_ptr<plugin::CommandProviderImpl> create() override
   {
     return std::unique_ptr<plugin::CommandProviderImpl>(new LambdaProvider(m_fn));
@@ -367,7 +371,7 @@ void plugin_tests()
   describe("PluginManager::register_commands dispatcher hardening", []() -> void
            {
         it("refuses a plug-in command whose name shadows a built-in verb and keeps the built-in", []() {
-            parser::Command root("zowex", "root");
+            parser::Command root("zo", "root");
             root.add_command(make_builtin("job", "builtin job"));
 
             plugin::PluginManager pm;
@@ -383,7 +387,7 @@ void plugin_tests()
         });
 
         it("refuses a plug-in command whose alias shadows a built-in verb", []() {
-            parser::Command root("zowex", "root");
+            parser::Command root("zo", "root");
             root.add_command(make_builtin("job", "builtin job"));
 
             plugin::PluginManager pm;
@@ -404,7 +408,7 @@ void plugin_tests()
         it("refuses a shadowing alias even when it is added after the command is attached to root", []() {
             // Ordering-robustness: add_alias is called *after* add_subcommand, so the check
             // must run against the command's final token set, not its state at attach time.
-            parser::Command root("zowex", "root");
+            parser::Command root("zo", "root");
             root.add_command(make_builtin("ds", "builtin ds"));
 
             plugin::PluginManager pm;
@@ -422,7 +426,7 @@ void plugin_tests()
         });
 
         it("registers a non-colliding plug-in command", []() {
-            parser::Command root("zowex", "root");
+            parser::Command root("zo", "root");
             root.add_command(make_builtin("job", "builtin job"));
 
             plugin::PluginManager pm;
@@ -438,7 +442,7 @@ void plugin_tests()
         });
 
         it("does not over-reject a plug-in command whose name merely resembles a built-in verb", []() {
-            parser::Command root("zowex", "root");
+            parser::Command root("zo", "root");
             root.add_command(make_builtin("job", "builtin job"));
 
             plugin::PluginManager pm;
@@ -453,7 +457,7 @@ void plugin_tests()
         });
 
         it("registers a plug-in's non-colliding commands even when one of its commands collides", []() {
-            parser::Command root("zowex", "root");
+            parser::Command root("zo", "root");
             root.add_command(make_builtin("job", "builtin job"));
 
             plugin::PluginManager pm;
@@ -471,7 +475,7 @@ void plugin_tests()
         });
 
         it("refuses a second plug-in command that duplicates one an earlier plug-in claimed", []() {
-            parser::Command root("zowex", "root");
+            parser::Command root("zo", "root");
             root.add_command(make_builtin("job", "builtin job"));
 
             plugin::PluginManager pm;
@@ -491,7 +495,7 @@ void plugin_tests()
         });
 
         it("does not crash and drops a malformed plug-in's duplicate nested subcommand", []() {
-            parser::Command root("zowex", "root");
+            parser::Command root("zo", "root");
             root.add_command(make_builtin("job", "builtin job"));
 
             plugin::PluginManager pm;
@@ -512,7 +516,7 @@ void plugin_tests()
         });
 
         it("drops a rejected shadowing command from the server command set", []() {
-            parser::Command root("zowex", "root");
+            parser::Command root("zo", "root");
             root.add_command(make_builtin("job", "builtin job"));
 
             plugin::PluginManager pm;
@@ -529,7 +533,7 @@ void plugin_tests()
         });
 
         it("keeps a non-colliding command in the server command set", []() {
-            parser::Command root("zowex", "root");
+            parser::Command root("zo", "root");
             root.add_command(make_builtin("job", "builtin job"));
 
             plugin::PluginManager pm;

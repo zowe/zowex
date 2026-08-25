@@ -34,7 +34,7 @@ plugin::PluginManager *g_plugin_manager = nullptr;
 
 std::string &program_name_ref()
 {
-  static std::string program_name("zowex");
+  static std::string program_name("zo");
   return program_name;
 }
 } // namespace

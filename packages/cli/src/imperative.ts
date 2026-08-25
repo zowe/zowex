@@ -15,7 +15,7 @@ const config: IImperativeConfig = {
     commandModuleGlobs: ["*/*.definition!(.d).*s"],
     rootCommandDescription: "Zowe Remote SSH Plug-in for Zowe CLI",
     productDisplayName: "z/OS SSH Plug-in",
-    name: "zowex",
+    name: "zo",
     pluginAliases: ["zssh"],
     pluginSummary: "z/OS Files and jobs via SSH",
     pluginFirstSteps: `

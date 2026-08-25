@@ -26,16 +26,16 @@ One workaround is to add `CBC.SCCNCMP` to your system LINKLIST concatenation. Be
 
 ```
 linklist
-linkdef zowex from current
-linklist zowex
+linkdef zo from current
+linklist zo
 add CBC.SCCNCMP
-linkact zowex
+linkact zo
 set asid 1
 linkupd *
 ```
 
-Note 1: You may need to run `linkact zowex` after an IPL if your linklist has been reset.<br/>
-Note 2: Depending on your z/OS configuration, you may need to replace `*` with your mask character. For example, `linkact zowex =`
+Note 1: You may need to run `linkact zo` after an IPL if your linklist has been reset.<br/>
+Note 2: Depending on your z/OS configuration, you may need to replace `*` with your mask character. For example, `linkact zo =`
 
 ## Downloading Go dependencies: tls: failed to verify certificate: x509: certificate signed by unknown authority
 
@@ -49,9 +49,9 @@ Update your `config.yaml` to include this property:
 CEE3561S External function _ZNSt5__1_e13__hash_memoryEPKvm was not found in DLL CRTEQCXE
 ```
 
-`zowex` links dynamically against the C++ runtime (libc++) that IBM ships **inside Language Environment**, in the DLL
+`zo` links dynamically against the C++ runtime (libc++) that IBM ships **inside Language Environment**, in the DLL
 `CRTEQCXE`. This message means the system running the binary does not export a function the binary needs, so z/OS
-cannot load it. It happens before `main()`, which is why `zowex` cannot report anything useful itself.
+cannot load it. It happens before `main()`, which is why `zo` cannot report anything useful itself.
 
 The deciding factor is the **Language Environment maintenance (PTF) level** of the system running the binary, not just
 its z/OS release — a system at a supported release can still be missing the required service. Three things contribute:

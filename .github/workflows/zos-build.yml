@@ -81,7 +81,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
-          name: zowex-runtime-imports
+          name: zo-runtime-imports
           path: listings/*
 
       - name: Package server artifacts
