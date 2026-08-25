@@ -689,11 +689,11 @@ int handle_data_set_resolve_alias(InvocationContext &context)
   // must prepend control statements with a space on each line's first character
   std::string idcamsInput = " LISTCAT -\n ENTRIES('" + aliasDsn + "') -\n ALL\n";
   std::string idcamsError = "";
-  std::string failMsg = "Could not determine the target data set for the specified alias. Ensure the alias exists and is cataloged.\n";
+  const std::string failMsg = "Could not determine the target data set for the specified alias. Ensure the alias exists and is cataloged.\n";
   rc = zds_idcams(idcamsInput, idcamsOutput, idcamsError);
   if (rc != 0)
   {
-    ZLOG_ERROR("Error resolving data set alias '%s': %s\n%s", aliasDsn, idcamsOutput, idcamsError);
+    ZLOG_ERROR("Error resolving data set alias '%s': %s\n%s", aliasDsn.c_str(), idcamsOutput.c_str(), idcamsError.c_str());
     context.error_stream() << failMsg;
     return RTNCD_FAILURE;
   }
@@ -702,7 +702,7 @@ int handle_data_set_resolve_alias(InvocationContext &context)
   // ASSOCIATIONS
   //     NONVSAM--CHRIS.PUBLIC.CNTL
   static const std::regex resolvedDsPattern(R"(ASSOCIATIONS[\s\S]+VSAM-{2,}(\S+))");
-  std::smatch mv;
+  std::smatch mv{};
 
   if (std::regex_search(idcamsOutput, mv, resolvedDsPattern))
   {
@@ -712,7 +712,7 @@ int handle_data_set_resolve_alias(InvocationContext &context)
   }
   else
   {
-    context.output_stream() << failMsg;
+    context.error_stream() << failMsg;
     result->set("targetDsn", str(""));
     rc = RTNCD_FAILURE;
   }

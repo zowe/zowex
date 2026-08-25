@@ -2195,7 +2195,7 @@ void zowex_ds_tests()
                                    std::string cleanup_output;
                                                      for (const auto &alias : created_aliases)
                    {
-                                   cleanup_idcams += "  DELETE -\n"+alias+" -\n ALIAS\n";
+                                   cleanup_idcams += "  DELETE -\n "+alias+" -\n ALIAS\n";
                    }
                                    cleanup_idcams += "  SET MAXCC = 0\n";
                                    int rc = zds_idcams(cleanup_idcams, cleanup_output, cleanup_err);
