@@ -12,7 +12,7 @@
     "license": "node scripts/updateLicenses.js",
     "lint": "npm run lint --workspaces",
     "lint:compat": "node scripts/checkNoStringHash.js",
-    "lint:cpp": "bash -c \"npx clang-format --dry-run --Werror native/**/*.{c,cpp,h,hpp}\"",
+    "lint:cpp": "bash -c \"clang-format --dry-run --Werror native/**/*.{c,cpp,h,hpp}\"",
     "package": "npm run package --workspaces --if-present",
     "prepare": "husky",
     "test": "npm run test --workspaces --if-present",
