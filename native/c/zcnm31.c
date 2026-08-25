@@ -160,7 +160,6 @@ int zcnm1put(ZCN *zcn, const char *command)
     char command[MGCRTEXT];
   } commandBuffer = {0};
 
-
   /* Use precision specifier %.*s as snprintf is unavailable in Metal C */
   commandBuffer.commandLen = sprintf(commandBuffer.command, "%.*s", (int)(sizeof(commandBuffer.command) - 1), command);
   char cart[8];
