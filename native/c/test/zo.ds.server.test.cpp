@@ -36,7 +36,7 @@ void zo_ds_server_tests()
              ServerHandle server;
 
              beforeAll([&]() -> void
-                       { server = start_server(zowex_server_command, true); });
+                       { server = start_server(zo_server_command, true); });
 
              afterAll([&]() -> void
                       { stop_server(server); });

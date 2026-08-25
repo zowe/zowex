@@ -44,7 +44,7 @@ void zo_job_server_tests()
     static std::vector<std::string> clean_uss;
 
     beforeAll([&]() -> void {
-      server = start_server(zowex_server_command, true);
+      server = start_server(zo_server_command, true);
     });
 
     afterAll([&]() -> void {
