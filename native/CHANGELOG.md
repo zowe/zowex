@@ -6,6 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- **Breaking:** `c`: Renamed the `ZOWEX_NUM_WORKERS` environmental variable to `ZO_NUM_WORKERS`. [#1119](https://github.com/zowe/zowex/pull/1119)
 - **Breaking:** `c`: Renamed the `ZOWEX_LOG_LEVEL` environmental variable to `ZO_LOG_LEVEL`. [#1119](https://github.com/zowe/zowex/pull/1119)
 - **Breaking:** `c`: Renamed the `ZOWEX_LOGS_DIR` environmental variable to `ZO_LOGS_DIR`. [#1119](https://github.com/zowe/zowex/pull/1119)
 - **Breaking:** `c`: Renamed the `ZOWEAX_PATH` environmental variable to `ZOA_PATH`. [#1119](https://github.com/zowe/zowex/pull/1119)
