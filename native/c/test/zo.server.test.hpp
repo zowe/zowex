@@ -32,7 +32,7 @@ int next_rpc_id();
 std::string make_rpc_request(const std::string &method, const std::string &params, int &id);
 std::string make_rpc_request(const std::string &method, const std::string &params);
 
-extern const std::string zowex_dir;
+extern const std::string zo_dir;
 extern const std::string zo_server_command;
 
 void zo_server_tests();

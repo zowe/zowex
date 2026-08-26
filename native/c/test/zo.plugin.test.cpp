@@ -51,10 +51,10 @@ void ensure_dir(const std::string &dir)
 
 void zo_plugin_tests()
 {
-  describe("zowex ZOWEX_PLUGINS_DIR opt-in",
+  describe("zowex ZO_PLUGINS_DIR opt-in",
            []() -> void
            {
-             it("does not load plug-ins from the legacy <exec_dir>/plugins fallback when ZOWEX_PLUGINS_DIR is unset",
+             it("does not load plug-ins from the legacy <exec_dir>/plugins fallback when ZO_PLUGINS_DIR is unset",
                 []()
                 {
                   const std::string probe_file = "legacy_fallback_probe.so";
@@ -63,9 +63,9 @@ void zo_plugin_tests()
 
                   int rc = 0;
                   std::string response;
-                  // Explicitly clear ZOWEX_PLUGINS_DIR for this invocation only, so a value
+                  // Explicitly clear ZO_PLUGINS_DIR for this invocation only, so a value
                   // leaked from the outer test environment can't mask a regression here.
-                  rc = execute_command_with_output("ZOWEX_PLUGINS_DIR= " + zo_command + " plugins list", response);
+                  rc = execute_command_with_output("ZO_PLUGINS_DIR= " + zo_command + " plugins list", response);
 
                   ExpectWithContext(rc, response).ToBe(0);
                   Expect(response).Not().ToContain(probe_file);
@@ -74,18 +74,18 @@ void zo_plugin_tests()
                   remove_dir_with_file(LEGACY_FALLBACK_DIR, probe_file);
                 });
 
-             it("does not touch any plugins directory when ZOWEX_PLUGINS_DIR is unset and no legacy directory exists",
+             it("does not touch any plugins directory when ZO_PLUGINS_DIR is unset and no legacy directory exists",
                 []()
                 {
                   int rc = 0;
                   std::string response;
-                  rc = execute_command_with_output("ZOWEX_PLUGINS_DIR= " + zo_command + " plugins list", response);
+                  rc = execute_command_with_output("ZO_PLUGINS_DIR= " + zo_command + " plugins list", response);
 
                   ExpectWithContext(rc, response).ToBe(0);
                   Expect(response).Not().ToContain(UNREGISTERED_BANNER);
                 });
 
-             it("honors an explicitly-set ZOWEX_PLUGINS_DIR and surfaces its contents",
+             it("honors an explicitly-set ZO_PLUGINS_DIR and surfaces its contents",
                 []()
                 {
                   const std::string probe_file = "opt_in_probe.so";
@@ -94,7 +94,7 @@ void zo_plugin_tests()
 
                   int rc = 0;
                   std::string response;
-                  rc = execute_command_with_output("ZOWEX_PLUGINS_DIR=" + EXPLICIT_OPT_IN_DIR + " " + zo_command + " plugins list", response);
+                  rc = execute_command_with_output("ZO_PLUGINS_DIR=" + EXPLICIT_OPT_IN_DIR + " " + zo_command + " plugins list", response);
 
                   ExpectWithContext(rc, response).ToBe(0);
                   Expect(response).ToContain(UNREGISTERED_BANNER);
@@ -103,13 +103,13 @@ void zo_plugin_tests()
                   remove_dir_with_file(EXPLICIT_OPT_IN_DIR, probe_file);
                 });
 
-             it("does not crash when ZOWEX_PLUGINS_DIR is explicitly set but points at a nonexistent directory",
+             it("does not crash when ZO_PLUGINS_DIR is explicitly set but points at a nonexistent directory",
                 []()
                 {
                   int rc = 0;
                   std::string response;
                   rc = execute_command_with_output(
-                      "ZOWEX_PLUGINS_DIR=" + EXPLICIT_OPT_IN_DIR + "/does_not_exist " + zo_command + " plugins list", response);
+                      "ZO_PLUGINS_DIR=" + EXPLICIT_OPT_IN_DIR + "/does_not_exist " + zo_command + " plugins list", response);
 
                   ExpectWithContext(rc, response).ToBe(0);
                   Expect(response).Not().ToContain(UNREGISTERED_BANNER);

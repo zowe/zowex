@@ -3,25 +3,25 @@
 The native plug-in infrastructure lets extenders add new commands and behaviors to `zo`. The entry points exposed in
 `native/c/extend/plugin.hpp` describe the full contract between a plug-in and `zo`.
 
-## Enabling plug-in loading: `ZOWEX_PLUGINS_DIR`
+## Enabling plug-in loading: `ZO_PLUGINS_DIR`
 
-`ZOWEX_PLUGINS_DIR` is a **security control**, not a path override. There is no implicit fallback directory: `zo`
+`ZO_PLUGINS_DIR` is a **security control**, not a path override. There is no implicit fallback directory: `zo`
 never loads plug-ins unless this environment variable is explicitly set for the process. Setting it opts that
 `zo` invocation into `dlopen`-ing and executing every shared library it finds in the named directory, with the
 same privileges as the `zo` process itself.
 
-- If `ZOWEX_PLUGINS_DIR` is unset or empty, `zo` does not touch a plugins directory at all: no `opendir`, no
+- If `ZO_PLUGINS_DIR` is unset or empty, `zo` does not touch a plugins directory at all: no `opendir`, no
   `dlopen`, no plug-in code runs.
 - If it is set, `zo` treats every regular file in that directory as native code to execute. On a shared install,
   this directory **must** be writable only by trusted installers/administrators. Anyone who can write a file into it
   can run arbitrary code as every user who subsequently invokes `zo` with that variable set.
-- Environment variables are set per session, so overriding `ZOWEX_PLUGINS_DIR` for a session grants that session's
+- Environment variables are set per session, so overriding `ZO_PLUGINS_DIR` for a session grants that session's
   code the privileges of whoever authored the plug-ins in the directory it names. Only set this variable for a
   session when you trust that directory's contents.
 
 ## Directory and file requirements (provenance checks)
 
-Even once `ZOWEX_PLUGINS_DIR` is set, `zo` will only load plug-ins from a directory whose ownership and
+Even once `ZO_PLUGINS_DIR` is set, `zo` will only load plug-ins from a directory whose ownership and
 permissions make it a safe place to load native code from. These checks run *before* any shared library is opened,
 so a rejected directory or file never gets to execute constructor code.
 
@@ -100,7 +100,7 @@ extern "C" void register_plugin(PluginManager &manager)
 Types like `InvocationContext`, `ArgumentMap` and `ast::ObjMap` cross the `dlopen` boundary, and accessors such as
 `context.get<T>(...)` are inlined *into your plug-in*. A plug-in built against a different revision of `plugin.hpp`
 therefore reads the wrong member offsets. `zo` compares the reported version against its own
-`ZOWEX_PLUGIN_ABI_VERSION` before calling `register_plugin`, and rejects a mismatch with a `ZLOG_ERROR` message rather
+`ZO_PLUGIN_ABI_VERSION` before calling `register_plugin`, and rejects a mismatch with a `ZLOG_ERROR` message rather
 than loading the plug-in and corrupting memory. A library that does not export the symbol at all is treated as version
 0 and rejected.
 

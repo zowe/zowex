@@ -113,11 +113,11 @@ inline bool make_dirs(const std::string &path)
 }
 
 // Resolves the directory zo should write log files to. Honors
-// `ZOWEX_LOGS_DIR` if set, otherwise defaults to `<home>/.zowex/logs`
+// `ZO_LOGS_DIR` if set, otherwise defaults to `<home>/.zowex/logs`
 // Always returns an absolute path
 inline std::string resolve_logs_dir()
 {
-  const char *override_dir = std::getenv("ZOWEX_LOGS_DIR");
+  const char *override_dir = std::getenv("ZO_LOGS_DIR");
   if (override_dir && *override_dir)
   {
     return to_absolute_path(strip_trailing_slashes(std::string(override_dir)));

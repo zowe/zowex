@@ -514,7 +514,7 @@ tool)
 
 console)
   # consoleCommand RPC: the server spawns the APF-authorized zoa binary per
-  # request (next to zo, on PATH, or via ZOWEAX_PATH on the remote host)
+  # request (next to zo, on PATH, or via ZOA_PATH on the remote host)
   [[ $# -ge 1 ]]||die "zx console '<cmd>' [--cn <name>] [--timeout <s>] [--no-wait]"
   need jq
   cn="" ct="" cw="" cmd=""

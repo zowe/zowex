@@ -6,8 +6,13 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
-- **Breaking:** `c`: The `ZOWEX_PLUGIN_DECLARE_ABI()` macro is renamed to `ZO_PLUGIN_DECLARE_ABI()`. [#1119](https://github.com/zowe/zowex/pull/1119)
-- **Breaking:** `c`: Rename the `zowex` binary to `zo`, and the `zoweax` binary to `zoa`. [#1119](https://github.com/zowe/zowex/pull/1119)
+- **Breaking:** `c`: Renamed the `ZOWEX_LOG_LEVEL` environmental variable to `ZO_LOG_LEVEL`. [#1119](https://github.com/zowe/zowex/pull/1119)
+- **Breaking:** `c`: Renamed the `ZOWEX_LOGS_DIR` environmental variable to `ZO_LOGS_DIR`. [#1119](https://github.com/zowe/zowex/pull/1119)
+- **Breaking:** `c`: Renamed the `ZOWEAX_PATH` environmental variable to `ZOA_PATH`. [#1119](https://github.com/zowe/zowex/pull/1119)
+- **Breaking:** `c`: Renamed the `ZOWEX_LOGS_DIR` environmental variable to `ZO_LOGS_DIR`. [#1119](https://github.com/zowe/zowex/pull/1119)
+- **Breaking:** `c`: Renamed the `ZOWEX_PLUGINS_DIR` environmental variable to `ZO_PLUGINS_DIR`. [#1119](https://github.com/zowe/zowex/pull/1119)
+- **Breaking:** `c`: Renamed `ZOWEX_PLUGIN_DECLARE_ABI()` macro to `ZO_PLUGIN_DECLARE_ABI()`. [#1119](https://github.com/zowe/zowex/pull/1119)
+- **Breaking:** `c`: Renamed the `zowex` binary to `zo`, and the `zoweax` binary to `zoa`. [#1119](https://github.com/zowe/zowex/pull/1119)
 - `c`: Added the `zowex ds resolve-alias <dsn>` command which allows the user to resolve data set aliases. [#1108](https://github.com/zowe/zowex/pull/1108)
 - `c`: Added `zds_idcams` utility function which allows the caller to execute the z/OS IDCAMS program and retrieve its output. [#1108](https://github.com/zowe/zowex/pull/1108)
 

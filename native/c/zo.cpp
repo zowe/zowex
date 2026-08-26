@@ -40,13 +40,13 @@ static std::string get_executable_dir(const char *argv0)
   return ".";
 }
 
-// Plugin loading is opt-in: ZOWEX_PLUGINS_DIR must be explicitly set
+// Plugin loading is opt-in: ZO_PLUGINS_DIR must be explicitly set
 static bool get_plugins_dir(std::string &plugins_path)
 {
-  const char *env_value = getenv("ZOWEX_PLUGINS_DIR");
+  const char *env_value = getenv("ZO_PLUGINS_DIR");
   if (env_value == nullptr || *env_value == '\0')
   {
-    ZLOG_DEBUG("ZOWEX_PLUGINS_DIR not set; skipping plug-in loading");
+    ZLOG_DEBUG("ZO_PLUGINS_DIR not set; skipping plug-in loading");
     return false;
   }
 

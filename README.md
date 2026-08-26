@@ -157,5 +157,5 @@ graph LR
   click sdk "https://github.com/zowe/zowex/blob/main/doc/client/architecture.md#sdk-package"
   click cli "https://github.com/zowe/zowex/blob/main/doc/client/architecture.md#cli-plug-in"
   click ioserver "https://github.com/zowe/zowex/blob/main/doc/backend/server/architecture.md"
-  click zowex "https://github.com/zowe/zowex/blob/main/doc/backend/zowex_architecture.md"
+  click zowex "https://github.com/zowe/zowex/blob/main/doc/backend/zo_architecture.md"
 ```

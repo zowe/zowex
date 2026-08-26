@@ -44,8 +44,8 @@ using namespace ztst;
 int main(int argc, char *argv[])
 {
   // Keep test log output confined to the test working directory rather than
-  // the real user's home directory (the default when ZOWEX_LOGS_DIR is unset)
-  setenv("ZOWEX_LOGS_DIR", "logs", 1);
+  // the real user's home directory (the default when ZO_LOGS_DIR is unset)
+  setenv("ZO_LOGS_DIR", "logs", 1);
 
   int rc = tests(
       argc, argv,

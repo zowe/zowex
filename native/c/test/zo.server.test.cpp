@@ -183,8 +183,8 @@ std::string make_rpc_request(const std::string &method, const std::string &param
   return make_rpc_request(method, params, dummy_id);
 }
 
-const std::string zowex_dir = "./../build-out";
-const std::string zo_server_command = zowex_dir + "/zo server";
+const std::string zo_dir = "./../build-out";
+const std::string zo_server_command = zo_dir + "/zo server";
 
 void zo_server_tests()
 {
@@ -286,7 +286,7 @@ void zo_server_tests()
              it("should return an error when zoa cannot be found",
                 []() -> void
                 {
-                  ServerHandle server = start_server("ZOWEAX_PATH=/nonexistent/zoa " + zo_server_command, true);
+                  ServerHandle server = start_server("ZOA_PATH=/nonexistent/zoa " + zo_server_command, true);
                   write_to_server(server, "{\"jsonrpc\":\"2.0\",\"method\":\"consoleCommand\",\"params\":{\"commandText\":\"D T\"},\"id\":1}\n");
                   std::string response = read_line_from_server(server);
                   stop_server(server);

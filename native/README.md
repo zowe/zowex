@@ -46,20 +46,20 @@ The logger supports the following log levels (in order of verbosity):
 
 #### Configuration
 
-Set the log level for `zo` using the `ZOWEX_LOG_LEVEL` environment variable:
+Set the log level for `zo` using the `ZO_LOG_LEVEL` environment variable:
 
 ```bash
 # Start zowex in interactive mode with log level "TRACE"
-ZOWEX_LOG_LEVEL=TRACE ./zo --it
+ZO_LOG_LEVEL=TRACE ./zo --it
 ```
 
 To modify the log level programmatically in C++ code, use the `ZLogger::set_log_level` function. To change the log level in Metal C code, use the `ZLGSTLVL` function defined in `zlogger_metal.h`. Both functions take an integer from the enum `zlog_level_t` (also redefined as `LogLevel` in the C++ header file).
 
-Override where log files are written using the `ZOWEX_LOGS_DIR` environment variable. This is useful for shared installations where users may not have write access to the default location, or for redirecting logs elsewhere for troubleshooting:
+Override where log files are written using the `ZO_LOGS_DIR` environment variable. This is useful for shared installations where users may not have write access to the default location, or for redirecting logs elsewhere for troubleshooting:
 
 ```bash
 # Write logs to a custom directory instead of ~/.zowex/logs
-ZOWEX_LOGS_DIR=/tmp/my-zowex-logs ./zo --it
+ZO_LOGS_DIR=/tmp/my-zowex-logs ./zo --it
 ```
 
 The `zo server` daemon rolls its log file over once it exceeds 100KB, keeping up to 10 generations (`zowex_server.log`, `zowex_server.log.1`, ..., `zowex_server.log.9`) in FIFO order — the oldest generation is dropped to make room for the newest, bounding total disk usage per user to roughly 1MB.

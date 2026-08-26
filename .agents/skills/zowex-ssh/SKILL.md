@@ -295,7 +295,7 @@ authenticates once (§8).
 |---|---|
 | `consoleCommand` | `{"commandText":"<mvs cmd>","consoleName"?:"<name>","timeout"?:N,"wait"?:bool}` — `result.data` is plain text |
 
-The server spawns the APF-authorized **`zoa`** binary per request (located next to `zo`, on the server's `PATH`, or via `ZOWEAX_PATH` on the remote host) — the server itself never holds APF authorization. Prereqs on the host: `zoa` installed and `extattr +ap`'d by a system programmer, and ESM OPERCMDS grants (`MVS.*` profiles, e.g. `MVS.REPLY.*` for WTOR replies) for anything beyond informational `D ...` displays. `consoleName` defaults to the SSH user's ID plus a digit suffix; console activation can be gated per user with `MVS.MCSOPER.<name>` profiles. Failures come back with actionable messages ("command not found" → zoa not installed; "Not authorized" → not APF-authorized or ESM denied).
+The server spawns the APF-authorized **`zoa`** binary per request (located next to `zo`, on the server's `PATH`, or via `ZOA_PATH` on the remote host) — the server itself never holds APF authorization. Prereqs on the host: `zoa` installed and `extattr +ap`'d by a system programmer, and ESM OPERCMDS grants (`MVS.*` profiles, e.g. `MVS.REPLY.*` for WTOR replies) for anything beyond informational `D ...` displays. `consoleName` defaults to the SSH user's ID plus a digit suffix; console activation can be gated per user with `MVS.MCSOPER.<name>` profiles. Failures come back with actionable messages ("command not found" → zoa not installed; "Not authorized" → not APF-authorized or ESM denied).
 
 ### Certificates / key rings (ESM)
 

@@ -8,7 +8,7 @@ The server mediates all requests and dispatches them to appropriate command hand
 
 ## Configuration
 
-The `ZOWEX_NUM_WORKERS` environment variable, if set, overrides the `--num-workers` argument for `zo server`. This is useful for system administrators who want to control server concurrency at the environment level without modifying client configurations.
+The `ZO_NUM_WORKERS` environment variable, if set, overrides the `--num-workers` argument for `zo server`. This is useful for system administrators who want to control server concurrency at the environment level without modifying client configurations.
 
 ## Request and response processing
 

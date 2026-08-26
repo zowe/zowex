@@ -208,7 +208,7 @@ static int handle_server(plugin::InvocationContext &context)
   opts.request_timeout = context.get<long long>("request-timeout", opts.request_timeout);
   opts.exec_dir = ZServer::get_instance().get_exec_dir();
 
-  const auto *num_workers_env = getenv("ZOWEX_NUM_WORKERS");
+  const auto *num_workers_env = getenv("ZO_NUM_WORKERS");
   if (num_workers_env != nullptr)
   {
     try

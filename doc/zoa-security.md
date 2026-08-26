@@ -84,7 +84,7 @@ outage.
 
 Resolution order for each `consoleCommand` request:
 
-1. `ZOWEAX_PATH` environment variable (full path to the binary) — most reliable.
+1. `ZOA_PATH` environment variable (full path to the binary) — most reliable.
 2. A `zoa` file next to the running `zo` binary — appropriate only when
    `zo` itself is in a protected admin-managed directory.
 3. `zoa` on the server process's `PATH`.

@@ -1068,7 +1068,7 @@ if [ -x ./zowex ]; then echo "HAVE $PWD"; else echo "NEED $PWD"; fi
 
 'console' {
   # consoleCommand RPC: the server spawns the APF-authorized zoa binary per
-  # request (next to zo, on PATH, or via ZOWEAX_PATH on the remote host)
+  # request (next to zo, on PATH, or via ZOA_PATH on the remote host)
   $usage = "usage: zx console '<cmd>' [--cn <name>] [--timeout <s>] [--no-wait]"
   if ($rest.Count -lt 1) { Die $usage }
   $cn = ''
