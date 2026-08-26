@@ -54,7 +54,9 @@ jobs:
         run: npm ci
 
       - name: Build Source
-        run: npm run build
+        run: |
+          npm run build
+          git add packages/sdk/src/ZSshConstants.ts
         env:
           ZOWEX_RELEASE_VERSION: ${{ inputs.version }}
 
