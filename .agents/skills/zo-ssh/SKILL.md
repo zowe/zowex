@@ -1,5 +1,5 @@
 ---
-name: zowex-ssh
+name: zo-ssh
 description: Deploy and operate the zo JSON-RPC server on a *remote* z/OS host over SSH, for end-user dataset/job/USS operations when that host has no working z/OSMF endpoint. Use when the user asks to "connect to <host> over ssh", "deploy zo to <lpar>", or "use zo on <lpar>" to work with a remote system's datasets, jobs, or USS files. Not for building/testing this repo's own native code — that uses `npm run z:rebuild` / `npm run z:test`.
 ---
 
@@ -11,8 +11,8 @@ This skill is an alternative to the `zowe` CLI (z/OSMF REST): it uses the **zo**
 
 | platform | helper | invoke as |
 |---|---|---|
-| macOS / Linux | [zx](zx) (bash) | `.agents/skills/zowex-ssh/zx ds list "SYS1.*"` |
-| Windows | [zx.ps1](zx.ps1) (Windows PowerShell 5.1+) | `.agents\skills\zowex-ssh\zx.ps1 ds list "SYS1.*"` |
+| macOS / Linux | [zx](zx) (bash) | `.agents/skills/zo-ssh/zx ds list "SYS1.*"` |
+| Windows | [zx.ps1](zx.ps1) (Windows PowerShell 5.1+) | `.agents\skills\zo-ssh\zx.ps1 ds list "SYS1.*"` |
 
 Everything below is written with the bash helper; on Windows substitute `zx.ps1` (or install the `zx.cmd` shim — §0) and PowerShell variable syntax. **Windows-specific behavior and gotchas are collected in §8 — read that section before your first call on Windows.**
 
@@ -37,8 +37,8 @@ $env:ZX_STATE = "$env:TEMP\zx-agent-$PID"   # same rule on Windows (default is %
 
 Do this at the very start of every session, before the first `zx`/`$zx` call — deploy included. Never call `zx reset` under a `ZX_STATE` a human or another agent might be using (see §7).
 
-**Local prereqs (bash):** `ssh`, `sftp`, `jq`, `base64`, bash ≥3.2, and `curl` or `wget`. Run `.agents/skills/zowex-ssh/zx check` to verify. (`jq` is the only one not stock on macOS — if it's missing, ask the user to install it via their package manager, e.g. Homebrew on macOS, before continuing.)
-**Local prereqs (Windows):** `ssh` + `sftp` (the Windows OpenSSH Client feature) and Windows PowerShell 5.1 or newer. No `jq`/`base64`/`curl` needed — `zx.ps1` does JSON, base64, and downloads in-process. Run `.agents\skills\zowex-ssh\zx.ps1 check` to verify.
+**Local prereqs (bash):** `ssh`, `sftp`, `jq`, `base64`, bash ≥3.2, and `curl` or `wget`. Run `.agents/skills/zo-ssh/zx check` to verify. (`jq` is the only one not stock on macOS — if it's missing, ask the user to install it via their package manager, e.g. Homebrew on macOS, before continuing.)
+**Local prereqs (Windows):** `ssh` + `sftp` (the Windows OpenSSH Client feature) and Windows PowerShell 5.1 or newer. No `jq`/`base64`/`curl` needed — `zx.ps1` does JSON, base64, and downloads in-process. Run `.agents\skills\zo-ssh\zx.ps1 check` to verify.
 **Remote prereqs:** SSH login + a writable USS directory. The `zowex` binary is self-contained.
 **Bundle:** `zx deploy` will auto-download the latest `server.pax.Z` from [github.com/zowe/zowex/releases](https://github.com/zowe/zowex/releases) if it isn't found locally. Default save path is `~/.local/share/zx/server.pax.Z` (`%LOCALAPPDATA%\zx\server.pax.Z` on Windows) — always user-writable, works whether the helper is run directly or via PATH. Downloads automatically without prompting. To pin a specific version or path, set `ZX_PAX` to it. Set `GITHUB_TOKEN` if the API is rate-limited on a shared corporate IP.
 
@@ -49,8 +49,8 @@ Do this at the very start of every session, before the first `zx`/`$zx` call —
 Run once to symlink the helper into `~/.local/bin` (created if absent):
 
 ```bash
-.agents/skills/zowex-ssh/zx install          # -> ~/.local/bin/zx  (default)
-.agents/skills/zowex-ssh/zx install ~/bin    # -> ~/bin/zx          (custom dir)
+.agents/skills/zo-ssh/zx install          # -> ~/.local/bin/zx  (default)
+.agents/skills/zo-ssh/zx install ~/bin    # -> ~/bin/zx          (custom dir)
 ```
 
 `zx install` prints an `export PATH=...` line if the target directory isn't already on your PATH — paste it into your shell profile (`~/.zshrc`, `~/.bashrc`, etc.).
@@ -58,8 +58,8 @@ Run once to symlink the helper into `~/.local/bin` (created if absent):
 On Windows there are no symlink permissions to worry about — `install` writes a `zx.cmd` shim that launches the script with `-ExecutionPolicy Bypass`, so it works regardless of the machine's execution policy:
 
 ```powershell
-.agents\skills\zowex-ssh\zx.ps1 install              # -> ~\.local\bin\zx.cmd  (default)
-.agents\skills\zowex-ssh\zx.ps1 install C:\tools     # -> C:\tools\zx.cmd      (custom dir)
+.agents\skills\zo-ssh\zx.ps1 install              # -> ~\.local\bin\zx.cmd  (default)
+.agents\skills\zo-ssh\zx.ps1 install C:\tools     # -> C:\tools\zx.cmd      (custom dir)
 ```
 
 It prints the `$env:PATH` / `[Environment]::SetEnvironmentVariable(...)` line to run if the directory isn't on PATH yet.
@@ -129,7 +129,7 @@ The CLI also exposes `tso` / `system` / `tool` subcommands — run `$ZX_BIN <cmd
 ### 2a · The `zx` helper (preferred)
 
 ```bash
-zx=.agents/skills/zowex-ssh/zx     # or alias/symlink it onto PATH
+zx=.agents/skills/zo-ssh/zx     # or alias/symlink it onto PATH
 
 $zx deploy user@host [/remote/dir]   # one-time per host (idempotent); also saves config
 $zx ds list "SYS1.*"                 # works immediately — auto one-shot
@@ -142,7 +142,7 @@ $zx stop
 On Windows, same sequence:
 
 ```powershell
-$zx = '.agents\skills\zowex-ssh\zx.ps1'   # or install the zx.cmd shim onto PATH (§0)
+$zx = '.agents\skills\zo-ssh\zx.ps1'   # or install the zx.cmd shim onto PATH (§0)
 
 & $zx deploy user@host /u/user/zowex
 & $zx ds list "SYS1.*"
@@ -398,7 +398,7 @@ For whole-PDS `ds get`, run `zx start` first — one persistent session is much 
 | every method returns auth-style errors | the SSH user lacks the needed ESM access; zo itself does no auth |
 | `ControlPath too long ('...' >= 104 bytes)` | Unix domain socket path limit (macOS: 104 bytes) — `$ZX_STATE/cm-%C` overflowed it. Use a short `ZX_STATE`, e.g. `/tmp/zx-<label>.$UID`, not a long nested path like a session scratch dir |
 | need password auth against a second host without disturbing an existing `zx` session/socket | give the second host its own `ZX_STATE` and prime its `ControlMaster` with `sshpass` — see §2c |
-| **(Windows)** `zx.ps1 cannot be loaded because running scripts is disabled on this system` | execution policy — call it as `powershell -ExecutionPolicy Bypass -File .agents\skills\zowex-ssh\zx.ps1 ...`, or run `install` once and use the `zx.cmd` shim, which already passes that flag |
+| **(Windows)** `zx.ps1 cannot be loaded because running scripts is disabled on this system` | execution policy — call it as `powershell -ExecutionPolicy Bypass -File .agents\skills\zo-ssh\zx.ps1 ...`, or run `install` once and use the `zx.cmd` shim, which already passes that flag |
 | **(Windows)** a password prompt on *every* call | expected in one-shot mode: Windows OpenSSH has no `ControlMaster`, so each call is a fresh connection. Run `zx start` (one connection, one prompt, reused by every later call) or set up key auth — see §8 |
 | **(Windows)** `zx start` says `server failed to start` | look in `$env:ZX_STATE\err` (session-host failure) and `$env:ZX_STATE\ssh-err` (what ssh/zo printed). A wrong host/bin, a rejected key, or an untrusted host key all land here |
 | **(Windows)** redirected output (`zx ds read X > f.txt`) is UTF-16 with doubled newlines | that's PowerShell's `>`, not `zx` — use `zx ds get "X" f.txt` / `zx uss get`, or pipe through `Out-File -Encoding utf8` / `Set-Content` |

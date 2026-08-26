@@ -619,7 +619,7 @@ function Save-RespB64([string]$resp, [string]$dst) {
 function Get-Usage {
   $txt = Get-Content -LiteralPath $script:Self -Raw
   if ($txt -match '(?s)<\#(.*?)\#>') { return $Matches[1].Trim() }
-  return 'zx.ps1 - see the zowex-ssh skill'
+  return 'zx.ps1 - see the zo-ssh skill'
 }
 function Show-GroupHelp([string]$grp) {
   $keep = $false
