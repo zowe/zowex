@@ -3,7 +3,7 @@ name: build-zowex-command
 description: Guides users through creating new zo commands across the Zowe Remote SSH stack (native C++, server, SDK). Use when the user wants to add a new command, implement a zo command, or add functionality to the native backend.
 ---
 
-# Building a New Zo Command
+# Building a New ZO Command
 
 This skill guides the creation of a new command for the Zowe Remote SSH stack, covering the C++ implementation, middleware layer, and SDK.
 
