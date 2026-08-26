@@ -56,7 +56,7 @@ printf "\n"
 echo "Converting EBCDIC to ASCII..."
 mv build-out/$filename_no_ext.h build-out/$filename_no_ext.h.u
 echo "Command: iconv -f 1047 -t utf8 build-out/$filename_no_ext.h.u > build-out/$filename_no_ext.h"
-iconv -f 1047 -t utf8 build-out/$filename_no_ext.h.u >build-out/$filename_no_ext.h
+iconv -f 1047 -t utf8 build-out/$filename_no_ext.h.u > build-out/$filename_no_ext.h
 chtag -tc ISO8859-1 build-out/$filename_no_ext.h
 echo "Conversion completed."
 printf "\n"
@@ -78,7 +78,7 @@ awk '{
   } else {
     print $0
   }
-}' build-out/$filename_no_ext.h >build-out/$filename_no_ext.h.tmp && \
+}' build-out/$filename_no_ext.h > build-out/$filename_no_ext.h.tmp && \
 	mv build-out/$filename_no_ext.h.tmp build-out/$filename_no_ext.h
 echo "Pragma ifdef replacement completed."
 printf "\n"
