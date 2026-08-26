@@ -78,7 +78,7 @@ awk '{
   } else {
     print $0
   }
-}' build-out/$filename_no_ext.h >build-out/$filename_no_ext.h.tmp &&
+}' build-out/$filename_no_ext.h >build-out/$filename_no_ext.h.tmp && \
 	mv build-out/$filename_no_ext.h.tmp build-out/$filename_no_ext.h
 echo "Pragma ifdef replacement completed."
 printf "\n"
