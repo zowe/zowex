@@ -133,7 +133,7 @@ int ZDSDSCB1(ZDS *zds, const char *dsn, const char *volser, DSCBFormat1 *dscb)
   {
     strcpy(zds->diag.service_name, "OBTAIN");
     ZDIAG_SET_MSG(&zds->diag, "OBTAIN SVC failed for %.44s on %.6s with rc=%d, workarea_ptr=%p",
-                dsn, volser, rc, workarea);
+                  dsn, volser, rc, workarea);
     zds->diag.service_rc = rc;
     zds->diag.detail_rc = ZDS_RTNCD_SERVICE_FAILURE;
     return RTNCD_FAILURE;
