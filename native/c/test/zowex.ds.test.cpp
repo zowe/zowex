@@ -24,7 +24,6 @@
 #include "ztest.hpp"
 #include "zutils.hpp"
 #include "ztype.h"
-#include "zowex.test.hpp"
 #include "zowex.ds.test.hpp"
 #include "../zusf.hpp"
 #include "../zjb.hpp"
@@ -43,6 +42,7 @@ void _create_ds(const std::string &ds_name, const std::string &ds_options = "")
 void zowex_ds_tests()
 {
   std::vector<std::string> _ds;
+  std::vector<std::string> created_aliases;
   describe("data-set",
            [&]() -> void
            {
@@ -62,8 +62,9 @@ void zowex_ds_tests()
                        ExpectWithContext(rc, response).ToBe(0);
                        Expect(response).ToContain("Data set '" + ds + "' deleted"); // ds deleted
                      }
-                     catch (...)
+                     catch (const std::exception &deleteErr)
                      {
+                       TestLog("Failed to delete: " + ds + ", error: " + deleteErr.what() + ". Verifying with data-set list command");
                        try
                        {
                          std::string response;
@@ -72,9 +73,9 @@ void zowex_ds_tests()
                          ExpectWithContext(rc, response).ToBe(0);
                          Expect(response).Not().ToContain(ds);
                        }
-                       catch (...)
+                       catch (const std::exception &listCheckErr)
                        {
-                         TestLog("Failed to delete: " + ds);
+                         TestLog("Failed to delete: " + ds + ", error: " + listCheckErr.what());
                        }
                      }
                    }
@@ -997,32 +998,32 @@ void zowex_ds_tests()
                         beforeAll([&]() -> void
                                   {
                                     // Clean up any leftover data sets from previous test runs
-                                    std::string cleanup_jcl;
-                                    cleanup_jcl += "//GDGCLN$ JOB IZUACCT\n";
-                                    cleanup_jcl += "//STEP1    EXEC PGM=IDCAMS\n";
-                                    cleanup_jcl += "//SYSPRINT DD SYSOUT=*\n";
-                                    cleanup_jcl += "//SYSIN    DD *\n";
-                                    cleanup_jcl += "  DELETE " + gdg_gen2_dsn + " NONVSAM PURGE\n";
-                                    cleanup_jcl += "  DELETE " + gdg_gen1_dsn + " NONVSAM PURGE\n";
-                                    cleanup_jcl += "  DELETE " + gdg_base_dsn + " GDG PURGE\n";
-                                    cleanup_jcl += "  SET MAXCC = 0\n";
-                                    cleanup_jcl += "/*\n";
-                                    submit_and_wait(cleanup_jcl, 200);
-
+                                    std::string cleanup_output;
+                                    std::string cleanup_err;
+                                    std::string cleanup_idcams;
+                                    cleanup_idcams += "  DELETE " + gdg_gen2_dsn + " NONVSAM PURGE\n";
+                                    cleanup_idcams += "  DELETE " + gdg_gen1_dsn + " NONVSAM PURGE\n";
+                                    cleanup_idcams += "  DELETE " + gdg_base_dsn + " GDG PURGE\n";
+                                    cleanup_idcams += "  SET MAXCC = 0\n";
+                                    int rc = zds_idcams(cleanup_idcams, cleanup_output, cleanup_err);
+                                    TestLog("Cleanup RC from IDCAMS: " + std::to_string(rc));
+                                    if (rc !=0 ){
+                                       throw std::runtime_error("Output and error from failed IDCAMS cleanup:" + cleanup_err + "\n" + cleanup_output +"\n");
+                                    }
                                     // Define the GDG base via IDCAMS
-                                    std::string setup_jcl;
-                                    setup_jcl += "//GDGSET$ JOB IZUACCT\n";
-                                    setup_jcl += "//STEP1    EXEC PGM=IDCAMS\n";
-                                    setup_jcl += "//SYSPRINT DD SYSOUT=*\n";
-                                    setup_jcl += "//SYSIN    DD *\n";
-                                    setup_jcl += "  DEFINE GDG ( -\n";
-                                    setup_jcl += "    NAME(" + gdg_base_dsn + ") -\n";
-                                    setup_jcl += "    LIMIT(5) -\n";
-                                    setup_jcl += "    NOEMPTY -\n";
-                                    setup_jcl += "    NOSCRATCH )\n";
-                                    setup_jcl += "/*\n";
-                                    submit_and_wait(setup_jcl, 200, true);
-
+                                    std::string setup_idcams;
+                                    std::string setup_output;
+                                    std::string setup_err;
+                                    setup_idcams += "  DEFINE GDG ( -\n";
+                                    setup_idcams += "    NAME(" + gdg_base_dsn + ") -\n";
+                                    setup_idcams += "    LIMIT(5) -\n";
+                                    setup_idcams += "    NOEMPTY -\n";
+                                    setup_idcams += "    NOSCRATCH )\n";
+                                    rc = zds_idcams(setup_idcams, setup_output, setup_err);
+                                    TestLog("Cleanup RC from IDCAMS: " + std::to_string(rc));
+                                    if (rc !=0 ){
+                                       throw std::runtime_error("Output and error from failed IDCAMS setup:" + setup_err + "\n" + setup_output +"\n");
+                                    }
                                     // Create generation 1 via IEBGENER
                                     std::string gen1_jcl;
                                     gen1_jcl += "//GDGGEN1 JOB IZUACCT\n";
@@ -1054,74 +1055,60 @@ void zowex_ds_tests()
 
                         afterAll([&]() -> void
                                  {
-                                   std::string del_jcl;
-                                   del_jcl += "//GDGDEL$ JOB IZUACCT\n";
-                                   del_jcl += "//STEP1    EXEC PGM=IDCAMS\n";
-                                   del_jcl += "//SYSPRINT DD SYSOUT=*\n";
-                                   del_jcl += "//SYSIN    DD *\n";
-                                   del_jcl += "  DELETE " + gdg_gen2_dsn + " NONVSAM PURGE\n";
-                                   del_jcl += "  DELETE " + gdg_gen1_dsn + " NONVSAM PURGE\n";
-                                   del_jcl += "  DELETE " + gdg_base_dsn + " GDG PURGE\n";
-                                   del_jcl += "  SET MAXCC = 0\n";
-                                   del_jcl += "/*\n";
-                                   submit_and_wait(del_jcl, 200); },
+                                   std::string cleanup_idcams;
+                                   std::string cleanup_err;
+                                   std::string cleanup_output;
+                                   cleanup_idcams += "  DELETE " + gdg_gen2_dsn + " NONVSAM PURGE\n";
+                                   cleanup_idcams += "  DELETE " + gdg_gen1_dsn + " NONVSAM PURGE\n";
+                                   cleanup_idcams += "  DELETE " + gdg_base_dsn + " GDG PURGE\n";
+                                   cleanup_idcams += "  SET MAXCC = 0\n";
+                                   int rc = zds_idcams(cleanup_idcams, cleanup_output, cleanup_err);
+                                    TestLog("Cleanup RC from IDCAMS: " + std::to_string(rc));
+                                    if (rc !=0 ){
+                                       throw std::runtime_error("Output and error from failed IDCAMS cleanup:" + cleanup_err + "\n" + cleanup_output +"\n");
+                                    } },
                                  gdg_opts);
 
-                        it("should list the GDG base in the catalog",
-                           [&]() -> void
+                        it("should list the GDG base in the catalog", [&]() -> void
                            {
                              std::string response;
                              const std::string command = zowex_command + " data-set list " + gdg_base_dsn + " --no-warn";
                              const int rc = execute_command_with_output(command, response);
                              ExpectWithContext(rc, response).ToBe(0);
-                             Expect(response).ToContain(gdg_base_dsn);
-                           },
-                           gdg_opts);
+                             Expect(response).ToContain(gdg_base_dsn); }, gdg_opts);
 
-                        it("should report ?????? volser for GDG base when listing with attributes",
-                           [&]() -> void
+                        it("should report ?????? volser for GDG base when listing with attributes", [&]() -> void
                            {
                              std::string response;
                              const std::string command = zowex_command + " data-set list " + gdg_base_dsn + " -a --rfc";
                              const int rc = execute_command_with_output(command, response);
                              ExpectWithContext(rc, response).ToBe(0);
-                             Expect(response).ToContain("??????");
-                           },
-                           gdg_opts);
+                             Expect(response).ToContain("??????"); }, gdg_opts);
 
-                        it("should list GDG generations using a wildcard pattern",
-                           [&]() -> void
+                        it("should list GDG generations using a wildcard pattern", [&]() -> void
                            {
                              std::string response;
                              const std::string command = zowex_command + " data-set list '" + gdg_base_dsn + ".*' --no-warn";
                              const int rc = execute_command_with_output(command, response);
                              ExpectWithContext(rc, response).ToBe(0);
                              Expect(response).ToContain(gdg_gen1_dsn);
-                             Expect(response).ToContain(gdg_gen2_dsn);
-                           },
-                           gdg_opts);
+                             Expect(response).ToContain(gdg_gen2_dsn); }, gdg_opts);
 
-                        it("should view the content of a GDG generation by absolute name",
-                           [&]() -> void
+                        it("should view the content of a GDG generation by absolute name", [&]() -> void
                            {
                              std::string response;
                              const std::string command = zowex_command + " data-set view " + gdg_gen1_dsn;
                              const int rc = execute_command_with_output(command, response);
                              ExpectWithContext(rc, response).ToBe(0);
-                             Expect(response).ToContain("GENERATION ONE CONTENT");
-                           },
-                           gdg_opts);
+                             Expect(response).ToContain("GENERATION ONE CONTENT"); }, gdg_opts);
 
-                        it("should view the most recent GDG generation via relative reference",
-                           [&]() -> void
+                        it("should view the most recent GDG generation via relative reference", [&]() -> void
                            {
                              std::string response;
                              const std::string command = zowex_command + " data-set view '" + gdg_base_dsn + "(0)'";
                              const int rc = execute_command_with_output(command, response);
                              ExpectWithContext(rc, response).ToBe(0);
-                             Expect(response).ToContain("GENERATION TWO CONTENT");
-                           },
-                           gdg_opts);
+                             Expect(response).ToContain("GENERATION TWO CONTENT"); }, gdg_opts);
 
                         // TODO: https://github.com/zowe/zowex/issues/666
                         xit("should delete a specific GDG generation", []() -> void {});
@@ -1164,23 +1151,23 @@ void zowex_ds_tests()
                          // TODO: What do?
                          xit("should fail to restore if not authorized", [&]() -> void {});
                        });
-            // CA Disk archival/restore is tested manually via native/c/test/test.cadisk.sh.
-            // See doc/ref/ds/ca-disk.md for instructions.
-            // Manual test for https://github.com/zowe/zowex/issues/1007
-            // Bug: "data-set restore" returns success for a data set that was never archived.
-            //
-            // To verify manually once the fix is in place:
-            //   1. Create a plain data set (never archived):
-            //        zowex data-set create HLQ.UNARCHIVED --dsorg PS
-            //   2. Attempt to restore it:
-            //        zowex data-set restore HLQ.UNARCHIVED
-            //   3. Expected (after fix): non-zero RC and a message such as
-            //        "Error: data set 'HLQ.UNARCHIVED' is not archived"
-            //   4. Actual (current bug): RC 0 and "Data set 'HLQ.UNARCHIVED' restored"
-            //
-            // For the full end-to-end archival/restore flow, see test.cadisk.sh.
-            xit("should fail to restore a data set that was never archived", []() -> void {});
-            describe("view",
+             // CA Disk archival/restore is tested manually via native/c/test/test.cadisk.sh.
+             // See doc/ref/ds/ca-disk.md for instructions.
+             // Manual test for https://github.com/zowe/zowex/issues/1007
+             // Bug: "data-set restore" returns success for a data set that was never archived.
+             //
+             // To verify manually once the fix is in place:
+             //   1. Create a plain data set (never archived):
+             //        zowex data-set create HLQ.UNARCHIVED --dsorg PS
+             //   2. Attempt to restore it:
+             //        zowex data-set restore HLQ.UNARCHIVED
+             //   3. Expected (after fix): non-zero RC and a message such as
+             //        "Error: data set 'HLQ.UNARCHIVED' is not archived"
+             //   4. Actual (current bug): RC 0 and "Data set 'HLQ.UNARCHIVED' restored"
+             //
+             // For the full end-to-end archival/restore flow, see test.cadisk.sh.
+             xit("should fail to restore a data set that was never archived", []() -> void {});
+             describe("view",
                       [&]() -> void
                       {
                         beforeEach(
@@ -1308,8 +1295,7 @@ void zowex_ds_tests()
                                  {
                                    TEST_OPTIONS concurrent_opts = {false, 60};
 
-                                   it("should not block concurrent reads of different PDSE members: fopen(r) does not take an exclusive ENQ",
-                                      [&]() -> void
+                                   it("should not block concurrent reads of different PDSE members: fopen(r) does not take an exclusive ENQ", [&]() -> void
                                       {
                                         const std::string ds = get_random_ds();
                                         _ds.push_back(ds);
@@ -1349,12 +1335,9 @@ void zowex_ds_tests()
                                         {
                                           ExpectWithContext(results[i], contents[i]).ToBe(0);
                                           Expect(contents[i]).ToContain("content for member " + std::to_string(i));
-                                        }
-                                      },
-                                      concurrent_opts);
+                                        } }, concurrent_opts);
 
-                                   it("should not block concurrent reads of the same PDSE member: fopen(r) uses SHR not exclusive ENQ",
-                                      [&]() -> void
+                                   it("should not block concurrent reads of the same PDSE member: fopen(r) uses SHR not exclusive ENQ", [&]() -> void
                                       {
                                         const std::string ds = get_random_ds();
                                         _ds.push_back(ds);
@@ -1390,9 +1373,7 @@ void zowex_ds_tests()
                                         {
                                           ExpectWithContext(results[i], contents[i]).ToBe(0);
                                           Expect(contents[i]).ToContain(expected);
-                                        }
-                                      },
-                                      concurrent_opts);
+                                        } }, concurrent_opts);
                                  });
                       });
              describe("write",
@@ -1484,7 +1465,6 @@ void zowex_ds_tests()
                              ExpectWithContext(rc, response).ToBe(0);
                              Expect(response).ToContain("Wrote data to '" + ds + "'");
 
-                             // Writing must not alter the data set's DCB attributes
                              command = zowex_command + " data-set list " + ds + " -a --rfc";
                              rc = execute_command_with_output(command, response);
                              ExpectWithContext(rc, response).ToBe(0);
@@ -2035,8 +2015,7 @@ void zowex_ds_tests()
                                    // compete for the same RESERVE regardless of member. EXCLUSIVE+RET=USE means the
                                    // holder gets RC=0; concurrent requestors get RC=4 immediately. At least one write
                                    // must succeed, and every member that was written must contain coherent data.
-                                   it("should serialize concurrent BPAM writes to the same PDSE via RESERVE: even across different members",
-                                      [&]() -> void
+                                   it("should serialize concurrent BPAM writes to the same PDSE via RESERVE: even across different members", [&]() -> void
                                       {
                                         const std::string ds = get_random_ds();
                                         _ds.push_back(ds);
@@ -2079,15 +2058,12 @@ void zowex_ds_tests()
                                           ZDSReadOpts read_opts{.zds = &read_zds, .dsname = ds + "(MEM" + std::to_string(i) + ")"};
                                           ExpectWithContext(zds_read(read_opts, content), content).ToBe(0);
                                           Expect(content).ToContain("thread " + std::to_string(i) + " data");
-                                        }
-                                      },
-                                      concurrent_opts);
+                                        } }, concurrent_opts);
 
                                    // Same member = same ENQ rname. ENQ uses EXCLUSIVE+RET=USE: the holder gets RC=0,
                                    // concurrent requestors get RC=4 immediately (no wait). At least one write must
                                    // succeed, and the final content must come from exactly one write (no interleaving).
-                                   it("should serialize concurrent writes to the same PDSE member via exclusive ENQ",
-                                      [&]() -> void
+                                   it("should serialize concurrent writes to the same PDSE member via exclusive ENQ", [&]() -> void
                                       {
                                         const std::string ds = get_random_ds();
                                         _ds.push_back(ds);
@@ -2128,10 +2104,104 @@ void zowex_ds_tests()
                                         for (int i = 0; i < thread_count; ++i)
                                           if (content.find("thread " + std::to_string(i) + " data") != std::string::npos)
                                             ++matching_threads;
-                                        Expect(matching_threads).ToBe(1);
-                                      },
-                                      concurrent_opts);
+                                        Expect(matching_threads).ToBe(1); }, concurrent_opts);
                                  });
                       });
+             describe("resolve-alias",
+                      [&]() -> void
+                      {
+                        beforeEach([&]() -> void
+                                   { _ds.push_back(get_random_ds()); });
+                        it("should resolve an alias to a sequential data set",
+                           [&]() -> void
+                           {
+                             std::string target = _ds.back();
+                             _create_ds(target, "--dsorg PS");
+
+                             std::string alias_name = get_random_ds() + ".ALIAS";
+                             std::string makeAliasOutput;
+                             std::string makeAliasError;
+
+                             int rc = zds_idcams(
+                                 " DEFINE ALIAS (NAME(" + alias_name + ") -\n RELATE(" + target + "))\n", makeAliasOutput, makeAliasError);
+
+                             ExpectWithContext(rc, "Failed to create alias with rc " + std::to_string(rc) +
+                                                       ". Idcams output/error:" + makeAliasOutput + "\n" + makeAliasError)
+                                 .ToBe(0);
+
+                             created_aliases.push_back(alias_name);
+                             std::string response;
+                             std::string command = zowex_command + " data-set resolve-alias " + alias_name;
+                             rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain(target);
+                           });
+
+                        it("should resolve an alias to a PDS",
+                           [&]() -> void
+                           {
+                             std::string target = _ds.back();
+                             _create_ds(target, "--dsorg PO");
+
+                             std::string alias_name = get_random_ds() + ".ALIAS";
+                             std::string makeAliasOutput;
+                             std::string makeAliasError;
+
+                             int rc = zds_idcams(
+                                 " DEFINE ALIAS (NAME(" + alias_name + ") -\n RELATE(" + target + "))\n", makeAliasOutput, makeAliasError);
+
+                             ExpectWithContext(rc, "Failed to create alias with rc " + std::to_string(rc) +
+                                                       ". Idcams output/error:" + makeAliasOutput + "\n" + makeAliasError)
+                                 .ToBe(0);
+
+                             created_aliases.push_back(alias_name);
+                             std::string response;
+                             std::string command = zowex_command + " data-set resolve-alias " + alias_name;
+                             rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain(target);
+                           });
+
+                        it("should resolve an alias to a PDSE",
+                           [&]() -> void
+                           {
+                             std::string target = _ds.back();
+                             _create_ds(target, "--dsorg PO --dsntype LIBRARY --recfm F,B --dirblk 5");
+
+                             std::string alias_name = get_random_ds() + ".ALIAS";
+                             std::string makeAliasOutput;
+                             std::string makeAliasError;
+
+                             int rc = zds_idcams(
+                                 " DEFINE ALIAS (NAME(" + alias_name + ") -\n RELATE(" + target + "))\n", makeAliasOutput, makeAliasError);
+
+                             ExpectWithContext(rc, "Failed to create alias with rc " + std::to_string(rc) +
+                                                       ". Idcams output/error:" + makeAliasOutput + "\n" + makeAliasError)
+                                 .ToBe(0);
+
+                             created_aliases.push_back(alias_name);
+                             std::string response;
+                             std::string command = zowex_command + " data-set resolve-alias " + alias_name;
+                             rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain(target);
+                           });
+                      });
+
+             afterAll([&]() -> void
+                      {
+                                   std::string cleanup_idcams;
+                                   std::string cleanup_err;
+                                   std::string cleanup_output;
+                                                     for (const auto &alias : created_aliases)
+                   {
+                                   cleanup_idcams += "  DELETE -\n "+alias+" -\n ALIAS\n";
+                   }
+                                   cleanup_idcams += "  SET MAXCC = 0\n";
+                                   int rc = zds_idcams(cleanup_idcams, cleanup_output, cleanup_err);
+                                    TestLog("Cleanup RC from IDCAMS: " + std::to_string(rc));
+                                    if (rc !=0 ){
+                                       throw std::runtime_error("Output and error from failed IDCAMS cleanup:" + cleanup_err + "\n" + cleanup_output +"\n");
+                                    } });
            });
 }

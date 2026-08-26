@@ -71,7 +71,6 @@ MTL_FLAGS64+=$(LOG_FLAGS)
 .END
 
 COMMAND_OBJS = $(OUT_DIR)/commands/certificates.o \
-	$(OUT_DIR)/commands/console.o \
 	$(OUT_DIR)/commands/core.o \
 	$(OUT_DIR)/commands/ds.o \
 	$(OUT_DIR)/commands/job.o \
@@ -383,21 +382,43 @@ $(OUT_DIR)/extend/plugin.o: extend/plugin.cpp
 #
 # Test CLI
 #
-$(OUT_DIR)/zowex: $(OUT_DIR)/zowex.o $(OUT_DIR)/extend/plugin.o $(COMMAND_OBJS) $(SERVER_OBJS) $(OUT_DIR)/zjsonm.o $(OUT_DIR)/libzcn.a $(OUT_DIR)/libzut.a $(OUT_DIR)/libzjb.a $(OUT_DIR)/libzds.a $(OUT_DIR)/libzusf.a $(OUT_DIR)/libztso.a $(OUT_DIR)/libzkr.a
+$(OUT_DIR)/zowex: $(OUT_DIR)/zowex.o $(OUT_DIR)/extend/plugin.o $(COMMAND_OBJS) $(SERVER_OBJS) $(OUT_DIR)/zjsonm.o $(OUT_DIR)/libzut.a $(OUT_DIR)/libzjb.a $(OUT_DIR)/libzds.a $(OUT_DIR)/libzusf.a $(OUT_DIR)/libztso.a $(OUT_DIR)/libzkr.a
 	@echo 'Building zowex (z/OS target level: $(ZosMinLevel))'
 	$(CXX) $(CPP_BND_FLAGS) -o $@ $^ $(GSKCMS_SIDEDECK)
 
 zowex: $(OUT_DIR) $(OUT_DIR)/zowex
 
-$(OUT_DIR)/zoweax: $(OUT_DIR)/zowex.o $(OUT_DIR)/extend/plugin.o $(COMMAND_OBJS) $(SERVER_OBJS) $(OUT_DIR)/zjsonm.o $(OUT_DIR)/libzcn.a $(OUT_DIR)/libzut.a $(OUT_DIR)/libzjb.a $(OUT_DIR)/libzds.a $(OUT_DIR)/libzusf.a $(OUT_DIR)/libztso.a $(OUT_DIR)/libzkr.a
+$(OUT_DIR)/zoweax: $(OUT_DIR)/zoweax.o $(OUT_DIR)/commands/console.o $(OUT_DIR)/commands/core.o $(OUT_DIR)/zjsonm.o $(OUT_DIR)/libzcn.a $(OUT_DIR)/libzut.a
 	@echo 'Building zoweax (z/OS target level: $(ZosMinLevel))'
-	$(CXX) $(CPP_BND_FLAGS_AUTH) -o $@ $^ $(GSKCMS_SIDEDECK)
+	$(CXX) $(CPP_BND_FLAGS_AUTH) -o $@ $^
 	extattr +ap $@
+	extattr -s $@
 
 zoweax: $(OUT_DIR) $(OUT_DIR)/zoweax
 
 $(OUT_DIR)/zowex.o: zowex.cpp
 	@echo 'Building $(OUT_DIR)/zowex.o'
+	@echo 'Add git hash? ${ADD_GIT_HASH}'
+	@if [ -f ../package.json ] && [ "${ADD_GIT_HASH}" = "TRUE" ]; then \
+		GIT_HASH=$$(grep '"gitHash"' ../package.json | sed 's/.*"gitHash"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/'); \
+		echo "Extracted git hash: $$GIT_HASH"; \
+	else \
+		echo "ADD_GIT_HASH is not TRUE, or package.json not found, building without GIT_HASH"; \
+		GIT_HASH=""; \
+	fi \
+	&& if [ -f ../package.json ]; then \
+		PACKAGE_VERSION=$$(grep '"version"' ../package.json | sed 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/'); \
+		PACKAGE_VERSION="$$PACKAGE_VERSION$$GIT_HASH"; \
+		echo "Git hash is $$GIT_HASH for build type '${BuildType}'";  \
+		echo "Extracted version: $$PACKAGE_VERSION"; \
+		$(CXX) $(CPP_FLAGS) -DPACKAGE_VERSION="\"$$PACKAGE_VERSION\"" -c $^ -o $@; \
+	else \
+		echo "package.json not found, building without version"; \
+		$(CXX) $(CPP_FLAGS) -c $^ -o $@; \
+	fi
+
+$(OUT_DIR)/zoweax.o: zoweax.cpp
+	@echo 'Building $(OUT_DIR)/zoweax.o'
 	@echo 'Add git hash? ${ADD_GIT_HASH}'
 	@if [ -f ../package.json ] && [ "${ADD_GIT_HASH}" = "TRUE" ]; then \
 		GIT_HASH=$$(grep '"gitHash"' ../package.json | sed 's/.*"gitHash"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/'); \

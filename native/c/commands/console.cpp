@@ -11,6 +11,7 @@
 
 #include "console.hpp"
 #include "../zcn.hpp"
+#include "../zut.hpp"
 
 using namespace parser;
 
@@ -23,7 +24,11 @@ int handle_console_issue(plugin::InvocationContext &context)
   ZcnSession session;
   ZCN &zcn = session.control_block();
 
-  const std::string console_name = context.get<std::string>("console-name", "zowex");
+  std::string console_name = context.get<std::string>("console-name", "");
+  if (console_name.empty() && 0 != zcn_build_default_console_name(console_name))
+  {
+    console_name = "zowex";
+  }
   const long long timeout = context.get<long long>("timeout", 0);
 
   const std::string command = context.get<std::string>("command", "");
@@ -82,8 +87,8 @@ void register_commands(parser::Command &root_command)
     auto issue_cmd = command_ptr(new Command("issue", "issue a console command"));
     issue_cmd->add_keyword_arg("console-name",
                                make_aliases("--cn", "--console-name"),
-                               "extended console name", ArgType_Single, false,
-                               ArgValue(std::string("zowex")));
+                               "extended console name (default: current user ID plus a digit)",
+                               ArgType_Single, false);
     issue_cmd->add_keyword_arg("wait",
                                make_aliases("--wait"),
                                "wait for responses", ArgType_Flag, false,

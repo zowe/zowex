@@ -139,6 +139,19 @@ export interface ListDsMembersResponse extends common.CommandResponse {
     returnedRows: number;
 }
 
+export interface ResolveDsAliasRequest extends common.CommandRequest<"resolveDsAlias"> {
+    /**
+     * Dataset name
+     */
+    dsname: string;
+}
+export interface ResolveDsAliasResponse extends common.CommandResponse {
+    /**
+     *  The original data set name pointed to by the alias.
+     */
+    targetDsn: string;
+}
+
 export interface ReadDatasetRequest extends common.CommandRequest<"readDataset">, common.WritableStreamRpc {
     /**
      * Desired encoding for the dataset (optional)

@@ -15,7 +15,6 @@
 #include <dirent.h>
 #include <iostream>
 #include <string>
-#include "commands/console.hpp"
 #include "commands/core.hpp"
 #include "commands/ds.hpp"
 #include "commands/job.hpp"
@@ -69,6 +68,7 @@ int main(int argc, char *argv[])
   {
     auto &root_cmd = core::setup_root_command(argv);
     core::set_version(PACKAGE_VERSION);
+    core::set_program_name("zowex");
 
     plugin::PluginManager pm;
     core::set_plugin_manager(&pm);
@@ -78,7 +78,6 @@ int main(int argc, char *argv[])
       pm.load_plugins(plugins_dir);
     }
 
-    console::register_commands(root_cmd);
     ds::register_commands(root_cmd);
     job::register_commands(root_cmd);
     server::register_commands(root_cmd);
