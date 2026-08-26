@@ -37,7 +37,8 @@ int ztso_issue(const std::string &command, std::string &response)
   int rc = zut_run_program("tsocmd", {command}, response);
   // discard first line - tsocmd prints the args to stderr
   int split_pos = response.find_first_of('\n');
-  if (split_pos != std::string::npos) {
+  if (split_pos != std::string::npos)
+  {
     response.erase(0, split_pos + 1); // erase up to and including the newline
   }
   return rc;
