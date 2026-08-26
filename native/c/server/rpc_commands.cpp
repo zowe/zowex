@@ -72,6 +72,9 @@ void register_ds_commands(CommandDispatcher &dispatcher)
                                   .rename_arg("maxItems", "max-entries")
                                   .set_default("warn", false)
                                   .set_default("pattern", ""));
+  dispatcher.register_command("resolveDsAlias",
+                              create_ds_builder(ds::handle_data_set_resolve_alias)
+                                  .validate<ResolveDsAliasRequest, ResolveDsAliasResponse>());
   dispatcher.register_command("readDataset",
                               create_ds_builder(ds::handle_data_set_view)
                                   .validate<ReadDatasetRequest, ReadDatasetResponse>()

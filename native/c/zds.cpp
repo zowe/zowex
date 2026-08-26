@@ -12,6 +12,7 @@
 #ifndef _OPEN_SYS_ITOA_EXT
 #define _OPEN_SYS_ITOA_EXT
 #include "ztype.h"
+#include "zutm.h"
 #include <cctype>
 #endif
 #ifndef _POSIX_SOURCE
@@ -300,6 +301,7 @@ static int copy_sequential(ZDS *zds, const std::string &dsn1, const std::string 
                     "IEBGENER failed with RC=%d. SYSPRINT: %s",
                     rc, truncated_detail);
     }
+
     zut_free_dynalloc_dds(zds->diag, dds);
     return RTNCD_FAILURE;
   }
@@ -4329,4 +4331,62 @@ static int zds_write_member_bpam_streamed(ZDS *zds, const std::string &dsn, cons
   // Close BPAM and handle truncation result
   rc = zds_close_output_bpam(zds, ioc);
   return handle_truncation_result(zds, rc, truncation);
+}
+
+int zds_idcams(const std::string &sysInData, std::string &output, std::string &error)
+{
+  unsigned int bpxwdynCode = 0;
+  int rc = 0;
+  ZDIAG diag{};
+  std::string sysinDdName = "";
+  std::string sysprintDdName = "";
+  std::string bpxwdynResponse = "";
+  std::vector<std::string> free_dds;
+  free_dds.reserve(2);
+
+  // Perform dynalloc for sysin and sysprint DDs
+  rc = zut_bpxwdyn_rtdd("alloc lrecl(80) recfm(f,b)", &bpxwdynCode, bpxwdynResponse, sysinDdName);
+  if (rc != 0)
+  {
+    error += "failed to allocate SYSIN dd for IDCAMS\n";
+    return RTNCD_FAILURE;
+  }
+  free_dds.push_back("free " + sysinDdName);
+
+  rc = zut_bpxwdyn_rtdd("alloc lrecl(80) recfm(f,b)", &bpxwdynCode, bpxwdynResponse, sysprintDdName);
+  if (rc != 0)
+  {
+    error += "failed to allocate SYSPRINT dd for IDCAMS\n";
+    zut_loop_dynalloc(diag, free_dds);
+    return RTNCD_FAILURE;
+  }
+  free_dds.push_back("free " + sysprintDdName);
+
+  ZDS sysinZds{};
+  ZDSWriteOpts write_opts{.zds = &sysinZds, .ddname = sysinDdName};
+  rc = zds_write(write_opts, sysInData);
+  if (rc != 0)
+  {
+    error += "failed to write IDCAMS commands to sysin\n";
+    zut_loop_dynalloc(diag, free_dds);
+    return RTNCD_FAILURE;
+  }
+
+  rc = ZUTIDCAM(sysinDdName.c_str(), sysprintDdName.c_str());
+  ZDS sysprintZds{};
+  ZDSReadOpts ropts{.zds = &sysprintZds, .ddname = sysprintDdName};
+  int sysprintReadRc = zds_read(ropts, output);
+  if (sysprintReadRc != 0)
+  {
+    error += "Failed to read from IDCAMS SYSPRINT DD '" + sysprintDdName + "'\n";
+  }
+  if (rc != 0)
+  {
+    error += "IDCAMS returned nonzero RC: " + std::to_string(rc);
+    zut_loop_dynalloc(diag, free_dds);
+    return rc;
+  }
+
+  zut_loop_dynalloc(diag, free_dds);
+  return rc;
 }
