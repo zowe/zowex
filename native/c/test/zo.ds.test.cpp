@@ -43,6 +43,7 @@ void _create_ds(const std::string &ds_name, const std::string &ds_options = "")
 void zo_ds_tests()
 {
   std::vector<std::string> _ds;
+  std::vector<std::string> created_aliases;
   describe("data-set",
            [&]() -> void
            {
@@ -62,8 +63,9 @@ void zo_ds_tests()
                        ExpectWithContext(rc, response).ToBe(0);
                        Expect(response).ToContain("Data set '" + ds + "' deleted"); // ds deleted
                      }
-                     catch (...)
+                     catch (const std::exception &deleteErr)
                      {
+                       TestLog("Failed to delete: " + ds + ", error: " + deleteErr.what() + ". Verifying with data-set list command");
                        try
                        {
                          std::string response;
@@ -72,9 +74,9 @@ void zo_ds_tests()
                          ExpectWithContext(rc, response).ToBe(0);
                          Expect(response).Not().ToContain(ds);
                        }
-                       catch (...)
+                       catch (const std::exception &listCheckErr)
                        {
-                         TestLog("Failed to delete: " + ds);
+                         TestLog("Failed to delete: " + ds + ", error: " + listCheckErr.what());
                        }
                      }
                    }
@@ -997,32 +999,32 @@ void zo_ds_tests()
                         beforeAll([&]() -> void
                                   {
                                     // Clean up any leftover data sets from previous test runs
-                                    std::string cleanup_jcl;
-                                    cleanup_jcl += "//GDGCLN$ JOB IZUACCT\n";
-                                    cleanup_jcl += "//STEP1    EXEC PGM=IDCAMS\n";
-                                    cleanup_jcl += "//SYSPRINT DD SYSOUT=*\n";
-                                    cleanup_jcl += "//SYSIN    DD *\n";
-                                    cleanup_jcl += "  DELETE " + gdg_gen2_dsn + " NONVSAM PURGE\n";
-                                    cleanup_jcl += "  DELETE " + gdg_gen1_dsn + " NONVSAM PURGE\n";
-                                    cleanup_jcl += "  DELETE " + gdg_base_dsn + " GDG PURGE\n";
-                                    cleanup_jcl += "  SET MAXCC = 0\n";
-                                    cleanup_jcl += "/*\n";
-                                    submit_and_wait(cleanup_jcl, 200);
-
+                                    std::string cleanup_output;
+                                    std::string cleanup_err;
+                                    std::string cleanup_idcams;
+                                    cleanup_idcams += "  DELETE " + gdg_gen2_dsn + " NONVSAM PURGE\n";
+                                    cleanup_idcams += "  DELETE " + gdg_gen1_dsn + " NONVSAM PURGE\n";
+                                    cleanup_idcams += "  DELETE " + gdg_base_dsn + " GDG PURGE\n";
+                                    cleanup_idcams += "  SET MAXCC = 0\n";
+                                    int rc = zds_idcams(cleanup_idcams, cleanup_output, cleanup_err);
+                                    TestLog("Cleanup RC from IDCAMS: " + std::to_string(rc));
+                                    if (rc !=0 ){
+                                       throw std::runtime_error("Output and error from failed IDCAMS cleanup:" + cleanup_err + "\n" + cleanup_output +"\n");
+                                    }
                                     // Define the GDG base via IDCAMS
-                                    std::string setup_jcl;
-                                    setup_jcl += "//GDGSET$ JOB IZUACCT\n";
-                                    setup_jcl += "//STEP1    EXEC PGM=IDCAMS\n";
-                                    setup_jcl += "//SYSPRINT DD SYSOUT=*\n";
-                                    setup_jcl += "//SYSIN    DD *\n";
-                                    setup_jcl += "  DEFINE GDG ( -\n";
-                                    setup_jcl += "    NAME(" + gdg_base_dsn + ") -\n";
-                                    setup_jcl += "    LIMIT(5) -\n";
-                                    setup_jcl += "    NOEMPTY -\n";
-                                    setup_jcl += "    NOSCRATCH )\n";
-                                    setup_jcl += "/*\n";
-                                    submit_and_wait(setup_jcl, 200, true);
-
+                                    std::string setup_idcams;
+                                    std::string setup_output;
+                                    std::string setup_err;
+                                    setup_idcams += "  DEFINE GDG ( -\n";
+                                    setup_idcams += "    NAME(" + gdg_base_dsn + ") -\n";
+                                    setup_idcams += "    LIMIT(5) -\n";
+                                    setup_idcams += "    NOEMPTY -\n";
+                                    setup_idcams += "    NOSCRATCH )\n";
+                                    rc = zds_idcams(setup_idcams, setup_output, setup_err);
+                                    TestLog("Cleanup RC from IDCAMS: " + std::to_string(rc));
+                                    if (rc !=0 ){
+                                       throw std::runtime_error("Output and error from failed IDCAMS setup:" + setup_err + "\n" + setup_output +"\n");
+                                    }
                                     // Create generation 1 via IEBGENER
                                     std::string gen1_jcl;
                                     gen1_jcl += "//GDGGEN1 JOB IZUACCT\n";
@@ -1054,17 +1056,18 @@ void zo_ds_tests()
 
                         afterAll([&]() -> void
                                  {
-                                   std::string del_jcl;
-                                   del_jcl += "//GDGDEL$ JOB IZUACCT\n";
-                                   del_jcl += "//STEP1    EXEC PGM=IDCAMS\n";
-                                   del_jcl += "//SYSPRINT DD SYSOUT=*\n";
-                                   del_jcl += "//SYSIN    DD *\n";
-                                   del_jcl += "  DELETE " + gdg_gen2_dsn + " NONVSAM PURGE\n";
-                                   del_jcl += "  DELETE " + gdg_gen1_dsn + " NONVSAM PURGE\n";
-                                   del_jcl += "  DELETE " + gdg_base_dsn + " GDG PURGE\n";
-                                   del_jcl += "  SET MAXCC = 0\n";
-                                   del_jcl += "/*\n";
-                                   submit_and_wait(del_jcl, 200); },
+                                   std::string cleanup_idcams;
+                                   std::string cleanup_err;
+                                   std::string cleanup_output;
+                                   cleanup_idcams += "  DELETE " + gdg_gen2_dsn + " NONVSAM PURGE\n";
+                                   cleanup_idcams += "  DELETE " + gdg_gen1_dsn + " NONVSAM PURGE\n";
+                                   cleanup_idcams += "  DELETE " + gdg_base_dsn + " GDG PURGE\n";
+                                   cleanup_idcams += "  SET MAXCC = 0\n";
+                                   int rc = zds_idcams(cleanup_idcams, cleanup_output, cleanup_err);
+                                    TestLog("Cleanup RC from IDCAMS: " + std::to_string(rc));
+                                    if (rc !=0 ){
+                                       throw std::runtime_error("Output and error from failed IDCAMS cleanup:" + cleanup_err + "\n" + cleanup_output +"\n");
+                                    } },
                                  gdg_opts);
 
                         it("should list the GDG base in the catalog", [&]() -> void
@@ -2105,5 +2108,101 @@ void zo_ds_tests()
                                         Expect(matching_threads).ToBe(1); }, concurrent_opts);
                                  });
                       });
+             describe("resolve-alias",
+                      [&]() -> void
+                      {
+                        beforeEach([&]() -> void
+                                   { _ds.push_back(get_random_ds()); });
+                        it("should resolve an alias to a sequential data set",
+                           [&]() -> void
+                           {
+                             std::string target = _ds.back();
+                             _create_ds(target, "--dsorg PS");
+
+                             std::string alias_name = get_random_ds() + ".ALIAS";
+                             std::string makeAliasOutput;
+                             std::string makeAliasError;
+
+                             int rc = zds_idcams(
+                                 " DEFINE ALIAS (NAME(" + alias_name + ") -\n RELATE(" + target + "))\n", makeAliasOutput, makeAliasError);
+
+                             ExpectWithContext(rc, "Failed to create alias with rc " + std::to_string(rc) +
+                                                       ". Idcams output/error:" + makeAliasOutput + "\n" + makeAliasError)
+                                 .ToBe(0);
+
+                             created_aliases.push_back(alias_name);
+                             std::string response;
+                             std::string command = zo_command + " data-set resolve-alias " + alias_name;
+                             rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain(target);
+                           });
+
+                        it("should resolve an alias to a PDS",
+                           [&]() -> void
+                           {
+                             std::string target = _ds.back();
+                             _create_ds(target, "--dsorg PO");
+
+                             std::string alias_name = get_random_ds() + ".ALIAS";
+                             std::string makeAliasOutput;
+                             std::string makeAliasError;
+
+                             int rc = zds_idcams(
+                                 " DEFINE ALIAS (NAME(" + alias_name + ") -\n RELATE(" + target + "))\n", makeAliasOutput, makeAliasError);
+
+                             ExpectWithContext(rc, "Failed to create alias with rc " + std::to_string(rc) +
+                                                       ". Idcams output/error:" + makeAliasOutput + "\n" + makeAliasError)
+                                 .ToBe(0);
+
+                             created_aliases.push_back(alias_name);
+                             std::string response;
+                             std::string command = zo_command + " data-set resolve-alias " + alias_name;
+                             rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain(target);
+                           });
+
+                        it("should resolve an alias to a PDSE",
+                           [&]() -> void
+                           {
+                             std::string target = _ds.back();
+                             _create_ds(target, "--dsorg PO --dsntype LIBRARY --recfm F,B --dirblk 5");
+
+                             std::string alias_name = get_random_ds() + ".ALIAS";
+                             std::string makeAliasOutput;
+                             std::string makeAliasError;
+
+                             int rc = zds_idcams(
+                                 " DEFINE ALIAS (NAME(" + alias_name + ") -\n RELATE(" + target + "))\n", makeAliasOutput, makeAliasError);
+
+                             ExpectWithContext(rc, "Failed to create alias with rc " + std::to_string(rc) +
+                                                       ". Idcams output/error:" + makeAliasOutput + "\n" + makeAliasError)
+                                 .ToBe(0);
+
+                             created_aliases.push_back(alias_name);
+                             std::string response;
+                             std::string command = zo_command + " data-set resolve-alias " + alias_name;
+                             rc = execute_command_with_output(command, response);
+                             ExpectWithContext(rc, response).ToBe(0);
+                             Expect(response).ToContain(target);
+                           });
+                      });
+
+             afterAll([&]() -> void
+                      {
+                                   std::string cleanup_idcams;
+                                   std::string cleanup_err;
+                                   std::string cleanup_output;
+                                                     for (const auto &alias : created_aliases)
+                   {
+                                   cleanup_idcams += "  DELETE -\n "+alias+" -\n ALIAS\n";
+                   }
+                                   cleanup_idcams += "  SET MAXCC = 0\n";
+                                   int rc = zds_idcams(cleanup_idcams, cleanup_output, cleanup_err);
+                                    TestLog("Cleanup RC from IDCAMS: " + std::to_string(rc));
+                                    if (rc !=0 ){
+                                       throw std::runtime_error("Output and error from failed IDCAMS cleanup:" + cleanup_err + "\n" + cleanup_output +"\n");
+                                    } });
            });
 }

@@ -8,6 +8,8 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 - **Breaking:** `c`: The `ZOWEX_PLUGIN_DECLARE_ABI()` macro is renamed to `ZO_PLUGIN_DECLARE_ABI()`. [#1119](https://github.com/zowe/zowex/pull/1119)
 - **Breaking:** `c`: Rename the `zowex` binary to `zo`, and the `zoweax` binary to `zoa`. [#1119](https://github.com/zowe/zowex/pull/1119)
+- `c`: Added the `zowex ds resolve-alias <dsn>` command which allows the user to resolve data set aliases. [#1108](https://github.com/zowe/zowex/pull/1108)
+- `c`: Added `zds_idcams` utility function which allows the caller to execute the z/OS IDCAMS program and retrieve its output. [#1108](https://github.com/zowe/zowex/pull/1108)
 
 ## `0.9.0`
 
