@@ -4,6 +4,10 @@ All notable changes to the Client code for "zowex-for-zowe-cli" are documented i
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## Recent Changes 
+
+- Added the `zssh files list alias` command to the CLI. [#1108](https://github.com/zowe/zowex/pull/1108)
+
 ## `0.9.0`
 
 - Added the `zssh issue console-command` command. The `--console-name` option is now optional and defaults to the current user ID. [#1112](https://github.com/zowe/zowex/issues/1112)

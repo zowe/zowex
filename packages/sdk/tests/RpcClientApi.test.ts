@@ -109,6 +109,12 @@ describe("RpcClientApi", () => {
             fromName: "FROM.NAME",
             toName: "TO.NAME",
         });
+
+        await client.ds.resolveDsAlias({ dsname: "MY.ALIAS" });
+        expect(client.request).toHaveBeenCalledWith({
+            command: "resolveDsAlias",
+            dsname: "MY.ALIAS",
+        });
     });
 
     it("should route jobs commands correctly", async () => {

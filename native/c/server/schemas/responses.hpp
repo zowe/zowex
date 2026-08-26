@@ -294,6 +294,12 @@ ZJSON_SCHEMA(ListDsMembersResponse,
     FIELD_REQUIRED(returnedRows, NUMBER)
 );
 
+struct ResolveDsAliasResponse {};
+ZJSON_SCHEMA(ResolveDsAliasResponse,
+    FIELD_REQUIRED(success, BOOL),
+    FIELD_REQUIRED(targetDsn, STRING)
+);
+
 struct ReadDatasetResponse {};
 ZJSON_SCHEMA(ReadDatasetResponse,
     FIELD_REQUIRED(success, BOOL),

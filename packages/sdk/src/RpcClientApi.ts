@@ -84,6 +84,7 @@ export abstract class RpcClientApi implements IRpcClient {
         listDatasets: this.rpc<ds.ListDatasetsRequest, ds.ListDatasetsResponse>("listDatasets"),
         listDsMembers: this.rpc<ds.ListDsMembersRequest, ds.ListDsMembersResponse>("listDsMembers"),
         readDataset: this.rpc<ds.ReadDatasetRequest, ds.ReadDatasetResponse>("readDataset"),
+        resolveDsAlias: this.rpc<ds.ResolveDsAliasRequest, ds.ResolveDsAliasResponse>("resolveDsAlias"),
         restoreDataset: this.rpc<ds.RestoreDatasetRequest, ds.RestoreDatasetResponse>("restoreDataset"),
         writeDataset: this.rpc<ds.WriteDatasetRequest, ds.WriteDatasetResponse>("writeDataset"),
         renameDataset: this.rpc<ds.RenameDatasetRequest, ds.RenameDatasetResponse>("renameDataset"),
