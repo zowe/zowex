@@ -100,10 +100,38 @@ for filename in object_files:
 setup_py_content = """#!/usr/bin/env python3
 
 from setuptools import setup, Extension
+from setuptools.command.build_ext import build_ext
 import os
 
 chdsect = "chdsect"
 ztype = "."
+
+# These sources are shared with zowex, which compiles them with the ibm-clang default EBCDIC
+# execution charset. The SWIG's default CFLAGS -fzos-le-char-mode=ascii flip the charset and 
+# silently reinterprets every string literal. This break all EBCDIC control blocks it builds
+# and the Metal C routines it calls. Let's compile those translations in EBCDIC and leave the 
+# SWIG wrappers in ASCII. The conversion.hpp should bridge the two.
+EBCDIC_CHAR_MODE = "-fzos-le-char-mode=ebcdic"
+CORE_SOURCES = {"zusf.cpp", "zds.cpp", "zjb.cpp", "zut.cpp"}
+
+
+class BuildExtMixedCharMode(build_ext):
+    \"\"\"Compiles the shared core sources EBCDIC and the SWIG wrappers ASCII.\"\"\"
+
+    def build_extension(self, ext):
+        compiler = self.compiler
+        base_compile = compiler._compile
+
+        def _compile(obj, src, src_ext, cc_args, extra_postargs, pp_opts):
+            if os.path.basename(src) in CORE_SOURCES:
+                extra_postargs = list(extra_postargs) + [EBCDIC_CHAR_MODE]
+            return base_compile(obj, src, src_ext, cc_args, extra_postargs, pp_opts)
+
+        compiler._compile = _compile
+        try:
+            super().build_extension(ext)
+        finally:
+            compiler._compile = base_compile
 
 zusf_py_module = Extension("_zusf_py",
                            sources=["zusf_py_wrap.cxx", "zusf_py.cpp", "zusf.cpp", "zut.cpp"],
@@ -151,6 +179,7 @@ zjb_py_module = Extension("_zjb_py",
 setup(name="zbind",
       version="1.0.0",
       description="Zowe Remote SSH Python Bindings (Self-contained Bundle)",
+      cmdclass={"build_ext": BuildExtMixedCharMode},
       ext_modules=[zusf_py_module, zds_py_module, zjb_py_module],
       py_modules=["zusf_py", "zds_py", "zjb_py"],
       )
