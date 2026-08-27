@@ -2007,6 +2007,11 @@ int zds_open_output_bpam(ZDS *zds, const std::string &dsname, IO_CTRL *&ioc)
   rc = ZDSOBPAM(zds, &ioc, zds->ddname);
   if (0 != rc)
   {
+    // The open may have taken the ENQ or RESERVE before failing, and the DD is ours either way.
+    // Without this the allocation survives for the life of the process, and a later delete of the
+    // same data set fails as in-use.
+    DiagMsgGuard guard(&zds->diag);
+    zds_close_output_bpam(zds, ioc);
     return rc;
   }
   return RTNCD_SUCCESS;

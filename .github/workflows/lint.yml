@@ -21,18 +21,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # std::hash<std::string> resolves to the out-of-line libc++ helper __hash_memory, which is
-      # not exported by CRTEQCXE on z/OS systems below the required Language Environment
-      # maintenance level (CEE3561S at load time). See native/c/compat/README.md and
-      # https://github.com/zowe/zowex/issues/871.
-      - name: Check for string-keyed hash containers
-        run: npm run lint:compat
-
-      # describe() runs afterAll hooks after the suite lambda has returned, so a hook that captured
-      # a suite-body local by reference reads freed stack memory -- cleanup silently no-ops while
-      # the test still passes. See the comment block in scripts/checkNoDanglingHooks.js.
-      - name: Check for dangling afterAll captures
-        run: npm run lint:hooks
+      # Bans string-keyed hash containers (CEE3561S at load time) and by-reference captures in
+      # afterAll hooks (silently skipped cleanup). Each script's header explains why.
+      - name: Run lint:tidy
+        run: npm run lint:tidy
 
       - name: Run lint:cpp
         run: |
