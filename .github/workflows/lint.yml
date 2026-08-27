@@ -28,6 +28,12 @@ jobs:
       - name: Check for string-keyed hash containers
         run: npm run lint:compat
 
+      # describe() runs afterAll hooks after the suite lambda has returned, so a hook that captured
+      # a suite-body local by reference reads freed stack memory -- cleanup silently no-ops while
+      # the test still passes. See the comment block in scripts/checkNoDanglingHooks.js.
+      - name: Check for dangling afterAll captures
+        run: npm run lint:hooks
+
       - name: Run lint:cpp
         run: |
           npm ci --ignore-scripts

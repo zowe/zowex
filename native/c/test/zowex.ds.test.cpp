@@ -1018,7 +1018,7 @@ void zowex_ds_tests()
                                     setup_idcams += "    NAME(" + gdg_base_dsn + ") -\n";
                                     setup_idcams += "    LIMIT(5) -\n";
                                     setup_idcams += "    NOEMPTY -\n";
-                                    setup_idcams += "    NOSCRATCH )\n";
+                                    setup_idcams += "    SCRATCH )\n";
                                     rc = zds_idcams(setup_idcams, setup_output, setup_err);
                                     TestLog("Cleanup RC from IDCAMS: " + std::to_string(rc));
                                     if (rc !=0 ){
@@ -1053,7 +1053,7 @@ void zowex_ds_tests()
                                     submit_and_wait(gen2_jcl, 600, true); },
                                   gdg_opts);
 
-                        afterAll([&]() -> void
+                        afterAll([gdg_base_dsn, gdg_gen1_dsn, gdg_gen2_dsn]() -> void
                                  {
                                    std::string cleanup_idcams;
                                    std::string cleanup_err;
