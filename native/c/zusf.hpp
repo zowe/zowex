@@ -71,27 +71,26 @@ struct ZusfListEntry
   std::string mtime;
 };
 
-
 // The Python bindings compile this header EBCDIC and their SWIG wrappers ASCII. libc++ uses a
 // distinct inline namespace per char mode (std::__1 vs std::__1_a), so a mangled name is
 // unresolvable across that boundary -- everything the bindings call needs C linkage.
 #ifdef SWIG
 extern "C"
 {
-  #endif
-  int zusf_copy_file_or_dir(ZUSF *zusf, const std::string &source_fs, const std::string &dest_fs, const CopyOptions &options);
-  int zusf_create_uss_file_or_dir(ZUSF *zusf, const std::string &file, mode_t mode, const CreateOptions &options);
-  int zusf_move_uss_file_or_dir(ZUSF *zusf, const std::string &source, const std::string &target, bool force = true);
-  int zusf_list_uss_file_path(ZUSF *zusf, const std::string &file, std::string &response, ListOptions options = ListOptions{}, bool use_csv_format = false, std::vector<ZusfListEntry> *entries = nullptr);
-  int zusf_read_from_uss_file(ZUSF *zusf, const std::string &file, std::string &response);
-  int zusf_read_from_uss_file_streamed(ZUSF *zusf, const std::string &file, const std::string &pipe, size_t *content_len);
-  int zusf_write_to_uss_file(ZUSF *zusf, const std::string &file, std::string &data);
-  int zusf_write_to_uss_file_streamed(ZUSF *zusf, const std::string &file, const std::string &pipe, size_t *content_len);
-  int zusf_chmod_uss_file_or_dir(ZUSF *zusf, const std::string &file, mode_t mode, bool recursive);
-  int zusf_delete_uss_item(ZUSF *zusf, const std::string &file, bool recursive);
-  int zusf_chown_uss_file_or_dir(ZUSF *zusf, const std::string &file, const std::string &owner, bool recursive);
-  int zusf_chtag_uss_file_or_dir(ZUSF *zusf, const std::string &file, const std::string &tag, bool recursive);
-  #ifdef SWIG
+#endif
+int zusf_copy_file_or_dir(ZUSF *zusf, const std::string &source_fs, const std::string &dest_fs, const CopyOptions &options);
+int zusf_create_uss_file_or_dir(ZUSF *zusf, const std::string &file, mode_t mode, const CreateOptions &options);
+int zusf_move_uss_file_or_dir(ZUSF *zusf, const std::string &source, const std::string &target, bool force = true);
+int zusf_list_uss_file_path(ZUSF *zusf, const std::string &file, std::string &response, ListOptions options = ListOptions{}, bool use_csv_format = false, std::vector<ZusfListEntry> *entries = nullptr);
+int zusf_read_from_uss_file(ZUSF *zusf, const std::string &file, std::string &response);
+int zusf_read_from_uss_file_streamed(ZUSF *zusf, const std::string &file, const std::string &pipe, size_t *content_len);
+int zusf_write_to_uss_file(ZUSF *zusf, const std::string &file, std::string &data);
+int zusf_write_to_uss_file_streamed(ZUSF *zusf, const std::string &file, const std::string &pipe, size_t *content_len);
+int zusf_chmod_uss_file_or_dir(ZUSF *zusf, const std::string &file, mode_t mode, bool recursive);
+int zusf_delete_uss_item(ZUSF *zusf, const std::string &file, bool recursive);
+int zusf_chown_uss_file_or_dir(ZUSF *zusf, const std::string &file, const std::string &owner, bool recursive);
+int zusf_chtag_uss_file_or_dir(ZUSF *zusf, const std::string &file, const std::string &tag, bool recursive);
+#ifdef SWIG
 }
 #endif
 
