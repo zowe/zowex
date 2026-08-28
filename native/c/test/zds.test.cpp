@@ -1047,6 +1047,146 @@ void zds_tests()
                             extended_timeout);
                       });
 
+             describe("write binary (zds_write_binary)",
+                      [&]() -> void
+                      {
+                        // RACDCERT FORMAT(PKCS12DER) parity shape: PS/VB, LRECL(84) -> 80 data
+                        // bytes per record (4-byte RDW), BLKSIZE(27998).
+                        DS_ATTRIBUTES vb_seq_attr{};
+                        vb_seq_attr.dsorg = "PS";
+                        vb_seq_attr.recfm = "V,B";
+                        vb_seq_attr.lrecl = 84;
+                        vb_seq_attr.blksize = 27998;
+                        vb_seq_attr.alcunit = "TRK";
+                        vb_seq_attr.primary = 5;
+                        vb_seq_attr.secondary = 5;
+
+                        DS_ATTRIBUTES vb_pds_attr{};
+                        vb_pds_attr.dsorg = "PO";
+                        vb_pds_attr.recfm = "V,B";
+                        vb_pds_attr.lrecl = 84;
+                        vb_pds_attr.blksize = 27998;
+                        vb_pds_attr.alcunit = "TRK";
+                        vb_pds_attr.primary = 5;
+                        vb_pds_attr.secondary = 5;
+                        vb_pds_attr.dirblk = 5;
+                        vb_pds_attr.dsntype = ZDS_DSNTYPE_LIBRARY;
+
+                        DS_ATTRIBUTES fb_seq_attr{};
+                        fb_seq_attr.dsorg = "PS";
+                        fb_seq_attr.recfm = "FB";
+                        fb_seq_attr.lrecl = 80;
+                        fb_seq_attr.blksize = 8000;
+                        fb_seq_attr.alcunit = "TRK";
+                        fb_seq_attr.primary = 1;
+                        fb_seq_attr.secondary = 1;
+
+                        // Bytes that a text-mode or fixed-format path would mangle: NUL,
+                        // EBCDIC NL (0x15), and EBCDIC blank (0x40).
+                        auto binary_payload = []() -> std::string
+                        {
+                          const char raw[] = {0x00, 0x15, 0x40, 'H', 'i', (char)0xFF, 0x00, 0x15};
+                          return std::string(raw, sizeof(raw));
+                        };
+
+                        it("round-trips arbitrary bytes through a sequential VB data set",
+                           [&]() -> void
+                           {
+                             ZDS zds{};
+                             std::string response;
+                             std::string dsn = get_random_ds(3);
+                             created_dsns.push_back(dsn);
+                             ExpectWithContext(zds_create_dsn(&zds, dsn, vb_seq_attr, response), response).ToBe(0);
+
+                             const std::string payload = binary_payload();
+                             ZDS write_zds{};
+                             int rc = zds_write_binary(ZDSWriteOpts{.zds = &write_zds, .dsname = dsn}, payload);
+                             ExpectWithContext(rc, write_zds.diag.e_msg).ToBe(0);
+
+                             ZDS read_zds{};
+                             zut_prepare_encoding("binary", &read_zds.encoding_opts);
+                             std::string out;
+                             rc = zds_read(ZDSReadOpts{.zds = &read_zds, .dsname = dsn}, out);
+                             ExpectWithContext(rc, read_zds.diag.e_msg).ToBe(0);
+                             Expect(out).ToBe(payload);
+                           });
+
+                        it("round-trips arbitrary bytes through a PDS/E member (BPAM)",
+                           [&]() -> void
+                           {
+                             ZDS zds{};
+                             std::string response;
+                             std::string dsn = get_random_ds(3);
+                             created_dsns.push_back(dsn);
+                             ExpectWithContext(zds_create_dsn(&zds, dsn, vb_pds_attr, response), response).ToBe(0);
+
+                             const std::string payload = binary_payload();
+                             const std::string member_dsn = dsn + "(CERT01)";
+                             ZDS write_zds{};
+                             int rc = zds_write_binary(ZDSWriteOpts{.zds = &write_zds, .dsname = member_dsn}, payload);
+                             ExpectWithContext(rc, write_zds.diag.e_msg).ToBe(0);
+
+                             ZDS read_zds{};
+                             zut_prepare_encoding("binary", &read_zds.encoding_opts);
+                             std::string out;
+                             rc = zds_read(ZDSReadOpts{.zds = &read_zds, .dsname = member_dsn}, out);
+                             ExpectWithContext(rc, read_zds.diag.e_msg).ToBe(0);
+                             Expect(out).ToBe(payload);
+
+                             // A second write to the same member must succeed, not hang --
+                             // proves the BPAM ENQ/RESERVE from the first write was released.
+                             ZDS write_zds2{};
+                             rc = zds_write_binary(ZDSWriteOpts{.zds = &write_zds2, .dsname = member_dsn}, payload);
+                             ExpectWithContext(rc, write_zds2.diag.e_msg).ToBe(0);
+                           });
+
+                        it("chunks a payload longer than one record, including an exact chunk-boundary multiple",
+                           [&]() -> void
+                           {
+                             ZDS zds{};
+                             std::string response;
+                             std::string dsn = get_random_ds(3);
+                             created_dsns.push_back(dsn);
+                             ExpectWithContext(zds_create_dsn(&zds, dsn, vb_seq_attr, response), response).ToBe(0);
+
+                             // LRECL(84) - 4-byte RDW = 80-byte chunks; use exactly 3 chunks
+                             // (240 bytes) plus a real payload doubled past one record.
+                             std::string unit = binary_payload();
+                             while (unit.size() < 80)
+                             {
+                               unit += unit;
+                             }
+                             unit.resize(80);
+                             std::string payload = unit + unit + unit; // exact multiple of the chunk size
+
+                             ZDS write_zds{};
+                             int rc = zds_write_binary(ZDSWriteOpts{.zds = &write_zds, .dsname = dsn}, payload);
+                             ExpectWithContext(rc, write_zds.diag.e_msg).ToBe(0);
+
+                             ZDS read_zds{};
+                             zut_prepare_encoding("binary", &read_zds.encoding_opts);
+                             std::string out;
+                             rc = zds_read(ZDSReadOpts{.zds = &read_zds, .dsname = dsn}, out);
+                             ExpectWithContext(rc, read_zds.diag.e_msg).ToBe(0);
+                             Expect(out).ToBe(payload);
+                           });
+
+                        it("rejects an FB target with ZDS_RTNCD_UNSUPPORTED_RECFM",
+                           [&]() -> void
+                           {
+                             ZDS zds{};
+                             std::string response;
+                             std::string dsn = get_random_ds(3);
+                             created_dsns.push_back(dsn);
+                             ExpectWithContext(zds_create_dsn(&zds, dsn, fb_seq_attr, response), response).ToBe(0);
+
+                             ZDS write_zds{};
+                             int rc = zds_write_binary(ZDSWriteOpts{.zds = &write_zds, .dsname = dsn}, std::string("payload"));
+                             Expect(rc).ToBe(RTNCD_FAILURE);
+                             Expect(write_zds.diag.detail_rc).ToBe(ZDS_RTNCD_UNSUPPORTED_RECFM);
+                           });
+                      });
+
              describe("delete data sets",
                       [&]() -> void
                       {
