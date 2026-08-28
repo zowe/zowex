@@ -23,7 +23,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   build-python:
@@ -55,7 +54,11 @@ jobs:
               # Keep in step with zos-build.yml: Open XL C/C++ 2.1 is the newest compiler IBM
               # supports on z/OS 2.5, our minimum supported release. See
               # native/c/compat/README.md and https://github.com/zowe/zowex/issues/871.
-              preBuildCmd: "export PATH=/usr/lpp/IBM/cnw/v2r1/openxl/bin:\$PATH"
+              # /ZOWE/tmp/zowex/python/swig is where Path B (see below) installs a
+              # precompiled SWIG when the remote system doesn't have one; the Lib/
+              # check keeps SWIG_LIB unset on Path A so the Makefile's own
+              # `swig -swiglib` fallback resolves the system SWIG instead.
+              preBuildCmd: "export PATH=/usr/lpp/IBM/cnw/v2r1/openxl/bin:/ZOWE/tmp/zowex/python/swig:\$PATH\nif [ -d /ZOWE/tmp/zowex/python/swig/Lib ]; then export SWIG_LIB=/ZOWE/tmp/zowex/python/swig/Lib; fi"
           EOF
 
       - name: Install Dependencies
@@ -75,31 +78,19 @@ jobs:
             echo "present=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # Path A: SWIG present -> build the bindings from source as usual.
+      # Path B: SWIG absent -> download the precompiled SWIG binary published to
+      # the zowex releases and install it under python/swig on z/OS, where
+      # preBuildCmd (above) puts it on PATH for the build below to find.
+      - name: Fetch and install SWIG from GitHub Releases
+        if: steps.swig.outputs.present != 'true'
+        run: npm run z:python:swig:install
+
+      # Build the bindings from source. On Path A this uses the system SWIG; on
+      # Path B, the one just installed above.
       - name: Build Python Bindings
-        if: steps.swig.outputs.present == 'true'
         run: npm run z:python:build
 
-      # Path B: SWIG absent -> fetch the latest precompiled bundle posted to this
-      # PR (any author) and apply it so the tests can run without building.
-      - name: Fetch precompiled Python bindings
-        if: steps.swig.outputs.present != 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: npm run z:python:fetch -- ${{ github.event.pull_request.number }}
-
-      - name: Apply precompiled Python bindings
-        if: steps.swig.outputs.present != 'true' && hashFiles('dist/zbind_bin_dist.tar.gz') != ''
-        run: npm run z:python:apply
-
-      - name: Warn if no bindings available
-        if: steps.swig.outputs.present != 'true' && hashFiles('dist/zbind_bin_dist.tar.gz') == ''
-        run: echo "::warning::SWIG not found on z/OS and no 'Precompiled Python bindings' comment found on this PR — skipping Python tests."
-
-      # Run tests when we have bindings: either freshly built, or applied from a
-      # downloaded precompiled bundle.
       - name: Test Python Bindings
-        if: steps.swig.outputs.present == 'true' || hashFiles('dist/zbind_bin_dist.tar.gz') != ''
         run: npm run z:python:test
 
       - name: Clean up on z/OS
