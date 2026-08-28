@@ -23,6 +23,7 @@ on:
 
 permissions:
   contents: read
+  checks: write
 
 jobs:
   build-python:
@@ -100,6 +101,14 @@ jobs:
 
       - name: Test Python Bindings
         run: npm run z:python:test
+
+      - name: Python Test Report
+        uses: dorny/test-reporter@v2
+        if: ${{ !cancelled() }}
+        with:
+          name: Python binding test results
+          path: "native/python/bindings/test/pybi_results.xml"
+          reporter: java-junit
 
       - name: Clean up on z/OS
         if: always()

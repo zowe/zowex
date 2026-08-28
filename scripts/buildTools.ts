@@ -1565,6 +1565,16 @@ async function test(connection: Client) {
     await retrieve(connection, [`c/test/test-results.xml`], "native", false, true);
 }
 
+async function testPython(connection: Client) {
+    await runCommandInShell(connection, `cd ${deployDirs.pythonTestDir} && make ${BUILD_TYPE_FLAG()}\n`, {
+        streamOutput: true,
+        stepName: "Running Python binding tests",
+        suppressError: true,
+    });
+    console.log("\nTesting complete!");
+    await retrieve(connection, ["python/bindings/test/pybi_results.xml"], "native", false, false);
+}
+
 /**
  * Lists the LE/libc++ symbols the built binaries import and downloads the report.
  *
@@ -1984,7 +1994,7 @@ async function main() {
                 await test(sshClient);
                 break;
             case "python:test":
-                await make(sshClient, deployDirs.pythonTestDir);
+                await testPython(sshClient);
                 break;
             case "upload":
                 await upload(sshClient, config.sshProfile as IProfile);
