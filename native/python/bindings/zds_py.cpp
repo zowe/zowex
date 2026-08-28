@@ -46,13 +46,14 @@ void create_data_set(std::string dsn, const DS_ATTRIBUTES &attributes)
   }
 }
 
-std::vector<ZDSEntry> list_data_sets(std::string dsn)
+std::vector<ZDSEntry> list_data_sets(std::string dsn, bool show_attributes)
 {
   std::vector<ZDSEntry> entries;
   ZDS zds = {0};
 
   a2e_inplace(dsn);
-  int rc = zds_list_data_sets(&zds, dsn, entries);
+  // dsorg, volser, recfm and migrated stay empty unless attributes are requested.
+  int rc = zds_list_data_sets(&zds, dsn, entries, show_attributes);
 
   if (rc != 0)
   {
