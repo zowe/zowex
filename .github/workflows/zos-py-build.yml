@@ -61,6 +61,14 @@ jobs:
               preBuildCmd: "export PATH=/usr/lpp/IBM/cnw/v2r1/openxl/bin:/ZOWE/tmp/zowex/python/swig:\$PATH\nif [ -d /ZOWE/tmp/zowex/python/swig/Lib ]; then export SWIG_LIB=/ZOWE/tmp/zowex/python/swig/Lib; fi"
           EOF
 
+      - name: Set up test fixtures
+        run: |
+          cat << EOF > native/python/bindings/fixtures/env.yml
+          OWNER: ${{ secrets.SSH_MARIST_ZNP_ID }}
+          DSN_PREFIX: ${{ secrets.SSH_MARIST_ZNP_ID }}.PY#BI
+          USS_BASE_DIR: /ZOWE/tmp/test_uss_functions_for_python_bindings
+          EOF
+
       - name: Install Dependencies
         run: npm ci --workspaces=false
 
