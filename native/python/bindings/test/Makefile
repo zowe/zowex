@@ -40,15 +40,15 @@ test: setup
 # Individual test targets
 test-zds: $(TEST_ZDS_UTF8)
 	@echo "Running dataset tests..."
-	@$(PYTEST) $(TEST_ZDS_UTF8) -v --junitxml=$(JUNIT_ZDS)
+	@$(PYTEST) $(TEST_ZDS_UTF8) -v --junitxml=$(JUNIT_ZDS) -o junit_suite_name=TestDatasetFunctions
 
 test-zjb: $(TEST_ZJB_UTF8)
 	@echo "Running job tests..."
-	@$(PYTEST) $(TEST_ZJB_UTF8) -v --junitxml=$(JUNIT_ZJB)
+	@$(PYTEST) $(TEST_ZJB_UTF8) -v --junitxml=$(JUNIT_ZJB) -o junit_suite_name=TestJobFunctions
 
 test-zusf: $(TEST_ZUSF_UTF8)
 	@echo "Running USS tests..."
-	@$(PYTEST) $(TEST_ZUSF_UTF8) -v --junitxml=$(JUNIT_ZUSF)
+	@$(PYTEST) $(TEST_ZUSF_UTF8) -v --junitxml=$(JUNIT_ZUSF) -o junit_suite_name=TestUSSFunctions
 
 # Combines the per-suite JUnit reports into a single file so CI only needs to retrieve/publish one report
 merge-results:
