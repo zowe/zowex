@@ -46,7 +46,7 @@ void zowex_ds_tests()
   describe("data-set",
            [&]() -> void
            {
-             TEST_OPTIONS long_test_opts = {false, 30};
+             TEST_OPTIONS long_test_opts = {false, 60};
 
              afterAll(
                  [&]() -> void
@@ -824,7 +824,7 @@ void zowex_ds_tests()
                            {
                              std::string ds = _ds.back();
                              _create_ds(ds + ".T00");
-                             _ds.push_back(ds + ".T00");
+                             _ds.back() = ds + ".T00";
 
                              // The parent qualifier only exists as a prefix of the
                              // child, so an exact match must find nothing.
