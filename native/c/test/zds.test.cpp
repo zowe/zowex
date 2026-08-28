@@ -1394,7 +1394,7 @@ void zds_tests()
                                     cleanup_idcams += "  DELETE " + esds_aix_dsn + " PURGE\n";
                                     cleanup_idcams += "  DELETE " + esds_dsn + " CLUSTER PURGE\n";
                                     cleanup_idcams += "  SET MAXCC = 0\n";
-                                    
+
                                     rc = zds_idcams(cleanup_idcams, cleanup_output, cleanup_err);
                                     TestLog("Cleanup RC from IDCAMS: " + std::to_string(rc));
                                     if (rc != 0 ){
@@ -1463,7 +1463,7 @@ void zds_tests()
                                     } },
                                   vsam_opts);
 
-                        afterAll([ksds_dsn, esds_dsn, &submit_and_wait]() -> void
+                        afterAll([ksds_dsn, esds_dsn]() -> void
                                  {
                                     std::string cleanup_output;
                                     std::string cleanup_err;
@@ -1593,20 +1593,6 @@ void zds_tests()
 
                         beforeAll([&]() -> void
                                   {
-                                    // Clean up any leftover data sets from previous test runs
-
-                                   std::string cleanup_output;
-                                   std::string cleanup_err;
-                                   std::string cleanup_idcams;
-                           
-                                    cleanup_idcams += "  DELETE " + gdg_gen1_dsn + " NONVSAM PURGE\n";
-                                    cleanup_idcams += "  DELETE " + gdg_base_dsn + " GDG PURGE\n";
-                                    cleanup_idcams += "  SET MAXCC = 0\n";
-                                    int rc = zds_idcams(cleanup_idcams, cleanup_output, cleanup_err);
-                                    TestLog("Cleanup RC from IDCAMS: " + std::to_string(rc));
-                                    if (rc !=0 ){
-                                       TestLog("Output and error from failed IDCAMS cleanup:" + cleanup_err + "\n" + cleanup_output +"\n");
-                                    }
                                     // Define the GDG base via IDCAMS
                                     std::string setup_output;
                                     std::string setup_err;
@@ -1615,8 +1601,11 @@ void zds_tests()
                                     setup_idcams += "    NAME(" + gdg_base_dsn + ") -\n";
                                     setup_idcams += "    LIMIT(5) -\n";
                                     setup_idcams += "    NOEMPTY -\n";
-                                    setup_idcams += "    NOSCRATCH )\n";
-                                    rc = zds_idcams(setup_idcams, setup_output, setup_err);
+                                    // SCRATCH so generations are removed from the VTOC when the base
+                                    // is deleted. Under NOSCRATCH they are only uncataloged, leaving
+                                    // orphaned data sets that cannot be deleted by name from ISPF.
+                                    setup_idcams += "    SCRATCH )\n";
+                                    int rc = zds_idcams(setup_idcams, setup_output, setup_err);
                                     TestLog("Setup RC from IDCAMS: " + std::to_string(rc));
                                     if (rc !=0 ){
                                        throw std::runtime_error("Output and error from failed IDCAMS cleanup:" + setup_err + "\n" + setup_output +"\n");
@@ -1636,18 +1625,25 @@ void zds_tests()
                                     submit_and_wait(gen_jcl, 600, true); },
                                   gdg_opts);
 
-                        afterAll([&]() -> void
+                        // Capture by value: afterAll hooks run after the enclosing describe() lambda
+                        // has returned, so any reference to its locals would already be dangling.
+                        afterAll([gdg_base_dsn, gdg_gen1_dsn]() -> void
                                  {
                                    std::string cleanup_idcams;
                                    std::string cleanup_output;
                                    std::string cleanup_err;
+                                   // Deleting the base also removes its generations, which SCRATCH on
+                                   // the DEFINE clears from the VTOC rather than merely uncataloging.
                                    cleanup_idcams += "  DELETE " + gdg_gen1_dsn + " NONVSAM PURGE\n";
                                    cleanup_idcams += "  DELETE " + gdg_base_dsn + " GDG PURGE\n";
-                                   cleanup_idcams += "  SET MAXCC = 0\n";
+                                   // No SET MAXCC here: unlike beforeAll, a nonzero RC is real news and
+                                   // the SYSPRINT is the only place the IDC3009I reason code shows up.
                                    int rc = zds_idcams(cleanup_idcams, cleanup_output, cleanup_err);
                                     TestLog("Cleanup RC from IDCAMS: " + std::to_string(rc));
                                     if (rc !=0 ){
-                                       TestLog("Output and error from failed IDCAMS cleanup:" + cleanup_err + "\n" + cleanup_output +"\n");
+                                       // Warn rather than fail: if setup died early the GDG may never
+                                       // have been defined, and DELETE of a missing entry is expected.
+                                       TestLog("WARNING: IDCAMS cleanup failed for " + gdg_base_dsn + " (RC " + std::to_string(rc) + "); data sets may need manual removal:\n" + cleanup_err + "\n" + cleanup_output +"\n");
                                     } },
                                  gdg_opts);
 
