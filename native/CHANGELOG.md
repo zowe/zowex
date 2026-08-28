@@ -6,6 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- `c`: Added JSON-RPC support for listing parmlib data sets. [#1124](https://github.com/zowe/zowex/pull/1124)
 - `c`: Added the `zowex ds resolve-alias <dsn>` command which allows the user to resolve data set aliases. [#1108](https://github.com/zowe/zowex/pull/1108)
 - `c`: Added `zds_idcams` utility function which allows the caller to execute the z/OS IDCAMS program and retrieve its output. [#1108](https://github.com/zowe/zowex/pull/1108)
 
