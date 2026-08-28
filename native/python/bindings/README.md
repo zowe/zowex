@@ -13,7 +13,7 @@ The bindings are split across three modules, each generated from the correspondi
 | Function | Description |
 | --- | --- |
 | `create_data_set(dsn: str, attributes: DS_ATTRIBUTES)` | Create a new dataset with the specified attributes. |
-| `list_data_sets(dsn: str) -> list[ZDSEntry]` | List datasets matching the given pattern. |
+| `list_data_sets(dsn: str, show_attributes: bool = False) -> list[ZDSEntry]` | List datasets matching the given pattern. Pass `show_attributes=True` to populate `dsorg`, `volser`, `recfm` and `migrated`. |
 | `read_data_set(dsn: str, codepage: str = "") -> str` | Read content from a dataset with optional encoding. |
 | `write_data_set(dsn: str, data: str, codepage: str = "", etag: str = "") -> str` | Write data to a dataset with optional encoding and etag validation. |
 | `delete_data_set(dsn: str)` | Delete the specified dataset. |
@@ -23,7 +23,7 @@ The bindings are split across three modules, each generated from the correspondi
 **Supporting types:**
 
 - `DS_ATTRIBUTES`: `alcunit`, `blksize`, `dirblk`, `dsorg`, `primary`, `recfm`, `lrecl`, `dataclass`, `unit`, `dsntype`, `mgntclass`, `dsname`, `avgblk`, `secondary`, `size`, `storclass`, `vol`
-- `ZDSEntry`: `name`, `dsorg`, `volser`, `recfm`, `migrated`
+- `ZDSEntry`: `name`, `dsorg`, `volser`, `recfm`, `migrated` (all but `name` require `show_attributes=True`)
 - `ZDSMem`: `name`
 
 ### `zjb_py` — Jobs
