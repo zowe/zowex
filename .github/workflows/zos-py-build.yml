@@ -63,7 +63,7 @@ jobs:
 
       - name: Set up test fixtures
         run: |
-          cat << EOF > native/python/bindings/fixtures/env.yml
+          cat << EOF > native/python/bindings/test/fixtures/env.yml
           OWNER: ${{ secrets.SSH_MARIST_ZNP_ID }}
           DSN_PREFIX: ${{ secrets.SSH_MARIST_ZNP_ID }}.PY#BI
           USS_BASE_DIR: /ZOWE/tmp/test_uss_functions_for_python_bindings
