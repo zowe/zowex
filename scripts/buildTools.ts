@@ -40,6 +40,10 @@ const SAFE_ASSET = /^zbind_bin_dist[\w.-]*\.tar\.gz$/;
 const TARBALL = path.resolve(__dirname, "../dist/zbind_bin_dist.tar.gz");
 const OUTPUT = path.resolve(__dirname, "../dist/zbind_bin_dist.tar.gz");
 
+// Precompiled SWIG binary for z/OS, published to the zowex releases used as a
+// persistent host for dev artifacts (see RELEASE_TAG above).
+const SWIG_RELEASE_URL = "https://github.com/zowe/zowex/releases/download/py-bindings-dev/swig-4.4.1.pax.Z";
+
 /** Runs `gh` with the given args, returning trimmed stdout. */
 function gh(args: string[]): string {
     try {
@@ -1313,6 +1317,57 @@ async function hasSwig(connection: Client) {
 }
 
 /**
+ * Downloads the precompiled SWIG binary published to SWIG_RELEASE_URL, uploads
+ * it to the remote python/swig directory, and extracts it there. The extracted
+ * `swig` binary and `Lib/` land directly under that directory (see
+ * native/python/swig/README.md), which preBuildCmd puts on PATH and points
+ * SWIG_LIB at, so `z:python:build` can find it without building SWIG from
+ * source. Used when swig is unavailable on z/OS.
+ */
+async function installSwigRelease(connection: Client) {
+    const cacheDir = path.resolve(__dirname, "./../.cache");
+    fs.mkdirSync(cacheDir, { recursive: true });
+    const filename = path.basename(SWIG_RELEASE_URL);
+    const localPax = path.join(cacheDir, filename);
+    await downloadTarball(SWIG_RELEASE_URL, localPax);
+
+    await runCommandInShell(connection, `mkdir -p ${deployDirs.pythonSwigDir}\n`, {
+        stepName: "Creating remote SWIG directory",
+    });
+
+    // Upload the archive without EBCDIC conversion to preserve its binary contents.
+    await new Promise<void>((resolve, reject) => {
+        connection.sftp(async (err, sftpcon) => {
+            if (err) {
+                reject(err);
+                return;
+            }
+            try {
+                await uploadFile(sftpcon, localPax, `${deployDirs.pythonSwigDir}/${filename}`, false);
+                resolve();
+            } catch (uploadErr) {
+                reject(uploadErr);
+            } finally {
+                sftpcon.end();
+            }
+        });
+    });
+
+    await runCommandInShell(
+        connection,
+        [
+            `cd ${deployDirs.pythonSwigDir}`,
+            "rm -rf Lib swig",
+            `pax -rz -f ${filename}`,
+            "chtag -b swig",
+            "chmod 755 swig",
+        ].join("\n"),
+        { stepName: "Extracting SWIG release", streamOutput: true },
+    );
+    console.log(`Installed SWIG from ${SWIG_RELEASE_URL} to ${deployDirs.pythonSwigDir}`);
+}
+
+/**
  * Applies a previously downloaded precompiled bindings bundle
  * (dist/zbind_bin_dist.tar.gz) to the remote bindings directory: uploads the
  * archive as binary, extracts it on z/OS, and copies the compiled `.so`
@@ -2070,6 +2125,9 @@ async function main() {
                 break;
             case "has:swig":
                 await hasSwig(sshClient);
+                break;
+            case "python:swig:install":
+                await installSwigRelease(sshClient);
                 break;
             case "python:apply":
                 await applyPrecompiled(sshClient);

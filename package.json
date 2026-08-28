@@ -36,6 +36,7 @@
     "z:python:fetch": "tsx scripts/buildTools.ts python:fetch",
     "z:python:pack": "tsx scripts/buildTools.ts python:pack",
     "z:python:post": "tsx scripts/buildTools.ts python:post",
+    "z:python:swig:install": "tsx scripts/buildTools.ts python:swig:install",
     "z:python:test": "tsx scripts/buildTools.ts python:test",
     "z:python:test:precompiled": "tsx scripts/buildTools.ts python:test:precompiled",
     "z:rebuild": "tsx scripts/buildTools.ts rebuild",
