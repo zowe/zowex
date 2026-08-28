@@ -99,7 +99,7 @@ class TestDatasetFunctions:
         self.created_datasets.append(dsn)
         
         # Verify creation by listing datasets
-        datasets = ds.list_data_sets(dsn)
+        datasets = ds.list_data_sets(dsn, True)
         # assert isinstance(datasets, (list, ds.ZDSEntryVector))
         assert len(datasets) > 0
         
@@ -117,7 +117,7 @@ class TestDatasetFunctions:
         self.created_datasets.append(dsn)
         
         # Verify creation by listing datasets
-        datasets = ds.list_data_sets(dsn)
+        datasets = ds.list_data_sets(dsn, True)
         # assert isinstance(datasets, (list, ds.ZDSEntryVector))
         assert len(datasets) > 0
         
@@ -157,7 +157,7 @@ class TestDatasetFunctions:
         self.created_datasets.append(dsn)
         
         # List datasets
-        datasets = ds.list_data_sets(dsn)
+        datasets = ds.list_data_sets(dsn, True)
         
         # Verify response
         # assert isinstance(datasets, (list, ds.ZDSEntryVector))
@@ -248,7 +248,7 @@ class TestDatasetFunctions:
         test_data = "Test data without codepage"
         
         # Create dataset
-        attributes = ds.DS_ATTRIBUTES()
+        attributes = self._create_ps_attributes(dsn)
         ds.create_data_set(dsn, attributes)
         self.created_datasets.append(dsn)
         
