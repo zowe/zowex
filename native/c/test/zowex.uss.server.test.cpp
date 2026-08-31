@@ -26,9 +26,8 @@ static const std::string ussTestDir = "/tmp/zowex_uss_srv_" + get_random_string(
 
 void zowex_uss_server_tests()
 {
-  describe("uss server tests", []() -> void {
-    ServerHandle server;
-    
+  ServerHandle server;
+  describe("uss server tests", [&]() -> void {
     beforeAll([&]() -> void {
       server = start_server(zowex_server_command, true);
 
