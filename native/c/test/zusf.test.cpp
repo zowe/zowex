@@ -60,7 +60,7 @@ void zusf_tests()
                           dir_a = tmp_base + "/test_dir_a";
                           dir_b = tmp_base + "/test_dir_b"; });
 
-             afterAll([&]() -> void
+             afterAll([tmp_base]() -> void
                       {
                   std::string discard;
                   execute_command_with_output("rm -rf " + tmp_base, discard); });
