@@ -801,7 +801,8 @@ int zut_list_parmlib(ZDIAG &diag, std::vector<std::string> &parmlibs)
   parmlibs.reserve(static_cast<size_t>(num_dsns));
   for (int i = 0; i < num_dsns; i++)
   {
-    parmlibs.emplace_back(std::string(dsns.dsn[i].val, sizeof(dsns.dsn[i].val)));
+    std::string dsn(dsns.dsn[i].val, sizeof(dsns.dsn[i].val));
+    parmlibs.emplace_back(zut_rtrim(dsn));
   }
 
   return rc;
