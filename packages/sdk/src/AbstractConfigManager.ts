@@ -544,7 +544,14 @@ export abstract class AbstractConfigManager {
             if (!testPassword) return undefined;
 
             try {
-                await this.attemptConnection({ ...config, ...configModifications, password: testPassword });
+                // Omit identityAgent: this attempt is specifically testing the typed password,
+                // and buildSshConfig prefers agent auth over password when both are present.
+                await this.attemptConnection({
+                    ...config,
+                    ...configModifications,
+                    password: testPassword,
+                    identityAgent: undefined,
+                });
                 return { password: testPassword };
             } catch (error) {
                 if (`${error}`.includes("FOTS1668")) {
@@ -571,6 +578,9 @@ export abstract class AbstractConfigManager {
                 for (const privateKey of foundPrivateKeys) {
                     const testValidation: ISshConfigExt = { ...this.selectedProfile };
                     testValidation.privateKey = privateKey;
+                    // Omit identityAgent: this attempt is specifically testing a discovered private key,
+                    // and buildSshConfig prefers agent auth over the private key when both are present.
+                    testValidation.identityAgent = undefined;
 
                     const result = await this.validateConfig(testValidation, false);
 
