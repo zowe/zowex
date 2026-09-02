@@ -205,7 +205,7 @@ export class ZSshUtils {
             password: useAgent ? undefined : session.ISshSession.password,
             privateKey:
                 !useAgent && session.ISshSession.privateKey
-                    ? fs.readFileSync(path.normalize(session.ISshSession.privateKey), "utf-8")
+                    ? fs.readFileSync(session.ISshSession.privateKey, "utf-8")
                     : undefined,
             passphrase: useAgent ? undefined : session.ISshSession.keyPassphrase,
             readyTimeout: session.ISshSession.handshakeTimeout,
