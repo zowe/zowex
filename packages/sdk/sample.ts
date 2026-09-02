@@ -41,6 +41,6 @@ import { SshSession, ZSshClient } from "./src";
         console.dir(response.items.map((item) => item.id));
     }
 })().catch((err) => {
-    console.error(err);
+    console.error(err.stack);
     process.exit(1);
 });

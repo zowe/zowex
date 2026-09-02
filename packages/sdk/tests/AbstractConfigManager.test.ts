@@ -1463,16 +1463,18 @@ describe("AbstractConfigManager", async () => {
                 handshakeTimeout: 5000,
             });
 
-            expect(connectMock).toHaveBeenCalledWith({
-                host: "test.com",
-                port: 22,
-                username: "user1",
-                password: "mypassword",
-                privateKey: undefined,
-                passphrase: undefined,
-                readyTimeout: 5000,
-                agent: undefined,
-            });
+            expect(connectMock).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    host: "test.com",
+                    port: 22,
+                    username: "user1",
+                    password: "mypassword",
+                    privateKey: undefined,
+                    passphrase: undefined,
+                    readyTimeout: 5000,
+                    agent: undefined,
+                }),
+            );
 
             connectMock.mockRestore();
             isConnectedMock.mockRestore();

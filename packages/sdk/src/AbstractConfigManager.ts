@@ -26,8 +26,8 @@ import {
     type IProfileTypeConfiguration,
     type ProfileInfo,
 } from "@zowe/imperative";
-import type { ISshSession } from "@zowe/zos-uss-for-zowe-sdk";
-import { NodeSSH } from "node-ssh";
+import { type ISshSession, SshSession } from "@zowe/zos-uss-for-zowe-sdk";
+import { NodeSSH, type Config as NodeSSHConfig } from "node-ssh";
 import { ConfigFileUtils } from "./ConfigFileUtils";
 import {
     type IDisposable,
@@ -40,6 +40,7 @@ import {
     type qpOpts,
 } from "./doc";
 import { type ISshConfigExt, SshConfigUtils } from "./SshConfigUtils";
+import { ZSshUtils } from "./ZSshUtils";
 
 export abstract class AbstractConfigManager {
     public constructor(private mProfilesCache: ProfileInfo) {}
@@ -509,20 +510,13 @@ export abstract class AbstractConfigManager {
 
         try {
             // Prepare connection configuration
-            const connectionConfig = {
-                host: config.hostname,
-                port: config.port || 22,
-                username: config.user,
-                password: config.privateKey ? undefined : config.password,
-                privateKey: config.privateKey ? readFileSync(path.normalize(config.privateKey), "utf8") : undefined,
-                passphrase: config.privateKey ? config.keyPassphrase : undefined,
-                readyTimeout: config.handshakeTimeout || this.getClientSetting("handshakeTimeout") || 30000,
-                // ssh2's ConnectConfig field is named "agent"; ISshConfigExt calls it identityAgent for clarity.
+            const connectionConfig = ZSshUtils.buildSshConfig(new SshSession(config), {
                 agent: config.identityAgent,
-            };
+                readyTimeout: config.handshakeTimeout || this.getClientSetting("handshakeTimeout") || 30000,
+            });
 
             // Attempt connection
-            await ssh.connect(connectionConfig);
+            await ssh.connect(connectionConfig as NodeSSHConfig);
             if (!ssh.isConnected()) {
                 throw new Error("Failed to connect to SSH: All configured authentication methods failed");
             }

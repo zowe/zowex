@@ -197,15 +197,17 @@ export class ZSshUtils {
     }
 
     public static buildSshConfig(session: SshSession, configProps?: ConnectConfig): ConnectConfig {
+        const useAgent = configProps?.agent != null;
         return {
             host: session.ISshSession.hostname,
             port: session.ISshSession.port,
             username: session.ISshSession.user,
-            password: session.ISshSession.password,
-            privateKey: session.ISshSession.privateKey
-                ? fs.readFileSync(session.ISshSession.privateKey, "utf-8")
-                : undefined,
-            passphrase: session.ISshSession.keyPassphrase,
+            password: useAgent ? undefined : session.ISshSession.password,
+            privateKey:
+                !useAgent && session.ISshSession.privateKey
+                    ? fs.readFileSync(path.normalize(session.ISshSession.privateKey), "utf-8")
+                    : undefined,
+            passphrase: useAgent ? undefined : session.ISshSession.keyPassphrase,
             readyTimeout: session.ISshSession.handshakeTimeout,
             // ssh2 debug messages are extremely verbose so log at TRACE level
             debug: (msg) => Logger.getAppLogger().trace(msg),
