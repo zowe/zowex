@@ -7,6 +7,15 @@ description: Deploy and operate the zowex JSON-RPC server on a *remote* z/OS hos
 
 This skill is an alternative to the `zowe` CLI (z/OSMF REST): it uses the **zowex** native backend driven over SSH stdio instead. Use it when the target z/OS system has SSH but no z/OSMF. It's for operating on a remote target host's datasets/jobs/USS — unrelated to building or testing this repo's own native code, which uses `npm run z:rebuild` / `npm run z:test`.
 
+**Two helpers, one command grammar.** Pick the one for your platform — they take the same subcommands, flags, env vars, and config keys:
+
+| platform | helper | invoke as |
+|---|---|---|
+| macOS / Linux | [zx](zx) (bash) | `.agents/skills/zowex-ssh/zx ds list "SYS1.*"` |
+| Windows | [zx.ps1](zx.ps1) (Windows PowerShell 5.1+) | `.agents\skills\zowex-ssh\zx.ps1 ds list "SYS1.*"` |
+
+Everything below is written with the bash helper; on Windows substitute `zx.ps1` (or install the `zx.cmd` shim — §0) and PowerShell variable syntax. **Windows-specific behavior and gotchas are collected in §8 — read that section before your first call on Windows.**
+
 Everything below uses two shell variables you should set once per target:
 
 ```bash
@@ -22,11 +31,16 @@ If the user gives only a hostname, ask for (or infer) the SSH user and a writabl
 export ZX_STATE=/tmp/zx-agent-$$.$UID   # unique per agent run; keep it short (see §6 ControlPath note)
 ```
 
+```powershell
+$env:ZX_STATE = "$env:TEMP\zx-agent-$PID"   # same rule on Windows (default is %TEMP%\zx.%USERNAME%)
+```
+
 Do this at the very start of every session, before the first `zx`/`$zx` call — deploy included. Never call `zx reset` under a `ZX_STATE` a human or another agent might be using (see §7).
 
-**Local prereqs:** `ssh`, `sftp`, `jq`, `base64`, bash ≥3.2, and `curl` or `wget`. Run `.agents/skills/zowex-ssh/zx check` to verify. (`jq` is the only one not stock on macOS — if it's missing, ask the user to install it via their package manager, e.g. Homebrew on macOS, before continuing.)
+**Local prereqs (bash):** `ssh`, `sftp`, `jq`, `base64`, bash ≥3.2, and `curl` or `wget`. Run `.agents/skills/zowex-ssh/zx check` to verify. (`jq` is the only one not stock on macOS — if it's missing, ask the user to install it via their package manager, e.g. Homebrew on macOS, before continuing.)
+**Local prereqs (Windows):** `ssh` + `sftp` (the Windows OpenSSH Client feature) and Windows PowerShell 5.1 or newer. No `jq`/`base64`/`curl` needed — `zx.ps1` does JSON, base64, and downloads in-process. Run `.agents\skills\zowex-ssh\zx.ps1 check` to verify.
 **Remote prereqs:** SSH login + a writable USS directory. The `zowex` binary is self-contained.
-**Bundle:** `zx deploy` will auto-download the latest `server.pax.Z` from [github.com/zowe/zowex/releases](https://github.com/zowe/zowex/releases) if it isn't found locally. Default save path is `~/.local/share/zx/server.pax.Z` (always user-writable, works whether `zx` is run directly or via a PATH symlink). Downloads automatically without prompting. To pin a specific version or path, set `ZX_PAX=/path/to/the.pax.Z`. Set `GITHUB_TOKEN` if the API is rate-limited on a shared corporate IP.
+**Bundle:** `zx deploy` will auto-download the latest `server.pax.Z` from [github.com/zowe/zowex/releases](https://github.com/zowe/zowex/releases) if it isn't found locally. Default save path is `~/.local/share/zx/server.pax.Z` (`%LOCALAPPDATA%\zx\server.pax.Z` on Windows) — always user-writable, works whether the helper is run directly or via PATH. Downloads automatically without prompting. To pin a specific version or path, set `ZX_PAX` to it. Set `GITHUB_TOKEN` if the API is rate-limited on a shared corporate IP.
 
 ---
 
@@ -41,7 +55,16 @@ Run once to symlink the helper into `~/.local/bin` (created if absent):
 
 `zx install` prints an `export PATH=...` line if the target directory isn't already on your PATH — paste it into your shell profile (`~/.zshrc`, `~/.bashrc`, etc.).
 
-After that, every command below can be called as `zx ...` directly. To remove the symlink: `zx uninstall`.
+On Windows there are no symlink permissions to worry about — `install` writes a `zx.cmd` shim that launches the script with `-ExecutionPolicy Bypass`, so it works regardless of the machine's execution policy:
+
+```powershell
+.agents\skills\zowex-ssh\zx.ps1 install              # -> ~\.local\bin\zx.cmd  (default)
+.agents\skills\zowex-ssh\zx.ps1 install C:\tools     # -> C:\tools\zx.cmd      (custom dir)
+```
+
+It prints the `$env:PATH` / `[Environment]::SetEnvironmentVariable(...)` line to run if the directory isn't on PATH yet.
+
+After that, every command below can be called as `zx ...` directly. To remove the symlink/shim: `zx uninstall`.
 
 ---
 
@@ -89,7 +112,7 @@ ssh "$ZX_HOST" "$ZX_BIN --help"
 
 If `pax -rvf` fails on the `.Z`, do `uncompress server.pax.Z && pax -rvf server.pax`.
 
-The CLI also exposes `console` / `tso` / `system` / `tool` subcommands — run `$ZX_BIN <cmd> --help` if you need one of those interactively. Only a subset is exposed via JSON-RPC (see §3). This CLI-only gap isn't limited to those four groups: `data-set copy` is CLI-only too (no `copyDataset` RPC — see §3's Datasets table). When in doubt whether a `zowex data-set`/`job`/`uss` verb has an RPC equivalent, check `$ZX_BIN data-set --help` against §3 rather than assuming parity.
+The CLI also exposes `tso` / `system` / `tool` subcommands — run `$ZX_BIN <cmd> --help` if you need one of those interactively. Only a subset is exposed via JSON-RPC (see §3; `tso` is RPC-backed, most of `system`/`tool` is CLI-only). Console is special: on servers newer than v0.8.0 the `console` CLI group exists only in the separate APF-authorized `zoweax` binary, and the `consoleCommand` RPC (see §3) is how `zowex server` reaches it. This CLI-only gap isn't limited to those groups: `data-set copy` is CLI-only too (no `copyDataset` RPC — see §3's Datasets table). When in doubt whether a `zowex data-set`/`job`/`uss` verb has an RPC equivalent, check `$ZX_BIN data-set --help` against §3 rather than assuming parity.
 
 ---
 
@@ -116,19 +139,31 @@ $zx job status JOB01234
 $zx stop
 ```
 
-`zx` remembers `host`+`bin` in `$ZX_STATE/config` (set by `deploy` or `zx use <host> <bin>`; overridable via `ZX_HOST`/`ZX_BIN` env). Every grouped command auto-detects whether a persistent session is live and falls back to a one-shot ssh if not.
+On Windows, same sequence:
+
+```powershell
+$zx = '.agents\skills\zowex-ssh\zx.ps1'   # or install the zx.cmd shim onto PATH (§0)
+
+& $zx deploy user@host /u/user/zowex
+& $zx ds list "SYS1.*"
+& $zx start                               # strongly recommended on Windows - see §8
+& $zx job status JOB01234
+& $zx stop
+```
+
+`zx` remembers `host`+`bin` in `$ZX_STATE/config` (`config.json` for `zx.ps1`; set by `deploy` or `zx use <host> <bin>`; overridable via `ZX_HOST`/`ZX_BIN` env). Every grouped command auto-detects whether a persistent session is live and falls back to a one-shot ssh if not.
 
 **Command groups** (run `zx help` for the full list):
 
 | group | subcommands |
 |---|---|
-| `zx ds` | `list <pat>` · `members <dsn>` · `read <dsn>` · `write <dsn> <file>` · `get`/`put` (member or whole PDS) · `create` · `delete` · `copy` · `rename` |
+| `zx ds` | `list <pat>` · `members <dsn>` · `read <dsn>` · `write <dsn> <file>` · `get`/`put` `[--binary]` (member or whole PDS; default is text with EBCDIC conversion — pass `--binary` for byte-faithful transfer, e.g. load modules or tersed files) · `create` · `delete` · `copy` · `rename` |
 | `zx job` | `list [<owner> [<prefix>]]` · `submit <file>` · `status <id>` · `spools <id>` · `spool <id> <n>` · `jcl <id>` · `cancel`/`delete`/`hold`/`release <id>` |
 | `zx uss` | `ls` · **`get`/`put`** (sftp, binary-safe) · `read`/`write` (RPC, text) · `rm` · `mkdir` · `mv` · `cp` · `chmod` · `chown` · `chtag` · `sh '<cmd>'` |
 | `zx tso` | `'<cmd>'` |
 | `zx system` | `apf` · `linklist` · `proclib` · `syslog` (RPC) · `parmlib` · `subsystems` · `symbol <s>` (CLI) |
 | `zx tool` | `amblist <dsn> --cs '<stmts>'` · `run <pgm> [opts]` · `search <dsn> <str>` · `dynalloc` · `dsect` (all CLI) |
-| `zx console` | `'<cmd>' [--cn <n>] [--timeout <s>] [--no-wait]` (CLI; needs APF — fails `Not authorized - 4` from a plain USS dir) |
+| `zx console` | `'<cmd>' [--cn <n>] [--timeout <s>] [--no-wait]` (RPC `consoleCommand`, servers > v0.8.0; needs `zoweax` installed + APF-authorized on the host and ESM OPERCMDS grants for non-display commands) |
 | `zx rpc` | `<method> ['<params>']` — raw escape hatch |
 
 There is no `zx` group yet for the ESM certificate / key ring commands (`zowex system cert ...` / `zowex system keyring ...`, servers newer than v0.7.0) — drive them with `zx rpc <method>` (see §3's Certificates table) or CLI passthrough: `ssh "$ZX_HOST" "$ZX_BIN system keyring list-rings $USER"`.
@@ -180,6 +215,13 @@ resolves to the same socket path either way, so `zx`'s own `ssh` invocations fin
 and skip the password prompt. Never run `zx start`/`zx stop`/`zx reset` in this workflow — those
 only make sense for the single shared default state and `reset` will nuke whichever `$ZX_STATE`
 is currently exported.
+
+On Windows the same isolation rule applies — a separate `$env:ZX_STATE` gives you a separate
+config, pid file, **and** named pipe (the pipe name is derived from the state directory), so two
+`ZX_STATE`s never see each other's sessions. The `ControlMaster`/`sshpass` priming above does
+*not* apply: Windows OpenSSH has no connection multiplexing. Instead give each host its own
+`ZX_STATE` and run `zx start` per host — each gets its own long-lived ssh connection, and each
+authenticates once (§8).
 
 ### Envelope
 
@@ -245,6 +287,16 @@ is currently exported.
 |---|---|
 | `tsoCommand` | `{"commandText":"<tso cmd>"}` — `result.data` is plain text |
 
+### Console
+
+**Server version gate:** `consoleCommand` exists only in servers **newer than v0.8.0** (zowex PR #1110). On older servers it returns `-32601 Unrecognized command`.
+
+| method | params |
+|---|---|
+| `consoleCommand` | `{"commandText":"<mvs cmd>","consoleName"?:"<name>","timeout"?:N,"wait"?:bool}` — `result.data` is plain text |
+
+The server spawns the APF-authorized **`zoweax`** binary per request (located next to `zowex`, on the server's `PATH`, or via `ZOWEAX_PATH` on the remote host) — the server itself never holds APF authorization. Prereqs on the host: `zoweax` installed and `extattr +ap`'d by a system programmer, and ESM OPERCMDS grants (`MVS.*` profiles, e.g. `MVS.REPLY.*` for WTOR replies) for anything beyond informational `D ...` displays. `consoleName` defaults to the SSH user's ID plus a digit suffix; console activation can be gated per user with `MVS.MCSOPER.<name>` profiles. Failures come back with actionable messages ("command not found" → zoweax not installed; "Not authorized" → not APF-authorized or ESM denied).
+
 ### Certificates / key rings (ESM)
 
 **Server version gate:** these methods exist only in servers **newer than v0.7.0** (zowex PR #1079). On older servers they return `-32601 Unrecognized command`. The caller's SSH user needs the corresponding ESM `IRR.DIGTCERT.*` / `RDATALIB` authority — without it, calls fail with a SAF diagnostic (see below), not an auth prompt.
@@ -273,7 +325,7 @@ Conventions shared by these methods:
 - Failures return `result.success:false` with `message`, `service`, and a structured `safReturns` object (`functionCode`, `safReturnCode`, `esmReturnCode`, `esmReasonCode`); GSK (System SSL) failures add `gskReturnCode`. Non-fatal SAF warnings (rc 4) succeed with a `warning` string.
 - `owner`, `keyring`, and `label` are case-sensitive (userids normally uppercase).
 
-`unixCommand` / `tsoCommand` are the escape hatches for anything not covered. There is **no JSON-RPC console method** (the `zowex console` CLI subcommand exists but isn't exposed over RPC) — use `unixCommand` with a host-side `opercmd`-equivalent if you need one, or fall back to `ssh "$ZX_HOST" "$ZX_BIN console issue ..."`.
+`unixCommand` / `tsoCommand` are the escape hatches for anything not covered. MVS console commands have their own method on servers newer than v0.8.0 — `consoleCommand` (see the Console table above). On older servers, run the APF-authorized companion binary directly on the host: `ssh "$ZX_HOST" "zoweax console issue ..."` (`zowex console issue` only exists on pre-v0.8.x binaries and requires the old fat `zoweax` there too).
 
 ---
 
@@ -346,6 +398,11 @@ For whole-PDS `ds get`, run `zx start` first — one persistent session is much 
 | every method returns auth-style errors | the SSH user lacks the needed ESM access; zowex itself does no auth |
 | `ControlPath too long ('...' >= 104 bytes)` | Unix domain socket path limit (macOS: 104 bytes) — `$ZX_STATE/cm-%C` overflowed it. Use a short `ZX_STATE`, e.g. `/tmp/zx-<label>.$UID`, not a long nested path like a session scratch dir |
 | need password auth against a second host without disturbing an existing `zx` session/socket | give the second host its own `ZX_STATE` and prime its `ControlMaster` with `sshpass` — see §2c |
+| **(Windows)** `zx.ps1 cannot be loaded because running scripts is disabled on this system` | execution policy — call it as `powershell -ExecutionPolicy Bypass -File .agents\skills\zowex-ssh\zx.ps1 ...`, or run `install` once and use the `zx.cmd` shim, which already passes that flag |
+| **(Windows)** a password prompt on *every* call | expected in one-shot mode: Windows OpenSSH has no `ControlMaster`, so each call is a fresh connection. Run `zx start` (one connection, one prompt, reused by every later call) or set up key auth — see §8 |
+| **(Windows)** `zx start` says `server failed to start` | look in `$env:ZX_STATE\err` (session-host failure) and `$env:ZX_STATE\ssh-err` (what ssh/zowex printed). A wrong host/bin, a rejected key, or an untrusted host key all land here |
+| **(Windows)** redirected output (`zx ds read X > f.txt`) is UTF-16 with doubled newlines | that's PowerShell's `>`, not `zx` — use `zx ds get "X" f.txt` / `zx uss get`, or pipe through `Out-File -Encoding utf8` / `Set-Content` |
+| **(Windows)** `sftp` ops (`deploy`, `uss get`/`put`) fail with `Permission denied` while RPC calls work | `sftp -b` normally forces `BatchMode=yes` (no prompting). `zx.ps1` passes `-o BatchMode=no` to allow it — but if `ZX_SSH_OPTS` sets `BatchMode=yes`, that wins (ssh takes the first value). Drop it, or use key auth |
 
 ---
 
@@ -358,3 +415,24 @@ ssh "$ZX_HOST" "rm -rf $ZX_DIR"     # remove the remote binary (only if you depl
 ```
 
 Only remove `$ZX_DIR` on the remote side if you created it for this session.
+
+On Windows, `zx.ps1 stop` shuts down the session host **and** reaps its `ssh` child (tracked in
+`$ZX_STATE\ssh-pid`), and `zx.ps1 reset` additionally wipes the state directory. There is no
+`ControlMaster` socket to close.
+
+---
+
+## 8 · Windows notes (`zx.ps1`)
+
+Behavior differences vs. the bash helper — everything else (subcommands, `-j`, `ZX_HOST`/`ZX_BIN`/`ZX_STATE`/`ZX_PAX`/`ZX_TIMEOUT`/`GITHUB_TOKEN`, method coverage, output shapes) is the same.
+
+- **Requires Windows PowerShell 5.1+** (the version that ships with Windows) or PowerShell 7. No `jq`, `base64`, `curl`, or `wget` — JSON, base64, and the release download are done in-process.
+- **No connection multiplexing.** Windows OpenSSH doesn't implement `ControlMaster`/`ControlPath`, so every one-shot call is a new SSH connection (slower, and one auth per call with passwords). `zx start` is the stand-in: it launches a hidden-ish background PowerShell host that owns one long-lived `zowex server -w 1` over ssh and answers one request per **named-pipe** connection. Every grouped command auto-routes through it when it's live, exactly like the bash version. **Use `zx start` for anything more than a couple of calls, and always for a whole-PDS `ds get`/`ds put`.**
+  - The host is started with `-NoNewWindow` so it keeps your console: with password auth, ssh's prompt appears in your terminal during `zx start` (which waits up to 60s, or `ZX_TIMEOUT` if larger, for the ready banner). Key auth (`ssh-keygen` + append your public key to the host's `~/.ssh/authorized_keys`) avoids the prompt entirely.
+  - The pipe name is derived from `$env:ZX_STATE`, so per-agent/per-host isolation works the same way (§2c) and there's no socket-path length limit (the bash `ControlPath too long` problem doesn't exist here).
+  - `zx info` prints the state dir, config, pid, and pipe name.
+- **Output goes through the PowerShell pipeline** (`Write-Output`), so `zx ds list "X.*" | Select-String FOO`, `$rows = zx -j ds list "X.*" | ConvertFrom-Json`, and `Tee-Object` all work. Errors and progress lines go to stderr. Caveat: PowerShell 5.1's `>` writes UTF-16 — use `zx ds get` / `zx uss get` for files, or `Out-File -Encoding utf8`.
+- **State/paths:** `$env:ZX_STATE` defaults to `%TEMP%\zx.%USERNAME%` and holds `config.json`, `pid`, `ssh-pid`, `ready`, `err`, `ssh-err`. `$env:ZX_PAX` defaults to `%LOCALAPPDATA%\zx\server.pax.Z`.
+- **Extra ssh options:** `$env:ZX_SSH_OPTS` is split on whitespace and prepended to every `ssh`/`sftp` call, e.g. `$env:ZX_SSH_OPTS = '-i C:\keys\zos_id -o StrictHostKeyChecking=accept-new'`. Since ssh honors the *first* value for an option, anything you set here wins over `zx.ps1`'s own defaults.
+- **Local paths** may use `\` or `/`; they're normalized for `sftp` (which treats `\` as an escape). Relative paths resolve against the current directory.
+- `zowex` CLI passthroughs (`zx tool`, `zx system parmlib|subsystems|symbol`, `zx ds copy`) work the same — they run as their own ssh command, not through the session pipe. Everything RPC-backed — including `zx console` (`consoleCommand`) and `zx ds get|put --binary` — goes through the session when one is live.

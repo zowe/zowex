@@ -11,16 +11,21 @@
 
 #include "rpc_commands.hpp"
 #include "dispatcher.hpp"
+#include <cstdlib>
+#include <unistd.h>
 #include "schemas/requests.hpp"
 #include "schemas/responses.hpp"
 #include "../commands/certificates.hpp"
 #include "../commands/core.hpp"
 #include "../commands/ds.hpp"
 #include "../commands/job.hpp"
+#include "../commands/server.hpp"
 #include "../commands/system.hpp"
 #include "../commands/tso.hpp"
 #include "../commands/uss.hpp"
 #include "../commands/tool.hpp"
+#include "../zut.hpp"
+#include "../ztype.h"
 
 // Helper functions to create builders with common argument mappings
 static CommandBuilder create_ds_builder(CommandBuilder::CommandHandler handler)
@@ -67,6 +72,9 @@ void register_ds_commands(CommandDispatcher &dispatcher)
                                   .rename_arg("maxItems", "max-entries")
                                   .set_default("warn", false)
                                   .set_default("pattern", ""));
+  dispatcher.register_command("resolveDsAlias",
+                              create_ds_builder(ds::handle_data_set_resolve_alias)
+                                  .validate<ResolveDsAliasRequest, ResolveDsAliasResponse>());
   dispatcher.register_command("readDataset",
                               create_ds_builder(ds::handle_data_set_view)
                                   .validate<ReadDatasetRequest, ReadDatasetResponse>()
@@ -201,6 +209,87 @@ void register_tso_commands(CommandDispatcher &dispatcher)
                                   .read_stdout("data", false));
 }
 
+static std::string locate_zoweax()
+{
+  const char *override_path = getenv("ZOWEAX_PATH");
+  if (override_path != nullptr && *override_path != '\0')
+  {
+    return override_path;
+  }
+  const std::string &exec_dir = ZServer::get_instance().get_exec_dir();
+  if (!exec_dir.empty())
+  {
+    const std::string sibling = exec_dir + "/zoweax";
+    if (0 == access(sibling.c_str(), X_OK))
+    {
+      return sibling;
+    }
+  }
+  return "zoweax";
+}
+
+static int handle_console_command(plugin::InvocationContext &context)
+{
+  const std::string command = context.get<std::string>("command", "");
+  std::string console_name = context.get<std::string>("console-name", "");
+  const long long timeout = context.get<long long>("timeout", 0);
+  const bool wait = context.get<bool>("wait", true);
+
+  std::vector<std::string> args;
+  args.emplace_back("console");
+  args.emplace_back("issue");
+  args.emplace_back(command);
+  if (!console_name.empty())
+  {
+    args.emplace_back("--console-name");
+    args.emplace_back(console_name);
+  }
+  if (timeout > 0)
+  {
+    args.emplace_back("--timeout");
+    args.emplace_back(std::to_string(timeout));
+  }
+  args.emplace_back("--wait");
+  args.emplace_back(wait ? "true" : "false");
+
+  std::string out;
+  std::string err;
+  const std::string zoweax = locate_zoweax();
+  const int rc = zut_run_program(zoweax, args, out, err);
+
+  if (0 != rc)
+  {
+    const std::string &details = err.empty() ? out : err;
+    context.error_stream() << "Error: console command failed via '" << zoweax << "', rc: '" << rc << "'" << std::endl;
+    if (!details.empty())
+    {
+      context.error_stream() << "  Details: " << details << std::endl;
+    }
+    if (std::string::npos != details.find("command not found") ||
+        std::string::npos != details.find("Permission denied"))
+    {
+      context.error_stream() << "  The zoweax binary must be installed alongside zowex (or named via ZOWEAX_PATH) and be executable by this user." << std::endl;
+    }
+    else if (std::string::npos != details.find("Not authorized"))
+    {
+      context.error_stream() << "  The zoweax binary is not APF-authorized; a system programmer must authorize it (extattr +ap) in a controlled location." << std::endl;
+    }
+    return RTNCD_FAILURE;
+  }
+
+  context.output_stream() << out;
+  return RTNCD_SUCCESS;
+}
+
+void register_console_commands(CommandDispatcher &dispatcher)
+{
+  dispatcher.register_command("consoleCommand",
+                              CommandBuilder(handle_console_command)
+                                  .validate<IssueConsoleCmdRequest, IssueConsoleCmdResponse>()
+                                  .rename_arg("commandText", "command")
+                                  .read_stdout("data", false));
+}
+
 void register_tool_commands(CommandDispatcher &dispatcher)
 {
   dispatcher.register_command("toolSearch",
@@ -224,6 +313,9 @@ void register_system_commands(CommandDispatcher &dispatcher)
                                   .rename_arg("secondsAgo", "seconds-ago")
                                   .rename_arg("maxLines", "max-lines")
                                   .read_stdout("data", false));
+  dispatcher.register_command("listParmlib",
+                              CommandBuilder(sys::handle_system_list_parmlib)
+                                  .validate<ListParmlibRequest, ListParmlibResponse>());
   dispatcher.register_command("listProclib",
                               CommandBuilder(sys::handle_system_list_proclib)
                                   .validate<ListProclibRequest, ListProclibResponse>());
@@ -285,6 +377,7 @@ void register_all_commands(CommandDispatcher &dispatcher)
 {
   register_core_commands(dispatcher);
   register_certificates_commands(dispatcher);
+  register_console_commands(dispatcher);
   register_ds_commands(dispatcher);
   register_job_commands(dispatcher);
   register_system_commands(dispatcher);

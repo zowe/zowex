@@ -146,7 +146,9 @@ ZJSON_SCHEMA(CountRingRequest,
 struct IssueConsoleCmdRequest {};
 ZJSON_SCHEMA(IssueConsoleCmdRequest,
     FIELD_REQUIRED(commandText, STRING),
-    FIELD_OPTIONAL(consoleName, STRING)
+    FIELD_OPTIONAL(consoleName, STRING),
+    FIELD_OPTIONAL(timeout, NUMBER),
+    FIELD_OPTIONAL(wait, BOOL)
 );
 
 struct GetInfoRequest {};
@@ -199,6 +201,11 @@ ZJSON_SCHEMA(ListDsMembersRequest,
     FIELD_REQUIRED(dsname, STRING),
     FIELD_OPTIONAL(attributes, BOOL),
     FIELD_OPTIONAL(pattern, STRING)
+);
+
+struct ResolveDsAliasRequest {};
+ZJSON_SCHEMA(ResolveDsAliasRequest,
+    FIELD_REQUIRED(dsname, STRING)
 );
 
 struct ReadDatasetRequest {};
@@ -310,6 +317,8 @@ ZJSON_SCHEMA(ViewSyslogRequest,
     FIELD_OPTIONAL(secondsAgo, NUMBER),
     FIELD_OPTIONAL(maxLines, NUMBER)
 );
+
+struct ListParmlibRequest {};
 
 struct ListProclibRequest {};
 

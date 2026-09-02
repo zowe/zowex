@@ -11,7 +11,7 @@
 #   zx info                                  show config + session state
 #
 #   zx ds   list <pattern> | members <dsn> | read <dsn> | write <dsn> <file>
-#           | get <dsn[(m)]> <localdir|file> | put <localdir|file> <dsn[(m)]>
+#           | get [--binary] <dsn[(m)]> <localdir|file> | put [--binary] <localdir|file> <dsn[(m)]>
 #           | create <dsn> [<attrs-json>] | delete <dsn> | copy <src> <dst> [--ow|-r] | rename <a> <b>
 #   zx job  list [<owner> [<prefix>]] | submit <file|/uss-path|DSN[(MBR)]> | status <id> | spools <id>
 #           | spool <id> <n> | jcl <id> | cancel|delete|hold|release <id>
@@ -151,7 +151,7 @@ _rpc(){
   fi
 }
 
-# ---- CLI passthrough (for tool/console/non-RPC system ops) ----------------
+# ---- CLI passthrough (for tool/non-RPC system ops) -------------------------
 _cli(){
   _load_cfg
   local q=""; for a in "$@"; do q+=" $(printf '%q' "$a")"; done
@@ -376,10 +376,11 @@ ds)
     read)    [[ $# -eq 1 ]]||die "zx ds read <dsn>";       _rpc readDataset   "{\"dsname\":$(_j "$1")}"  | _out _pp_data_b64;;
     write)   [[ $# -eq 2 ]]||die "zx ds write <dsn> <file>"; need base64
              b=$(base64 < "$2"|tr -d '\n'); _rpc writeDataset "{\"dsname\":$(_j "$1"),\"data\":\"$b\"}" | _out _pp_kv;;
-    get)     [[ $# -eq 2 ]]||die "zx ds get <dsn[(member)]> <localdir-or-file>"; need jq; need base64
+    get)     enc=""; [[ "${1-}" == "--binary" ]] && { enc=',"encoding":"binary"'; shift; }
+             [[ $# -eq 2 ]]||die "zx ds get [--binary] <dsn[(member)]> <localdir-or-file>"; need jq; need base64
              dsn="$1"; dst="$2"
              if [[ "$dsn" == *"("*")"* ]]; then
-               _rpc readDataset "{\"dsname\":$(_j "$dsn")}" | jq -r '.result.data' | base64 -d > "$dst"
+               _rpc readDataset "{\"dsname\":$(_j "$dsn")$enc}" | jq -r '.result.data' | base64 -d > "$dst"
                echo "zx: $dsn -> $dst"
              else
                mkdir -p "$dst"
@@ -387,17 +388,18 @@ ds)
                n=0
                while IFS= read -r m; do
                  [[ -z "$m" ]] && continue
-                 _rpc readDataset "{\"dsname\":$(_j "$dsn($m)")}" | jq -r '.result.data' | base64 -d > "$dst/$m"
+                 _rpc readDataset "{\"dsname\":$(_j "$dsn($m)")$enc}" | jq -r '.result.data' | base64 -d > "$dst/$m"
                  n=$((n+1)); echo "zx: $dsn($m) -> $dst/$m"
                done <<< "$mbrs"
                echo "zx: $n member(s)"
              fi;;
-    put)     [[ $# -eq 2 ]]||die "zx ds put <localdir-or-file> <dsn[(member)]>"; need base64; need jq
+    put)     enc=""; [[ "${1-}" == "--binary" ]] && { enc=',"encoding":"binary"'; shift; }
+             [[ $# -eq 2 ]]||die "zx ds put [--binary] <localdir-or-file> <dsn[(member)]>"; need base64; need jq
              src="$1"; dsn="$2"
              _putone(){
                local f="$1" tgt="$2" b r
                b=$(base64 < "$f"|tr -d '\n')
-               r=$(_rpc writeDataset "{\"dsname\":$(_j "$tgt"),\"data\":\"$b\"}")
+               r=$(_rpc writeDataset "{\"dsname\":$(_j "$tgt"),\"data\":\"$b\"$enc}")
                if printf '%s' "$r" | jq -e '.error' >/dev/null 2>&1; then
                  echo "zx: $f -> $tgt  FAILED: $(printf '%s' "$r" | jq -r '.error.message')" >&2; return 1
                fi
@@ -511,8 +513,25 @@ tool)
   esac;;
 
 console)
+  # consoleCommand RPC: the server spawns the APF-authorized zoweax binary per
+  # request (next to zowex, on PATH, or via ZOWEAX_PATH on the remote host)
   [[ $# -ge 1 ]]||die "zx console '<cmd>' [--cn <name>] [--timeout <s>] [--no-wait]"
-  _cli console issue "$@";;
+  need jq
+  cn="" ct="" cw="" cmd=""
+  while [[ $# -gt 0 ]]; do case "$1" in
+    --cn|--console-name) [[ $# -ge 2 ]]||die "--cn requires a value"; cn=$2; shift 2;;
+    --timeout)           [[ $# -ge 2 ]]||die "--timeout requires a value"; ct=$2; shift 2;;
+    --no-wait)           cw=false; shift;;
+    *) cmd="${cmd:+$cmd }$1"; shift;;
+  esac; done
+  [[ -n "$cmd" ]]||die "zx console '<cmd>' [--cn <name>] [--timeout <s>] [--no-wait]"
+  [[ -z "$ct" || "$ct" =~ ^[0-9]+$ ]]||die "--timeout must be a number of seconds"
+  p="{\"commandText\":$(_j "$cmd")"
+  [[ -n "$cn" ]]&&p+=",\"consoleName\":$(_j "$cn")"
+  [[ -n "$ct" ]]&&p+=",\"timeout\":$ct"
+  [[ -n "$cw" ]]&&p+=",\"wait\":$cw"
+  p+="}"
+  _rpc consoleCommand "$p" | _out _pp_data_text;;
 
 # ========================================================================= #
 ""|help) sed -n '2,/^set -euo/p' "$0" | sed '$d';;

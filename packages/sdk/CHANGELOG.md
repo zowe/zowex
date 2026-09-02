@@ -6,7 +6,13 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- Added JSON-RPC support for listing parmlib data sets. [#1124](https://github.com/zowe/zowex/pull/1124)
+- Added support for the `resolveDsAlias` RPC command which allows the caller to resolve data set aliases. [#1108](https://github.com/zowe/zowex/pull/1108)
 - Added support for SSH agents (`IdentityAgent` in SSH config) as an authentication method. [#342](https://github.com/zowe/zowex/issues/342)
+
+## `0.9.0`
+
+- Enable console commands through JSON-RPC. [#1112](https://github.com/zowe/zowex/pull/1110)
 
 ## `0.8.1`
 

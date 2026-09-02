@@ -117,7 +117,7 @@ IEFSSI_QUERY_MODEL(iefssi_query_model); // make this copy in static storage
 
 typedef struct jqry___header JQRY_HEADER;
 
-static int iefssi_query(JQRY_HEADER *PTR32 *PTR32 area, int *PTR32 rsn, const char *filter)
+static int iefssi_query(JQRY_HEADER * PTR32 * PTR32 area, int *PTR32 rsn, const char *filter)
 {
   int rc = 0;
   char filter_truncated[4] = {};
@@ -129,7 +129,7 @@ static int iefssi_query(JQRY_HEADER *PTR32 *PTR32 area, int *PTR32 rsn, const ch
 }
 
 // https://www.ibm.com/docs/en/zos/3.1.0?topic=subsystem-making-request-iefssreq-macro
-static int iefssreq(SSOB *PTR32 *PTR32 ssob)
+static int iefssreq(SSOB * PTR32 * PTR32 ssob)
 {
   if (!ssob)
   {

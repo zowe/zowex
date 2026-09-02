@@ -1,6 +1,6 @@
 {
   "name": "zowex",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "private": true,
   "scripts": {
     "all": "npm run z:rebuild && concurrently \"npm run z:artifacts\" \"npm run build\"",
@@ -11,8 +11,9 @@
     "download": "gh run download --dir packages/sdk/bin --name zowe-server-bin",
     "license": "node scripts/updateLicenses.js",
     "lint": "npm run lint --workspaces",
-    "lint:compat": "node scripts/checkNoStringHash.js",
+    "lint:all": "npm run lint && npm run lint:cpp && npm run lint:tidy",
     "lint:cpp": "bash -c \"clang-format --dry-run --Werror native/**/*.{c,cpp,h,hpp}\"",
+    "lint:tidy": "node scripts/checkNoStringHash.js && node scripts/checkNoDanglingHooks.js",
     "package": "npm run package --workspaces --if-present",
     "prepare": "husky",
     "test": "npm run test --workspaces --if-present",

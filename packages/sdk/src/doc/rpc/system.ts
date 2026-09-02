@@ -63,6 +63,19 @@ export interface ViewSyslogResponse extends common.CommandResponse {
     hasMore?: boolean;
 }
 
+export interface ListParmlibRequest extends common.CommandRequest<"listParmlib"> {}
+
+export interface ListParmlibResponse extends common.CommandResponse {
+    /**
+     * List of parmlib data set names.
+     */
+    items: string[];
+    /**
+     * Number of rows returned.
+     */
+    returnedRows: number;
+}
+
 export interface ListProclibRequest extends common.CommandRequest<"listProclib"> {}
 
 export interface ListProclibResponse extends common.CommandResponse {

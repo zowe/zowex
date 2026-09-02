@@ -12,6 +12,7 @@
 import type { ICommandDefinition } from "@zowe/imperative";
 import { SshSession } from "@zowe/zos-uss-for-zowe-sdk";
 import { Constants } from "../Constants";
+import { ConsoleCommand } from "./console/ConsoleCommand.definition";
 import { TsoCommand } from "./tso/TsoCommand.definition";
 
 const IssueDefinition: ICommandDefinition = {
@@ -20,7 +21,7 @@ const IssueDefinition: ICommandDefinition = {
     description: "Issue console, TSO, or Unix commands",
     type: "group",
     aliases: ["i"],
-    children: [TsoCommand],
+    children: [ConsoleCommand, TsoCommand],
     passOn: [
         {
             property: "options",
