@@ -104,7 +104,14 @@ public:
     }
 
     parser::ArgValue defaultArg = convert_default(default_value);
-    record->get().add_keyword_arg(std::string(name), alias_vector, std::string(help ? help : ""), convert_type(type), required != 0, defaultArg);
+    try
+    {
+      record->get().add_keyword_arg(std::string(name), alias_vector, std::string(help ? help : ""), convert_type(type), required != 0, defaultArg);
+    }
+    catch (const std::invalid_argument &e)
+    {
+      ZLOG_ERROR("Rejected plug-in keyword argument '%s': %s", name, e.what());
+    }
   }
 
   void add_positional_arg(CommandHandle command,
@@ -120,10 +127,17 @@ public:
 
     parser::ArgValue default_arg = convert_default(default_value);
 
-    record->get().add_positional_arg(std::string(name),
-                                     help ? std::string(help) : std::string(),
-                                     parser::ArgType_Single, required != 0,
-                                     default_arg);
+    try
+    {
+      record->get().add_positional_arg(std::string(name),
+                                       help ? std::string(help) : std::string(),
+                                       parser::ArgType_Single, required != 0,
+                                       default_arg);
+    }
+    catch (const std::invalid_argument &e)
+    {
+      ZLOG_ERROR("Rejected plug-in positional argument '%s': %s", name, e.what());
+    }
   }
 
   void set_handler(CommandHandle command, CommandHandler handler)

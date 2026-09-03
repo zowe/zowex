@@ -6,6 +6,10 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- `c`: Added a `--json` option to `zowex` commands, which prints the command's result to stdout as a single line of JSON (`success`, `exitCode`, `data`, `stderr`) so callers can parse it without starting `zowex server`. [#XXXX](https://github.com/zowe/zowex/pull/XXXX)
+- `c`: Fixed `zowex uss list` only returning structured results when `--response-format-csv` was also passed. [#XXXX](https://github.com/zowe/zowex/pull/XXXX)
+- `c`: Fixed `plugin::Io::is_redirecting_error()` and `is_redirecting_input()` reporting the state of the output stream instead of their own. [#XXXX](https://github.com/zowe/zowex/pull/XXXX)
+- `c`: Fixed a plug-in that registers an argument conflicting with an existing name or alias aborting `zowex` for every command instead of being rejected with a logged diagnostic. [#XXXX](https://github.com/zowe/zowex/pull/XXXX)
 - `c`: Added JSON-RPC support for listing parmlib data sets. [#1124](https://github.com/zowe/zowex/pull/1124)
 - `c`: Added the `zowex ds resolve-alias <dsn>` command which allows the user to resolve data set aliases. [#1108](https://github.com/zowe/zowex/pull/1108)
 - `c`: Added `zds_idcams` utility function which allows the caller to execute the z/OS IDCAMS program and retrieve its output. [#1108](https://github.com/zowe/zowex/pull/1108)
