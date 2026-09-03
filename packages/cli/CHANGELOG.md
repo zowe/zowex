@@ -6,6 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes 
 
+- Added `--dsn` to `zowex system cert export`/`import`, letting a certificate be exported to, or imported from, a sequential data set or PDS/E member on the server instead of a USS file. [#NNNN](https://github.com/zowe/zowex/pull/NNNN)
 - Added the `zssh files list alias` command to the CLI. [#1108](https://github.com/zowe/zowex/pull/1108)
 
 ## `0.9.0`
