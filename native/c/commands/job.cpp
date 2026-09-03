@@ -822,6 +822,7 @@ void register_commands(parser::Command &root_command)
 
   // View-file subcommand
   auto job_view_file_cmd = command_ptr(new Command("view-file", "view job file output"));
+  job_view_file_cmd->mark_stdout_as_payload();
   job_view_file_cmd->add_alias("vf");
   job_view_file_cmd->add_positional_arg("dsn", "job dsn via 'job list-files'", ArgType_Single, true);
   job_view_file_cmd->add_keyword_arg(ENCODING);
@@ -832,6 +833,7 @@ void register_commands(parser::Command &root_command)
 
   // View-file-by-id subcommand
   auto job_view_file_by_id_cmd = command_ptr(new Command("view-file-by-id", "view job file output by id"));
+  job_view_file_by_id_cmd->mark_stdout_as_payload();
   job_view_file_by_id_cmd->add_alias("vfbi");
   job_view_file_by_id_cmd->add_positional_arg(JOB_ID);
   job_view_file_by_id_cmd->add_positional_arg("key", "valid job dsn key via 'job list-files'", ArgType_Single, true);
@@ -843,6 +845,7 @@ void register_commands(parser::Command &root_command)
 
   // View-jcl subcommand
   auto job_view_jcl_cmd = command_ptr(new Command("view-jcl", "view job jcl from input jobid"));
+  job_view_jcl_cmd->mark_stdout_as_payload();
   job_view_jcl_cmd->add_alias("vj");
   job_view_jcl_cmd->add_positional_arg(JOB_ID);
   job_view_jcl_cmd->set_handler(handle_job_view_jcl);

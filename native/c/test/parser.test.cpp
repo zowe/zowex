@@ -875,5 +875,398 @@ void parser_tests()
                Expect(captured_passthrough[1] == "-la").ToBe(true);
                Expect(captured_passthrough[2] == "/tmp").ToBe(true);
              });
+             });
+
+             describe("json envelope", []() -> void
+                      {
+             it("injects --json into every command in the tree", []() {
+               static bool leaf_called = false;
+               leaf_called = false;
+
+               auto leaf_handler = [](plugin::InvocationContext &context) -> int {
+                 leaf_called = true;
+                 context.output_stream() << "leaf ran" << std::endl;
+                 return 0;
+               };
+
+               ArgumentParser arg_parser("prog", "json sample");
+               Command &root = arg_parser.get_root_command();
+               auto group = command_ptr(new Command("grp", "a group"));
+               auto leaf = command_ptr(new Command("leaf", "a leaf"));
+               leaf->set_handler(leaf_handler);
+               group->add_command(leaf);
+               root.add_command(group);
+
+               std::vector<std::string> raw = {"prog", "grp", "leaf", "--json"};
+               std::vector<char *> argv = to_argv(raw);
+
+               ParseResult result;
+               {
+                 test_utils::OutputStreamCapture output_capture;
+                 result = arg_parser.parse(static_cast<int>(argv.size()), argv.data());
+               }
+
+               Expect(result.status).ToBe(ParseResult::ParserStatus_Success);
+               Expect(leaf_called).ToBe(true);
+               Expect(result.json_requested).ToBe(true);
+               Expect(result.json_output).ToContain("\"success\":true");
+             });
+
+             it("accepts --json before the subcommand without consuming it", []() {
+               static bool leaf_called = false;
+               leaf_called = false;
+
+               auto leaf_handler = [](plugin::InvocationContext &context) -> int {
+                 leaf_called = true;
+                 context.output_stream() << "leaf ran" << std::endl;
+                 return 0;
+               };
+
+               ArgumentParser arg_parser("prog", "json sample");
+               Command &root = arg_parser.get_root_command();
+               auto group = command_ptr(new Command("grp", "a group"));
+               auto leaf = command_ptr(new Command("leaf", "a leaf"));
+               leaf->set_handler(leaf_handler);
+               group->add_command(leaf);
+               root.add_command(group);
+
+               // A flag whose value is omitted used to swallow the next token,
+               // which turned this into "unexpected argument: leaf".
+               std::vector<std::string> raw = {"prog", "--json", "grp", "leaf"};
+               std::vector<char *> argv = to_argv(raw);
+
+               ParseResult result;
+               {
+                 test_utils::OutputStreamCapture output_capture;
+                 result = arg_parser.parse(static_cast<int>(argv.size()), argv.data());
+               }
+
+               Expect(result.status).ToBe(ParseResult::ParserStatus_Success);
+               Expect(leaf_called).ToBe(true);
+               Expect(result.json_requested).ToBe(true);
+             });
+
+             it("captures handler output instead of printing it", []() {
+               auto handler = [](plugin::InvocationContext &context) -> int {
+                 context.output_stream() << "human readable line" << std::endl;
+                 return 0;
+               };
+
+               ArgumentParser arg_parser("prog", "json sample");
+               Command &root = arg_parser.get_root_command();
+               auto leaf = command_ptr(new Command("leaf", "a leaf"));
+               leaf->set_handler(handler);
+               root.add_command(leaf);
+
+               std::vector<std::string> raw = {"prog", "leaf", "--json"};
+               std::vector<char *> argv = to_argv(raw);
+
+               std::string printed;
+               ParseResult result;
+               {
+                 test_utils::OutputStreamCapture output_capture;
+                 result = arg_parser.parse(static_cast<int>(argv.size()), argv.data());
+                 printed = output_capture.get_output();
+               }
+
+               Expect(result.json_stdout).ToContain("human readable line");
+               // Only the envelope reaches stdout; the plain text is inside it.
+               Expect(printed).ToContain("\"data\"");
+               Expect(printed).ToContain("human readable line");
+               Expect(printed.find("\"success\":true")).Not().ToBe(std::string::npos);
+             });
+
+             it("uses captured output as the payload when a handler sets no object", []() {
+               auto handler = [](plugin::InvocationContext &context) -> int {
+                 context.output_stream() << "Data set created" << std::endl;
+                 return 0;
+               };
+
+               ArgumentParser arg_parser("prog", "json sample");
+               Command &root = arg_parser.get_root_command();
+               auto leaf = command_ptr(new Command("leaf", "a leaf"));
+               leaf->set_handler(handler);
+               root.add_command(leaf);
+
+               std::vector<std::string> raw = {"prog", "leaf", "--json"};
+               std::vector<char *> argv = to_argv(raw);
+
+               ParseResult result;
+               {
+                 test_utils::OutputStreamCapture output_capture;
+                 result = arg_parser.parse(static_cast<int>(argv.size()), argv.data());
+               }
+
+               Expect(result.json_output).ToContain("Data set created");
+             });
+
+             it("discards captured output when the handler already reported fields", []() {
+               auto handler = [](plugin::InvocationContext &context) -> int {
+                 context.output_stream() << "MY.DATA.SET" << std::endl;
+                 const auto items = ast::arr();
+                 items->push(ast::str("MY.DATA.SET"));
+                 const auto payload = ast::obj();
+                 payload->set("items", items);
+                 payload->set("returnedRows", ast::i64(1));
+                 context.set_object(payload);
+                 return 0;
+               };
+
+               ArgumentParser arg_parser("prog", "json sample");
+               Command &root = arg_parser.get_root_command();
+               auto leaf = command_ptr(new Command("leaf", "a leaf"));
+               leaf->set_handler(handler);
+               root.add_command(leaf);
+
+               std::vector<std::string> raw = {"prog", "leaf", "--json"};
+               std::vector<char *> argv = to_argv(raw);
+
+               ParseResult result;
+               {
+                 test_utils::OutputStreamCapture output_capture;
+                 result = arg_parser.parse(static_cast<int>(argv.size()), argv.data());
+               }
+
+               Expect(result.json_output).ToContain("\"returnedRows\":1");
+               // The aligned text is a rendering of items[], not extra payload.
+               // Match on the nested key with a string value: the envelope always
+               // has a top-level "data" whose value is an object.
+               Expect(result.json_output).Not().ToContain("\"data\":\"");
+             });
+
+             it("keeps captured output for a command marked as stdout payload", []() {
+               auto handler = [](plugin::InvocationContext &context) -> int {
+                 context.output_stream() << "//JOBCARD JOB";
+                 const auto payload = ast::obj();
+                 payload->set("etag", ast::str("abc123"));
+                 context.set_object(payload);
+                 return 0;
+               };
+
+               ArgumentParser arg_parser("prog", "json sample");
+               Command &root = arg_parser.get_root_command();
+               auto leaf = command_ptr(new Command("leaf", "a leaf"));
+               leaf->set_handler(handler);
+               leaf->mark_stdout_as_payload();
+               root.add_command(leaf);
+
+               std::vector<std::string> raw = {"prog", "leaf", "--json"};
+               std::vector<char *> argv = to_argv(raw);
+
+               ParseResult result;
+               {
+                 test_utils::OutputStreamCapture output_capture;
+                 result = arg_parser.parse(static_cast<int>(argv.size()), argv.data());
+               }
+
+               // Both the handler's own field and the stdout payload survive.
+               Expect(result.json_output).ToContain("\"etag\":\"abc123\"");
+               Expect(result.json_output).ToContain("//JOBCARD JOB");
+             });
+
+             it("reports a failing handler as unsuccessful with its exit code", []() {
+               auto handler = [](plugin::InvocationContext &context) -> int {
+                 context.error_stream() << "Error: could not list data set" << std::endl;
+                 return 8;
+               };
+
+               ArgumentParser arg_parser("prog", "json sample");
+               Command &root = arg_parser.get_root_command();
+               auto leaf = command_ptr(new Command("leaf", "a leaf"));
+               leaf->set_handler(handler);
+               root.add_command(leaf);
+
+               std::vector<std::string> raw = {"prog", "leaf", "--json"};
+               std::vector<char *> argv = to_argv(raw);
+
+               ParseResult result;
+               {
+                 test_utils::OutputStreamCapture output_capture;
+                 result = arg_parser.parse(static_cast<int>(argv.size()), argv.data());
+               }
+
+               Expect(result.exit_code).ToBe(8);
+               Expect(result.json_output).ToContain("\"success\":false");
+               Expect(result.json_output).ToContain("\"exitCode\":8");
+               Expect(result.json_output).ToContain("could not list data set");
+             });
+
+             it("escapes quotes and backslashes in the payload", []() {
+               auto handler = [](plugin::InvocationContext &context) -> int {
+                 const auto payload = ast::obj();
+                 payload->set("note", ast::str("say \"hi\" and a back\\slash"));
+                 context.set_object(payload);
+                 return 0;
+               };
+
+               ArgumentParser arg_parser("prog", "json sample");
+               Command &root = arg_parser.get_root_command();
+               auto leaf = command_ptr(new Command("leaf", "a leaf"));
+               leaf->set_handler(handler);
+               root.add_command(leaf);
+
+               std::vector<std::string> raw = {"prog", "leaf", "--json"};
+               std::vector<char *> argv = to_argv(raw);
+
+               ParseResult result;
+               {
+                 test_utils::OutputStreamCapture output_capture;
+                 result = arg_parser.parse(static_cast<int>(argv.size()), argv.data());
+               }
+
+               // ast::Ast::as_json() would emit these raw and produce invalid JSON.
+               Expect(result.json_output).ToContain("say \\\"hi\\\"");
+               Expect(result.json_output).ToContain("back\\\\slash");
+             });
+
+             it("prints help rather than an envelope when help is requested", []() {
+               ArgumentParser arg_parser("prog", "json sample");
+               Command &root = arg_parser.get_root_command();
+               auto leaf = command_ptr(new Command("leaf", "a leaf"));
+               root.add_command(leaf);
+
+               std::vector<std::string> raw = {"prog", "leaf", "--json", "--help"};
+               std::vector<char *> argv = to_argv(raw);
+
+               ParseResult result;
+               std::string printed;
+               {
+                 test_utils::OutputStreamCapture output_capture;
+                 result = arg_parser.parse(static_cast<int>(argv.size()), argv.data());
+                 printed = output_capture.get_output();
+               }
+
+               Expect(result.status).ToBe(ParseResult::ParserStatus_HelpRequested);
+               Expect(result.json_output.empty()).ToBe(true);
+               Expect(printed).Not().ToContain("\"success\"");
+             });
+
+             it("honors disable_json_output through add_command", []() {
+               ArgumentParser arg_parser("prog", "json sample");
+               Command &root = arg_parser.get_root_command();
+               auto leaf = command_ptr(new Command("leaf", "a leaf"));
+               leaf->disable_json_output();
+               // add_command re-runs the injector, so the opt-out has to stick.
+               root.add_command(leaf);
+
+               std::vector<std::string> raw = {"prog", "leaf", "--json"};
+               std::vector<char *> argv = to_argv(raw);
+
+               ParseResult result;
+               {
+                 test_utils::ErrorStreamCapture error_capture;
+                 result = arg_parser.parse(static_cast<int>(argv.size()), argv.data());
+               }
+
+               // The flag is gone, so this is an unknown option. The raw-input
+               // pre-scan still saw it, which is deliberate: a usage error under
+               // --json should be reported as JSON rather than as bare stderr.
+               Expect(result.status).ToBe(ParseResult::ParserStatus_ParseError);
+               Expect(result.json_requested).ToBe(false);
+               Expect(result.json_output).ToContain("\"success\":false");
+             });
+
+             it("suppresses the envelope for a capture-disabled command", []() {
+               static bool handler_called = false;
+               handler_called = false;
+
+               auto handler = [](plugin::InvocationContext &context) -> int {
+                 handler_called = true;
+                 context.output_stream() << "help-like text" << std::endl;
+                 return 0;
+               };
+
+               ArgumentParser arg_parser("prog", "json sample");
+               Command &root = arg_parser.get_root_command();
+               root.disable_json_capture();
+               root.set_handler(handler);
+
+               std::vector<std::string> raw = {"prog", "--json"};
+               std::vector<char *> argv = to_argv(raw);
+
+               std::string printed;
+               ParseResult result;
+               {
+                 test_utils::OutputStreamCapture output_capture;
+                 result = arg_parser.parse(static_cast<int>(argv.size()), argv.data());
+                 printed = output_capture.get_output();
+               }
+
+               Expect(result.status).ToBe(ParseResult::ParserStatus_Success);
+               Expect(handler_called).ToBe(true);
+               // The flag parsed, but this handler owns stdout.
+               Expect(result.json_suppressed).ToBe(true);
+               Expect(result.json_output.empty()).ToBe(true);
+               Expect(printed).ToContain("help-like text");
+               Expect(printed).Not().ToContain("\"success\"");
+             });
+
+             it("threads --json from a capture-disabled parent into a subcommand", []() {
+               static bool leaf_called = false;
+               leaf_called = false;
+
+               auto leaf_handler = [](plugin::InvocationContext &context) -> int {
+                 leaf_called = true;
+                 context.output_stream() << "leaf output" << std::endl;
+                 return 0;
+               };
+
+               ArgumentParser arg_parser("prog", "json sample");
+               Command &root = arg_parser.get_root_command();
+               // Mirrors the real root command: accepts --json, never captured.
+               root.disable_json_capture();
+               auto group = command_ptr(new Command("grp", "a group"));
+               auto leaf = command_ptr(new Command("leaf", "a leaf"));
+               leaf->set_handler(leaf_handler);
+               group->add_command(leaf);
+               root.add_command(group);
+
+               std::vector<std::string> raw = {"prog", "--json", "grp", "leaf"};
+               std::vector<char *> argv = to_argv(raw);
+
+               ParseResult result;
+               {
+                 test_utils::OutputStreamCapture output_capture;
+                 result = arg_parser.parse(static_cast<int>(argv.size()), argv.data());
+               }
+
+               Expect(result.status).ToBe(ParseResult::ParserStatus_Success);
+               Expect(leaf_called).ToBe(true);
+               Expect(result.json_suppressed).ToBe(false);
+               Expect(result.json_requested).ToBe(true);
+               Expect(result.json_output).ToContain("leaf output");
+             });
+             it("leaves --json after a passthrough delimiter to the child", []() {
+               static std::vector<std::string> captured;
+               captured.clear();
+
+               auto handler = [](plugin::InvocationContext &context) -> int {
+                 captured = context.get_passthrough_args();
+                 return 0;
+               };
+
+               ArgumentParser arg_parser("prog", "json sample");
+               Command &root = arg_parser.get_root_command();
+               auto leaf = command_ptr(new Command("leaf", "a leaf"));
+               leaf->enable_passthrough("Arguments to pass through");
+               leaf->set_handler(handler);
+               root.add_command(leaf);
+
+               std::vector<std::string> raw = {"prog", "leaf", "--", "child", "--json"};
+               std::vector<char *> argv = to_argv(raw);
+
+               ParseResult result;
+               {
+                 test_utils::OutputStreamCapture output_capture;
+                 result = arg_parser.parse(static_cast<int>(argv.size()), argv.data());
+               }
+
+               Expect(result.status).ToBe(ParseResult::ParserStatus_Success);
+               Expect(captured.size()).ToBe(static_cast<size_t>(2));
+               Expect(captured[1] == "--json").ToBe(true);
+               // The pre-scan must not treat the child's flag as ours.
+               Expect(result.json_requested).ToBe(false);
+               Expect(result.json_output.empty()).ToBe(true);
+             });
              }); });
 }

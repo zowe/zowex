@@ -263,6 +263,7 @@ static int handle_server(plugin::InvocationContext &context)
 void register_commands(Command &root_command)
 {
   auto server_cmd = std::make_shared<Command>("server", "start the Zowe Remote SSH I/O server");
+  server_cmd->disable_json_capture();
   server_cmd->add_keyword_arg("num-workers",
                               make_aliases("-w", "--num-workers"),
                               "number of worker threads",
