@@ -6,6 +6,9 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- `python`: Added the `zkr_py` module (certificate/key ring operations: `create_keyring`, `list_certificates`, `export_certificate`, `import_certificate`, and 14 others) — an in-process binding over the same `native/c/zkr.hpp`/`zkr.cpp` service layer `zowex system cert`/`system keyring` use. [#NNNN](https://github.com/zowe/zowex/pull/NNNN)
+- `python`: `zkr_py`'s PKCS#12/PEM payloads cross as Python `bytes`, not `str`, so binary certificate material round-trips byte-exact; PEM returned to Python is portable ASCII, but PEM written to a file or data set stays EBCDIC, byte-identical to `keyring-util`. [#NNNN](https://github.com/zowe/zowex/pull/NNNN)
+- `c`: Added `zkrio` (`native/c/zkrio.hpp`/`zkrio.cpp`), shared certificate-material data set/file I/O extracted from `commands/certificates.cpp` so `zkr_py` can reuse it without linking the CLI command layer. [#NNNN](https://github.com/zowe/zowex/pull/NNNN)
 - `c`: Added `--dsn` to `zowex system cert import`/`export`, letting a certificate be read from or written to a sequential data set or PDS/E member instead of a USS file. [#NNNN](https://github.com/zowe/zowex/pull/NNNN)
 - `c`: Added `zds_write_binary`, a byte-exact data set writer (BPAM for members, binary `fopen` for sequential) with no code-page conversion or line splitting; requires a V-format target. [#NNNN](https://github.com/zowe/zowex/pull/NNNN)
 - `c`: Guard against OPEN hanging on a password-protected data set (legacy MVS password protection issues a WTOR with no console to answer it) by failing fast, pre-OPEN, in the BPAM write path. [#NNNN](https://github.com/zowe/zowex/pull/NNNN)
