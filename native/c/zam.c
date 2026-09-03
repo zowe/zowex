@@ -76,6 +76,18 @@ static int validate_jfcb_attributes(ZDIAG *PTR32 diag, IO_CTRL *PTR32 ioc)
 {
   int rc = 0;
 
+  // Legacy MVS password protection: OPEN on a password-protected data set
+  // issues a WTOR to the operator console and waits for a reply. zowex server
+  // is a long-lived RPC server with no console, so that OPEN would hang the
+  // request forever instead of returning an error. Fail fast, pre-OPEN.
+  if (ioc->jfcb.jfcbind2 & (jfcsecur | jfcbrwpw))
+  {
+    ZDIAG_SET_MSG(diag, "DDname: %8.8s data set: %44.44s is password protected; copy it to an unprotected data set first",
+                  ioc->dcb.dcbddnam, ioc->jfcb.jfcbdsnm);
+    diag->detail_rc = ZDS_RTNCD_UNSUPPORTED_DATA_SET;
+    return RTNCD_FAILURE;
+  }
+
   if (ioc->jfcb.jfcbind1 != jfcpds)
   {
     ZDIAG_SET_MSG(diag, "DDname: %8.8s data set: %44.44s is not a PDS: %X", ioc->dcb.dcbddnam, ioc->jfcb.jfcbdsnm, ioc->jfcb.jfcbind1);
