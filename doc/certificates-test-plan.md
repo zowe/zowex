@@ -24,28 +24,38 @@ the repo. Gated tests **skip** (not fail) when their gate is closed, so the
 suite passes for any user — but skipped tests provide no coverage. CI currently
 runs with both gates closed.
 
+The Python bindings suite (`native/python/bindings/test/test_zkr.py`, part of
+`npm run z:python:test` / `.github/workflows/zos-py-build.yml`) mirrors the same
+three tiers against the `zkr_py` module (`create_keyring`, `list_certificates`,
+`export_certificate`, etc. — see
+[native/python/bindings/README.md](../native/python/bindings/README.md#zkr_py--certificates-and-key-rings)).
+It calls the same `zkr.hpp`/`zkr.cpp` service layer **in-process** (no JSON-RPC, no
+`zowex server`), so it is complementary to, not a substitute for, Item 4 below, which
+drives the RPC layer out-of-process over JSON-RPC. Same gates, same expectation in
+CI: the CI user has no certificate authority, so Tiers B and C skip there too.
+
 ## 2. Coverage matrix
 
 "zowe-mcp" marks methods exercised on a real system by
 [zowe-mcp#45](https://github.com/zowe/zowe-mcp/pull/45) — the field-proven
 "don't break" set.
 
-| RPC method | zowe-mcp | Automation today | Gap |
-|---|---|---|---|
-| `showCertificate` | ✅ | gated lifecycle | — |
-| `connectCertificate` | ✅ | gated (`--from-ring`) | `--from-database` never exercised anywhere |
-| `deleteCertificate` | ✅ | gated (database delete only) | ring-scoped disconnect + auto-refresh (SAF 4/4/12) untested |
-| `exportCertificate` | ✅ | gated (PEM + p12, `--file` and `--dsn` incl. PDS/E member) | byte-for-byte parity against `keyring-util`/RACDCERT DSN output untested |
-| `importCertificate` | ✅ | gated happy path, incl. `--dsn` (sequential + PDS/E member) | warning branches untested: already-exists (rsn 8/12/16), refresh-failed fallback |
-| `setDefaultCertificate` | ✅ | gated lifecycle | — |
-| `trustCertificate` | ✅ | gated (NOTRUST↔TRUST) | HIGHTRUST never exercised |
-| `renameCertificate` | ✅ | gated (rename + back) | — |
-| `refreshDigtcert` | ✅ | indirect only (delete auto-refresh) | no standalone test |
-| `listCertificates` | — | gated list + unconditional filter unit suite | cap/`moreAvailable` never hit against a real >10-cert ring |
-| `listRings` | — | gated (one call) | binary result-area parser + 256 KB truncation path: zero real exposure |
-| `countRing` | — | **none** | both branches (virtual-ring enumeration, GetRingInfo sum) |
-| `createKeyring` | — | gated ring lifecycle | — |
-| `deleteKeyring` | — | gated (incl. error path) | — |
+| RPC method | zowe-mcp | Automation today | zkr_py (in-process, Tier) | Gap |
+|---|---|---|---|---|
+| `showCertificate` | ✅ | gated lifecycle | C | — |
+| `connectCertificate` | ✅ | gated (`--from-ring`) | C | `--from-database` never exercised anywhere |
+| `deleteCertificate` | ✅ | gated (database delete only) | C | ring-scoped disconnect + auto-refresh (SAF 4/4/12) untested |
+| `exportCertificate` | ✅ | gated (PEM + p12, `--file` and `--dsn` incl. PDS/E member) | C | byte-for-byte parity against `keyring-util`/RACDCERT DSN output untested |
+| `importCertificate` | ✅ | gated happy path, incl. `--dsn` (sequential + PDS/E member) | C | warning branches untested: already-exists (rsn 8/12/16), refresh-failed fallback |
+| `setDefaultCertificate` | ✅ | gated lifecycle | C | — |
+| `trustCertificate` | ✅ | gated (NOTRUST↔TRUST) | C | HIGHTRUST never exercised |
+| `renameCertificate` | ✅ | gated (rename + back) | C | — |
+| `refreshDigtcert` | ✅ | indirect only (delete auto-refresh) | C (standalone) | no standalone test |
+| `listCertificates` | — | gated list + unconditional filter unit suite | A + C | cap/`moreAvailable` never hit against a real >10-cert ring |
+| `listRings` | — | gated (one call) | A + B | binary result-area parser + 256 KB truncation path: zero real exposure |
+| `countRing` | — | **none** | C | both branches (virtual-ring enumeration, GetRingInfo sum) |
+| `createKeyring` | — | gated ring lifecycle | B | — |
+| `deleteKeyring` | — | gated (incl. error path) | A + B | — |
 
 Layers with **no automation at any tier**: JSON-RPC dispatch + schema
 validation for these 14 methods, the SDK TypeScript client, the CLI TypeScript

@@ -119,6 +119,29 @@
 | List proclib    | ❌     | ❌  | ✅      | ❌         | ❌  | ❌  | ➖   | ❌     |
 | List subsystems | ❌     | ❌  | ✅      | ❌         | ❌  | ❌  | ➖   | ❌     |
 
+## Certificates
+
+See [doc/certificates-test-plan.md](./certificates-test-plan.md) for the service layer
+(`native/c/zkr.hpp`/`zkr.cpp`, R_datalib/IRRSDL64 + System SSL GSKCMS), the 14 JSON-RPC
+methods below, and their test coverage.
+
+| Operation                | z/OSMF | FTP | Backend | Middleware | SDK | CLI | VSCE | Python |
+| ------------------------ | ------ | --- | ------- | ---------- | --- | --- | ---- | ------ |
+| Create key ring          | ❌     | ❌  | ✅      | ✅         | ✅  | ✅  | ❌   | ✅     |
+| Delete key ring          | ❌     | ❌  | ✅      | ✅         | ✅  | ✅  | ❌   | ✅     |
+| List key rings           | ❌     | ❌  | ✅      | ✅         | ✅  | ✅  | ❌   | ✅     |
+| Count certificates       | ❌     | ❌  | ✅      | ✅         | ✅  | ✅  | ❌   | ✅     |
+| Refresh DIGTCERT class   | ❌     | ❌  | ✅      | ✅         | ✅  | ✅  | ❌   | ✅     |
+| List certificates        | ❌     | ❌  | ✅      | ✅         | ✅  | ✅  | ❌   | ✅     |
+| Show certificate         | ❌     | ❌  | ✅      | ✅         | ✅  | ✅  | ❌   | ✅     |
+| Set default certificate  | ❌     | ❌  | ✅      | ✅         | ✅  | ✅  | ❌   | ✅     |
+| Connect certificate      | ❌     | ❌  | ✅      | ✅         | ✅  | ✅  | ❌   | ✅     |
+| Delete certificate       | ❌     | ❌  | ✅      | ✅         | ✅  | ✅  | ❌   | ✅     |
+| Trust certificate        | ❌     | ❌  | ✅      | ✅         | ✅  | ✅  | ❌   | ✅     |
+| Rename certificate       | ❌     | ❌  | ✅      | ✅         | ✅  | ✅  | ❌   | ✅     |
+| Export certificate       | ❌     | ❌  | ✅      | ✅         | ✅  | ✅  | ❌   | ✅     |
+| Import certificate       | ❌     | ❌  | ✅      | ✅         | ✅  | ✅  | ❌   | ✅     |
+
 ## Other
 
 | Operation            | z/OSMF | FTP | Backend | Middleware | SDK | CLI | VSCE | Python |
