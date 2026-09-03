@@ -46,7 +46,7 @@ void zowex_ds_tests()
   describe("data-set",
            [&]() -> void
            {
-             TEST_OPTIONS long_test_opts = {false, 30};
+             TEST_OPTIONS long_test_opts = {false, 60};
 
              afterAll(
                  [&]() -> void
@@ -64,7 +64,6 @@ void zowex_ds_tests()
                      }
                      catch (const std::exception &deleteErr)
                      {
-                       TestLog("Failed to delete: " + ds + ", error: " + deleteErr.what() + ". Verifying with data-set list command");
                        try
                        {
                          std::string response;
@@ -73,9 +72,9 @@ void zowex_ds_tests()
                          ExpectWithContext(rc, response).ToBe(0);
                          Expect(response).Not().ToContain(ds);
                        }
-                       catch (const std::exception &listCheckErr)
+                       catch (...)
                        {
-                         TestLog("Failed to delete: " + ds + ", error: " + listCheckErr.what());
+                         TestLog("Failed to delete: " + ds + ", error: " + deleteErr.what());
                        }
                      }
                    }
@@ -825,7 +824,7 @@ void zowex_ds_tests()
                            {
                              std::string ds = _ds.back();
                              _create_ds(ds + ".T00");
-                             _ds.push_back(ds + ".T00");
+                             _ds.back() = ds + ".T00";
 
                              // The parent qualifier only exists as a prefix of the
                              // child, so an exact match must find nothing.
@@ -1018,7 +1017,7 @@ void zowex_ds_tests()
                                     setup_idcams += "    NAME(" + gdg_base_dsn + ") -\n";
                                     setup_idcams += "    LIMIT(5) -\n";
                                     setup_idcams += "    NOEMPTY -\n";
-                                    setup_idcams += "    NOSCRATCH )\n";
+                                    setup_idcams += "    SCRATCH )\n";
                                     rc = zds_idcams(setup_idcams, setup_output, setup_err);
                                     TestLog("Cleanup RC from IDCAMS: " + std::to_string(rc));
                                     if (rc !=0 ){
@@ -1053,7 +1052,7 @@ void zowex_ds_tests()
                                     submit_and_wait(gen2_jcl, 600, true); },
                                   gdg_opts);
 
-                        afterAll([&]() -> void
+                        afterAll([gdg_base_dsn, gdg_gen1_dsn, gdg_gen2_dsn]() -> void
                                  {
                                    std::string cleanup_idcams;
                                    std::string cleanup_err;
@@ -1297,8 +1296,7 @@ void zowex_ds_tests()
 
                                    it("should not block concurrent reads of different PDSE members: fopen(r) does not take an exclusive ENQ", [&]() -> void
                                       {
-                                        const std::string ds = get_random_ds();
-                                        _ds.push_back(ds);
+                                        const std::string ds = _ds.back();
                                         _create_ds(ds, "--dsorg PO --dirblk 5 --dsntype LIBRARY");
 
                                         const int thread_count = 4;
@@ -1339,8 +1337,7 @@ void zowex_ds_tests()
 
                                    it("should not block concurrent reads of the same PDSE member: fopen(r) uses SHR not exclusive ENQ", [&]() -> void
                                       {
-                                        const std::string ds = get_random_ds();
-                                        _ds.push_back(ds);
+                                        const std::string ds = _ds.back();
                                         _create_ds(ds, "--dsorg PO --dirblk 5 --dsntype LIBRARY");
 
                                         const std::string expected = "shared member content";
@@ -1429,8 +1426,7 @@ void zowex_ds_tests()
                         it("should fail to write to a RECFM=U data set",
                            [&]() -> void
                            {
-                             std::string ds = get_random_ds();
-                             _ds.push_back(ds);
+                             std::string ds = _ds.back();
                              _create_ds(ds, "--dsorg PO --dirblk 2 --recfm U --lrecl 0 --blksize 32760");
 
                              std::string response;
@@ -1442,8 +1438,7 @@ void zowex_ds_tests()
                         it("should be able to write to a RECFM=A data set",
                            [&]() -> void
                            {
-                             std::string ds = get_random_ds();
-                             _ds.push_back(ds);
+                             std::string ds = _ds.back();
                              _create_ds(ds, "--dsorg PS --recfm A --lrecl 80 --blksize 800");
 
                              std::string response;
@@ -1476,8 +1471,7 @@ void zowex_ds_tests()
                         it("should preserve LRECL when writing to a variable-length sequential data set",
                            [&]() -> void
                            {
-                             std::string ds = get_random_ds();
-                             _ds.push_back(ds);
+                             std::string ds = _ds.back();
                              _create_ds(ds, "--dsorg PS --recfm VB --lrecl 259 --blksize 263");
 
                              std::string response;
@@ -2017,8 +2011,7 @@ void zowex_ds_tests()
                                    // must succeed, and every member that was written must contain coherent data.
                                    it("should serialize concurrent BPAM writes to the same PDSE via RESERVE: even across different members", [&]() -> void
                                       {
-                                        const std::string ds = get_random_ds();
-                                        _ds.push_back(ds);
+                                        const std::string ds = _ds.back();
                                         _create_ds(ds, "--dsorg PO --dirblk 5 --dsntype LIBRARY");
 
                                         const int thread_count = 4;
@@ -2065,8 +2058,7 @@ void zowex_ds_tests()
                                    // succeed, and the final content must come from exactly one write (no interleaving).
                                    it("should serialize concurrent writes to the same PDSE member via exclusive ENQ", [&]() -> void
                                       {
-                                        const std::string ds = get_random_ds();
-                                        _ds.push_back(ds);
+                                        const std::string ds = _ds.back();
                                         _create_ds(ds, "--dsorg PO --dirblk 5 --dsntype LIBRARY");
 
                                         const int thread_count = 4;

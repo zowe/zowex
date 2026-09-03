@@ -39,12 +39,17 @@ using namespace ztst;
 namespace
 {
 
-// A collision-resistant suffix for scratch ring/label names. Random() is fine in
-// a normal test binary (unlike the workflow sandbox); combine it with the pid so
-// concurrent test runs on the same LPAR do not clash.
+// A collision-resistant suffix for scratch ring/label names, capped at 8 chars.
+// Random() is fine in a normal test binary (unlike the workflow sandbox); combine
+// it with the pid so concurrent test runs on the same LPAR do not clash.
 std::string zkr_unique()
 {
-  return std::to_string(getpid()) + get_random_string(4);
+  std::string pid = std::to_string(getpid());
+  if (pid.size() > 4)
+  {
+    pid = pid.substr(pid.size() - 4);
+  }
+  return pid + get_random_string(4);
 }
 
 // Delete a scratch ring, swallowing any error (best-effort cleanup).

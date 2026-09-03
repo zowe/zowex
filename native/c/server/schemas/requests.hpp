@@ -320,6 +320,8 @@ ZJSON_SCHEMA(ViewSyslogRequest,
     FIELD_OPTIONAL(maxLines, NUMBER)
 );
 
+struct ListParmlibRequest {};
+
 struct ListProclibRequest {};
 
 struct ListApfRequest {};
