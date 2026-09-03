@@ -879,12 +879,12 @@ int zjb_view(ZJB *zjb, const std::string &jobid, ZJob &job)
   return RTNCD_SUCCESS;
 }
 
+#ifndef SWIG // Convenience overloads are not declared for SWIG; see zjb.hpp
 int zjb_list_by_owner(ZJB *zjb, const std::string &owner_name, std::vector<ZJob> &jobs)
 {
   return zjb_list_by_owner(zjb, owner_name, "", "", jobs);
 }
 
-#ifndef SWIG // Exclude owner and prefix implementation for SWIG
 int zjb_list_by_owner(ZJB *zjb, const std::string &owner_name, const std::string &prefix_name, std::vector<ZJob> &jobs)
 {
   return zjb_list_by_owner(zjb, owner_name, prefix_name, "", jobs);

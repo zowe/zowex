@@ -35,10 +35,11 @@ const RELEASE_TAG = "py-bindings-dev";
 const RELEASE_TITLE = "Python Bindings (Dev Artifacts)";
 const RELEASE_NOTES =
     "Persistent host for precompiled Python bindings built from pull requests. Not for distribution — assets here are dev artifacts linked from PR comments.";
-const SAFE_TAG = /^[\w.-]+$/;
-const SAFE_ASSET = /^zbind_bin_dist[\w.-]*\.tar\.gz$/;
 const TARBALL = path.resolve(__dirname, "../dist/zbind_bin_dist.tar.gz");
-const OUTPUT = path.resolve(__dirname, "../dist/zbind_bin_dist.tar.gz");
+
+// Precompiled SWIG binary for z/OS, published to the zowex releases used as a
+// persistent host for dev artifacts (see RELEASE_TAG above).
+const SWIG_RELEASE_URL = "https://github.com/zowe/zowex/releases/download/py-bindings-dev/swig-4.4.1.pax.Z";
 
 /** Runs `gh` with the given args, returning trimmed stdout. */
 function gh(args: string[]): string {
@@ -1313,18 +1314,23 @@ async function hasSwig(connection: Client) {
 }
 
 /**
- * Applies a previously downloaded precompiled bindings bundle
- * (dist/zbind_bin_dist.tar.gz) to the remote bindings directory: uploads the
- * archive as binary, extracts it on z/OS, and copies the compiled `.so`
- * libraries and Python wrapper modules into the bindings dir so the test step
- * can import them without building. Used when swig is unavailable on z/OS.
+ * Downloads the precompiled SWIG binary published to SWIG_RELEASE_URL, uploads
+ * it to the remote python/swig directory, and extracts it there. The extracted
+ * `swig` binary and `Lib/` land directly under that directory (see
+ * native/python/swig/README.md), which preBuildCmd puts on PATH and points
+ * SWIG_LIB at, so `z:python:build` can find it without building SWIG from
+ * source. Used when swig is unavailable on z/OS.
  */
-async function applyPrecompiled(connection: Client) {
-    const localTarball = path.resolve(__dirname, "./../dist/zbind_bin_dist.tar.gz");
-    if (!fs.existsSync(localTarball)) {
-        throw new Error(`Precompiled bundle not found at ${localTarball}. Run "npm run z:python:fetch" first.`);
-    }
-    const remoteTarball = `${deployDirs.pythonDir}/zbind_bin_dist.tar.gz`;
+async function installSwigRelease(connection: Client) {
+    const cacheDir = path.resolve(__dirname, "./../.cache");
+    fs.mkdirSync(cacheDir, { recursive: true });
+    const filename = path.basename(SWIG_RELEASE_URL);
+    const localPax = path.join(cacheDir, filename);
+    await downloadTarball(SWIG_RELEASE_URL, localPax);
+
+    await runCommandInShell(connection, `mkdir -p ${deployDirs.pythonSwigDir}\n`, {
+        stepName: "Creating remote SWIG directory",
+    });
 
     // Upload the archive without EBCDIC conversion to preserve its binary contents.
     await new Promise<void>((resolve, reject) => {
@@ -1334,7 +1340,7 @@ async function applyPrecompiled(connection: Client) {
                 return;
             }
             try {
-                await uploadFile(sftpcon, localTarball, remoteTarball, false);
+                await uploadFile(sftpcon, localPax, `${deployDirs.pythonSwigDir}/${filename}`, false);
                 resolve();
             } catch (uploadErr) {
                 reject(uploadErr);
@@ -1347,21 +1353,15 @@ async function applyPrecompiled(connection: Client) {
     await runCommandInShell(
         connection,
         [
-            `cd ${deployDirs.pythonDir}`,
-            "rm -rf zbind_bin_dist zbind_bin_dist.tar",
-            // Decompress with Python (always present here) to avoid depending on a gzip binary.
-            "python -c \"import gzip, shutil; dst=open('zbind_bin_dist.tar','wb'); shutil.copyfileobj(gzip.open('zbind_bin_dist.tar.gz','rb'), dst); dst.close()\"",
-            "chtag -b zbind_bin_dist.tar",
-            "pax -r -f zbind_bin_dist.tar",
-            "cp zbind_bin_dist/_*.so zbind_bin_dist/z*_py.py .",
-            // USTAR does not carry z/OS file tags, so re-apply them by file type.
-            "chtag -b _*.so",
-            "chtag -tc ISO8859-1 z*_py.py",
-            "rm -f zbind_bin_dist.tar",
+            `cd ${deployDirs.pythonSwigDir}`,
+            "rm -rf Lib swig",
+            `pax -rz -f ${filename}`,
+            "chtag -b swig",
+            "chmod 755 swig",
         ].join("\n"),
-        { stepName: "Applying precompiled bindings", streamOutput: true },
+        { stepName: "Extracting SWIG release", streamOutput: true },
     );
-    console.log("Applied precompiled bindings to the z/OS bindings directory.");
+    console.log(`Installed SWIG from ${SWIG_RELEASE_URL} to ${deployDirs.pythonSwigDir}`);
 }
 
 interface RunCommandOpts {
@@ -1563,6 +1563,16 @@ async function test(connection: Client) {
     });
     console.log("\nTesting complete!");
     await retrieve(connection, [`c/test/test-results.xml`], "native", false, true);
+}
+
+async function testPython(connection: Client) {
+    await runCommandInShell(connection, `cd ${deployDirs.pythonTestDir} && make ${BUILD_TYPE_FLAG()}\n`, {
+        streamOutput: true,
+        stepName: "Running Python binding tests",
+        suppressError: true,
+    });
+    console.log("\nTesting complete!");
+    await retrieve(connection, ["python/bindings/test/pybi_results.xml"], "native", false, false);
 }
 
 /**
@@ -1917,114 +1927,10 @@ function postPrecompiledBindings(prNumber: string) {
     }
 }
 
-/**
- * Locates the most recent "Precompiled Python bindings" comment on a pull
- * request (any author), parses the release-asset link it contains, and
- * downloads that asset to dist/zbind_bin_dist.tar.gz so it can be applied to
- * z/OS for testing.
- */
-function fetchPrecompiledFromPr(prNumber: string) {
-    if (!prNumber || !/^\d+$/.test(prNumber)) {
-        console.error("Usage: npm run z:python:fetch -- <PR_NUMBER>");
-        process.exit(1);
-    }
-
-    // Most recent matching comment on this PR, regardless of author.
-    const comments = JSON.parse(gh(["pr", "view", prNumber, "--json", "comments"])).comments as Array<{
-        body: string;
-        createdAt: string;
-    }>;
-    const latest = comments
-        .filter((c) => c.body.includes(STICKY_MARKER))
-        .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-        .at(-1);
-    if (!latest) {
-        console.warn(`No "${STICKY_MARKER}" comment found on PR #${prNumber}.`);
-        process.exit(2);
-    }
-
-    // Pull the release-asset URL out of the markdown download link.
-    const linkMatch = latest.body.match(/]\((https?:\/\/[^)]+\/releases\/download\/[^)]+)\)/);
-    if (!linkMatch) {
-        console.warn(`Found a "${STICKY_MARKER}" comment on PR #${prNumber} but no release-asset download link.`);
-        process.exit(2);
-    }
-    const urlMatch = linkMatch[1].match(/\/releases\/download\/([^/]+)\/([^/]+)$/);
-    const tag = urlMatch ? decodeURIComponent(urlMatch[1]) : "";
-    const assetName = urlMatch ? decodeURIComponent(urlMatch[2]) : "";
-    if (!SAFE_TAG.test(tag) || !SAFE_ASSET.test(assetName)) {
-        console.warn(`Asset link did not match the expected pattern (tag="${tag}", asset="${assetName}"); skipping.`);
-        process.exit(2);
-    }
-
-    // Download from the current repo's release by tag + asset name. Using
-    // `gh release download` (rather than the raw URL) keeps the fetch scoped to
-    // this repository regardless of what the comment URL points at.
-    const outDir = path.dirname(OUTPUT);
-    fs.mkdirSync(outDir, { recursive: true });
-    console.log(`Downloading "${assetName}" from release "${tag}"...`);
-    gh(["release", "download", tag, "--pattern", assetName, "--dir", outDir, "--clobber"]);
-
-    const downloaded = path.resolve(outDir, assetName);
-    if (path.dirname(downloaded) !== path.resolve(outDir) || !fs.existsSync(downloaded)) {
-        console.error(`Expected downloaded asset at ${downloaded} was not found.`);
-        process.exit(1);
-    }
-    if (downloaded !== OUTPUT) {
-        fs.copyFileSync(downloaded, OUTPUT);
-        fs.rmSync(downloaded, { force: true });
-    }
-    console.log(`Fetched precompiled bindings -> ${OUTPUT}`);
-}
-
-/**
- * Runs another npm script in this package. Spawns via the absolute node path
- * (process.execPath) and npm's own entry point (npm_execpath) rather than a
- * bare command name, so execution never depends on a hijackable PATH.
- */
-function npmRun(step: string, stepArgs: string[] = []) {
-    const npmExec = process.env.npm_execpath;
-    if (!npmExec) {
-        console.error("This script must be run via npm, e.g. `npm run z:python:test:precompiled -- <PR_NUMBER>`.");
-        process.exit(1);
-    }
-    const runArgs = [npmExec, "run", step, ...(stepArgs.length > 0 ? ["--", ...stepArgs] : [])];
-    childProcess.execFileSync(process.execPath, runArgs, { stdio: "inherit" });
-}
-
-/**
- * Local convenience runner that mirrors what the CI workflow does on the
- * precompiled (no-swig) path: fetch the latest "Precompiled Python bindings"
- * bundle posted to a PR, apply it to z/OS, then run the Python tests against it.
- */
-function testPrecompiledLocal(prNumber: string) {
-    if (!prNumber || !/^\d+$/.test(prNumber)) {
-        console.error("Usage: npm run z:python:test:precompiled -- <PR_NUMBER>");
-        process.exit(1);
-    }
-
-    try {
-        npmRun("z:python:fetch", [prNumber]);
-    } catch {
-        console.error(`\nNo precompiled bindings could be fetched for PR #${prNumber}; nothing to test.`);
-        process.exit(1);
-    }
-
-    npmRun("z:python:apply");
-    npmRun("z:python:test");
-    console.log(`\n✅ Tested precompiled bindings from PR #${prNumber} on z/OS.`);
-}
-
 async function main() {
     switch (args[0]) {
         case "python:post":
             postPrecompiledBindings(args[1]);
-            return;
-        case "python:fetch":
-            fetchPrecompiledFromPr(args[1]);
-            return;
-        case "python:test:precompiled":
-            testPrecompiledLocal(args[1]);
             return;
     }
     const config = await loadConfig();
@@ -2073,8 +1979,8 @@ async function main() {
             case "has:swig":
                 await hasSwig(sshClient);
                 break;
-            case "python:apply":
-                await applyPrecompiled(sshClient);
+            case "python:swig:install":
+                await installSwigRelease(sshClient);
                 break;
             case "python:pack":
                 await packPrecompiled(sshClient);
@@ -2090,7 +1996,7 @@ async function main() {
                 await test(sshClient);
                 break;
             case "python:test":
-                await make(sshClient, deployDirs.pythonTestDir);
+                await testPython(sshClient);
                 break;
             case "upload":
                 await upload(sshClient, config.sshProfile as IProfile);
