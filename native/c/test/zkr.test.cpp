@@ -29,8 +29,10 @@
 
 #include "ztest.hpp"
 #include "zutils.hpp"
+#include "../zds.hpp"
 #include "../zkr.hpp"
 #include "../zkrtype.h"
+#include "../zut.hpp"
 
 using namespace ztst;
 
@@ -234,6 +236,48 @@ void zkr_tests()
                        out);
                    Expect(rc).Not().ToBe(0);
                    Expect(out).ToContain("--password is required");
+                 });
+
+              it("`cert export -F p12` with neither --file nor --dsn requires one of them",
+                 []() -> void
+                 {
+                   std::string out;
+                   int rc = execute_command_with_output(
+                       zowex_command + " system cert export TESTUSER RING01 -l LBL -F p12 -p secret", out);
+                   Expect(rc).Not().ToBe(0);
+                   Expect(out).ToContain("--dsn");
+                 });
+
+              it("`cert export` rejects --file and --dsn together",
+                 []() -> void
+                 {
+                   std::string out;
+                   int rc = execute_command_with_output(
+                       zowex_command + " system cert export TESTUSER RING01 -l LBL -f /tmp/a.pem --dsn A.B.C", out);
+                   Expect(rc).Not().ToBe(0);
+                   Expect(out).ToContain("not both");
+                 });
+
+              it("`cert import` rejects --file and --dsn together",
+                 []() -> void
+                 {
+                   std::string out;
+                   int rc = execute_command_with_output(
+                       zowex_command + " system cert import TESTUSER RING01 -l LBL -u PERSONAL -p secret "
+                                        "-f /tmp/a.p12 --dsn A.B.C",
+                       out);
+                   Expect(rc).Not().ToBe(0);
+                   Expect(out).ToContain("not both");
+                 });
+
+              it("`cert import` requires --file or --dsn",
+                 []() -> void
+                 {
+                   std::string out;
+                   int rc = execute_command_with_output(
+                       zowex_command + " system cert import TESTUSER RING01 -l LBL -u PERSONAL -p secret", out);
+                   Expect(rc).Not().ToBe(0);
+                   Expect(out).ToContain("--dsn");
                  });
             });
 
@@ -557,6 +601,7 @@ void zkr_tests()
               // still tears down the scratch rings and any stray DB certificate.
               static std::vector<std::string> cleanup_rings;
               static std::vector<std::string> cleanup_labels;
+              static std::vector<std::string> cleanup_dsns;
               static std::string exported_p12;
               afterAll(
                   [&]() -> void
@@ -565,8 +610,14 @@ void zkr_tests()
                       zkr_try_purge_cert(owner, l);
                     for (const auto &r : cleanup_rings)
                       zkr_try_del_ring(owner, r);
+                    for (const auto &d : cleanup_dsns)
+                    {
+                      ZDS zds{};
+                      zds_delete_dsn(&zds, d);
+                    }
                     cleanup_rings.clear();
                     cleanup_labels.clear();
+                    cleanup_dsns.clear();
                     if (!generated_p12.empty())
                     {
                       unlink(generated_p12.c_str());
@@ -802,6 +853,104 @@ void zkr_tests()
                     // Remove the certificate from the DB and every ring (also
                     // covered by afterAll if an earlier expectation aborts).
                     ExpectWithContext(zkr_del_cert(&z, owner, "*", real_label, false), z.diag.e_msg).ToBe(0);
+                  },
+                  cert_opts, run_cert);
+
+              // `--dsn` support (native/c/commands/certificates.cpp): export to a
+              // data set and re-import from it, for both a sequential DSN and a
+              // PDS/E member -- the BPAM path step 1 of the design exists for.
+              // PKCS#12 encryption is salted, so two independent exports are never
+              // byte-identical; round-trip validity (re-import succeeds) is what
+              // proves the bytes survived the data set unmangled.
+              itif(
+                  "exports a certificate to a data set and re-imports it, for a "
+                  "sequential DSN and a PDS/E member",
+                  [&]() -> void
+                  {
+                    const std::string ring1 = "ZKRUT.DS1." + zkr_unique();
+                    const std::string ring2 = "ZKRUT.DS2." + zkr_unique();
+                    const std::string ring3 = "ZKRUT.DS3." + zkr_unique();
+                    const std::string label = "ZKRUTDS" + zkr_unique();
+                    cleanup_rings.push_back(ring1);
+                    cleanup_rings.push_back(ring2);
+                    cleanup_rings.push_back(ring3);
+                    cleanup_labels.push_back(label);
+
+                    ZKR z{};
+                    ExpectWithContext(zkr_new_ring(&z, owner, ring1), z.diag.e_msg).ToBe(0);
+                    ExpectWithContext(zkr_new_ring(&z, owner, ring2), z.diag.e_msg).ToBe(0);
+                    ExpectWithContext(zkr_new_ring(&z, owner, ring3), z.diag.e_msg).ToBe(0);
+
+                    ZKRImportOptions imp;
+                    imp.owner = owner;
+                    imp.ring = ring1;
+                    imp.label = label;
+                    imp.usage = "PERSONAL";
+                    imp.p12_path = p12;
+                    imp.password = p12pass;
+                    ExpectWithContext(zkr_import_cert(&z, imp), z.diag.e_msg).ToBe(0);
+
+                    std::vector<ZKRCertInfo> certs;
+                    ExpectWithContext(zkr_list_ring(&z, owner, ring1, certs), z.diag.e_msg).ToBe(0);
+                    Expect(certs.size()).ToBeGreaterThanOrEqualTo(static_cast<size_t>(1));
+                    const std::string real_label = certs[0].label;
+                    cleanup_labels.push_back(real_label);
+
+                    const std::string dsn_pass = "ZKRUTDSN" + zkr_unique();
+                    const std::string seq_dsn = owner + ".ZKRUT." + zkr_unique() + ".P12";
+                    const std::string lib_dsn = owner + ".ZKRUT." + zkr_unique() + ".LIB";
+                    const std::string member_dsn = lib_dsn + "(CERT01)";
+                    cleanup_dsns.push_back(seq_dsn);
+                    cleanup_dsns.push_back(lib_dsn);
+
+                    // Sequential data set.
+                    std::string out;
+                    int rc = execute_command_with_output(
+                        zowex_command + " system cert export " + owner + " " + ring1 + " -l '" + real_label +
+                            "' -F p12 -p " + dsn_pass + " --dsn " + seq_dsn,
+                        out);
+                    ExpectWithContext(rc, out).ToBe(0);
+
+                    ZDS read_zds{};
+                    zut_prepare_encoding("binary", &read_zds.encoding_opts);
+                    std::string seq_bytes;
+                    rc = zds_read(ZDSReadOpts{.zds = &read_zds, .dsname = seq_dsn}, seq_bytes);
+                    ExpectWithContext(rc, read_zds.diag.e_msg).ToBe(0);
+                    Expect(seq_bytes.empty()).ToBe(false);
+
+                    rc = execute_command_with_output(
+                        zowex_command + " system cert import " + owner + " " + ring2 + " -l ZKRUTN" + zkr_unique() +
+                            " -u PERSONAL -p " + dsn_pass + " --dsn " + seq_dsn,
+                        out);
+                    ExpectWithContext(rc, out).ToBe(0);
+
+                    // PDS/E member -- the BPAM path.
+                    rc = execute_command_with_output(
+                        zowex_command + " system cert export " + owner + " " + ring1 + " -l '" + real_label +
+                            "' -F p12 -p " + dsn_pass + " --dsn " + member_dsn,
+                        out);
+                    ExpectWithContext(rc, out).ToBe(0);
+
+                    ZDS read_member_zds{};
+                    zut_prepare_encoding("binary", &read_member_zds.encoding_opts);
+                    std::string member_bytes;
+                    rc = zds_read(ZDSReadOpts{.zds = &read_member_zds, .dsname = member_dsn}, member_bytes);
+                    ExpectWithContext(rc, read_member_zds.diag.e_msg).ToBe(0);
+                    Expect(member_bytes.empty()).ToBe(false);
+
+                    rc = execute_command_with_output(
+                        zowex_command + " system cert import " + owner + " " + ring3 + " -l ZKRUTN" + zkr_unique() +
+                            " -u PERSONAL -p " + dsn_pass + " --dsn " + member_dsn,
+                        out);
+                    ExpectWithContext(rc, out).ToBe(0);
+
+                    // A subsequent export to the same member must succeed, not hang
+                    // -- proves the BPAM ENQ/RESERVE from the first export released.
+                    rc = execute_command_with_output(
+                        zowex_command + " system cert export " + owner + " " + ring1 + " -l '" + real_label +
+                            "' -F p12 -p " + dsn_pass + " --dsn " + member_dsn,
+                        out);
+                    ExpectWithContext(rc, out).ToBe(0);
                   },
                   cert_opts, run_cert);
             });
