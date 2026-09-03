@@ -2007,6 +2007,10 @@ int zds_open_output_bpam(ZDS *zds, const std::string &dsname, IO_CTRL *&ioc)
   rc = ZDSOBPAM(zds, &ioc, zds->ddname);
   if (0 != rc)
   {
+    // same data set fails as in-use.
+    DiagMsgGuard guard(&zds->diag);
+    auto free_dds = {"FREE DD(" + ddname + ")"};
+    zut_loop_dynalloc(zds->diag, free_dds);
     return rc;
   }
   return RTNCD_SUCCESS;

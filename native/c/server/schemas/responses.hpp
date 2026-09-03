@@ -425,6 +425,13 @@ ZJSON_SCHEMA(ViewSyslogResponse,
     FIELD_OPTIONAL(hasMore, BOOL)
 );
 
+struct ListParmlibResponse {};
+ZJSON_SCHEMA(ListParmlibResponse,
+    FIELD_REQUIRED(success, BOOL),
+    FIELD_REQUIRED_ARRAY(items, STRING),
+    FIELD_REQUIRED(returnedRows, NUMBER)
+);
+
 struct ListProclibResponse {};
 ZJSON_SCHEMA(ListProclibResponse,
     FIELD_REQUIRED(success, BOOL),

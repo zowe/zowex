@@ -313,6 +313,9 @@ void register_system_commands(CommandDispatcher &dispatcher)
                                   .rename_arg("secondsAgo", "seconds-ago")
                                   .rename_arg("maxLines", "max-lines")
                                   .read_stdout("data", false));
+  dispatcher.register_command("listParmlib",
+                              CommandBuilder(sys::handle_system_list_parmlib)
+                                  .validate<ListParmlibRequest, ListParmlibResponse>());
   dispatcher.register_command("listProclib",
                               CommandBuilder(sys::handle_system_list_proclib)
                                   .validate<ListProclibRequest, ListProclibResponse>());

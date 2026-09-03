@@ -27,10 +27,9 @@ using namespace ztst;
 
 void zowex_cert_server_tests()
 {
-  describe("certificate server tests", []() -> void
+  ServerHandle server;
+  describe("certificate server tests", [&]() -> void
            {
-    ServerHandle server;
-
     beforeAll([&]() -> void {
       server = start_server(zowex_server_command, true);
     });
