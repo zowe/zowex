@@ -6,6 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- Added an optional `dsn` field to `exportCertificate`/`importCertificate` (RPC), letting a certificate be exported to, or imported from, a sequential data set or PDS/E member. `importCertificate`'s `file` field is now optional since `dsn` can satisfy it instead. [#NNNN](https://github.com/zowe/zowex/pull/NNNN)
 - Added JSON-RPC support for listing parmlib data sets. [#1124](https://github.com/zowe/zowex/pull/1124)
 - Added support for the `resolveDsAlias` RPC command which allows the caller to resolve data set aliases. [#1108](https://github.com/zowe/zowex/pull/1108)
 

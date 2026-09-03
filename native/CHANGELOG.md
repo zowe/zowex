@@ -6,6 +6,9 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- `c`: Added `--dsn` to `zowex system cert import`/`export`, letting a certificate be read from or written to a sequential data set or PDS/E member instead of a USS file. [#NNNN](https://github.com/zowe/zowex/pull/NNNN)
+- `c`: Added `zds_write_binary`, a byte-exact data set writer (BPAM for members, binary `fopen` for sequential) with no code-page conversion or line splitting; requires a V-format target. [#NNNN](https://github.com/zowe/zowex/pull/NNNN)
+- `c`: Guard against OPEN hanging on a password-protected data set (legacy MVS password protection issues a WTOR with no console to answer it) by failing fast, pre-OPEN, in the BPAM write path. [#NNNN](https://github.com/zowe/zowex/pull/NNNN)
 - `python`: Fixed the Python bindings compiling the shared `native/c` sources with `-fzos-le-char-mode=ascii`, which flipped their execution charset to ASCII and broke every data set and job binding. [#1121](https://github.com/zowe/zowex/pull/1121)
 - `python`: `list_data_sets` accepts `show_attributes` so `dsorg`, `volser`, `recfm` and `migrated` can be populated. [#1121](https://github.com/zowe/zowex/pull/1121)
 - `python`: Fixed `get_job_status` returning unconverted EBCDIC strings and `create_data_set` raising errors with an empty message. [#1121](https://github.com/zowe/zowex/pull/1121)

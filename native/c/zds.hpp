@@ -149,6 +149,15 @@ bool zds_dataset_exists(const std::string &dsn);
 bool zds_member_exists(const std::string &dsn, const std::string &member);
 
 /**
+ * @brief Check if a string is a valid PDS/PDSE member name (up to 8 characters,
+ *        alphabetic/national first character, alphanumeric/national thereafter)
+ *
+ * @param name member name to check
+ * @return true if it is a syntactically valid member name; false otherwise
+ */
+bool zds_is_valid_member_name(const std::string &name);
+
+/**
  * @brief Options for reading a z/OS data set or DD
  */
 struct ZDSReadOpts
@@ -177,6 +186,18 @@ struct ZDSWriteOpts
  * @return int RTNCD_SUCCESS on success; RTNCD_FAILURE on failure
  */
 int zds_write(const ZDSWriteOpts &opts, const std::string &data);
+
+/**
+ * @brief Write raw bytes to a data set with no code-page conversion or line
+ *        splitting. Members go through BPAM (ENQ/RESERVE/STOW + DCB abend exit);
+ *        sequential data sets use the binary fopen path, since BPAM output is
+ *        PDS-only. The target must be V-format: fixed-format records are blank
+ *        padded and would change the byte count.
+ * @param opts write options; opts.dsname may name a member, e.g. MY.LIB(MEM)
+ * @param data raw bytes to write
+ * @return RTNCD_SUCCESS on success; RTNCD_FAILURE otherwise (details in zds->diag)
+ */
+int zds_write_binary(const ZDSWriteOpts &opts, const std::string &data);
 
 /**
  * @brief Write data to a z/OS data set or DD in streaming mode.
