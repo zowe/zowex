@@ -1,6 +1,6 @@
 {
   "name": "@zowe/zowex-for-zowe-sdk",
-  "version": "0.9.0",
+  "version": "1.0.0",
   "main": "lib/index.js",
   "scripts": {
     "generate-constants": "tsx generateConstants.ts",
