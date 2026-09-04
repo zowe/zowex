@@ -30,6 +30,10 @@ int main(int argc, char *argv[])
     auto &root_cmd = core::setup_root_command(argv, false);
     core::set_version(PACKAGE_VERSION);
     core::set_program_name("zoweax");
+    // zoweax runs APF-authorized and its console commands stay privileged, so
+    // the authorization-drop hook never fires for them. Keep the HWTJ-backed
+    // JSON serializer out of an authorized job step entirely.
+    core::disable_json_output();
 
     console::register_commands(root_cmd);
 

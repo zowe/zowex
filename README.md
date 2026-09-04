@@ -56,6 +56,8 @@ See the [CLI readme](./packages/cli/README.md) for more details about using the 
 
 To run the `zowex` CLI on z/OS, connect to USS shell (OMVS) and `cd` to `c/build-out` inside the deploy directory. Then run `zowex`. MVS console commands live in the separate APF-authorized `zoweax` binary (`zoweax console issue "D T"`) — see [doc/zoweax-security.md](./doc/zoweax-security.md) for how to install and secure it.
 
+Pass `--json` to any command to get its result as a single line of JSON instead of formatted text — handy for scripting without starting a server. See [doc/json-output.md](./doc/json-output.md).
+
 See the [native readme](./native/README.md) for more details about building the native components.
 
 ## Development

@@ -12,6 +12,7 @@
 #include "rpc_server.hpp"
 #include "rpcio.hpp"
 #include "dispatcher.hpp"
+#include "../json_output.hpp"
 #include "logger.hpp"
 #include <iostream>
 
@@ -278,56 +279,8 @@ zjson::Value RpcServer::convert_output_to_json(const string &output)
 
 zjson::Value RpcServer::convert_ast_to_json(const ast::Node &ast_node)
 {
-  if (!ast_node)
-  {
-    return zjson::Value(); // null
-  }
-
-  switch (ast_node->kind())
-  {
-  case ast::Ast::Null:
-    return zjson::Value(); // null
-
-  case ast::Ast::Boolean:
-    return zjson::Value(ast_node->as_bool());
-
-  case ast::Ast::Integer:
-    return zjson::Value(ast_node->as_integer());
-
-  case ast::Ast::Number:
-    return zjson::Value(ast_node->as_number());
-
-  case ast::Ast::String:
-    return zjson::Value(ast_node->as_string());
-
-  case ast::Ast::Array:
-  {
-    zjson::Value array_value = zjson::Value::create_array();
-    const auto &ast_array = ast_node->as_array();
-    array_value.reserve_array(ast_array.size());
-
-    for (size_t i = 0; i < ast_array.size(); ++i)
-    {
-      array_value.add_to_array(convert_ast_to_json(ast_array[i]));
-    }
-    return array_value;
-  }
-
-  case ast::Ast::Object:
-  {
-    zjson::Value object_value = zjson::Value::create_object();
-    const auto &ast_object = ast_node->as_object();
-
-    for (const auto &pair : ast_object)
-    {
-      object_value.add_to_object(pair.first, convert_ast_to_json(pair.second));
-    }
-    return object_value;
-  }
-
-  default:
-    return zjson::Value(); // null for unknown types
-  }
+  // Shared with the CLI's --json path so both agree on the ast -> JSON mapping.
+  return json_output::ast_to_json(ast_node);
 }
 
 void RpcServer::print_response(const RpcResponse &response, MiddlewareContext *context)

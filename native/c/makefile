@@ -357,6 +357,10 @@ $(OUT_DIR)/zjsonm.o: $(OUT_DIR)/zjsonm.s
 	@echo 'Building $(OUT_DIR)/zjsonm.o'
 	$(ASM) $(ASM_FLAGS) -a=$*.s.lst $(MACLIBS) -o $@ $^
 
+$(OUT_DIR)/json_output.o: json_output.cpp
+	@echo 'Building $(OUT_DIR)/json_output.o'
+	$(CXX) $(CPP_FLAGS) -c $< -o $@
+
 #
 # ZAM24
 #
@@ -382,13 +386,13 @@ $(OUT_DIR)/extend/plugin.o: extend/plugin.cpp
 #
 # Test CLI
 #
-$(OUT_DIR)/zowex: $(OUT_DIR)/zowex.o $(OUT_DIR)/extend/plugin.o $(COMMAND_OBJS) $(SERVER_OBJS) $(OUT_DIR)/zjsonm.o $(OUT_DIR)/libzut.a $(OUT_DIR)/libzjb.a $(OUT_DIR)/libzds.a $(OUT_DIR)/libzusf.a $(OUT_DIR)/libztso.a $(OUT_DIR)/libzkr.a
+$(OUT_DIR)/zowex: $(OUT_DIR)/zowex.o $(OUT_DIR)/json_output.o $(OUT_DIR)/extend/plugin.o $(COMMAND_OBJS) $(SERVER_OBJS) $(OUT_DIR)/zjsonm.o $(OUT_DIR)/libzut.a $(OUT_DIR)/libzjb.a $(OUT_DIR)/libzds.a $(OUT_DIR)/libzusf.a $(OUT_DIR)/libztso.a $(OUT_DIR)/libzkr.a
 	@echo 'Building zowex (z/OS target level: $(ZosMinLevel))'
 	$(CXX) $(CPP_BND_FLAGS) -o $@ $^ $(GSKCMS_SIDEDECK)
 
 zowex: $(OUT_DIR) $(OUT_DIR)/zowex
 
-$(OUT_DIR)/zoweax: $(OUT_DIR)/zoweax.o $(OUT_DIR)/commands/console.o $(OUT_DIR)/commands/core.o $(OUT_DIR)/zjsonm.o $(OUT_DIR)/libzcn.a $(OUT_DIR)/libzut.a
+$(OUT_DIR)/zoweax: $(OUT_DIR)/zoweax.o $(OUT_DIR)/json_output.o $(OUT_DIR)/commands/console.o $(OUT_DIR)/commands/core.o $(OUT_DIR)/zjsonm.o $(OUT_DIR)/libzcn.a $(OUT_DIR)/libzut.a
 	@echo 'Building zoweax (z/OS target level: $(ZosMinLevel))'
 	$(CXX) $(CPP_BND_FLAGS_AUTH) -o $@ $^
 	extattr +ap $@

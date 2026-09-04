@@ -145,6 +145,7 @@ build-out/zlogger_metal.o \
 build-out/zwto.test.o \
 build-out/zjson.test.o \
 build-out/zjsonm.o \
+build-out/json_output.o \
 build-out/zowex.server.test.o \
 build-out/zowex.uss.server.test.o \
 build-out/zowex.ds.server.test.o \
@@ -207,6 +208,9 @@ build-out/server_validator.o:
 	ln -sf ../../build-out/server/validator.o build-out/server_validator.o
 
 build-out/plugin.o: ../extend/plugin.cpp
+	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
+
+build-out/json_output.o: ../json_output.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
 build-out/zowex.ds.test.o: zowex.ds.test.cpp

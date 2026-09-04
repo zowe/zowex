@@ -932,12 +932,12 @@ public:
 
   bool is_redirecting_error() const
   {
-    return m_output_stream != nullptr;
+    return m_error_stream != nullptr;
   }
 
   bool is_redirecting_input() const
   {
-    return m_output_stream != nullptr;
+    return m_input_stream != nullptr;
   }
 
   bool is_redirecting_output() const
@@ -970,11 +970,11 @@ protected:
 
 private:
   ArgumentMap m_output;
-  std::istream *m_input_stream;
-  std::ostream *m_output_stream;
-  std::ostream *m_error_stream;
+  std::istream *m_input_stream = nullptr;
+  std::ostream *m_output_stream = nullptr;
+  std::ostream *m_error_stream = nullptr;
   ast::Node m_object;
-  size_t m_content_len;
+  size_t m_content_len = 0;
 };
 
 template <>
