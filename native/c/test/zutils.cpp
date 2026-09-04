@@ -11,6 +11,7 @@
 
 #include "ztest.hpp"
 #include "zutils.hpp"
+#include "../zut.hpp"
 #include <vector>
 #include <string>
 #include <cstring>
@@ -205,7 +206,7 @@ bool wait_for_job(const std::string &jobid, int max_retries, int delay_ms)
   std::string output;
   for (int i = 0; i < max_retries; ++i)
   {
-    int rc = execute_command_with_output(zowex_command + " job view-status " + jobid, output);
+    int rc = execute_command_with_output(zo_command + " job view-status " + jobid, output);
     if (rc == 0 && output.find(jobid) != std::string::npos)
     {
       return true;
@@ -385,7 +386,8 @@ TestDirGuard::operator std::string() const
 
 std::thread start_pipe_writer_thread(const std::string &pipe_path, const std::string &data_to_write)
 {
-  return std::thread([pipe_path, data_to_write]() -> void {
+  return std::thread([pipe_path, data_to_write]() -> void
+                     {
     int fd = -1;
     for (int attempt = 0; attempt < 100 && fd == -1; ++attempt)
     {
@@ -399,13 +401,13 @@ std::thread start_pipe_writer_thread(const std::string &pipe_path, const std::st
     {
       write(fd, data_to_write.data(), data_to_write.size());
       close(fd);
-    }
-  });
+    } });
 }
 
 std::thread start_pipe_reader_thread(const std::string &pipe_path, std::string *output_content)
 {
-  return std::thread([pipe_path, output_content]() -> void {
+  return std::thread([pipe_path, output_content]() -> void
+                     {
     if (output_content == nullptr)
     {
       return;
@@ -421,6 +423,5 @@ std::thread start_pipe_reader_thread(const std::string &pipe_path, std::string *
         *output_content = std::string(buffer, bytes_read);
       }
       close(fd);
-    }
-  });
+    } });
 }

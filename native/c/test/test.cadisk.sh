@@ -22,7 +22,7 @@ export _TAG_REDIR_ERR=txt
 export _TAG_REDIR_IN=txt
 export _TAG_REDIR_OUT=txt
 
-ZOWEX="${ZOWEX:-zowex}"
+ZOWEX="${ZOWEX:-zo}"
 HLQ="${1:-$(whoami | tr '[:lower:]' '[:upper:]')}"
 DS="${HLQ}.CADISK.TEST"
 CONTENT="cadisk archival test content"
@@ -32,12 +32,16 @@ POLL_INTERVAL=120 # seconds between volser checks
 SEPARATOR="=========================================="
 
 pass() { echo "  ..passed!"; }
-fail() { local msg="$1"; echo "  ..FAILED: $msg"; exit 1; }
+fail() {
+	local msg="$1"
+	echo "  ..FAILED: $msg"
+	exit 1
+}
 
 cleanup() {
-  echo ""
-  echo "--- Cleanup ---"
-  "$ZOWEX" data-set delete "$DS" 2>/dev/null && echo "Deleted $DS" || echo "$DS already gone (expected after archival)"
+	echo ""
+	echo "--- Cleanup ---"
+	"$ZOWEX" data-set delete "$DS" 2>/dev/null && echo "Deleted $DS" || echo "$DS already gone (expected after archival)"
 }
 trap cleanup EXIT
 
@@ -67,19 +71,19 @@ pass
 echo "[4/6] Polling for archival completion (CA Disk deferred — may take ~30 min)..."
 archived=false
 for i in $(seq 1 "$MAX_POLLS"); do
-  printf "  Poll %d/%d..." "$i" "$MAX_POLLS"
-  list_out=$("$ZOWEX" data-set list "$DS" -a --rfc 2>&1) || true
-  if echo "$list_out" | grep -q "ARCIVE"; then
-    archived=true
-    echo " ARCIVE volser detected"
-    break
-  fi
-  echo " not yet"
-  sleep "$POLL_INTERVAL"
+	printf "  Poll %d/%d..." "$i" "$MAX_POLLS"
+	list_out=$("$ZOWEX" data-set list "$DS" -a --rfc 2>&1) || true
+	if echo "$list_out" | grep -q "ARCIVE"; then
+		archived=true
+		echo " ARCIVE volser detected"
+		break
+	fi
+	echo " not yet"
+	sleep "$POLL_INTERVAL"
 done
 
 if [[ "$archived" != "true" ]]; then
-  fail "data set was not archived within $((MAX_POLLS * POLL_INTERVAL / 60)) minutes"
+	fail "data set was not archived within $((MAX_POLLS * POLL_INTERVAL / 60)) minutes"
 fi
 pass
 
@@ -88,7 +92,7 @@ echo "[5/6] Restoring archived data set..."
 restore_out=$("$ZOWEX" data-set restore "$DS" 2>&1)
 echo "  $restore_out"
 if ! echo "$restore_out" | grep -qi "restored"; then
-  fail "restore command did not report success"
+	fail "restore command did not report success"
 fi
 pass
 
@@ -96,7 +100,7 @@ pass
 echo "[6/6] Verifying restored content..."
 view_out=$("$ZOWEX" data-set view "$DS" 2>&1)
 if ! echo "$view_out" | grep -Fq "$CONTENT"; then
-  fail "content not found after restore (got: $view_out)"
+	fail "content not found after restore (got: $view_out)"
 fi
 pass
 

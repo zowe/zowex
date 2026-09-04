@@ -31,7 +31,7 @@ import { ZSshUtils } from "./ZSshUtils";
 
 export class ZSshClient extends RpcClientApi implements Disposable {
     public static readonly DEFAULT_SERVER_PATH = "~/.zowe-server";
-    public static readonly BIN_NAME = "zowex";
+    public static readonly BIN_NAME = "zo";
     public static readonly REQUIRED_DEPLOY_SIZE_MB = 20;
     private static readonly DEFAULT_SERVER_STARTUP_TIMEOUT_S = 60;
     private mErrHandler: ClientOptions["onError"];

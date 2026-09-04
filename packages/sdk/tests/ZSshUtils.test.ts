@@ -153,7 +153,7 @@ describe("ZSshUtils", () => {
             expect(fastPutMock).toHaveBeenCalledTimes(1);
             expect(unlinkMock).toHaveBeenCalledTimes(1);
             // The install is only complete once the binary is confirmed to load on the target
-            expect(sshMock.execCommand).toHaveBeenCalledWith("./zowex --version", { cwd: "./.zowe-server" });
+            expect(sshMock.execCommand).toHaveBeenCalledWith("./zo --version", { cwd: "./.zowe-server" });
         });
 
         describe("installServer binary verification", () => {

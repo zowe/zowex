@@ -6,6 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes 
 
+- The `zowex` top level command group of this plug-in has been renamed to `zo`. `zowex` and `zssh` will still function as aliases. [#1119](https://github.com/zowe/zowex/pull/1119) 
 - Added the `zssh files list alias` command to the CLI. [#1108](https://github.com/zowe/zowex/pull/1108)
 
 ## `0.9.0`

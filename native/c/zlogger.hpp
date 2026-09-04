@@ -89,7 +89,7 @@ public:
    */
   auto initialize() -> void
   {
-    // Resolve and create the per-user logs directory (honors ZOWEX_LOGS_DIR)
+    // Resolve and create the per-user logs directory (honors ZO_LOGS_DIR)
     const std::string logs_dir = zlog_util::resolve_logs_dir();
     if (!zlog_util::make_dirs(logs_dir))
     {
@@ -100,7 +100,7 @@ public:
     const std::string log_path_str = logs_dir + "/zowex.log";
 
     // Check environment variable for log level
-    const char *env_level = std::getenv("ZOWEX_LOG_LEVEL");
+    const char *env_level = std::getenv("ZO_LOG_LEVEL");
     int initial_level = ZLOGLEVEL_INFO;
     if (env_level)
     {

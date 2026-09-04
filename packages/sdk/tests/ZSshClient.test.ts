@@ -374,7 +374,7 @@ describe("ZSshClient", () => {
                 serverPath: "/tmp/zowe-server",
             });
             expect(execAsyncSpy).toHaveBeenCalledTimes(1);
-            expect(execAsyncSpy!.mock.calls[0][0]).toBe("/tmp/zowe-server/zowex");
+            expect(execAsyncSpy!.mock.calls[0][0]).toBe("/tmp/zowe-server/zo");
         });
 
         it("should respect useNativeSsh option", async () => {
@@ -482,7 +482,7 @@ describe("ZSshClient", () => {
             const sshStream = { stdin: { write: vi.fn() }, stdout: fakeStdout, stderr: { on: vi.fn() } };
             const client: ZSshClient = new (ZSshClient as any)();
             (client as any).mSshStream = sshStream;
-            (client as any).getServerStatus(sshStream, readyMessage, "zowex server");
+            (client as any).getServerStatus(sshStream, readyMessage, "zo server");
 
             const response = client.request(request);
             // Send response with empty lines
@@ -524,7 +524,7 @@ describe("ZSshClient", () => {
                     return this;
                 },
             };
-            await expect((client as any).execAsync("zowex", "server")).rejects.toMatchObject({
+            await expect((client as any).execAsync("zo", "server")).rejects.toMatchObject({
                 errorCode: "ESERVEREXIT",
             });
         });
@@ -593,7 +593,7 @@ describe("ZSshClient", () => {
             const sshStream = { stdin: { write: vi.fn() }, stdout: { on: vi.fn() }, stderr: fakeStderr };
             const client: ZSshClient = new (ZSshClient as any)();
             (client as any).mSshStream = sshStream;
-            (client as any).getServerStatus(sshStream, readyMessage, "zowex server");
+            (client as any).getServerStatus(sshStream, readyMessage, "zo server");
             const response = client.request(request);
             fakeStderr.emit("data", `${JSON.stringify(rpcResponseBad)}\n`);
             await expect(response).rejects.toMatchObject({ message: rpcResponseBad.error?.message });
@@ -605,7 +605,7 @@ describe("ZSshClient", () => {
             const sshStream = { stdin: { write: vi.fn() }, stdout: fakeStdout, stderr: { on: vi.fn() } };
             const client: ZSshClient = new (ZSshClient as any)();
             (client as any).mSshStream = sshStream;
-            (client as any).getServerStatus(sshStream, readyMessage, "zowex server");
+            (client as any).getServerStatus(sshStream, readyMessage, "zo server");
             const response = client.request(request);
             fakeStdout.emit("data", `${JSON.stringify(rpcResponseGood)}\n`);
             expect(await response).toEqual({ success: true });
@@ -640,7 +640,7 @@ describe("ZSshClient", () => {
                 if (!err.toString().includes("Request timed out")) throw err; // we're expecting a request timed out error for the handler
             };
             (client as any).mSshStream = sshStream;
-            (client as any).getServerStatus(sshStream, readyMessage, "zowex server");
+            (client as any).getServerStatus(sshStream, readyMessage, "zo server");
             const response = client.request(request);
             expect(() => fakeStdout.emit("data", "bad json\n")).toThrow("Invalid JSON response");
             vi.runAllTimers();
@@ -656,7 +656,7 @@ describe("ZSshClient", () => {
                 if (!err.toString().includes("Request timed out")) throw err; // we're expecting a request timed out error for the handler
             };
             (client as any).mSshStream = sshStream;
-            (client as any).getServerStatus(sshStream, readyMessage, "zowex server");
+            (client as any).getServerStatus(sshStream, readyMessage, "zo server");
             const response = client.request(request);
             expect(() => fakeStdout.emit("data", `${JSON.stringify({ ...rpcResponseGood, id: -1 })}\n`)).toThrow(
                 "Missing promise for response ID",
@@ -675,7 +675,7 @@ describe("ZSshClient", () => {
                 linkStreamToPromise: linkStreamMock,
             };
             (client as any).mSshStream = sshStream;
-            (client as any).getServerStatus(sshStream, readyMessage, "zowex server");
+            (client as any).getServerStatus(sshStream, readyMessage, "zo server");
 
             const responsePromise = client.request(request);
 
@@ -724,7 +724,7 @@ describe("ZSshClient", () => {
                 registerStream: registerStreamMock,
             };
             (client as any).mSshStream = sshStream;
-            (client as any).getServerStatus(sshStream, readyMessage, "zowex server");
+            (client as any).getServerStatus(sshStream, readyMessage, "zo server");
 
             const progressCallback = vi.fn();
             const responsePromise = client.request(request, progressCallback);
@@ -750,7 +750,7 @@ describe("ZSshClient", () => {
                 registerStream: registerStreamMock,
             };
             (client as any).mSshStream = sshStream;
-            (client as any).getServerStatus(sshStream, readyMessage, "zowex server");
+            (client as any).getServerStatus(sshStream, readyMessage, "zo server");
 
             const progressCallback = vi.fn();
             const responsePromise = client.request(request, progressCallback);
@@ -845,7 +845,7 @@ describe("ZSshClient", () => {
             const linkStreamToPromiseMock = vi.fn();
             (client as any).mStreamMgr = { linkStreamToPromise: linkStreamToPromiseMock };
             (client as any).mSshStream = sshStream;
-            (client as any).getServerStatus(sshStream, readyMessage, "zowex server");
+            (client as any).getServerStatus(sshStream, readyMessage, "zo server");
 
             (client as any).mRequestMap.set(1, {
                 rpc: { resolve: vi.fn(), reject: vi.fn() },
@@ -871,7 +871,7 @@ describe("ZSshClient", () => {
             const client: ZSshClient = new (ZSshClient as any)();
             (client as any).mErrHandler = onErrorMock;
             (client as any).mSshStream = sshStream;
-            (client as any).getServerStatus(sshStream, readyMessage, "zowex server");
+            (client as any).getServerStatus(sshStream, readyMessage, "zo server");
 
             (client as any).mRequestMap.set(1, {
                 rpc: { resolve: vi.fn(), reject: vi.fn() },

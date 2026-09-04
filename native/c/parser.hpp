@@ -2059,7 +2059,7 @@ public:
   /**
    * @brief Register a pre-command hook to be called before any command handler executes.
    *
-   * Hooks receive the full command path (e.g. "zowex console issue") and run
+   * Hooks receive the full command path (e.g. "zo console issue") and run
    * in registration order. They cannot prevent handler execution.
    *
    * @param hook Callback invoked with the command path before the handler runs

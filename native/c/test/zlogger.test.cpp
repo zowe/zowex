@@ -86,14 +86,14 @@ void zlogger_tests()
             ZLogger& logger = ZLogger::get_instance();
             
             // Test environment variable log level setting
-            setenv("ZOWEX_LOG_LEVEL", "DEBUG", 1);
+            setenv("ZO_LOG_LEVEL", "DEBUG", 1);
             
             // Note: This tests the internal get_level_from_str method indirectly
             // We can't test it directly as it's private, but we can verify behavior
             logger.set_log_level(ZLOGLEVEL_TRACE);
             Expect(logger.get_log_level()).ToBe(ZLOGLEVEL_TRACE);
             
-            unsetenv("ZOWEX_LOG_LEVEL");
+            unsetenv("ZO_LOG_LEVEL");
         });
 
         it("should support all log levels correctly", []() {
