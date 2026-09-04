@@ -4,7 +4,7 @@ All notable changes to the native code for "zowex" are documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## Recent Changes
+## `1.0.0`
 
 - **Breaking:** `c`: Renamed the `ZOWEX_NUM_WORKERS` environmental variable to `ZO_NUM_WORKERS`. [#1119](https://github.com/zowe/zowex/pull/1119)
 - **Breaking:** `c`: Renamed the `ZOWEX_LOG_LEVEL` environmental variable to `ZO_LOG_LEVEL`. [#1119](https://github.com/zowe/zowex/pull/1119)
@@ -323,4 +323,3 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## [Unreleased]
 
 - Initial release
-
