@@ -21,20 +21,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # std::hash<std::string> resolves to the out-of-line libc++ helper __hash_memory, which is
-      # not exported by CRTEQCXE on z/OS systems below the required Language Environment
-      # maintenance level (CEE3561S at load time). See native/c/compat/README.md and
-      # https://github.com/zowe/zowex/issues/871.
-      - name: Check for string-keyed hash containers
-        run: npm run lint:compat
+      # Bans string-keyed hash containers (CEE3561S at load time) and by-reference captures in
+      # afterAll hooks (silently skipped cleanup). Each script's header explains why.
+      - name: Run lint:tidy
+        run: npm run lint:tidy
 
-      - name: Run Cpp-Linter
-        uses: cpp-linter/cpp-linter-action@v2
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        with:
-          ignore: c/chdsect
-          repo-root: native
-          style: file
-          tidy-checks: "-*"
-          version: 21
+      - name: Run lint:cpp
+        run: |
+          npm ci --ignore-scripts
+          npm run lint:cpp

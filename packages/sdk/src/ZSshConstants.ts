@@ -10,4 +10,4 @@
  */
 
 // Generated via generateConstants.ts
-export const BUNDLED_SSH_SERVER_VERSION = "0.8.0";
+export const BUNDLED_SSH_SERVER_VERSION = "0.9.0";

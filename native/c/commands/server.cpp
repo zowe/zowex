@@ -118,7 +118,7 @@ void ZServer::print_ready_message()
 
   StatusMessage status_msg{
       .status = "ready",
-      .message = "zowex server is ready to accept input",
+      .message = "zo server is ready to accept input",
       .data = std::optional<zjson::Value>(data),
   };
 
@@ -151,7 +151,7 @@ void ZServer::run(const server::Options &opts)
   options = opts;
 
   server::Logger::init_logger(options.verbose);
-  LOG_INFO("Starting zowex server with %lld workers and %lld seconds until request timeout (verbose=%s)", options.num_workers, options.request_timeout, options.verbose ? "true" : "false");
+  LOG_INFO("Starting zo server with %lld workers and %lld seconds until request timeout (verbose=%s)", options.num_workers, options.request_timeout, options.verbose ? "true" : "false");
 
   setup_signal_handlers();
 
@@ -208,7 +208,7 @@ static int handle_server(plugin::InvocationContext &context)
   opts.request_timeout = context.get<long long>("request-timeout", opts.request_timeout);
   opts.exec_dir = ZServer::get_instance().get_exec_dir();
 
-  const auto *num_workers_env = getenv("ZOWEX_NUM_WORKERS");
+  const auto *num_workers_env = getenv("ZO_NUM_WORKERS");
   if (num_workers_env != nullptr)
   {
     try

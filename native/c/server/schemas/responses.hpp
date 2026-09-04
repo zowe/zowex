@@ -294,6 +294,12 @@ ZJSON_SCHEMA(ListDsMembersResponse,
     FIELD_REQUIRED(returnedRows, NUMBER)
 );
 
+struct ResolveDsAliasResponse {};
+ZJSON_SCHEMA(ResolveDsAliasResponse,
+    FIELD_REQUIRED(success, BOOL),
+    FIELD_REQUIRED(targetDsn, STRING)
+);
+
 struct ReadDatasetResponse {};
 ZJSON_SCHEMA(ReadDatasetResponse,
     FIELD_REQUIRED(success, BOOL),
@@ -419,6 +425,13 @@ ZJSON_SCHEMA(ViewSyslogResponse,
     FIELD_OPTIONAL(hasMore, BOOL)
 );
 
+struct ListParmlibResponse {};
+ZJSON_SCHEMA(ListParmlibResponse,
+    FIELD_REQUIRED(success, BOOL),
+    FIELD_REQUIRED_ARRAY(items, STRING),
+    FIELD_REQUIRED(returnedRows, NUMBER)
+);
+
 struct ListProclibResponse {};
 ZJSON_SCHEMA(ListProclibResponse,
     FIELD_REQUIRED(success, BOOL),
@@ -509,7 +522,8 @@ ZJSON_SCHEMA(WriteFileResponse,
 struct IssueUssCmdResponse {};
 ZJSON_SCHEMA(IssueUssCmdResponse,
     FIELD_REQUIRED(success, BOOL),
-    FIELD_REQUIRED(data, STRING)
+    FIELD_REQUIRED(data, STRING),
+    FIELD_OPTIONAL(stderr, STRING)
 );
 
 struct MoveFileResponse {};

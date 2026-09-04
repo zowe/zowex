@@ -127,17 +127,17 @@ build-out/zmetal.test.o \
 build-out/zmetal.metal.test.o \
 build-out/zusf.test.o \
 build-out/zusf.o \
-build-out/zowex.ds.test.o \
-build-out/zowex.uss.test.o \
-build-out/zowex.job.test.o \
-build-out/zowex.system.test.o \
-build-out/zowex.job.list.test.o \
-build-out/zowex.job.submit.test.o \
-build-out/zowex.job.manage.test.o \
-build-out/zowex.test.o \
-build-out/zowex.tso.test.o \
-build-out/zowex.plugin.test.o \
-build-out/zoweax.console.test.o \
+build-out/zo.ds.test.o \
+build-out/zo.uss.test.o \
+build-out/zo.job.test.o \
+build-out/zo.system.test.o \
+build-out/zo.job.list.test.o \
+build-out/zo.job.submit.test.o \
+build-out/zo.job.manage.test.o \
+build-out/zo.test.o \
+build-out/zo.tso.test.o \
+build-out/zo.plugin.test.o \
+build-out/zoa.console.test.o \
 build-out/zutils.o \
 build-out/parser.test.o \
 build-out/zlogger.test.o \
@@ -145,11 +145,11 @@ build-out/zlogger_metal.o \
 build-out/zwto.test.o \
 build-out/zjson.test.o \
 build-out/zjsonm.o \
-build-out/zowex.server.test.o \
-build-out/zowex.uss.server.test.o \
-build-out/zowex.ds.server.test.o \
-build-out/zowex.cert.server.test.o \
-build-out/zowex.job.server.test.o \
+build-out/zo.server.test.o \
+build-out/zo.uss.server.test.o \
+build-out/zo.ds.server.test.o \
+build-out/zo.cert.server.test.o \
+build-out/zo.job.server.test.o \
 build-out/server.worker.test.o \
 build-out/server_validator.o \
 build-out/server.validator.test.o \
@@ -209,37 +209,37 @@ build-out/server_validator.o:
 build-out/plugin.o: ../extend/plugin.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
-build-out/zowex.ds.test.o: zowex.ds.test.cpp
+build-out/zo.ds.test.o: zo.ds.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
-build-out/zowex.uss.test.o: zowex.uss.test.cpp
+build-out/zo.uss.test.o: zo.uss.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
-build-out/zowex.job.test.o: zowex.job.test.cpp
+build-out/zo.job.test.o: zo.job.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
-build-out/zowex.system.test.o: zowex.system.test.cpp
+build-out/zo.system.test.o: zo.system.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
-build-out/zowex.job.list.test.o: zowex.job.list.test.cpp
+build-out/zo.job.list.test.o: zo.job.list.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
-build-out/zowex.job.submit.test.o: zowex.job.submit.test.cpp
+build-out/zo.job.submit.test.o: zo.job.submit.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
-build-out/zowex.job.manage.test.o: zowex.job.manage.test.cpp
+build-out/zo.job.manage.test.o: zo.job.manage.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
-build-out/zowex.tso.test.o: zowex.tso.test.cpp
+build-out/zo.tso.test.o: zo.tso.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
-build-out/zowex.plugin.test.o: zowex.plugin.test.cpp
+build-out/zo.plugin.test.o: zo.plugin.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
-build-out/zoweax.console.test.o: zoweax.console.test.cpp
+build-out/zoa.console.test.o: zoa.console.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
-build-out/zowex.test.o: zowex.test.cpp
+build-out/zo.test.o: zo.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
 build-out/zutils.o: zutils.cpp
@@ -314,19 +314,19 @@ build-out/zwto.test.o: zwto.test.cpp
 build-out/zjson.test.o: zjson.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
-build-out/zowex.server.test.o: zowex.server.test.cpp
+build-out/zo.server.test.o: zo.server.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
-build-out/zowex.uss.server.test.o: zowex.uss.server.test.cpp
+build-out/zo.uss.server.test.o: zo.uss.server.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
-build-out/zowex.ds.server.test.o: zowex.ds.server.test.cpp
+build-out/zo.ds.server.test.o: zo.ds.server.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
-build-out/zowex.cert.server.test.o: zowex.cert.server.test.cpp
+build-out/zo.cert.server.test.o: zo.cert.server.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
-build-out/zowex.job.server.test.o: zowex.job.server.test.cpp
+build-out/zo.job.server.test.o: zo.job.server.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
 build-out/server.worker.test.o: server/worker.test.cpp

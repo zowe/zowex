@@ -894,8 +894,8 @@ void register_commands(parser::Command &root_command)
   job_watch_cmd->add_keyword_arg("max-wait-seconds", make_aliases("--max-wait-seconds", "--mws"), "maximum number of seconds to wait for the pattern to match (max 300 seconds)", ArgType_Single, false, ArgValue(15ll));
   job_watch_cmd->add_keyword_arg("ignore-case", make_aliases("--ignore-case", "--ic"), "match string in any case", ArgType_Flag, false, ArgValue(false));
   job_watch_cmd->set_handler(handle_job_watch);
-  job_watch_cmd->add_example("Watch job spool files for a given string pattern", "zowex job watch IBMUSER.IEFBR14@.JOB01684.D0000002.JESMSGLG --pattern \"$HASP395 IEFBR14@ ENDED\"");
-  job_watch_cmd->add_example("Watch job spool files for a given regex pattern", "zowex job watch IBMUSER.IEFBR14@.JOB01684D0000002.JESMSGLG --pattern \"/^.*ENDED.*$/g\"");
+  job_watch_cmd->add_example("Watch job spool files for a given string pattern", "zo job watch IBMUSER.IEFBR14@.JOB01684.D0000002.JESMSGLG --pattern \"$HASP395 IEFBR14@ ENDED\"");
+  job_watch_cmd->add_example("Watch job spool files for a given regex pattern", "zo job watch IBMUSER.IEFBR14@.JOB01684D0000002.JESMSGLG --pattern \"/^.*ENDED.*$/g\"");
   job_group->add_command(job_watch_cmd);
 
   // Cancel subcommand

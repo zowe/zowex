@@ -48,8 +48,8 @@ int ZCNACT(ZCN *zcn)
   }
   else
   {
-    zcn->diag.e_msg_len = sprintf(zcn->diag.e_msg, "Unexpected abend occurred during console activation (rc:%X, rsn:%X)", 
-                                   zenv.abend_rc, zenv.abend_rsn);
+    zcn->diag.e_msg_len = sprintf(zcn->diag.e_msg, "Unexpected abend occurred during console activation (rc:%X, rsn:%X)",
+                                  zenv.abend_rc, zenv.abend_rsn);
     rc = RTNCD_FAILURE;
   }
 
@@ -88,8 +88,8 @@ int ZCNPUT(ZCN *zcn, const char *command)
   }
   else
   {
-    zcn->diag.e_msg_len = sprintf(zcn->diag.e_msg, "Unexpected abend occurred during command execution (rc:%X, rsn:%X)", 
-                                   zenv.abend_rc, zenv.abend_rsn);
+    zcn->diag.e_msg_len = sprintf(zcn->diag.e_msg, "Unexpected abend occurred during command execution (rc:%X, rsn:%X)",
+                                  zenv.abend_rc, zenv.abend_rsn);
     rc = RTNCD_FAILURE;
   }
 
@@ -165,8 +165,8 @@ int ZCNGET(ZCN *zcn, char *response)
     {
       cancel_timers();
     }
-    zcn->diag.e_msg_len = sprintf(zcn->diag.e_msg, "Unexpected abend occurred during console read (rc:%X, rsn:%X)", 
-                                   zenv.abend_rc, zenv.abend_rsn);
+    zcn->diag.e_msg_len = sprintf(zcn->diag.e_msg, "Unexpected abend occurred during console read (rc:%X, rsn:%X)",
+                                  zenv.abend_rc, zenv.abend_rsn);
     rc = RTNCD_FAILURE;
   }
 
@@ -205,8 +205,8 @@ int ZCNDACT(ZCN *zcn)
   }
   else
   {
-    zcn->diag.e_msg_len = sprintf(zcn->diag.e_msg, "Unexpected abend occurred during console deactivation (rc:%X, rsn:%X)", 
-                                   zenv.abend_rc, zenv.abend_rsn);
+    zcn->diag.e_msg_len = sprintf(zcn->diag.e_msg, "Unexpected abend occurred during console deactivation (rc:%X, rsn:%X)",
+                                  zenv.abend_rc, zenv.abend_rsn);
     rc = RTNCD_FAILURE;
   }
 

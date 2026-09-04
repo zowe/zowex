@@ -26,6 +26,7 @@
 #include "csvdlaa.h"
 #include "zwto.h"
 #include "zdbg.h"
+#include "zrecovery.h"
 
 #define ZUT_BPXWDYN_SERVICE_FAILURE -2
 
@@ -549,12 +550,36 @@ int ZUTSSIQ(ZDIAG *diag, JQRY_HEADER **area, const char *filter)
   return rc;
 }
 
-#pragma prolog(ZUTNOAUT, " ZWEPROLG NEWDSA=(YES,1) ")
+#pragma prolog(ZUTNOAUT, " ZWEPROLG NEWDSA=(YES,4) ")
 #pragma epilog(ZUTNOAUT, " ZWEEPILG ")
 int ZUTNOAUT()
 {
-  auth_off();
-  return 0;
+  if (0 != test_auth())
+  {
+    return RTNCD_SUCCESS; // not APF-authorized; nothing to relinquish
+  }
+
+  int rc = RTNCD_SUCCESS;
+  ZRCVY_ENV zenv = {0};
+
+  if (0 == enable_recovery(&zenv))
+  {
+    rc = auth_off();
+  }
+  else
+  {
+    rc = RTNCD_FAILURE; // abend in elevated window; retry restored problem state & key
+  }
+
+  disable_recovery(&zenv);
+
+  // fail closed - confirm authorization was actually relinquished
+  if (RTNCD_SUCCESS == rc && 0 == test_auth())
+  {
+    rc = RTNCD_FAILURE;
+  }
+
+  return rc;
 }
 
 #pragma prolog(ZUTMSREL, " ZWEPROLG NEWDSA=(YES,4) ")
@@ -588,5 +613,45 @@ int ZUTCVTD(const char *ptr, char *time)
             time_out.date.mmddyyyy.year[0],
             time_out.date.mmddyyyy.year[1]);
   }
+  return rc;
+}
+
+struct idcamsDdNameList
+{
+  unsigned short len;
+  char _unused[32];
+  char sysin[8];
+  char sysprint[8];
+};
+typedef int (*IDCAMS)(unsigned int, unsigned int) ATTRIBUTE(amode31);
+#pragma prolog(ZUTIDCAM, " ZWEPROLG NEWDSA=(YES,4) ")
+#pragma epilog(ZUTIDCAM, " ZWEEPILG ")
+int ZUTIDCAM(const char *sysinDdName, const char *sysprintDdName)
+{
+  int rc = 0;
+
+  unsigned short options = 0;
+  struct idcamsDdNameList ddNameList = {0};
+  ddNameList.len = sizeof(ddNameList._unused) + sizeof(ddNameList.sysin) + sizeof(ddNameList.sysprint);
+
+  // DD name replacements should be padded with blanks
+  memset(ddNameList.sysin, ' ', sizeof(ddNameList.sysin));
+  memset(ddNameList.sysprint, ' ', sizeof(ddNameList.sysprint));
+  memcpy(ddNameList.sysin, sysinDdName,
+         strlen(sysinDdName) > sizeof(ddNameList.sysin) ? sizeof(ddNameList.sysin) : strlen(sysinDdName));
+  memcpy(ddNameList.sysprint, sysprintDdName,
+         strlen(sysprintDdName) > sizeof(ddNameList.sysprint) ? sizeof(ddNameList.sysprint) : strlen(sysprintDdName));
+
+  char programName[8] = "IDCAMS";
+  // IDCAMS must be entered in 31-bit mode. https://www.ibm.com/docs/en/zos/3.1.0?topic=commands-invoking-access-method-services-from-your-program
+  IDCAMS idcams = (IDCAMS)load_module31(programName);
+  // www.ibm.com/docs/en/zos/3.1.0?topic=instructions-load-call-macro
+  // ddnameList is the current last entry so set the high order bit to indicate the last
+  unsigned int parm_list[2];
+  parm_list[0] = (unsigned int)(uintptr_t)&options;
+  parm_list[1] = (unsigned int)(uintptr_t)&ddNameList | 0x80000000U;
+  rc = idcams(parm_list[0], parm_list[1]);
+  delete_module(programName);
+
   return rc;
 }

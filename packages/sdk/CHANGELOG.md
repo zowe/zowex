@@ -4,6 +4,20 @@ All notable changes to the Client code for "@zowe/zowex-for-zowe-sdk" are docume
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## Recent Changes
+
+- **Breaking** The `zowex` program bundled in `server.pax.Z` is now renamed to `zo`. [#1119](https://github.com/zowe/zowex/pull/1119)
+- Added JSON-RPC support for listing parmlib data sets. [#1124](https://github.com/zowe/zowex/pull/1124)
+- Added support for the `resolveDsAlias` RPC command which allows the caller to resolve data set aliases. [#1108](https://github.com/zowe/zowex/pull/1108)
+
+## `0.9.0`
+
+- Enable console commands through JSON-RPC. [#1112](https://github.com/zowe/zowex/pull/1110)
+
+## `0.8.1`
+
+- Fixed the `SearchParser.parseSearchOutput` function silently dropping matches when searching a sequential data set [#1104](https://github.com/zowe/zowex/pull/1104)
+
 ## `0.8.0`
 
 - Added detection of available disk space on the z/OS Unix deployment directory in the `ZSshUtils.installServer` method, giving the user the opportunity to cancel deployment if they have less than the recommended amount of available space. [#1088](https://github.com/zowe/zowex/pull/1088)

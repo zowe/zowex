@@ -4,6 +4,31 @@ All notable changes to the native code for "zowex" are documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## Recent Changes
+
+- **Breaking:** `c`: Renamed the `ZOWEX_NUM_WORKERS` environmental variable to `ZO_NUM_WORKERS`. [#1119](https://github.com/zowe/zowex/pull/1119)
+- **Breaking:** `c`: Renamed the `ZOWEX_LOG_LEVEL` environmental variable to `ZO_LOG_LEVEL`. [#1119](https://github.com/zowe/zowex/pull/1119)
+- **Breaking:** `c`: Renamed the `ZOWEX_LOGS_DIR` environmental variable to `ZO_LOGS_DIR`. [#1119](https://github.com/zowe/zowex/pull/1119)
+- **Breaking:** `c`: Renamed the `ZOWEAX_PATH` environmental variable to `ZOA_PATH`. [#1119](https://github.com/zowe/zowex/pull/1119)
+- **Breaking:** `c`: Renamed the `ZOWEX_LOGS_DIR` environmental variable to `ZO_LOGS_DIR`. [#1119](https://github.com/zowe/zowex/pull/1119)
+- **Breaking:** `c`: Renamed the `ZOWEX_PLUGINS_DIR` environmental variable to `ZO_PLUGINS_DIR`. [#1119](https://github.com/zowe/zowex/pull/1119)
+- **Breaking:** `c`: Renamed `ZOWEX_PLUGIN_DECLARE_ABI()` macro to `ZO_PLUGIN_DECLARE_ABI()`. [#1119](https://github.com/zowe/zowex/pull/1119)
+- **Breaking:** `c`: Renamed the `zowex` binary to `zo`, and the `zoweax` binary to `zoa`. [#1119](https://github.com/zowe/zowex/pull/1119)
+- `c`: Added JSON-RPC support for listing parmlib data sets. [#1124](https://github.com/zowe/zowex/pull/1124)
+- `c`: Added the `zowex ds resolve-alias <dsn>` command which allows the user to resolve data set aliases. [#1108](https://github.com/zowe/zowex/pull/1108)
+- `c`: Added `zds_idcams` utility function which allows the caller to execute the z/OS IDCAMS program and retrieve its output. [#1108](https://github.com/zowe/zowex/pull/1108)
+
+## `0.9.0`
+
+- `c`: `unixCommand` returns stderr in a new optional `stderr` response field. [#1112](https://github.com/zowe/zowex/issues/1112)
+- **Breaking:** `c`: `zowex` `console` command group is removed. [#1112](https://github.com/zowe/zowex/issues/1112)
+- **Breaking:** `c`: `zoweax` contains only the `console` command group and no longer supports plug-in loading. [#1112](https://github.com/zowe/zowex/issues/1112)
+- **Breaking:** `c`: Console commands are no longer issued with master authority. [#1112](https://github.com/zowe/zowex/issues/1112)
+- `c`: Console commands now use a unique CART instead of `ZOWECART`. [#1112](https://github.com/zowe/zowex/issues/1112)
+- `c`: The `version` command now reports the invoked binary's instead of always `zowex`. [#1112](https://github.com/zowe/zowex/issues/1112)
+- `c`: Preserve LRECL on PS write operations. [#1109](https://github.com/zowe/zowex/issues/1109)
+- `c`: Flipped to and from encoding arguments in error message to be accurate. [#1106](https://github.com/zowe/zowex/pull/1106)
+
 ## `0.8.0`
 
 - `c`: Stripped ASA control characters when reading spool files. [#114](https://github.com/zowe/zowex/issues/114)

@@ -57,12 +57,20 @@ int handle_system_list_parmlib(InvocationContext &context)
     return RTNCD_FAILURE;
   }
 
-  for (vector<string>::iterator it = parmlibs.begin(); it != parmlibs.end(); ++it)
+  const auto result = obj();
+  const auto items = arr();
+
+  for (const auto &dsn : parmlibs)
   {
-    context.output_stream() << *it << endl;
+    context.output_stream() << dsn << endl;
+    items->push(str(dsn));
   }
 
-  return rc;
+  result->set("items", items);
+  result->set("returnedRows", i64(parmlibs.size()));
+  context.set_object(result);
+
+  return RTNCD_SUCCESS;
 }
 
 int handle_system_list_proclib(InvocationContext &context)
@@ -404,9 +412,9 @@ void register_commands(parser::Command &root_command)
   system_view_syslog_cmd->add_keyword_arg("date", make_aliases("--date", "-d"), "specify date yyyy-mm-dd, e.g. --date 2026-01-20. Mutually exclusive with --seconds-ago", ArgType_Single, false, ArgValue(""), true);
   system_view_syslog_cmd->add_keyword_arg("seconds-ago", make_aliases("--seconds-ago", "-s"), "relative offset in seconds from now, e.g. --seconds-ago 300 for last 5 minutes. Mutually exclusive with --date/--time", ArgType_Single, false);
   system_view_syslog_cmd->add_keyword_arg("max-lines", make_aliases("--max-lines", "--ml"), "maximum number of lines to display (1-10000), e.g. --max-lines 100", ArgType_Single, false);
-  system_view_syslog_cmd->add_example("View last 30 seconds of syslog (default)", "zowex system view-syslog");
-  system_view_syslog_cmd->add_example("View last 5 minutes of syslog", "zowex system view-syslog --seconds-ago 300");
-  system_view_syslog_cmd->add_example("View syslog for a specific date and time", "zowex system view-syslog --date 2026-03-13 --time 10:41:00 --max-lines 100");
+  system_view_syslog_cmd->add_example("View last 30 seconds of syslog (default)", "zo system view-syslog");
+  system_view_syslog_cmd->add_example("View last 5 minutes of syslog", "zo system view-syslog --seconds-ago 300");
+  system_view_syslog_cmd->add_example("View syslog for a specific date and time", "zo system view-syslog --date 2026-03-13 --time 10:41:00 --max-lines 100");
   system_cmd->add_command(system_view_syslog_cmd);
 
   // ESM certificate and key ring commands live as `cert` and `keyring` sibling

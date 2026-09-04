@@ -33,3 +33,4 @@ packages/sdk/logs/test.log
 .jscpd-report/jscpd-report.json
 *.tgz
 *.env
+.idea/

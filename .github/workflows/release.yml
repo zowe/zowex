@@ -58,7 +58,7 @@ jobs:
           npm run build
           git add packages/sdk/src/ZSshConstants.ts
         env:
-          ZOWEX_RELEASE_VERSION: ${{ inputs.version }}
+          ZO_RELEASE_VERSION: ${{ inputs.version }}
 
       - name: Set Environment
         run: |

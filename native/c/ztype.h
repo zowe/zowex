@@ -95,6 +95,11 @@ enum DataType
 typedef struct _ZEncode
 {
   char codepage[16];
+  /**
+   * Represents the local user/CLI encoding (--local-encoding).
+   * WRITE (local -> remote): acts as the source encoding.
+   * READ  (remote -> local): acts as the destination encoding.
+   */
   char source_codepage[16];
   int64_t data_type;
 } ZEncode;

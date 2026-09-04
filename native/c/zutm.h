@@ -153,6 +153,7 @@ extern "C"
   int ZUTEDSCT();
   int ZUTSYMBP(SYMBOL_DATA *);
   int ZUTSRCH(const char *);
+  int ZUTIDCAM(const char *, const char *);
   int ZUTRUN(ZDIAG *, const char *, const char *);
   void ZUTDBGMG(const char *);
   unsigned char ZUTMGKEY();
@@ -188,6 +189,15 @@ extern "C"
 
   int ZUTSSIQ(ZDIAG *, JQRY_HEADER **, const char *filter);
   int ZUTCVTD(const char *ptr, char *time_out);
+
+  /**
+   * @brief Relinquish job step APF authorization (turn off JSCBAUTH) under
+   * ESTAE-type (IEAARR) recovery. Verifies with TESTAUTH that authorization
+   * was actually dropped.
+   * @return RTNCD_SUCCESS if the job step is (now) unauthorized,
+   * RTNCD_FAILURE if authorization could not be relinquished (callers must
+   * fail closed and not run unprivileged work)
+   */
   int ZUTNOAUT();
 
 #if defined(__cplusplus)

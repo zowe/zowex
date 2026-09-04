@@ -93,13 +93,9 @@ struct DS_ATTRIBUTES
 struct DscbAttributes
 {
   std::string recfm;
-  int lrecl;
-  bool is_asa;
-
-  DscbAttributes()
-      : recfm(""), lrecl(0), is_asa(false)
-  {
-  }
+  int lrecl = 0;
+  int blksize = 0;
+  bool is_asa = false;
 };
 
 #ifdef SWIG
@@ -357,5 +353,15 @@ int zdsReadDynalloc(const std::string &, const std::string &, const std::string 
  * @return int 0 for success; non zero otherwise
  */
 int zds_read_streamed(const ZDSReadOpts &opts, const std::string &pipe, size_t *content_len, uint32_t *etag_checksum = nullptr);
+
+/**
+ * @brief Invoke the IDCAMS program and receive its SYSPRINT output.
+ * https://www.ibm.com/docs/en/zos-basic-skills?topic=management-access-method-services-idcams-commands
+ * @param sysInData string data to write to the SYSIN DD for IDCAMS. Consists of commands to pass to IDCAMS.
+ * @param output output from the SYSPRINT DD of IDCAMS will be written here.
+ * @param error Reference to a string that receives a short error description on failure
+ * @return Return code (0 for success, non-zero for error)
+ */
+int zds_idcams(const std::string &sysInData, std::string &output, std::string &error);
 
 #endif

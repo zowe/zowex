@@ -84,6 +84,7 @@ export abstract class RpcClientApi implements IRpcClient {
         listDatasets: this.rpc<ds.ListDatasetsRequest, ds.ListDatasetsResponse>("listDatasets"),
         listDsMembers: this.rpc<ds.ListDsMembersRequest, ds.ListDsMembersResponse>("listDsMembers"),
         readDataset: this.rpc<ds.ReadDatasetRequest, ds.ReadDatasetResponse>("readDataset"),
+        resolveDsAlias: this.rpc<ds.ResolveDsAliasRequest, ds.ResolveDsAliasResponse>("resolveDsAlias"),
         restoreDataset: this.rpc<ds.RestoreDatasetRequest, ds.RestoreDatasetResponse>("restoreDataset"),
         writeDataset: this.rpc<ds.WriteDatasetRequest, ds.WriteDatasetResponse>("writeDataset"),
         renameDataset: this.rpc<ds.RenameDatasetRequest, ds.RenameDatasetResponse>("renameDataset"),
@@ -108,6 +109,7 @@ export abstract class RpcClientApi implements IRpcClient {
 
     public system = {
         viewSyslog: this.rpc<system.ViewSyslogRequest, system.ViewSyslogResponse>("viewSyslog"),
+        listParmlib: this.rpc<system.ListParmlibRequest, system.ListParmlibResponse>("listParmlib"),
         listProclib: this.rpc<system.ListProclibRequest, system.ListProclibResponse>("listProclib"),
         listApf: this.rpc<system.ListApfRequest, system.ListApfResponse>("listApf"),
         listLinklist: this.rpc<system.ListLinklistRequest, system.ListLinklistResponse>("listLinklist"),

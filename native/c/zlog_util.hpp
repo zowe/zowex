@@ -19,11 +19,11 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-// Shared helpers for resolving where zowex should write its log files.
+// Shared helpers for resolving where zo should write its log files.
 //
 // Logs are written per-user (defaulting to `~/.zowex/logs`) rather than to a
 // location shared by all users of the binary (e.g. next to the executable),
-// so that concurrent users of a shared zowex installation don't contend for
+// so that concurrent users of a shared zo installation don't contend for
 // the same log file.
 namespace zlog_util
 {
@@ -112,12 +112,12 @@ inline bool make_dirs(const std::string &path)
   return true;
 }
 
-// Resolves the directory zowex should write log files to. Honors
-// `ZOWEX_LOGS_DIR` if set, otherwise defaults to `<home>/.zowex/logs`
+// Resolves the directory zo should write log files to. Honors
+// `ZO_LOGS_DIR` if set, otherwise defaults to `<home>/.zowex/logs`
 // Always returns an absolute path
 inline std::string resolve_logs_dir()
 {
-  const char *override_dir = std::getenv("ZOWEX_LOGS_DIR");
+  const char *override_dir = std::getenv("ZO_LOGS_DIR");
   if (override_dir && *override_dir)
   {
     return to_absolute_path(strip_trailing_slashes(std::string(override_dir)));

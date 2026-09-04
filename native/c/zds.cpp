@@ -12,6 +12,7 @@
 #ifndef _OPEN_SYS_ITOA_EXT
 #define _OPEN_SYS_ITOA_EXT
 #include "ztype.h"
+#include "zutm.h"
 #include <cctype>
 #endif
 #ifndef _POSIX_SOURCE
@@ -300,6 +301,7 @@ static int copy_sequential(ZDS *zds, const std::string &dsn1, const std::string 
                     "IEBGENER failed with RC=%d. SYSPRINT: %s",
                     rc, truncated_detail);
     }
+
     zut_free_dynalloc_dds(zds->diag, dds);
     return RTNCD_FAILURE;
   }
@@ -673,9 +675,28 @@ static DscbAttributes zds_get_dscb_attributes(const std::string &dsn)
 
   attrs.recfm = datasets[0].recfm;
   attrs.lrecl = datasets[0].lrecl;
+  attrs.blksize = datasets[0].blksize;
   attrs.is_asa = attrs.recfm.find('A') != std::string::npos;
 
   return attrs;
+}
+
+static std::string zds_build_text_write_flags(const DscbAttributes &attrs)
+{
+  if (attrs.recfm.empty())
+  {
+    return "w,recfm=*";
+  }
+  std::string flags = "w,recfm=" + attrs.recfm;
+  if (attrs.lrecl > 0)
+  {
+    flags += ",lrecl=" + std::to_string(attrs.lrecl);
+  }
+  if (attrs.blksize > 0)
+  {
+    flags += ",blksize=" + std::to_string(attrs.blksize);
+  }
+  return flags;
 }
 
 /**
@@ -930,7 +951,7 @@ int zds_read(const ZDSReadOpts &opts, std::string &response)
     }
     catch (std::exception &e)
     {
-      ZDIAG_SET_MSG(&zds->diag, "Failed to convert input data from %s to %s", source_encoding.c_str(), zds->encoding_opts.codepage);
+      ZDIAG_SET_MSG(&zds->diag, "Failed to convert input data from %s to %s", zds->encoding_opts.codepage, source_encoding.c_str());
       return RTNCD_FAILURE;
     }
     if (!temp.empty())
@@ -1474,12 +1495,11 @@ static int zds_write_sequential(ZDS *zds, const std::string &dsn, const std::str
   const bool isTextMode = zds->encoding_opts.data_type != eDataTypeBinary;
   std::string dsname = dsn;
   TruncationTracker truncation;
-  // Build fopen flags with actual recfm from DSCB
+  // Build fopen flags with actual recfm/lrecl/blksize from DSCB
   // Use text mode - the C runtime handles ASA control characters and record boundaries
-  const std::string recfm_flag = attrs.recfm.empty() ? "*" : attrs.recfm;
   const std::string fopen_flags = zds->encoding_opts.data_type == eDataTypeBinary
                                       ? "wb"
-                                      : "w,recfm=" + recfm_flag;
+                                      : zds_build_text_write_flags(attrs);
 
   {
     FileGuard fp(dsname.c_str(), fopen_flags.c_str());
@@ -1987,6 +2007,10 @@ int zds_open_output_bpam(ZDS *zds, const std::string &dsname, IO_CTRL *&ioc)
   rc = ZDSOBPAM(zds, &ioc, zds->ddname);
   if (0 != rc)
   {
+    // same data set fails as in-use.
+    DiagMsgGuard guard(&zds->diag);
+    auto free_dds = {"FREE DD(" + ddname + ")"};
+    zut_loop_dynalloc(zds->diag, free_dds);
     return rc;
   }
   return RTNCD_SUCCESS;
@@ -3949,12 +3973,11 @@ static int zds_write_sequential_streamed(ZDS *zds, const std::string &dsn, const
   const bool isTextMode = zds->encoding_opts.data_type != eDataTypeBinary;
   const int max_len = get_effective_lrecl_from_attrs(attrs);
 
-  // Build fopen flags with actual recfm from DSCB
+  // Build fopen flags with actual recfm/lrecl/blksize from DSCB
   // Use text mode - the C runtime handles ASA control characters and record boundaries
-  const std::string recfm_flag = attrs.recfm.empty() ? "*" : attrs.recfm;
   const std::string fopen_flags = zds->encoding_opts.data_type == eDataTypeBinary
                                       ? "wb"
-                                      : "w,recfm=" + recfm_flag;
+                                      : zds_build_text_write_flags(attrs);
 
   // Track truncated lines for text mode
   TruncationTracker truncation;
@@ -4312,4 +4335,62 @@ static int zds_write_member_bpam_streamed(ZDS *zds, const std::string &dsn, cons
   // Close BPAM and handle truncation result
   rc = zds_close_output_bpam(zds, ioc);
   return handle_truncation_result(zds, rc, truncation);
+}
+
+int zds_idcams(const std::string &sysInData, std::string &output, std::string &error)
+{
+  unsigned int bpxwdynCode = 0;
+  int rc = 0;
+  ZDIAG diag{};
+  std::string sysinDdName = "";
+  std::string sysprintDdName = "";
+  std::string bpxwdynResponse = "";
+  std::vector<std::string> free_dds;
+  free_dds.reserve(2);
+
+  // Perform dynalloc for sysin and sysprint DDs
+  rc = zut_bpxwdyn_rtdd("alloc lrecl(80) recfm(f,b)", &bpxwdynCode, bpxwdynResponse, sysinDdName);
+  if (rc != 0)
+  {
+    error += "failed to allocate SYSIN dd for IDCAMS\n";
+    return RTNCD_FAILURE;
+  }
+  free_dds.push_back("free " + sysinDdName);
+
+  rc = zut_bpxwdyn_rtdd("alloc lrecl(80) recfm(f,b)", &bpxwdynCode, bpxwdynResponse, sysprintDdName);
+  if (rc != 0)
+  {
+    error += "failed to allocate SYSPRINT dd for IDCAMS\n";
+    zut_loop_dynalloc(diag, free_dds);
+    return RTNCD_FAILURE;
+  }
+  free_dds.push_back("free " + sysprintDdName);
+
+  ZDS sysinZds{};
+  ZDSWriteOpts write_opts{.zds = &sysinZds, .ddname = sysinDdName};
+  rc = zds_write(write_opts, sysInData);
+  if (rc != 0)
+  {
+    error += "failed to write IDCAMS commands to sysin\n";
+    zut_loop_dynalloc(diag, free_dds);
+    return RTNCD_FAILURE;
+  }
+
+  rc = ZUTIDCAM(sysinDdName.c_str(), sysprintDdName.c_str());
+  ZDS sysprintZds{};
+  ZDSReadOpts ropts{.zds = &sysprintZds, .ddname = sysprintDdName};
+  int sysprintReadRc = zds_read(ropts, output);
+  if (sysprintReadRc != 0)
+  {
+    error += "Failed to read from IDCAMS SYSPRINT DD '" + sysprintDdName + "'\n";
+  }
+  if (rc != 0)
+  {
+    error += "IDCAMS returned nonzero RC: " + std::to_string(rc);
+    zut_loop_dynalloc(diag, free_dds);
+    return rc;
+  }
+
+  zut_loop_dynalloc(diag, free_dds);
+  return rc;
 }

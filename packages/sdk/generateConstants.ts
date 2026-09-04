@@ -20,7 +20,7 @@ const main = () => {
 // Generated via generateConstants.ts
 export const BUNDLED_SSH_SERVER_VERSION = "{{version}}";
 `;
-        let versionValue = process.env.ZOWEX_RELEASE_VERSION;
+        let versionValue = process.env.ZO_RELEASE_VERSION;
         if (!versionValue) {
             const packageJsonContent = fs.readFileSync(path.resolve(__dirname, "..", "..", "package.json"));
             const packageJsonObj = JSON.parse(packageJsonContent.toString());

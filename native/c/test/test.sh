@@ -17,14 +17,14 @@ passed="..passed!"
 failed="..failed!"
 
 if [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
-  echo "Usage: $0 [-h|--help]|[-c|--clean]"
-  echo "This script does something."
-  exit 0
+	echo "Usage: $0 [-h|--help]|[-c|--clean]"
+	echo "This script does something."
+	exit 0
 fi
 
 if [ "$1" == "-c" ] || [ "$1" == "--clean" ]; then
-  zowex data-set delete $data_set
-  exit 0
+	zowex data-set delete $data_set
+	exit 0
 fi
 
 echo "$testing data set creation..."
@@ -83,5 +83,5 @@ zowex job delete ${jobid}
 printf "$passed\n"
 
 echo "$testing issuing conosle command ..."
-zoweax console issue "d iplinfo" --console-name zowe
+zoa console issue "d iplinfo" --console-name zowe
 printf "$passed\n"

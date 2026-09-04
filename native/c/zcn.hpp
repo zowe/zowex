@@ -17,6 +17,15 @@
 #include "zcntype.h"
 
 /**
+ * @brief Build the default extended console name: the current user ID
+ * truncated to 7 characters plus a rotating digit
+ *
+ * @param name string where the console name will be stored
+ * @return int 0 for success; non zero if the user ID is unavailable
+ */
+int zcn_build_default_console_name(std::string &name);
+
+/**
  * @brief Activate extended console
  * @note Prefer `ZcnSession` for RAII-managed usage. When using this API directly you MUST call `zcn_deactivate` to prevent resource leaks.
  * @param zcn extended console returned attributes and error information

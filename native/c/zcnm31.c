@@ -101,7 +101,25 @@ int zcnm1act(ZCN *zcn)
 MGCRE_MODEL(mgcre_model);
 
 #if defined(__IBM_METAL__)
-#define MGCRE(id, message, cart, authcmdx, plist)                       \
+#define MGCRE(id, message, cart, plist)                                 \
+  __asm(                                                                \
+      "*                                                            \n" \
+      " LA 2,%1                                                     \n" \
+      "*                                                            \n" \
+      " MGCRE TEXT=(2),"                                                \
+      "CART=%2,"                                                        \
+      "CONSID=%0,"                                                      \
+      "MF=(E,%3)                                                    \n" \
+      "*                                                            \n" \
+      :                                                                 \
+      : "m"(id), "m"(message), "m"(cart), "m"(plist)                    \
+      : "r0", "r1", "r2", "r14", "r15");
+#else
+#define MGCRE(id, message, cart, plist)
+#endif
+
+#if defined(__IBM_METAL__)
+#define MGCRE_AUTHX(id, message, cart, authcmdx, plist)                 \
   __asm(                                                                \
       "*                                                            \n" \
       " LA 2,%1                                                     \n" \
@@ -116,7 +134,7 @@ MGCRE_MODEL(mgcre_model);
       : "m"(id), "m"(message), "m"(cart), "m"(authcmdx), "m"(plist)     \
       : "r0", "r1", "r2", "r14", "r15");
 #else
-#define MGCRE(id, message, cart, authcmdx, plist)
+#define MGCRE_AUTHX(id, message, cart, authcmdx, plist)
 #endif
 
 // MGCETXT	Command text - Table 2 "MGCRE mapping", structure "MGCETEXT" https://www.ibm.com/docs/en/zos/3.2.0?topic=rqe-mgcre-information
@@ -142,12 +160,14 @@ int zcnm1put(ZCN *zcn, const char *command)
     char command[MGCRTEXT];
   } commandBuffer = {0};
 
-  unsigned short authcmdx = 0x8000; // 1000000000000000 - Master Authority - https://www.ibm.com/docs/en/zos/3.1.0?topic=commands-mgcre-execute-form
-  unsigned short *authcmdxp = &authcmdx;
-
   /* Use precision specifier %.*s as snprintf is unavailable in Metal C */
   commandBuffer.commandLen = sprintf(commandBuffer.command, "%.*s", (int)(sizeof(commandBuffer.command) - 1), command);
-  char cart[8] = "ZOWECART";
+  char cart[8];
+  memcpy(cart, zcn->cart, sizeof(cart));
+
+  unsigned short authcmdx = zcn->authcmdx;
+  unsigned short *authcmdxp = &authcmdx;
+  (void)authcmdxp; // codeql
 
   strcpy(zcn->diag.service_name, "MGCRE");
 
@@ -156,7 +176,14 @@ int zcnm1put(ZCN *zcn, const char *command)
     mode_sup();
   }
   set_key(&key_zero);
-  MGCRE(zcn->id, commandBuffer, cart, authcmdxp, dsa_mgcre_model);
+  if (0 != authcmdx)
+  {
+    MGCRE_AUTHX(zcn->id, commandBuffer, cart, authcmdxp, dsa_mgcre_model);
+  }
+  else
+  {
+    MGCRE(zcn->id, commandBuffer, cart, dsa_mgcre_model);
+  }
   set_key(&key);
   if (mode_switch)
   {
@@ -335,7 +362,8 @@ int zcnm1get(ZCN *zcn, char *resp)
   MCSOPMSG_MODEL(dsa_mcsopmsg_model);
   dsa_mcsopmsg_model = mcsopmsg_model;
 
-  char cart[8] = "ZOWECART";
+  char cart[8];
+  memcpy(cart, zcn->cart, sizeof(cart));
   void *area = NULL;
   int alet = 0;
 

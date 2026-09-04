@@ -86,14 +86,14 @@
 
 ## Console
 
-| Operation                | z/OSMF | FTP | Backend         | Middleware | SDK | CLI | VSCE |
-| ------------------------ | ------ | --- | --------------- | ---------- | --- | --- | ---- |
-| Issue MVS command        | ✅     | ❌  | ✅ <sup>1</sup> | ❌         | ✅  | ❌  | ❌   |
-| Get MVS command response | ✅     | ❌  | ❌              | ❌         | ❌  | ❌  | ❌   |
-| Get MVS detect result    | ✅     | ❌  | ❌              | ❌         | ❌  | ➖  | ➖   |
+| Operation                | z/OSMF | FTP | Backend         | Middleware      | SDK | CLI            | VSCE |
+| ------------------------ | ------ | --- | --------------- | --------------- | --- | -------------- | ---- |
+| Issue MVS command        | ✅     | ❌  | ✅ <sup>1</sup> | ✅ <sup>1</sup> | ✅  | ✅ <sup>1</sup> | ❌   |
+| Get MVS command response | ✅     | ❌  | ❌              | ❌              | ❌  | ❌             | ❌   |
+| Get MVS detect result    | ✅     | ❌  | ❌              | ❌              | ❌  | ➖             | ➖   |
 
-1. Requires APF authorization.
-<!-- 2. You must manually deploy/symlink `zoweax` -->
+1. Requires the APF-authorized `zoa` binary installed on the host and ESM
+   OPERCMDS authorization — see [zoa-security.md](./zoa-security.md).
 
 ## TSO
 

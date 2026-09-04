@@ -1100,7 +1100,7 @@ function getDirs(next = "") {
 }
 
 async function artifacts(connection: Client, packageAll: boolean) {
-    const artifactPaths = ["c/build-out/zowex", packageAll && "c/build-out/zoweax"].filter(Boolean);
+    const artifactPaths = ["c/build-out/zo", packageAll && "c/build-out/zoa"].filter(Boolean);
     const artifactNames = artifactPaths.map((file) => path.basename(file)).sort(localeCompare);
     const localDir = packageAll ? "dist" : "packages/sdk/bin";
     const localFiles = ["server.pax.Z"];
@@ -1431,7 +1431,9 @@ async function clean(connection: Client) {
 
 async function rmdir(connection: Client, sshProfile: IProfile) {
     console.log(
-        await runCommandInShell(connection, `rm -rf ${deployDirs.root}\n`, { stepName: "Removing deploy directory" }),
+        await runCommandInShell(connection, `rm -rf "$(realpath ${deployDirs.root})"\n`, {
+            stepName: "Removing deploy directory",
+        }),
     );
     console.log("Removal complete");
     const watcher = new WatchUtils(connection, sshProfile);

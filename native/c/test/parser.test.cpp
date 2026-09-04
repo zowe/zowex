@@ -44,6 +44,21 @@ int sample_handler(plugin::InvocationContext &context)
   return 7;
 }
 
+bool g_priv_handler_called = false;
+bool g_plain_handler_called = false;
+
+int priv_probe_handler(plugin::InvocationContext &)
+{
+  g_priv_handler_called = true;
+  return 0;
+}
+
+int plain_probe_handler(plugin::InvocationContext &)
+{
+  g_plain_handler_called = true;
+  return 0;
+}
+
 } // namespace
 
 void parser_tests()
@@ -420,7 +435,7 @@ void parser_tests()
              });
 
              it("rejects unexpected trailing positional arguments", []() {
-               ArgumentParser arg_parser("zowex", "command sample");
+               ArgumentParser arg_parser("zo", "command sample");
                Command &root = arg_parser.get_root_command();
 
                command_ptr job_cmd(new Command("job", "job operations"));
@@ -428,7 +443,7 @@ void parser_tests()
                job_cmd->add_command(list_cmd);
                root.add_command(job_cmd);
 
-               std::vector<std::string> raw = {"zowex", "job", "list", "extra"};
+               std::vector<std::string> raw = {"zo", "job", "list", "extra"};
                std::vector<char *> argv = to_argv(raw);
 
                ParseResult result;
@@ -582,6 +597,98 @@ void parser_tests()
                Expect(hook1_called).ToBe(true);
                Expect(hook2_called).ToBe(false); // Second hook shouldn't run
                Expect(g_handler_called).ToBe(false); // Handler shouldn't run
+             });
+
+             it("exposes the privileged flag of the executing subcommand to hooks", []() {
+               bool hook_called = false;
+               bool hook_saw_privileged = false;
+
+               ArgumentParser arg_parser("prog", "privileged flag sample");
+               arg_parser.add_pre_command_hook([&](const Command &cmd, bool is_help_request) -> bool {
+                 hook_called = true;
+                 hook_saw_privileged = cmd.is_privileged();
+                 return true;
+               });
+
+               auto group = command_ptr(new Command("secure", "privileged group"));
+               auto sub_before = command_ptr(new Command("early", "added before set_privileged"));
+               sub_before->set_handler(&priv_probe_handler);
+               group->add_command(sub_before);
+               group->set_privileged(true);
+               auto sub_after = command_ptr(new Command("late", "added after set_privileged"));
+               sub_after->set_handler(&priv_probe_handler);
+               group->add_command(sub_after);
+               arg_parser.get_root_command().add_command(group);
+
+               {
+                 g_priv_handler_called = false;
+                 std::vector<std::string> raw = {"prog", "secure", "early"};
+                 std::vector<char *> argv = to_argv(raw);
+                 ParseResult result = arg_parser.parse(static_cast<int>(argv.size()), argv.data());
+                 Expect(result.exit_code).ToBe(0);
+                 Expect(hook_called).ToBe(true);
+                 Expect(hook_saw_privileged).ToBe(true);
+                 Expect(g_priv_handler_called).ToBe(true);
+               }
+
+               {
+                 g_priv_handler_called = false;
+                 hook_called = false;
+                 hook_saw_privileged = false;
+                 std::vector<std::string> raw = {"prog", "secure", "late"};
+                 std::vector<char *> argv = to_argv(raw);
+                 ParseResult result = arg_parser.parse(static_cast<int>(argv.size()), argv.data());
+                 Expect(result.exit_code).ToBe(0);
+                 Expect(hook_called).ToBe(true);
+                 Expect(hook_saw_privileged).ToBe(true);
+                 Expect(g_priv_handler_called).ToBe(true);
+               }
+             });
+
+             it("supports fail-closed authorization hooks: privileged bypasses, non-privileged aborts", []() {
+               // mirrors the zowex authorization-drop hook when the drop fails:
+               // privileged commands skip the drop and run; everything else aborts
+               ArgumentParser arg_parser("prog", "fail closed sample");
+               arg_parser.add_pre_command_hook([](const Command &cmd, bool is_help_request) -> bool {
+                 if (!is_help_request && cmd.is_privileged())
+                 {
+                   return true;
+                 }
+                 return false; // simulated failure to relinquish authorization
+               });
+
+               auto group = command_ptr(new Command("secure", "privileged group"));
+               auto sub = command_ptr(new Command("run", "privileged action"));
+               sub->set_handler(&priv_probe_handler);
+               group->add_command(sub);
+               group->set_privileged(true);
+               arg_parser.get_root_command().add_command(group);
+
+               auto plain = command_ptr(new Command("list", "non-privileged action"));
+               plain->set_handler(&plain_probe_handler);
+               arg_parser.get_root_command().add_command(plain);
+
+               {
+                 g_priv_handler_called = false;
+                 std::vector<std::string> raw = {"prog", "secure", "run"};
+                 std::vector<char *> argv = to_argv(raw);
+                 ParseResult result = arg_parser.parse(static_cast<int>(argv.size()), argv.data());
+                 Expect(result.exit_code).ToBe(0);
+                 Expect(g_priv_handler_called).ToBe(true);
+               }
+
+               {
+                 g_plain_handler_called = false;
+                 std::vector<std::string> raw = {"prog", "list"};
+                 std::vector<char *> argv = to_argv(raw);
+                 ParseResult result;
+                 {
+                   test_utils::ErrorStreamCapture error_capture;
+                   result = arg_parser.parse(static_cast<int>(argv.size()), argv.data());
+                 }
+                 Expect(result.exit_code).ToBe(1);
+                 Expect(g_plain_handler_called).ToBe(false); // fail closed: handler never ran
+               }
              });
              
              it("executes hooks before help is shown", []() {

@@ -62,31 +62,31 @@ void cleanup_test_dir(const std::string &dir)
   rmdir(dir.c_str());
 }
 
-// Temporarily overrides ZOWEX_LOGS_DIR for the duration of a test, restoring
+// Temporarily overrides ZO_LOGS_DIR for the duration of a test, restoring
 // the previous value (set by ztest_runner.cpp) on destruction.
 class ScopedLogsDirOverride
 {
 public:
   explicit ScopedLogsDirOverride(const std::string &dir)
   {
-    const char *previous = std::getenv("ZOWEX_LOGS_DIR");
+    const char *previous = std::getenv("ZO_LOGS_DIR");
     if (previous)
     {
       had_previous = true;
       previous_value = previous;
     }
-    setenv("ZOWEX_LOGS_DIR", dir.c_str(), 1);
+    setenv("ZO_LOGS_DIR", dir.c_str(), 1);
   }
 
   ~ScopedLogsDirOverride()
   {
     if (had_previous)
     {
-      setenv("ZOWEX_LOGS_DIR", previous_value.c_str(), 1);
+      setenv("ZO_LOGS_DIR", previous_value.c_str(), 1);
     }
     else
     {
-      unsetenv("ZOWEX_LOGS_DIR");
+      unsetenv("ZO_LOGS_DIR");
     }
   }
 
@@ -131,25 +131,24 @@ private:
 
 void server_logger_tests()
 {
-  describe("server::Logger ZOWEX_LOGS_DIR tests", []() -> void
-           {
-        it("should write logs to the directory specified by ZOWEX_LOGS_DIR", []() {
+  describe("server::Logger ZO_LOGS_DIR tests", []() -> void
+           { it("should write logs to the directory specified by ZO_LOGS_DIR", []()
+                {
             const std::string test_dir = "logs/server_logger_env_test";
             const std::string log_path = test_dir + "/zowex_server.log";
 
             ScopedLogsDirOverride override_dir(test_dir);
 
             server::Logger::init_logger(false, true);
-            LOG_INFO("Message written for ZOWEX_LOGS_DIR test");
+            LOG_INFO("Message written for ZO_LOGS_DIR test");
             server::Logger::shutdown();
 
             Expect(file_exists(log_path)).ToBe(true);
 
             const std::string contents = read_file_contents(log_path);
-            Expect(contents).ToContain("Message written for ZOWEX_LOGS_DIR test");
+            Expect(contents).ToContain("Message written for ZO_LOGS_DIR test");
 
-            cleanup_test_dir(test_dir);
-        }); });
+            cleanup_test_dir(test_dir); }); });
 
   describe("server::Logger log rolling tests", []() -> void
            {
@@ -234,8 +233,8 @@ void server_logger_tests()
         }); });
 
   describe("server::Logger rotation failure handling", []() -> void
-           {
-        it("should preserve the active log if archiving it during rotation fails", []() {
+           { it("should preserve the active log if archiving it during rotation fails", []()
+                {
             const std::string test_dir = "logs/server_logger_rotate_failure_test";
             const std::string log_path = test_dir + "/zowex_server.log";
 
@@ -273,6 +272,5 @@ void server_logger_tests()
             Expect(contents).ToContain("Simulated failure #149:");
 
             unlink(log_path.c_str());
-            rmdir(test_dir.c_str());
-        }); });
+            rmdir(test_dir.c_str()); }); });
 }

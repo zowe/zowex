@@ -15,6 +15,7 @@
 #include "../zutm.h"
 #include <dirent.h>
 #include <algorithm>
+#include <mutex>
 #include <set>
 #include <vector>
 
@@ -30,11 +31,22 @@ namespace
 {
 std::string g_version("unknown");
 plugin::PluginManager *g_plugin_manager = nullptr;
+
+std::string &program_name_ref()
+{
+  static std::string program_name("zo");
+  return program_name;
+}
 } // namespace
 
 void set_version(const std::string &version)
 {
   g_version = version;
+}
+
+void set_program_name(const std::string &name)
+{
+  program_name_ref() = name;
 }
 
 const std::string &get_version()
@@ -97,7 +109,7 @@ int interactive_mode(const plugin::InvocationContext &context)
 
 int handle_version(plugin::InvocationContext &context)
 {
-  context.output_stream() << "Zowe Remote SSH CLI (zowex)" << std::endl;
+  context.output_stream() << "Zowe Remote SSH CLI (" << program_name_ref() << ")" << std::endl;
   context.output_stream() << "Version: " << g_version << std::endl;
   context.output_stream() << "Build Date: " << BUILD_DATE << " " << BUILD_TIME << std::endl;
   context.output_stream() << "Copyright Contributors to the Zowe Project." << std::endl;
@@ -212,7 +224,7 @@ int execute_command(int argc, char *argv[])
   return result.exit_code;
 }
 
-Command &setup_root_command(char *argv[])
+Command &setup_root_command(char *argv[], bool include_plugin_commands)
 {
   g_arg_parser = std::make_shared<ArgumentParser>(argv[0], "Zowe Remote SSH CLI");
   g_arg_parser->add_pre_command_hook([](const Command &command, bool is_help_request)
@@ -222,8 +234,11 @@ Command &setup_root_command(char *argv[])
       return true;
     }
 
-    ZUTNOAUT(); 
-    return true; });
+    // Serialize against concurrent callers and fail closed: never run a
+    // non-privileged command while the job step is still APF-authorized
+    static std::mutex noaut_mutex;
+    std::lock_guard<std::mutex> lock(noaut_mutex);
+    return 0 == ZUTNOAUT(); });
   auto &root_command = g_arg_parser->get_root_command();
 
   root_command.add_keyword_arg("interactive",
@@ -242,11 +257,14 @@ Command &setup_root_command(char *argv[])
     version_cmd->set_handler(handle_version);
     root_command.add_command(version_cmd); // Should provide more info here, if command is enhanced later.
 
-    auto plugins_cmd = command_ptr(new Command("plugins", "plug-in management commands"));
-    auto list_cmd = command_ptr(new Command("list", "list available plug-ins"));
-    list_cmd->set_handler(handle_plugins_list);
-    plugins_cmd->add_command(list_cmd);
-    root_command.add_command(plugins_cmd);
+    if (include_plugin_commands)
+    {
+      auto plugins_cmd = command_ptr(new Command("plugins", "plug-in management commands"));
+      auto list_cmd = command_ptr(new Command("list", "list available plug-ins"));
+      list_cmd->set_handler(handle_plugins_list);
+      plugins_cmd->add_command(list_cmd);
+      root_command.add_command(plugins_cmd);
+    }
   }
 
   return root_command;
