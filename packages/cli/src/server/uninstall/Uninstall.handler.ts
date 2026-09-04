@@ -16,7 +16,7 @@ export default class ServerUninstallHandler implements ICommandHandler {
     public async process(params: IHandlerParameters): Promise<void> {
         const session = ZSshUtils.buildSession(params.arguments);
         const serverPath = params.arguments.serverPath ?? ZSshClient.DEFAULT_SERVER_PATH;
-        await ZSshUtils.uninstallServer(session, serverPath);
+        await ZSshUtils.uninstallServer(session, serverPath, { identityAgent: params.arguments.identityAgent });
         params.response.console.log(
             `Uninstalled Zowe Remote SSH server from ${ConfigUtils.getActiveProfileName("ssh", params.arguments)}`,
         );

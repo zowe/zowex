@@ -26,8 +26,8 @@ import {
     type IProfileTypeConfiguration,
     type ProfileInfo,
 } from "@zowe/imperative";
-import type { ISshSession } from "@zowe/zos-uss-for-zowe-sdk";
-import { NodeSSH } from "node-ssh";
+import { type ISshSession, SshSession } from "@zowe/zos-uss-for-zowe-sdk";
+import { NodeSSH, type Config as NodeSSHConfig } from "node-ssh";
 import { ConfigFileUtils } from "./ConfigFileUtils";
 import {
     type IDisposable,
@@ -40,6 +40,7 @@ import {
     type qpOpts,
 } from "./doc";
 import { type ISshConfigExt, SshConfigUtils } from "./SshConfigUtils";
+import { ZSshUtils } from "./ZSshUtils";
 
 export abstract class AbstractConfigManager {
     public constructor(private mProfilesCache: ProfileInfo) {}
@@ -167,6 +168,7 @@ export abstract class AbstractConfigManager {
                     keyPassphrase: foundProfile?.profile?.keyPassphrase,
                     user: foundProfile?.profile?.user,
                     password: foundProfile?.profile?.password,
+                    identityAgent: foundProfile?.profile?.identityAgent,
                 });
 
                 if (validConfig === undefined) {
@@ -221,8 +223,12 @@ export abstract class AbstractConfigManager {
             this.selectedProfile.privateKey = this.selectedProfile.keyPassphrase = undefined;
             this.selectedProfile = { ...this.selectedProfile, ...this.validationResult };
         }
-        // If no private key or password is on the profile then there is no possible validation combination, thus return
-        if (!this.selectedProfile?.privateKey && !this.selectedProfile?.password) {
+        // If no private key, password, or identity agent is on the profile then there is no possible validation combination, thus return
+        if (
+            !this.selectedProfile?.privateKey &&
+            !this.selectedProfile?.password &&
+            !this.selectedProfile?.identityAgent
+        ) {
             this.showMessage("SSH setup cancelled.", MESSAGE_TYPE.WARNING);
             return;
         }
@@ -243,6 +249,7 @@ export abstract class AbstractConfigManager {
                 handshakeTimeout: this.selectedProfile.handshakeTimeout,
                 port: this.selectedProfile.port,
                 keyPassphrase: this.selectedProfile.keyPassphrase,
+                identityAgent: this.selectedProfile.identityAgent,
             },
         };
     }
@@ -406,7 +413,11 @@ export abstract class AbstractConfigManager {
                 configModifications.user = userModification;
             }
 
-            if ((!privateKeyPath || !readFileSync(path.normalize(privateKeyPath), "utf-8")) && !newConfig.password) {
+            if (
+                (!privateKeyPath || !readFileSync(path.normalize(privateKeyPath), "utf-8")) &&
+                !newConfig.password &&
+                !newConfig.identityAgent
+            ) {
                 const passwordPrompt = askForPassword && (await this.promptForPassword(newConfig, configModifications));
                 return passwordPrompt ? { ...configModifications, ...passwordPrompt } : undefined;
             }
@@ -499,18 +510,13 @@ export abstract class AbstractConfigManager {
 
         try {
             // Prepare connection configuration
-            const connectionConfig = {
-                host: config.hostname,
-                port: config.port || 22,
-                username: config.user,
-                password: config.privateKey ? undefined : config.password,
-                privateKey: config.privateKey ? readFileSync(path.normalize(config.privateKey), "utf8") : undefined,
-                passphrase: config.privateKey ? config.keyPassphrase : undefined,
+            const connectionConfig = ZSshUtils.buildSshConfig(new SshSession(config), {
+                agent: config.identityAgent,
                 readyTimeout: config.handshakeTimeout || this.getClientSetting("handshakeTimeout") || 30000,
-            };
+            });
 
             // Attempt connection
-            await ssh.connect(connectionConfig);
+            await ssh.connect(connectionConfig as NodeSSHConfig);
             if (!ssh.isConnected()) {
                 throw new Error("Failed to connect to SSH: All configured authentication methods failed");
             }
@@ -538,7 +544,14 @@ export abstract class AbstractConfigManager {
             if (!testPassword) return undefined;
 
             try {
-                await this.attemptConnection({ ...config, ...configModifications, password: testPassword });
+                // Omit identityAgent: this attempt is specifically testing the typed password,
+                // and buildSshConfig prefers agent auth over password when both are present.
+                await this.attemptConnection({
+                    ...config,
+                    ...configModifications,
+                    password: testPassword,
+                    identityAgent: undefined,
+                });
                 return { password: testPassword };
             } catch (error) {
                 if (`${error}`.includes("FOTS1668")) {
@@ -565,6 +578,9 @@ export abstract class AbstractConfigManager {
                 for (const privateKey of foundPrivateKeys) {
                     const testValidation: ISshConfigExt = { ...this.selectedProfile };
                     testValidation.privateKey = privateKey;
+                    // Omit identityAgent: this attempt is specifically testing a discovered private key,
+                    // and buildSshConfig prefers agent auth over the private key when both are present.
+                    testValidation.identityAgent = undefined;
 
                     const result = await this.validateConfig(testValidation, false);
 
@@ -627,6 +643,7 @@ export abstract class AbstractConfigManager {
                 port: selectedConfig.port || 22,
                 keyPassphrase: selectedConfig.keyPassphrase,
                 password: selectedConfig.password,
+                identityAgent: selectedConfig.identityAgent,
             },
             //if user, password, or KP is defined, make them secure
             secure: ["user", "password", "keyPassphrase"].filter((key) => selectedConfig[key as keyof ISshConfigExt]),
