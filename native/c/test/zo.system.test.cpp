@@ -45,7 +45,7 @@ void zo_system_tests()
                 {
                   int rc = 0;
                   string response;
-                  rc = execute_command_with_output(zowex_command + " system list-parmlib", response);
+                  rc = execute_command_with_output(zo_command + " system list-parmlib", response);
                   ExpectWithContext(rc, response).ToBeGreaterThanOrEqualTo(0);
                 });
            });
