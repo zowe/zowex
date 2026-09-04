@@ -1029,14 +1029,14 @@ private:
       }
       for (size_t i = 0; i < arg.aliases.size(); ++i)
       {
-        if (arg.aliases[i] == "--json")
+        if (arg.aliases[i] == "--json" || arg.aliases[i] == "--rfj")
         {
           return;
         }
       }
     }
 
-    ArgumentDef json_arg("json", make_aliases("--json"),
+    ArgumentDef json_arg("json", make_aliases("--json", "--rfj"),
                          "print the result as a single line of JSON",
                          ArgType_Flag, false, false, ArgValue(false), false);
     json_arg.is_json_flag = true;
@@ -2253,7 +2253,7 @@ private:
       const std::string arg(argv[i]);
       if (arg == "--")
         break;
-      if (arg == "--json")
+      if (arg == "--json" || arg == "--rfj")
         return true;
     }
     return false;
@@ -2267,7 +2267,7 @@ private:
     {
       if (word == "--")
         break;
-      if (word == "--json")
+      if (word == "--json" || word == "--rfj")
         return true;
     }
     return false;
