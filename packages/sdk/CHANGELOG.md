@@ -4,9 +4,10 @@ All notable changes to the Client code for "@zowe/zowex-for-zowe-sdk" are docume
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## Recent Changes 
+## Recent Changes
 
 - **Breaking** The `zowex` program bundled in `server.pax.Z` is now renamed to `zo`. [#1119](https://github.com/zowe/zowex/pull/1119)
+- Added JSON-RPC support for listing parmlib data sets. [#1124](https://github.com/zowe/zowex/pull/1124)
 - Added support for the `resolveDsAlias` RPC command which allows the caller to resolve data set aliases. [#1108](https://github.com/zowe/zowex/pull/1108)
 
 ## `0.9.0`

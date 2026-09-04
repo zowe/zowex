@@ -26,12 +26,9 @@ static const std::string ussTestDir = "/tmp/zowex_uss_srv_" + get_random_string(
 
 void zo_uss_server_tests()
 {
-  describe("uss server tests", []() -> void
-           {
-             ServerHandle server;
-
-             beforeAll([&]() -> void
-                       {
+  ServerHandle server;
+  describe("uss server tests", [&]() -> void {
+    beforeAll([&]() -> void {
       server = start_server(zo_server_command, true);
 
       // Create test directory with full permissions for all test operations

@@ -31,10 +31,8 @@ static std::string get_test_ds()
 
 void zo_ds_server_tests()
 {
-  describe("data set server tests", []() -> void
-           {
-             ServerHandle server;
-
+  ServerHandle server;
+  describe("data set server tests", [&]() -> void {
              beforeAll([&]() -> void
                        { server = start_server(zo_server_command, true); });
 

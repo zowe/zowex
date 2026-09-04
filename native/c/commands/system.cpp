@@ -57,12 +57,20 @@ int handle_system_list_parmlib(InvocationContext &context)
     return RTNCD_FAILURE;
   }
 
-  for (vector<string>::iterator it = parmlibs.begin(); it != parmlibs.end(); ++it)
+  const auto result = obj();
+  const auto items = arr();
+
+  for (const auto &dsn : parmlibs)
   {
-    context.output_stream() << *it << endl;
+    context.output_stream() << dsn << endl;
+    items->push(str(dsn));
   }
 
-  return rc;
+  result->set("items", items);
+  result->set("returnedRows", i64(parmlibs.size()));
+  context.set_object(result);
+
+  return RTNCD_SUCCESS;
 }
 
 int handle_system_list_proclib(InvocationContext &context)

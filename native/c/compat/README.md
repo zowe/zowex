@@ -33,7 +33,7 @@ puts Open XL 2.1 on the `PATH`. This is the dominant factor and it is what zowex
 the build had moved to Open XL 2.2, whose newer libc++ raises the LE level every consumer must carry.
 Keep it at 2.1 for as long as z/OS 2.5 is supported.
 
-**2. A source-level lint.** `npm run lint:compat` ([`scripts/checkNoStringHash.js`](../../../scripts/checkNoStringHash.js))
+**2. A source-level lint.** `npm run lint:tidy` ([`scripts/checkNoStringHash.js`](../../../scripts/checkNoStringHash.js))
 rejects string-keyed hash containers, which pull in `std::__1_e::__hash_memory` — the specific symbol
 behind zowex#871. Runs on any machine in milliseconds, no z/OS needed, and catches the regression at
 the point someone writes it.
