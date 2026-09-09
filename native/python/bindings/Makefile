@@ -1,4 +1,4 @@
-# Makefile for building Python bindings for zowex
+# Makefile for building Python bindings for zo
 
 # Default target
 all: swig-extenders build

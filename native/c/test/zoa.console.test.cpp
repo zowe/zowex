@@ -69,7 +69,7 @@ void zoa_console_tests()
             ExpectWithContext(rc, response).ToBe(0);
         });
 
-        it("should not exist in the unauthorized zowex binary", []() -> void
+        it("should not exist in the unauthorized zo binary", []() -> void
         {
             std::string response;
             std::string command = zo_command + " console issue \"D T\"";
