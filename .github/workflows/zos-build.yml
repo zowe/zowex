@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     concurrency:
       group: "zos-build"
-    timeout-minutes: ${{ github.event_name == 'pull_request' && 25 || 20 }}
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v4
@@ -71,6 +71,9 @@ jobs:
         run: npm pkg set version=${{ inputs.version }}
 
       - name: Build on z/OS
+        env:
+          # Debug builds run only for PRs; main/release/nightly builds stay in release mode
+          ZOWE_NATIVE_DEBUG: ${{ github.event_name == 'pull_request' && '1' || '0' }}
         run: npm run z:rebuild
 
       # Informational, uploaded as an artifact for inspection. Does not gate: what keeps the binary
@@ -118,17 +121,6 @@ jobs:
           name: Test results
           path: native/c/test/test-results.xml
           reporter: java-junit
-
-      # Debug builds run only for PRs; main/release/nightly builds stay in release mode
-      - name: Clean native build artifacts
-        if: github.event_name == 'pull_request'
-        run: npm run z:clean
-
-      - name: Debug build on z/OS
-        if: github.event_name == 'pull_request'
-        env:
-          ZOWE_NATIVE_DEBUG: "1"
-        run: npm run z:build
 
       - name: Clean up on z/OS
         if: always()
