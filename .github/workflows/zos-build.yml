@@ -10,6 +10,9 @@ on:
       - main
   workflow_call:
     inputs:
+      debug:
+        required: false
+        type: boolean
       version:
         required: false
         type: string
@@ -72,8 +75,7 @@ jobs:
 
       - name: Build on z/OS
         env:
-          # Debug builds run only for PRs; main/release/nightly builds stay in release mode
-          ZOWE_NATIVE_DEBUG: ${{ github.event_name == 'pull_request' && '1' || '0' }}
+          ZOWE_NATIVE_DEBUG: ${{ inputs.debug && '1' || '0' }}
         run: npm run z:rebuild
 
       # Informational, uploaded as an artifact for inspection. Does not gate: what keeps the binary
@@ -88,6 +90,8 @@ jobs:
           path: listings/*
 
       - name: Package server artifacts
+        # Don't produce artifacts for nightly builds; we want release artifacts available from last successful build
+        if: ${{ !inputs.debug }}
         run: npm run z:package
 
       - uses: actions/upload-artifact@v4
