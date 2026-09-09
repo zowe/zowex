@@ -14,6 +14,16 @@ import { ZSshClient } from "@zowe/zowex-for-zowe-sdk";
 
 // biome-ignore lint/complexity/noStaticOnlyClass: Constants class has static properties
 export class Constants {
+    public static readonly OPT_RESPONSE_TIMEOUT: ICommandOptionDefinition = {
+        name: "response-timeout",
+        aliases: ["rto"],
+        description:
+            "The maximum number of seconds to wait for a response to a single request before timing out. " +
+            "Increase this for large file uploads/downloads over slow connections. Defaults to 60 seconds.",
+        type: "number",
+        required: false,
+    };
+
     public static readonly OPT_SERVER_PATH: ICommandOptionDefinition = {
         name: "server-path",
         aliases: ["sp"],
@@ -21,4 +31,12 @@ export class Constants {
         type: "string",
         required: false,
     };
+
+    /**
+     * Options appended to every zowex command definition on top of SshSession.SSH_CONNECTION_OPTIONS.
+     */
+    public static readonly ZSSH_EXTRA_OPTIONS: ICommandOptionDefinition[] = [
+        Constants.OPT_RESPONSE_TIMEOUT,
+        Constants.OPT_SERVER_PATH,
+    ];
 }
