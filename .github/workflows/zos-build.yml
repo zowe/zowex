@@ -90,7 +90,7 @@ jobs:
           path: listings/*
 
       - name: Package server artifacts
-        # Don't produce artifacts for nightly builds; we want release artifacts available from last successful build
+        # Don't produce artifacts for debug builds; we want release artifacts available from last successful build
         if: ${{ !inputs.debug }}
         run: npm run z:package
 
