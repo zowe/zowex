@@ -146,6 +146,13 @@ void Worker::add_request(const RequestMetadata &request)
 
 void Worker::worker_loop()
 {
+  // Let streaming command handlers (e.g. large file uploads) touch this
+  // worker's heartbeat per chunk via MiddlewareContext::update_heartbeat(), so
+  // the supervisor's request-timeout watchdog sees ongoing progress instead
+  // of only the start/end of the request.
+  RpcServer::set_heartbeat_callback([this]
+                                     { update_heartbeat(); });
+
   try
   {
     while (true)

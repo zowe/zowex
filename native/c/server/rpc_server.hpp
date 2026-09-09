@@ -16,6 +16,7 @@
 #include <mutex>
 #include <deque>
 #include <set>
+#include <functional>
 #include "../extend/plugin.hpp"
 #include "../singleton.hpp"
 
@@ -131,6 +132,25 @@ public:
    * @param notification The RpcNotification to send
    */
   static void send_notification(const RpcNotification &notification);
+
+  /**
+   * @brief Set the heartbeat callback returned by heartbeat_callback() on this thread.
+   *
+   * The RPC server runs one dedicated worker thread per Worker for its whole life, so this is
+   * set once by that thread (see Worker::worker_loop) rather than being threaded through every
+   * process_request() call.
+   *
+   * @param callback Callback to invoke on this thread, or an empty std::function to clear it
+   */
+  static void set_heartbeat_callback(std::function<void()> callback);
+
+  /**
+   * @brief Get this thread's registered heartbeat callback, if any.
+   *
+   * Used by MiddlewareContext::update_heartbeat() so streaming command handlers (e.g. large
+   * file uploads) can signal per-chunk progress back to the worker that's servicing them.
+   */
+  static const std::function<void()> &heartbeat_callback();
 
   /**
    * Send a timeout error response for a request that exceeded the timeout limit

@@ -95,6 +95,9 @@ public:
   // Set content length and send pending notification if present
   void set_content_len(size_t content_length);
 
+  // Invokes RpcServer::heartbeat_callback(), if set (see there for why it's registered per-thread)
+  void update_heartbeat() override;
+
   // Store pending notification for delayed sending
   void set_pending_notification(const RpcNotification &notification);
 

@@ -965,6 +965,11 @@ public:
     m_content_len = content_len;
   }
 
+  // Signal that a long-running request (e.g. a streamed file upload/download)
+  // is still making progress. No-op by default; overridden where there's a
+  // liveness mechanism to feed (see MiddlewareContext::update_heartbeat).
+  virtual void update_heartbeat() {}
+
 protected:
   ArgumentMap m_args;
 

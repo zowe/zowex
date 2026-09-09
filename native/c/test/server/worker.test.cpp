@@ -116,6 +116,15 @@ public:
   }
 
   /**
+   * @brief Mock implementation of set_heartbeat_callback.
+   * No-op; heartbeat behavior for streaming operations isn't exercised by this test.
+   */
+  static void set_heartbeat_callback(std::function<void()> callback)
+  {
+    (void)callback;
+  }
+
+  /**
    * @brief Resets the mock server's state.
    * Called before tests.
    */

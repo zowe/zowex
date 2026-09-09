@@ -13,6 +13,7 @@
 #define ZDSTYPE_H
 
 #include <stdint.h>
+#include <functional>
 #include "ztype.h"
 
 // RTNCD_CODE_SUCCESS ztype.h         -1
@@ -124,6 +125,10 @@ typedef struct
   int returned_lines;
 
   ZDIAG diag;
+
+  // Invoked per chunk during streamed read/write to signal that the request
+  // is still making progress (e.g. to feed a caller's request-timeout watchdog)
+  std::function<void()> update_heartbeat_callback;
 
 } ZDS;
 

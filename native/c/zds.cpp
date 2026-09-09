@@ -3808,6 +3808,11 @@ int zds_read_streamed(const ZDSReadOpts &opts, const std::string &pipe, size_t *
 
     while ((bytes_read = fread(&buf[0], 1, lrecl, fin)) > 0)
     {
+      if (zds->update_heartbeat_callback)
+      {
+        zds->update_heartbeat_callback();
+      }
+
       // Add newline before each record (except the first)
       std::string record_data;
       if (!first_record)
@@ -3888,6 +3893,11 @@ int zds_read_streamed(const ZDSReadOpts &opts, const std::string &pipe, size_t *
 
     while ((bytes_read = fread(&buf[0], 1, chunk_size, fin)) > 0)
     {
+      if (zds->update_heartbeat_callback)
+      {
+        zds->update_heartbeat_callback();
+      }
+
       int chunk_len = bytes_read;
       const char *chunk = &buf[0];
 
@@ -4024,6 +4034,11 @@ static int zds_write_sequential_streamed(ZDS *zds, const std::string &dsn, const
     // Write chunks directly - the C runtime handles ASA and record boundaries in text mode
     while ((bytes_read = fread(&buf[0], 1, FIFO_CHUNK_SIZE, fin)) > 0)
     {
+      if (zds->update_heartbeat_callback)
+      {
+        zds->update_heartbeat_callback();
+      }
+
       temp_encoded = zbase64::decode(&buf[0], bytes_read, &left_over);
       const char *chunk = &temp_encoded[0];
       int chunk_len = temp_encoded.size();
@@ -4194,6 +4209,11 @@ static int zds_write_member_bpam_streamed(ZDS *zds, const std::string &dsn, cons
 
   while ((bytes_read = fread(&buf[0], 1, FIFO_CHUNK_SIZE, fin)) > 0)
   {
+    if (zds->update_heartbeat_callback)
+    {
+      zds->update_heartbeat_callback();
+    }
+
     temp_encoded = zbase64::decode(&buf[0], bytes_read, &left_over);
     *content_len += temp_encoded.size();
 

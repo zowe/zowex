@@ -73,6 +73,15 @@ void MiddlewareContext::set_content_len(size_t content_length)
   }
 }
 
+void MiddlewareContext::update_heartbeat()
+{
+  const auto &callback = RpcServer::heartbeat_callback();
+  if (callback)
+  {
+    callback();
+  }
+}
+
 void MiddlewareContext::set_pending_notification(const RpcNotification &notification)
 {
   m_pending_notification.reset(new RpcNotification(notification));
