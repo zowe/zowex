@@ -17,21 +17,6 @@
 
 using std::string;
 
-namespace
-{
-thread_local std::function<void()> g_heartbeat_callback;
-} // namespace
-
-void RpcServer::set_heartbeat_callback(std::function<void()> callback)
-{
-  g_heartbeat_callback = std::move(callback);
-}
-
-const std::function<void()> &RpcServer::heartbeat_callback()
-{
-  return g_heartbeat_callback;
-}
-
 // Process error output to extract message and data
 static void process_error_output(const string &error_output, string &out_message, string &out_data)
 {
@@ -50,7 +35,7 @@ static void process_error_output(const string &error_output, string &out_message
   }
 }
 
-void RpcServer::process_request(const string &request_data)
+void RpcServer::process_request(const string &request_data, std::function<void()> heartbeat_callback)
 {
   try
   {
@@ -103,6 +88,7 @@ void RpcServer::process_request(const string &request_data)
 
     // Create MiddlewareContext for the command
     MiddlewareContext context(request.method, args);
+    context.set_heartbeat_callback(std::move(heartbeat_callback));
 
     // Dispatch the command
     int result = dispatcher.dispatch(request.method, context);

@@ -40,6 +40,12 @@
 #include "zdsm.h"
 #include "zamtypes.h"
 
+// If this fires, sizeof(std::function<void()>) no longer matches the Metal C placeholder
+// reserved for ZDS::update_heartbeat_callback - update ZDS_HEARTBEAT_CALLBACK_STORAGE_SIZE
+// in zdstype.h to match, so sizeof(ZDS) stays identical between the C++ and Metal C compilers.
+static_assert(sizeof(decltype(ZDS::update_heartbeat_callback)) == ZDS_HEARTBEAT_CALLBACK_STORAGE_SIZE,
+              "ZDS_HEARTBEAT_CALLBACK_STORAGE_SIZE in zdstype.h must match sizeof(std::function<void()>)");
+
 const size_t MAX_DS_LENGTH = 44u;
 const size_t MAX_VOLSER_LENGTH = 6u;
 // carriage return character, used for detecting CRLF line endings

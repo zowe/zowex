@@ -13,8 +13,17 @@
 #define ZDSTYPE_H
 
 #include <stdint.h>
+#ifdef __cplusplus
 #include <functional>
+#endif
 #include "ztype.h"
+
+// Storage reserved for update_heartbeat_callback below when this header is parsed by a
+// C compiler (e.g. Metal C in zam.c/zdsm.c, which never touches the field itself - it
+// only ever carries ZDS pointers through to/from the C++ side). Must equal
+// sizeof(std::function<void()>) on the target C++ toolchain; kept in sync via the
+// static_assert next to ZDS::update_heartbeat_callback's use in zds.cpp.
+#define ZDS_HEARTBEAT_CALLBACK_STORAGE_SIZE 32
 
 // RTNCD_CODE_SUCCESS ztype.h         -1
 #define ZDS_RTNCD_SERVICE_FAILURE -2
@@ -128,7 +137,11 @@ typedef struct
 
   // Invoked per chunk during streamed read/write to signal that the request
   // is still making progress (e.g. to feed a caller's request-timeout watchdog)
+#ifdef __cplusplus
   std::function<void()> update_heartbeat_callback;
+#else
+  unsigned char _update_heartbeat_callback[ZDS_HEARTBEAT_CALLBACK_STORAGE_SIZE];
+#endif
 
 } ZDS;
 
