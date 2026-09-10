@@ -8,6 +8,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 - The `zowex` top level command group of this plug-in has been renamed to `zo`. `zowex` and `zssh` will still function as aliases. [#1119](https://github.com/zowe/zowex/pull/1119) 
 - Added the `zssh files list alias` command to the CLI. [#1108](https://github.com/zowe/zowex/pull/1108)
+- Added support for SSH agents (`IdentityAgent` in SSH config) with the `--agent` option. [#342](https://github.com/zowe/zowex/issues/342)
 
 ## `0.9.0`
 

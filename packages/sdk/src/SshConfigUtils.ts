@@ -17,6 +17,11 @@ import * as sshConfig from "ssh-config";
 
 export interface ISshConfigExt extends ISshSession {
     name?: string;
+    /**
+     * Path to the ssh-agent's UNIX socket (or named pipe on Windows), or `"pageant"` on Windows.
+     * Populated from the `IdentityAgent` directive when migrating a `~/.ssh/config` entry.
+     */
+    identityAgent?: string;
 }
 // biome-ignore lint/complexity/noStaticOnlyClass: Utilities class has static methods
 export class SshConfigUtils {
@@ -80,6 +85,20 @@ export class SshConfigUtils {
                                     break;
                                 case "connecttimeout":
                                     session.handshakeTimeout = Number.parseInt(value, 10) * 1000;
+                                    break;
+                                case "identityagent":
+                                    // "none" explicitly disables the agent; leave session.identityAgent unset.
+                                    // "SSH_AUTH_SOCK" (literal) means use that environment variable's value,
+                                    // matching OpenSSH's own IdentityAgent semantics.
+                                    if (value.toLowerCase() === "none") {
+                                        break;
+                                    }
+                                    session.identityAgent =
+                                        value === "SSH_AUTH_SOCK"
+                                            ? process.env.SSH_AUTH_SOCK
+                                            : path.normalize(
+                                                  value.startsWith("~") ? path.join(homeDir, value.slice(2)) : value,
+                                              );
                                     break;
                                 default:
                                     break;
