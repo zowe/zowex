@@ -140,6 +140,7 @@ build-out/zo.plugin.test.o \
 build-out/zoa.console.test.o \
 build-out/zutils.o \
 build-out/parser.test.o \
+build-out/result_table.test.o \
 build-out/zlogger.test.o \
 build-out/zlogger_metal.o \
 build-out/zwto.test.o \
@@ -301,6 +302,9 @@ build-out/zusf.test.o: zusf.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
 build-out/parser.test.o: parser.test.cpp
+	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
+
+build-out/result_table.test.o: result_table.test.cpp
 	$(CXX) $(CXXFLAGS) $(CPP_LIST_FLAG) -c $^ -o $@
 
 build-out/zlogger.test.o: zlogger.test.cpp

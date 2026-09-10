@@ -24,6 +24,7 @@
 #include "zlogger.test.hpp"
 #include "zwto.test.hpp"
 #include "parser.test.hpp"
+#include "result_table.test.hpp"
 #include "zstd.test.hpp"
 #include "zjson.test.hpp"
 #include "zo.server.test.hpp"
@@ -66,6 +67,7 @@ int main(int argc, char *argv[])
         zlogger_tests();
         zwto_tests();
         parser_tests();
+        result_table_tests();
         zstd_tests();
         zjson_tests();
         zo_server_tests();
