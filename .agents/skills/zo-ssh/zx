@@ -289,7 +289,7 @@ deploy)
   probe=$(_ssh "$host" /bin/sh -s -- "$dir_arg" <<<"$remote_script") || die "cannot create '${dir_arg:-\$HOME/zowex}' on $host (see error above)"
   state=${probe%% *}; dir=${probe#* }
   case "$state" in
-    HAVE) echo "zx: $dir/zowex already present on $host" ;;
+    HAVE) echo "zx: $dir/zo already present on $host" ;;
     NEED)
       echo "zx: uploading $(basename "$ZX_PAX") -> $host:$dir"
       _sftpb "$host" >/dev/null <<EOF

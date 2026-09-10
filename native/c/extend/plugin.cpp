@@ -254,7 +254,7 @@ private:
   {
     if (collision.shadows_builtin)
     {
-      ZLOG_ERROR("Rejected plug-in command '%s': token '%s' would shadow a built-in zowex command",
+      ZLOG_ERROR("Rejected plug-in command '%s': token '%s' would shadow a built-in zo command",
                  command->get_name().c_str(), collision.token.c_str());
     }
     else

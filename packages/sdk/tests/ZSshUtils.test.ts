@@ -44,7 +44,7 @@ function setupSftpMocks(
 describe("ZSshUtils", () => {
     describe("checkIfOutdated", () => {
         it.each([
-            // compared against mocked zowex binary version: 1.2.1
+            // compared against mocked zo binary version: 1.2.1
             {
                 desc: "versions match exactly- not outdated",
                 remoteVersion: BUNDLED_SSH_SERVER_VERSION,
