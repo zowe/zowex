@@ -17,6 +17,7 @@
 
 #include "ds.hpp"
 #include "common_args.hpp"
+#include "result_table.hpp"
 #include "../zds.hpp"
 #include "../zut.hpp"
 #include <string>
@@ -26,6 +27,7 @@
 using namespace ast;
 using namespace parser;
 using namespace commands::common;
+using namespace commands::format;
 
 namespace ds
 {
@@ -492,68 +494,46 @@ int handle_data_set_list(InvocationContext &context)
   }
   std::vector<ZDSEntry> entries;
 
-  const auto num_attr_fields = 10;
-  bool emit_csv = context.get<bool>("response-format-csv", false);
   rc = zds_list_data_sets(&zds, dsn, entries, attributes);
   if (RTNCD_SUCCESS == rc || RTNCD_WARNING == rc)
   {
-    std::vector<std::string> fields;
-    fields.reserve((attributes ? num_attr_fields : 0) + 1);
-    const auto entries_array = arr();
+    ResultTable table(context);
+    table.add_column(44);
+    if (attributes)
+    {
+      table.add_column(7)   // volser
+          .add_column(7)    // devtype
+          .add_column(4)    // dsorg
+          .add_column(6)    // recfm
+          .add_column(6)    // lrecl
+          .add_column(6)    // blksize
+          .add_column(10)   // primary
+          .add_column(10)   // secondary
+          .add_column(8)    // dsntype
+          .add_column();    // migrated
+    }
 
     for (auto &entry : entries)
     {
-      if (emit_csv)
+      auto &row = table.row();
+      row.add(entry.name);
+      if (attributes)
       {
-        fields.push_back(entry.name);
-        if (attributes)
-        {
-          fields.push_back(entry.multivolume ? (entry.volser + "+") : entry.volser);
-          fields.push_back(entry.devtype != 0 ? zut_hex_to_string(entry.devtype) : "");
-          fields.push_back(entry.dsorg);
-          fields.push_back(entry.recfm);
-          fields.push_back(entry.lrecl == -1 ? "" : std::to_string(entry.lrecl));
-          fields.push_back(entry.blksize == -1 ? "" : std::to_string(entry.blksize));
-          fields.push_back(entry.primary == -1 ? "" : std::to_string(entry.primary));
-          fields.push_back(entry.secondary == -1 ? "" : std::to_string(entry.secondary));
-          fields.push_back(entry.dsntype);
-          fields.emplace_back(entry.migrated ? "YES" : "NO");
-        }
-        context.output_stream() << zut_format_as_csv(fields) << std::endl;
-        fields.clear();
+        row.add(entry.multivolume ? (entry.volser + "+") : entry.volser)
+            .add(entry.devtype != 0 ? zut_hex_to_string(entry.devtype) : "")
+            .add(entry.dsorg)
+            .add(entry.recfm)
+            .add_or_blank(entry.lrecl)
+            .add_or_blank(entry.blksize)
+            .add_or_blank(entry.primary)
+            .add_or_blank(entry.secondary)
+            .add(entry.dsntype)
+            .add_flag(entry.migrated, "YES", "NO");
       }
-      else
-      {
-        if (attributes)
-        {
-          context.output_stream() << std::left
-                                  << std::setw(44) << entry.name << " "
-                                  << std::setw(7) << (entry.multivolume ? (entry.volser + "+") : entry.volser) << " "
-                                  << std::setw(7) << (entry.devtype != 0 ? zut_hex_to_string(entry.devtype) : "") << " "
-                                  << std::setw(4) << entry.dsorg << " "
-                                  << std::setw(6) << entry.recfm << " "
-                                  << std::setw(6) << (entry.lrecl == -1 ? "" : std::to_string(entry.lrecl)) << " "
-                                  << std::setw(6) << (entry.blksize == -1 ? "" : std::to_string(entry.blksize)) << " "
-                                  << std::setw(10) << (entry.primary == -1 ? "" : std::to_string(entry.primary)) << " "
-                                  << std::setw(10) << (entry.secondary == -1 ? "" : std::to_string(entry.secondary)) << " "
-                                  << std::setw(8) << entry.dsntype << " "
-                                  << (entry.migrated ? "YES" : "NO")
-                                  << std::endl;
-        }
-        else
-        {
-          context.output_stream() << std::left << std::setw(44) << entry.name << std::endl;
-        }
-      }
-
-      const auto ds_obj = build_ds_object(entry, attributes);
-      entries_array->push(ds_obj);
+      row.emit(build_ds_object(entry, attributes));
     }
 
-    const auto result = obj();
-    result->set("items", entries_array);
-    result->set("returnedRows", i64(entries.size()));
-    context.set_object(result);
+    table.finish("items", true);
   }
   if (RTNCD_WARNING == rc)
   {
@@ -588,7 +568,6 @@ int handle_data_set_list_members(InvocationContext &context)
   long long max_entries = context.get<long long>("max-entries", 0);
   bool warn = context.get<bool>("warn", true);
   bool attributes = context.get<bool>("attributes", false);
-  bool emit_csv = context.get<bool>("response-format-csv", false);
   std::string pattern = context.get<std::string>("pattern", "");
 
   ZDS zds{};
@@ -601,69 +580,46 @@ int handle_data_set_list_members(InvocationContext &context)
 
   if (RTNCD_SUCCESS == rc || RTNCD_WARNING == rc)
   {
-    std::vector<std::string> fields;
-    const auto entries_array = arr();
+    ResultTable table(context);
+    table.add_column(12);
+    if (attributes)
+    {
+      table.add_column(4)  // vers
+          .add_column(4)   // mod
+          .add_column(10)  // c4date
+          .add_column(10)  // m4date
+          .add_column(8)   // mtime
+          .add_column(6)   // cnorc
+          .add_column(6)   // inorc
+          .add_column(6)   // mnorc
+          .add_column(8)   // user
+          .add_column();   // sclm
+    }
+
     for (std::vector<ZDSMem>::iterator it = members.begin(); it != members.end(); ++it)
     {
-      if (emit_csv)
+      auto &row = table.row();
+      row.add(it->name);
+      // Without statistics there is nothing to put in the attribute columns.
+      // The short row prints as a bare name and still pads out to the full
+      // field count in CSV, so every record keeps the same shape.
+      if (attributes && it->stats_valid)
       {
-        fields.push_back(it->name);
-
-        if (attributes)
-        {
-          if (it->stats_valid)
-          {
-            fields.push_back(it->vers == -1 ? "" : std::to_string(it->vers));
-            fields.push_back(it->mod == -1 ? "" : std::to_string(it->mod));
-            fields.push_back(it->c4date);
-            fields.push_back(it->m4date);
-            fields.push_back(it->mtime);
-            fields.push_back(it->cnorc == -1 ? "" : std::to_string(it->cnorc));
-            fields.push_back(it->inorc == -1 ? "" : std::to_string(it->inorc));
-            fields.push_back(it->mnorc == -1 ? "" : std::to_string(it->mnorc));
-            fields.push_back(it->user);
-            fields.push_back(it->sclm ? "Y" : "N");
-          }
-          else
-          {
-            fields.insert(fields.end(), 10, "");
-          }
-        }
-
-        context.output_stream() << zut_format_as_csv(fields) << std::endl;
-        fields.clear();
+        row.add_or_blank(it->vers)
+            .add_or_blank(it->mod)
+            .add(it->c4date)
+            .add(it->m4date)
+            .add(it->mtime)
+            .add_or_blank(it->cnorc)
+            .add_or_blank(it->inorc)
+            .add_or_blank(it->mnorc)
+            .add(it->user)
+            .add_flag(it->sclm, "Y", "N");
       }
-      else
-      {
-        if (attributes && it->stats_valid)
-        {
-          context.output_stream() << std::left
-                                  << std::setw(12) << it->name << " "
-                                  << std::setw(4) << (it->vers == -1 ? "" : std::to_string(it->vers)) << " "
-                                  << std::setw(4) << (it->mod == -1 ? "" : std::to_string(it->mod)) << " "
-                                  << std::setw(10) << it->c4date << " "
-                                  << std::setw(10) << it->m4date << " "
-                                  << std::setw(8) << it->mtime << " "
-                                  << std::setw(6) << (it->cnorc == -1 ? "" : std::to_string(it->cnorc)) << " "
-                                  << std::setw(6) << (it->inorc == -1 ? "" : std::to_string(it->inorc)) << " "
-                                  << std::setw(6) << (it->mnorc == -1 ? "" : std::to_string(it->mnorc)) << " "
-                                  << std::setw(8) << it->user << " "
-                                  << (it->sclm ? "Y" : "N")
-                                  << std::endl;
-        }
-        else
-        {
-          context.output_stream() << std::left << std::setw(12) << it->name << std::endl;
-        }
-      }
-
-      const auto entry = build_member_object(*it, attributes);
-      entries_array->push(entry);
+      row.emit(build_member_object(*it, attributes));
     }
-    const auto result = obj();
-    result->set("items", entries_array);
-    result->set("returnedRows", i64(members.size()));
-    context.set_object(result);
+
+    table.finish("items", true);
   }
   if (RTNCD_WARNING == rc)
   {

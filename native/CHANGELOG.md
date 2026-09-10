@@ -7,6 +7,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## Recent Changes
 
 - `c`: Added a `--json` option to `zowex` commands, which prints the command's result to stdout as a single line of JSON (`success`, `exitCode`, `data`, `stderr`) so callers can parse it without starting `zowex server`. [#837](https://github.com/zowe/zowex/issues/837)
+- `c`: Fixed `zowex job list-files --response-format-csv` repeating every preceding record's fields at the start of each row, so only the first row had the documented five fields.
 - `c`: Fixed `zowex uss list` only returning structured results when `--response-format-csv` was also passed. [#1128](https://github.com/zowe/zowex/pull/1128)
 - `c`: Fixed `plugin::Io::is_redirecting_error()` and `is_redirecting_input()` reporting the state of the output stream instead of their own. [#1128](https://github.com/zowe/zowex/pull/1128)
 - `c`: Fixed a plug-in that registers an argument conflicting with an existing name or alias aborting `zowex` for every command instead of being rejected with a logged diagnostic. [#1128](https://github.com/zowe/zowex/pull/1128)
