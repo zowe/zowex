@@ -1027,9 +1027,9 @@ private:
       {
         return;
       }
-      for (size_t i = 0; i < arg.aliases.size(); ++i)
+      for (const auto &alias : arg.aliases)
       {
-        if (arg.aliases[i] == "--json" || arg.aliases[i] == "--rfj")
+        if (alias == "--json" || alias == "--rfj")
         {
           return;
         }
@@ -1194,8 +1194,8 @@ public:
     ParserStatus_ParseError
   };
 
-  ParserStatus status;       // no default initializer
-  int exit_code;             // exit code returned by handler or set by parser
+  ParserStatus status = ParserStatus_Success;
+  int exit_code = 0;         // exit code returned by handler or set by parser
   std::string error_message; // error message if status is parse_error
   std::string command_path;  // full path of the executed command (e.g., "git
                              // remote add")
@@ -1208,25 +1208,20 @@ public:
   std::vector<std::string> m_passthrough_args;
 
   // pointer to the command definition for default value lookup
-  const Command *m_command;
+  const Command *m_command = nullptr;
 
   // --json state. Collected here rather than printed by Command::parse so
   // that ArgumentParser::parse can emit the envelope from a single place,
   // covering the handler path and every parser-level error return alike.
-  bool json_requested;
-  bool json_suppressed;
+  bool json_requested = false;
+  bool json_suppressed = false;
   ast::Node json_data;
   std::string json_stdout;
   std::string json_stderr;
-  bool json_stdout_is_payload;
+  bool json_stdout_is_payload = false;
   std::string json_output;
 
-  ParseResult()
-      : status(ParserStatus_Success), exit_code(0), m_command(nullptr),
-        json_requested(false), json_suppressed(false),
-        json_stdout_is_payload(false)
-  {
-  }
+  ParseResult() = default;
 
   // check if an arg was provided
   bool has(const std::string &name) const
@@ -2307,6 +2302,66 @@ private:
 #endif
   }
 
+  // Try to parse `arg` as a numeric or boolean literal that spans the whole
+  // argument; anything else (including a lex failure) is an identifier.
+  static lexer::Token classify_literal_or_identifier(const std::string &arg, const lexer::Span &span)
+  {
+    try
+    {
+      lexer::Src arg_source = lexer::Src::from_string(arg, "<arg>");
+      std::vector<lexer::Token> arg_tokens = lexer::Lexer::tokenize(arg_source);
+
+      if (arg_tokens.size() != 2 || arg_tokens[1].get_kind() != lexer::TokEof)
+      {
+        return lexer::Token::make_id(arg.c_str(), arg.size(), span);
+      }
+
+      const lexer::Token &parsed_token = arg_tokens[0];
+      switch (parsed_token.get_kind())
+      {
+      case lexer::TokIntLit:
+        return lexer::Token::make_int_lit(parsed_token.get_int_value(), parsed_token.get_int_base(), span);
+      case lexer::TokFloatLit:
+        return lexer::Token::make_float_lit(parsed_token.get_float_value(), parsed_token.has_float_exponent(), span);
+      case lexer::TokTrue:
+        return lexer::Token(lexer::TokTrue, span);
+      case lexer::TokFalse:
+        return lexer::Token(lexer::TokFalse, span);
+      default:
+        return lexer::Token::make_id(arg.c_str(), arg.size(), span);
+      }
+    }
+    catch (const lexer::LexError &)
+    {
+      return lexer::Token::make_id(arg.c_str(), arg.size(), span);
+    }
+  }
+
+  // Classify a single non-passthrough CLI argument as a long flag, short
+  // flag, quoted string literal, numeric/boolean literal, or identifier.
+  static lexer::Token classify_argument(const std::string &arg, const lexer::Span &span)
+  {
+    if (arg.size() > 2 && arg[0] == '-' && arg[1] == '-')
+    {
+      // Long flag: --flag
+      return lexer::Token::make_long_flag(arg.c_str() + 2, arg.size() - 2, span);
+    }
+    if (arg.size() > 1 && arg[0] == '-' && arg != "-")
+    {
+      // Short flag: -f or -abc
+      return lexer::Token::make_short_flag(arg.c_str() + 1, arg.size() - 1, span);
+    }
+    if (arg.size() >= 2 &&
+        ((arg[0] == '"' && arg[arg.size() - 1] == '"') ||
+         (arg[0] == '\'' && arg[arg.size() - 1] == '\'')))
+    {
+      // Quoted string literal (remove quotes)
+      return lexer::Token::make_str_lit(arg.c_str() + 1, arg.size() - 2, span);
+    }
+    // Use lexer to determine if this is numeric or identifier
+    return classify_literal_or_identifier(arg, span);
+  }
+
   ParseResult parse_impl(int argc, char *argv[])
   {
     ZLOG_TRACE("ArgumentParser::parse(argc=%d) entry", argc);
@@ -2355,88 +2410,7 @@ private:
         continue;
       }
 
-      if (arg.size() > 2 && arg[0] == '-' && arg[1] == '-')
-      {
-        // Long flag: --flag
-        tokens.push_back(
-            lexer::Token::make_long_flag(arg.c_str() + 2, arg.size() - 2, span));
-      }
-      else if (arg.size() > 1 && arg[0] == '-' && arg != "-")
-      {
-        // Short flag: -f or -abc
-        tokens.push_back(
-            lexer::Token::make_short_flag(arg.c_str() + 1, arg.size() - 1, span));
-      }
-      else if ((arg.size() >= 2 &&
-                ((arg[0] == '"' && arg[arg.size() - 1] == '"') ||
-                 (arg[0] == '\'' && arg[arg.size() - 1] == '\''))))
-      {
-        // Quoted string literal (remove quotes)
-        tokens.push_back(
-            lexer::Token::make_str_lit(arg.c_str() + 1, arg.size() - 2, span));
-      }
-      else
-      {
-        // Use lexer to determine if this is numeric or identifier
-        try
-        {
-          lexer::Src arg_source = lexer::Src::from_string(arg, "<arg>");
-          std::vector<lexer::Token> arg_tokens = lexer::Lexer::tokenize(arg_source);
-
-          // Filter out EOF token and check if we got exactly one meaningful token
-          if (arg_tokens.size() >= 1 && arg_tokens[0].get_kind() != lexer::TokEof)
-          {
-            lexer::Token parsed_token = arg_tokens[0];
-
-            // If the lexer successfully parsed it as a single token that covers the whole argument,
-            // and it's a numeric or boolean literal, use that. Otherwise treat as identifier.
-            if (arg_tokens.size() == 2 && arg_tokens[1].get_kind() == lexer::TokEof &&
-                (parsed_token.get_kind() == lexer::TokIntLit ||
-                 parsed_token.get_kind() == lexer::TokFloatLit ||
-                 parsed_token.get_kind() == lexer::TokTrue ||
-                 parsed_token.get_kind() == lexer::TokFalse))
-            {
-              // Create a new token with the correct span for our context
-              switch (parsed_token.get_kind())
-              {
-              case lexer::TokIntLit:
-                tokens.push_back(lexer::Token::make_int_lit(
-                    parsed_token.get_int_value(), parsed_token.get_int_base(), span));
-                break;
-              case lexer::TokFloatLit:
-                tokens.push_back(lexer::Token::make_float_lit(
-                    parsed_token.get_float_value(), parsed_token.has_float_exponent(), span));
-                break;
-              case lexer::TokTrue:
-                tokens.push_back(lexer::Token(lexer::TokTrue, span));
-                break;
-              case lexer::TokFalse:
-                tokens.push_back(lexer::Token(lexer::TokFalse, span));
-                break;
-              default:
-                // Fallback to identifier
-                tokens.push_back(lexer::Token::make_id(arg.c_str(), arg.size(), span));
-                break;
-              }
-            }
-            else
-            {
-              // Multiple tokens or not a literal - treat as identifier
-              tokens.push_back(lexer::Token::make_id(arg.c_str(), arg.size(), span));
-            }
-          }
-          else
-          {
-            // No meaningful tokens - treat as identifier
-            tokens.push_back(lexer::Token::make_id(arg.c_str(), arg.size(), span));
-          }
-        }
-        catch (const lexer::LexError &)
-        {
-          // Lexer failed - treat as identifier
-          tokens.push_back(lexer::Token::make_id(arg.c_str(), arg.size(), span));
-        }
-      }
+      tokens.push_back(classify_argument(arg, span));
       pos += arg.size() + 1;
     }
 

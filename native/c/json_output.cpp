@@ -12,7 +12,9 @@
 #include "json_output.hpp"
 #include "zbase64.h"
 #include "zjson.hpp"
+#include <algorithm>
 #include <cctype>
+#include <iostream>
 #include <sstream>
 
 namespace json_output
@@ -38,19 +40,13 @@ const size_t MAX_PAYLOAD_BYTES = 8u * 1024u * 1024u;
  */
 bool is_json_safe_text(const std::string &text)
 {
-  for (size_t i = 0; i < text.size(); ++i)
-  {
-    const char ch = text[i];
+  return std::all_of(text.begin(), text.end(), [](char ch) {
     if (ch == '\b' || ch == '\f' || ch == '\n' || ch == '\r' || ch == '\t')
     {
-      continue;
+      return true;
     }
-    if (iscntrl(static_cast<unsigned char>(ch)))
-    {
-      return false;
-    }
-  }
-  return true;
+    return !iscntrl(static_cast<unsigned char>(ch));
+  });
 }
 
 struct Payload
@@ -155,8 +151,8 @@ std::string fallback(const Envelope &envelope)
   out << "{\"success\":" << (envelope.exit_code == 0 ? "true" : "false")
       << ",\"exitCode\":" << envelope.exit_code
       << ",\"data\":{}"
-      << ",\"stderr\":\"\""
-      << ",\"jsonError\":\"failed to serialize command result\"}";
+      << R"(,"stderr":"")"
+      << R"(,"jsonError":"failed to serialize command result"})";
   return out.str();
 }
 } // namespace
@@ -191,9 +187,9 @@ zjson::Value ast_to_json(const ast::Node &node)
     const std::vector<ast::Node> &items = node->as_array();
     array_value.reserve_array(items.size());
 
-    for (size_t i = 0; i < items.size(); ++i)
+    for (const ast::Node &item : items)
     {
-      array_value.add_to_array(ast_to_json(items[i]));
+      array_value.add_to_array(ast_to_json(item));
     }
     return array_value;
   }
@@ -203,9 +199,9 @@ zjson::Value ast_to_json(const ast::Node &node)
     zjson::Value object_value = zjson::Value::create_object();
     const ast::ObjMap &fields = node->as_object();
 
-    for (ast::ObjMap::const_iterator it = fields.begin(); it != fields.end(); ++it)
+    for (const auto &field : fields)
     {
-      object_value.add_to_object(it->first, ast_to_json(it->second));
+      object_value.add_to_object(field.first, ast_to_json(field.second));
     }
     return object_value;
   }
@@ -246,9 +242,10 @@ std::string serialize(const Envelope &envelope)
       return serialized.value();
     }
   }
-  catch (const std::exception &)
+  catch (const zjson::Error &e)
   {
-    // Fall through to the hand-built envelope below.
+    // Serialization failed; report why, then fall through to the hand-built envelope below.
+    std::cerr << "json_output: " << e.what() << std::endl;
   }
 
   return fallback(envelope);
