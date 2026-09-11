@@ -174,7 +174,19 @@ Once compiled, you can test the command directly on z/OS:
 
 # Expected output:
 # PONG: Hello, world! at Mon Oct  6 14:23:45 2025
+
+# The object passed to context.set_object() is also what --json prints
+./zowex ping --message "Hello, world!" --json
+
+# Expected output:
+# {"data":{"data":"PONG: Hello, world!","timestamp":"Mon Oct  6 14:23:45 2025"},"exitCode":0,"stderr":"","success":true}
 ```
+
+> [!NOTE]
+> `--json` is injected into every command by the parser, so there is nothing to register for
+> it. See [json-output.md](./json-output.md) for the envelope contract, and call
+> `mark_stdout_as_payload()` on the command if its payload is its stdout rather than a set of
+> fields.
 
 ---
 
@@ -459,7 +471,7 @@ You've successfully added a new command to the Zowe Remote SSH stack! Here's wha
 ## Key Patterns
 
 - **Separation of concerns**: Library logic is separate from command handling
-- **Return objects**: Always set a return object using `context.set_object()` for programmatic access
+- **Return objects**: Always set a return object using `context.set_object()` for programmatic access. It feeds both the JSON-RPC `result` and the CLI's `--json` payload, so a command that sets one is machine-readable from either entry point. See [json-output.md](./json-output.md).
 - **Error handling**: Use proper return codes (`RTNCD_SUCCESS`, `RTNCD_FAILURE`) and error messages
 - **CommandBuilder**: Use the fluent API to map RPC parameters to command arguments
 - **Type safety**: Define TypeScript types to ensure consistency between middleware and SDK

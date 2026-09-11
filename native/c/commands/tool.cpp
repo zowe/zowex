@@ -499,6 +499,7 @@ void register_commands(parser::Command &root_command)
 
   // Search subcommand
   auto tool_search_cmd = command_ptr(new Command("search", "search members for string with parms, e.g. --parms anyc"));
+  tool_search_cmd->mark_stdout_as_payload();
   tool_search_cmd->add_positional_arg(DSN)
       .add_positional_arg("string", "string to search for", ArgType_Single, true)
       .add_keyword_arg("parms",

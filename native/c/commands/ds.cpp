@@ -1142,6 +1142,7 @@ void register_commands(parser::Command &root_command)
 
   // View subcommand
   auto ds_view_cmd = command_ptr(new Command("view", "view data set"));
+  ds_view_cmd->mark_stdout_as_payload();
   ds_view_cmd->add_positional_arg(DSN);
   ds_view_cmd->add_keyword_arg(ENCODING);
   ds_view_cmd->add_keyword_arg(LOCAL_ENCODING);
