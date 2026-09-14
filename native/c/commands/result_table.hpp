@@ -113,11 +113,16 @@ private:
  * The two text renderings had to be kept in step by hand, and neither one
  * shared a definition of how wide a column is.
  *
- * ResultTable owns the text side: declare the columns once with add_column(),
- * then feed each row through row(). Whether that row lands as a padded table
- * line or a CSV record is decided here, from the `response-format-csv`
- * argument, rather than at every call site. Rows are written as they arrive,
- * so a large listing still streams instead of accumulating in memory.
+ * ResultTable owns the text side: declare the named columns once with
+ * add_column(), then feed each row through row(). Whether that row lands as a
+ * padded table line or a CSV record is decided here, from the
+ * `response-format-csv` argument, rather than at every call site. Rows are
+ * written as they arrive, so a large listing still streams instead of
+ * accumulating in memory.
+ *
+ * Naming a column also makes it printable: passing `response-format-header`
+ * prints the column names as the first line, ahead of the first row, in
+ * whichever of the two text forms was asked for.
  *
  * The JSON side is still supplied per row, as an ast::Node handed to
  * Row::emit(). The structured output is deliberately not derived from the
@@ -136,6 +141,8 @@ public:
   explicit ResultTable(plugin::InvocationContext &context)
       : m_context(context),
         m_csv(context.get<bool>("response-format-csv", false)),
+        m_header(context.get<bool>("response-format-header", false)),
+        m_header_printed(false),
         m_items(ast::arr()),
         m_row(*this)
   {
@@ -144,12 +151,15 @@ public:
   /**
    * @brief Declare the next column, in display order
    *
+   * @param name  Column name, shown as its heading when a caller asks for
+   *              `response-format-header`
    * @param width Column width for the human-readable table; 0 leaves the cell
    *              unpadded, which is what the final column of a row wants.
    *              Ignored in CSV, where the width only fixes the field count.
    */
-  ResultTable &add_column(int width = 0)
+  ResultTable &add_column(const std::string &name, int width = 0)
   {
+    m_names.push_back(name);
     m_widths.push_back(width);
     return *this;
   }
@@ -183,19 +193,14 @@ public:
 private:
   friend class Row;
 
-  void emit_row(const std::vector<std::string> &cells, const ast::Node &object)
+  void print_line(const std::vector<std::string> &cells)
   {
-    if (object)
-    {
-      m_items->push(object);
-    }
-
     std::ostream &out = m_context.output_stream();
 
     if (m_csv)
     {
       // zut_format_as_csv trims each field and takes a mutable reference, so
-      // the padded copy is made here rather than shared with the table path.
+      // the padded copy is made here rather than shared with the caller.
       std::vector<std::string> fields(cells);
       if (fields.size() < m_widths.size())
       {
@@ -222,8 +227,27 @@ private:
     out << std::endl;
   }
 
+  void emit_row(const std::vector<std::string> &cells, const ast::Node &object)
+  {
+    if (object)
+    {
+      m_items->push(object);
+    }
+
+    if (m_header && !m_header_printed)
+    {
+      m_header_printed = true;
+      print_line(m_names);
+    }
+
+    print_line(cells);
+  }
+
   plugin::InvocationContext &m_context;
   bool m_csv;
+  bool m_header;
+  bool m_header_printed;
+  std::vector<std::string> m_names;
   std::vector<int> m_widths;
   ast::Node m_items;
   Row m_row;
