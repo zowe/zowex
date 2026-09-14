@@ -493,19 +493,19 @@ int handle_data_set_list(InvocationContext &context)
   if (RTNCD_SUCCESS == rc || RTNCD_WARNING == rc)
   {
     ResultTable table(context);
-    table.add_column(44);
+    table.add_column("dsname", 44);
     if (attributes)
     {
-      table.add_column(7)   // volser
-          .add_column(7)    // devtype
-          .add_column(4)    // dsorg
-          .add_column(6)    // recfm
-          .add_column(6)    // lrecl
-          .add_column(6)    // blksize
-          .add_column(10)   // primary
-          .add_column(10)   // secondary
-          .add_column(8)    // dsntype
-          .add_column();    // migrated
+      table.add_column("volser", 7)
+          .add_column("devtype", 7)
+          .add_column("dsorg", 4)
+          .add_column("recfm", 6)
+          .add_column("lrecl", 6)
+          .add_column("blksize", 6)
+          .add_column("primary", 10)
+          .add_column("secondary", 10)
+          .add_column("dsntype", 8)
+          .add_column("migrated");
     }
 
     for (auto &entry : entries)
@@ -576,19 +576,19 @@ int handle_data_set_list_members(InvocationContext &context)
   if (RTNCD_SUCCESS == rc || RTNCD_WARNING == rc)
   {
     ResultTable table(context);
-    table.add_column(12);
+    table.add_column("member", 12);
     if (attributes)
     {
-      table.add_column(4)  // vers
-          .add_column(4)   // mod
-          .add_column(10)  // c4date
-          .add_column(10)  // m4date
-          .add_column(8)   // mtime
-          .add_column(6)   // cnorc
-          .add_column(6)   // inorc
-          .add_column(6)   // mnorc
-          .add_column(8)   // user
-          .add_column();   // sclm
+      table.add_column("vers", 4)
+          .add_column("mod", 4)
+          .add_column("c4date", 10)
+          .add_column("m4date", 10)
+          .add_column("mtime", 8)
+          .add_column("cnorc", 6)
+          .add_column("inorc", 6)
+          .add_column("mnorc", 6)
+          .add_column("user", 8)
+          .add_column("sclm");
     }
 
     for (std::vector<ZDSMem>::iterator it = members.begin(); it != members.end(); ++it)
@@ -1118,6 +1118,7 @@ void register_commands(parser::Command &root_command)
   ds_list_cmd->add_keyword_arg(MAX_ENTRIES);
   ds_list_cmd->add_keyword_arg(WARN);
   ds_list_cmd->add_keyword_arg(RESPONSE_FORMAT_CSV);
+  ds_list_cmd->add_keyword_arg(RESPONSE_FORMAT_HEADER);
   ds_list_cmd->set_handler(handle_data_set_list);
   ds_list_cmd->add_example("List SYS1.* with all attributes", "zo ds ls 'sys1.*' -a");
   data_set_cmd->add_command(ds_list_cmd);
@@ -1137,6 +1138,7 @@ void register_commands(parser::Command &root_command)
       ArgValue());
   ds_list_members_cmd->add_keyword_arg(WARN);
   ds_list_members_cmd->add_keyword_arg(RESPONSE_FORMAT_CSV);
+  ds_list_members_cmd->add_keyword_arg(RESPONSE_FORMAT_HEADER);
   ds_list_members_cmd->set_handler(handle_data_set_list_members);
   data_set_cmd->add_command(ds_list_members_cmd);
 
