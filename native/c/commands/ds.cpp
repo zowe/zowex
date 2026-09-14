@@ -384,7 +384,7 @@ int handle_data_set_view(InvocationContext &context)
 
   if (has_pipe_path && !pipe_path.empty())
   {
-    zds.update_heartbeat_callback = [&context]()
+    read_opts.update_heartbeat_callback = [&context]()
     {
       context.update_heartbeat();
     };
@@ -792,12 +792,12 @@ int handle_data_set_write(InvocationContext &context)
 
   if (has_pipe_path && !pipe_path.empty())
   {
-    zds.update_heartbeat_callback = [&context]()
+    ZDSWriteOpts write_opts{.zds = &zds, .dsname = dsn};
+    write_opts.update_heartbeat_callback = [&context]()
     {
       context.update_heartbeat();
     };
 
-    ZDSWriteOpts write_opts{.zds = &zds, .dsname = dsn};
     rc = zds_write_streamed(write_opts, pipe_path, &content_len);
     result->set("contentLen", i64(content_len));
   }
