@@ -11,7 +11,13 @@
 
 import { type ICommandHandler, type IHandlerParameters, TextUtils } from "@zowe/imperative";
 import { SshSession } from "@zowe/zos-uss-for-zowe-sdk";
-import { type CommandResponse, type ISshErrorDefinition, ZSshClient, ZSshUtils } from "@zowe/zowex-for-zowe-sdk";
+import {
+    type ClientOptions,
+    type CommandResponse,
+    type ISshErrorDefinition,
+    ZSshClient,
+    ZSshUtils,
+} from "@zowe/zowex-for-zowe-sdk";
 import { translateCliError } from "./CliErrorUtils";
 
 export abstract class SshBaseHandler implements ICommandHandler {
@@ -68,10 +74,7 @@ export abstract class SshBaseHandler implements ICommandHandler {
             // Test the password by attempting a connection
             try {
                 const testSession = this.createPasswordSession(session, password);
-                using _testClient = await ZSshClient.create(testSession, {
-                    serverPath: commandParameters.arguments.serverPath,
-                    numWorkers: 1,
-                });
+                using _testClient = await ZSshClient.create(testSession, this.buildSshClientOptions(commandParameters));
                 // If we get here, the password is valid
                 return password;
             } catch (error) {
@@ -109,10 +112,7 @@ export abstract class SshBaseHandler implements ICommandHandler {
 
     private async _processCommandWithClient(commandParameters: IHandlerParameters, session: SshSession): Promise<void> {
         try {
-            using client = await ZSshClient.create(session, {
-                serverPath: commandParameters.arguments.serverPath,
-                numWorkers: 1,
-            });
+            using client = await ZSshClient.create(session, this.buildSshClientOptions(commandParameters));
 
             const response = await this.processWithClient(commandParameters, client);
 
@@ -146,10 +146,10 @@ export abstract class SshBaseHandler implements ICommandHandler {
                     const passwordSession = this.createPasswordSession(session, password);
 
                     // Retry the connection with password
-                    using client = await ZSshClient.create(passwordSession, {
-                        serverPath: commandParameters.arguments.serverPath,
-                        numWorkers: 1,
-                    });
+                    using client = await ZSshClient.create(
+                        passwordSession,
+                        this.buildSshClientOptions(commandParameters),
+                    );
 
                     const response = await this.processWithClient(commandParameters, client);
 
@@ -164,6 +164,15 @@ export abstract class SshBaseHandler implements ICommandHandler {
                 throw error; // Re-throw for other types of errors
             }
         }
+    }
+
+    private buildSshClientOptions(commandParameters: IHandlerParameters): ClientOptions {
+        return {
+            numWorkers: 1,
+            requestTimeout: commandParameters.arguments.responseTimeout,
+            responseTimeout: commandParameters.arguments.responseTimeout,
+            serverPath: commandParameters.arguments.serverPath,
+        };
     }
 
     /**

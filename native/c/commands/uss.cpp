@@ -257,6 +257,10 @@ int handle_uss_view(InvocationContext &context)
     {
       context.set_content_len(size);
     };
+    zusf.update_heartbeat_callback = [&context]()
+    {
+      context.update_heartbeat();
+    };
 
     size_t content_len = 0;
     rc = zusf_read_from_uss_file_streamed(&zusf, uss_file, pipe_path, &content_len);
@@ -354,6 +358,11 @@ int handle_uss_write(InvocationContext &context)
 
   if (has_pipe_path && !pipe_path.empty())
   {
+    zusf.update_heartbeat_callback = [&context]()
+    {
+      context.update_heartbeat();
+    };
+
     rc = zusf_write_to_uss_file_streamed(&zusf, file, pipe_path, &content_len);
     result->set("contentLen", i64(content_len));
   }
