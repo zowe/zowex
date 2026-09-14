@@ -71,11 +71,11 @@ int handle_job_list(InvocationContext &context)
   if (RTNCD_SUCCESS == rc || RTNCD_WARNING == rc)
   {
     ResultTable table(context);
-    table.add_column()   // jobid
-        .add_column()    // jobname
-        .add_column()    // owner
-        .add_column(7)   // status
-        .add_column();   // retcode
+    table.add_column("jobid")
+        .add_column("jobname")
+        .add_column("owner")
+        .add_column("status", 7)
+        .add_column("retcode");
 
     for (const auto &job : jobs)
     {
@@ -146,11 +146,11 @@ int handle_job_list_files(InvocationContext &context)
   if (RTNCD_SUCCESS == rc || RTNCD_WARNING == rc)
   {
     ResultTable table(context);
-    table.add_column(9)  // ddname
-        .add_column()    // dsname
-        .add_column(4)   // id
-        .add_column()    // stepname
-        .add_column();   // procstep
+    table.add_column("ddname", 9)
+        .add_column("dsname")
+        .add_column("id", 4)
+        .add_column("stepname")
+        .add_column("procstep");
 
     for (const auto &dd : job_dds)
     {
@@ -217,13 +217,13 @@ int handle_job_view_status(InvocationContext &context)
   zut_rtrim(trimmed_correlator);
 
   ResultTable table(context);
-  table.add_column()    // jobid
-      .add_column()     // jobname
-      .add_column()     // owner
-      .add_column(7)    // status
-      .add_column(10)   // retcode
-      .add_column(33)   // correlator
-      .add_column();    // phaseName
+  table.add_column("jobid")
+      .add_column("jobname")
+      .add_column("owner")
+      .add_column("status", 7)
+      .add_column("retcode", 10)
+      .add_column("correlator", 33)
+      .add_column("phaseName");
   table.row()
       .add(job.jobid)
       .add(job.jobname)
@@ -788,6 +788,7 @@ void register_commands(parser::Command &root_command)
   job_list_cmd->add_keyword_arg(MAX_ENTRIES);
   job_list_cmd->add_keyword_arg(WARN);
   job_list_cmd->add_keyword_arg(RESPONSE_FORMAT_CSV);
+  job_list_cmd->add_keyword_arg(RESPONSE_FORMAT_HEADER);
   job_list_cmd->set_handler(handle_job_list);
   job_group->add_command(job_list_cmd);
 
@@ -798,6 +799,7 @@ void register_commands(parser::Command &root_command)
   job_list_files_cmd->add_keyword_arg(MAX_ENTRIES);
   job_list_files_cmd->add_keyword_arg(WARN);
   job_list_files_cmd->add_keyword_arg(RESPONSE_FORMAT_CSV);
+  job_list_files_cmd->add_keyword_arg(RESPONSE_FORMAT_HEADER);
   job_list_files_cmd->set_handler(handle_job_list_files);
   job_group->add_command(job_list_files_cmd);
 
@@ -806,6 +808,7 @@ void register_commands(parser::Command &root_command)
   job_view_status_cmd->add_alias("vs");
   job_view_status_cmd->add_positional_arg(JOB_ID);
   job_view_status_cmd->add_keyword_arg(RESPONSE_FORMAT_CSV);
+  job_view_status_cmd->add_keyword_arg(RESPONSE_FORMAT_HEADER);
   job_view_status_cmd->set_handler(handle_job_view_status);
   job_group->add_command(job_view_status_cmd);
 
