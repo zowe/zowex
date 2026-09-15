@@ -214,6 +214,30 @@ describe("ZSshClient", () => {
             expect(endSpy).toHaveBeenCalledTimes(1);
         });
 
+        it("should time out when startup output arrives but the failure is never confirmed", async () => {
+            // Unrecognized output with no exit code and no channel close: execAsync keeps waiting,
+            // so the startup timeout has to be what ends it.
+            const sshStream = { stderr: new EventEmitter(), stdout: new EventEmitter() };
+            setupMockSshClient({ sshStream, mockExecAsync: false });
+            vi.spyOn(Client.prototype, "exec").mockImplementation(function (
+                _command: string,
+                callback: ClientCallback,
+            ) {
+                callback(undefined, sshStream as any);
+                sshStream.stderr.emit("data", "some unexpected warning\n");
+                return this;
+            });
+            vi.spyOn(Client.prototype, "end").mockImplementation(() => {});
+            const promise = ZSshClient.create(new SshSession(fakeSession), { serverStartupTimeout: 5 });
+            // The collected output is the only clue as to why startup never completed.
+            const assertion = expect(promise).rejects.toMatchObject({
+                errorCode: "ESERVERSTARTUPTIMEOUT",
+                mDetails: expect.objectContaining({ additionalDetails: "some unexpected warning" }),
+            });
+            await vi.advanceTimersByTimeAsync(5e3);
+            await assertion;
+        });
+
         it("should time out after 60 seconds by default when the server never becomes ready", async () => {
             const { execAsyncSpy } = setupMockSshClient();
             execAsyncSpy.mockReturnValue(new Promise(() => {}));
@@ -374,7 +398,7 @@ describe("ZSshClient", () => {
                 serverPath: "/tmp/zowe-server",
             });
             expect(execAsyncSpy).toHaveBeenCalledTimes(1);
-            expect(execAsyncSpy!.mock.calls[0][0]).toBe("/tmp/zowe-server/zo");
+            expect(execAsyncSpy!.mock.calls[0][0]).toBe('"/tmp/zowe-server/zo"');
         });
 
         it("should respect useNativeSsh option", async () => {
@@ -535,7 +559,8 @@ describe("ZSshClient", () => {
             (client as any).mSshClient = {
                 exec: function (_command: string, callback: ClientCallback) {
                     callback(undefined, sshStream as any);
-                    sshStream.stderr.emit("data", "FSUM7351 not found");
+                    const marker = (ZSshClient as any).EXIT_CODE_MARKER;
+                    sshStream.stderr.emit("data", `sh: zo: not found\n${marker}127\n`);
                     return this;
                 },
             };
@@ -548,11 +573,53 @@ describe("ZSshClient", () => {
             (client as any).mSshClient = {
                 exec: function (_command: string, callback: ClientCallback) {
                     callback(undefined, sshStream as any);
+                    // The exit code is echoed in a later chunk than the error text, so the
+                    // failure is only definitive once it arrives.
                     sshStream.stderr.emit("data", "bad json");
+                    sshStream.stderr.emit("data", `${(ZSshClient as any).EXIT_CODE_MARKER}1\n`);
                     return this;
                 },
             };
             await expect((client as any).execAsync()).rejects.toThrow("Error starting Zowe server");
+        });
+
+        it("should collect a multi-line startup error before aborting", async () => {
+            const sshStream = { stderr: new EventEmitter(), stdout: new EventEmitter() };
+            const client: ZSshClient = new (ZSshClient as any)();
+            (client as any).mSshClient = {
+                exec: function (_command: string, callback: ClientCallback) {
+                    callback(undefined, sshStream as any);
+                    sshStream.stderr.emit("data", "first line of trouble\n");
+                    sshStream.stderr.emit("data", "second line of trouble\n");
+                    sshStream.stderr.emit("data", `${(ZSshClient as any).EXIT_CODE_MARKER}8\n`);
+                    return this;
+                },
+            };
+            // Every line is reported, and the marker itself is stripped from the details.
+            await expect((client as any).execAsync("zo", "server")).rejects.toMatchObject({
+                mDetails: expect.objectContaining({
+                    additionalDetails: "first line of trouble\nsecond line of trouble",
+                    msg: expect.stringContaining("(exit code 8)"),
+                }),
+            });
+        });
+
+        it("should not abort startup on unrecognized output that precedes the ready message", async () => {
+            const sshStream = { stderr: new EventEmitter(), stdout: new EventEmitter() };
+            const client: ZSshClient = new (ZSshClient as any)();
+            (client as any).mErrHandler = vi.fn();
+            (client as any).mSshClient = {
+                exec: function (_command: string, callback: ClientCallback) {
+                    callback(undefined, sshStream as any);
+                    // A warning with no exit code means the server is still running, so startup
+                    // must keep waiting rather than giving up on the first odd line.
+                    sshStream.stderr.emit("data", "some unexpected warning\n");
+                    sshStream.stdout.emit("data", readyMessage);
+                    return this;
+                },
+            };
+            await (client as any).execAsync();
+            expect(client.serverVersion).not.toBeNull();
         });
 
         it("should handle a Language Environment load failure from Zowe server", async () => {
