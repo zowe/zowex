@@ -34,6 +34,8 @@ export class ZSshClient extends RpcClientApi implements Disposable {
     public static readonly BIN_NAME = "zo";
     public static readonly REQUIRED_DEPLOY_SIZE_MB = 20;
     private static readonly DEFAULT_SERVER_STARTUP_TIMEOUT_S = 60;
+    private static readonly EXIT_CODE_MARKER = "@@ZOWE_EXIT_CODE@@";
+    private static readonly EXIT_CODE_PATTERN = new RegExp(`${ZSshClient.EXIT_CODE_MARKER}(\\d+)`);
     private mErrHandler: ClientOptions["onError"];
     private mResponseTimeout: number;
     private mServerInfo: { version?: string };
@@ -326,7 +328,9 @@ export class ZSshClient extends RpcClientApi implements Disposable {
 
     private execAsync(...args: string[]): Promise<ClientChannel> {
         return new Promise((resolve, reject) => {
-            this.mSshClient.exec(args.join(" "), (err, stream) => {
+            const cmd = args.join(" ");
+            const wrappedCmd = `${cmd} || echo "${ZSshClient.EXIT_CODE_MARKER}$?" >&2`;
+            this.mSshClient.exec(wrappedCmd, (err, stream) => {
                 if (err) {
                     Logger.getAppLogger().error(`Error running SSH command: ${err}`);
                     reject(err);
@@ -354,7 +358,7 @@ export class ZSshClient extends RpcClientApi implements Disposable {
                     };
                     const onData = (data: Buffer) => {
                         try {
-                            this.mServerInfo = this.getServerStatus(stream, data.toString(), args.join(" "));
+                            this.mServerInfo = this.getServerStatus(stream, data.toString(), cmd);
                             if (this.mServerInfo) {
                                 settled = true;
                                 removeListeners();
@@ -376,6 +380,14 @@ export class ZSshClient extends RpcClientApi implements Disposable {
         });
     }
 
+    private stripExitCode(output: string): [code: number, output: string] {
+        // We print the exit code to stdout, since the exit-status of an exec channel only
+        // arrives via a separate "exit" event, whose timing relative to stdout/stderr data
+        // is not guaranteed, so it can't be read synchronously alongside stderr output.
+        const match = output.match(ZSshClient.EXIT_CODE_PATTERN);
+        return [match ? Number(match[1]) : -1, output.replace(ZSshClient.EXIT_CODE_PATTERN, "").trimEnd()];
+    }
+
     private getServerStatus(stream: ClientChannel, data: string, command: string): StatusMessage["data"] | undefined {
         Logger.getAppLogger().debug(`Received SSH data: ${data}`);
         let response: StatusMessage;
@@ -384,11 +396,12 @@ export class ZSshClient extends RpcClientApi implements Disposable {
         } catch {
             this.mStartupOutput += data;
             const errMsg = Logger.getAppLogger().error("Error starting Zowe server: %s\n%s", command, data);
-            if (data.includes("FSUM7351")) {
+            const [exitCode, cleanOutput] = this.stripExitCode(this.mStartupOutput);
+            if (data.includes("FSUM7351") || exitCode === 127) {
                 throw new ImperativeError({
                     msg: "Server not found",
                     errorCode: "ENOTFOUND",
-                    additionalDetails: data,
+                    additionalDetails: cleanOutput,
                 });
             }
             if (data.includes("FOTS1681")) {
@@ -406,7 +419,10 @@ export class ZSshClient extends RpcClientApi implements Disposable {
                     additionalDetails: this.mStartupOutput,
                 });
             }
-            throw new ImperativeError({ msg: `Error starting Zowe server: ${command}`, additionalDetails: data });
+            throw new ImperativeError({
+                msg: `Error starting Zowe server: ${command}${exitCode !== -1 ? ` (exit code ${exitCode})` : ""}`,
+                additionalDetails: cleanOutput,
+            });
         }
         if (response?.status === "ready") {
             stream.stderr.on("data", this.onErrData.bind(this));
