@@ -405,6 +405,7 @@ export class ZSshUtils {
         );
         const localDir = ZSshUtils.getBinDir(__dirname);
         const remoteDir = serverPath.replace(/^~/, ".");
+        let extractionStarted = false;
 
         return ZSshUtils.sftp(session, async (sftp, ssh) => {
             Logger.getAppLogger().info(`[ZSshUtils] Step 1/5: Creating remote directory ${remoteDir}`);
@@ -506,6 +507,7 @@ export class ZSshUtils {
                 if (result.code === 0) {
                     Logger.getAppLogger().info(`[ZSshUtils] Step 3 OK: Extracted server binaries`);
                 } else {
+                    extractionStarted = true;
                     const technical = `pax -rzf RC=${result.code}: ${result.stderr}`;
                     Logger.getAppLogger().error(`[ZSshUtils] Step 3 FAILED: ${technical}`);
                     const paxErr = new ImperativeError({
@@ -545,6 +547,12 @@ export class ZSshUtils {
                         await promisify(sftp.unlink.bind(sftp))(remotePaxPath);
                     }
 
+                    const remoteProgramPath = path.posix.join(remoteDir, ZSshUtils.SERVER_PAX_FILE);
+
+                    if (extractionStarted && (await ZSshUtils.pathExists(ssh, remoteProgramPath)).exists) {
+                        Logger.getAppLogger().debug(`Deployment failed, but extract `);
+                        await promisify(sftp.unlink.bind(sftp))(remoteProgramPath);
+                    }
                     if (!initialRemoteDirExistCheck.exists) {
                         Logger.getAppLogger().debug(
                             `Post-failure cleanup: deleting remote dir ${remoteDir} which we created`,
