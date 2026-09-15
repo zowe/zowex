@@ -9,6 +9,7 @@
  *
  */
 
+import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { loadLicenseHeader } from "../../scripts/generateTypes";
@@ -19,6 +20,7 @@ const main = () => {
         const constantsClassTemplate = `${licenseHeader}
 // Generated via generateConstants.ts
 export const BUNDLED_SSH_SERVER_VERSION = "{{version}}";
+export const RUSSH_BINARY_SHA256: Record<string, string> = {{russhHashes}};
 `;
         let versionValue = process.env.ZO_RELEASE_VERSION;
         if (!versionValue) {
@@ -31,7 +33,21 @@ export const BUNDLED_SSH_SERVER_VERSION = "{{version}}";
             versionValue = packageJsonObj.version;
         }
 
-        const output = constantsClassTemplate.replace("{{version}}", versionValue);
+        const russhDir = path.resolve(__dirname, "..", "..", "node_modules", "russh");
+        const russhBinaries = fs.readdirSync(russhDir).filter((file) => /^russh\..+\.node$/.test(file));
+        if (russhBinaries.length === 0) {
+            throw new Error("No russh .node binaries found in node_modules/russh");
+        }
+        const russhHashes: Record<string, string> = {};
+        for (const file of russhBinaries) {
+            const triple = file.slice("russh.".length, -".node".length);
+            const fileBuffer = fs.readFileSync(path.join(russhDir, file));
+            russhHashes[triple] = crypto.createHash("sha256").update(fileBuffer).digest("hex");
+        }
+
+        const output = constantsClassTemplate
+            .replace("{{version}}", versionValue)
+            .replace("{{russhHashes}}", JSON.stringify(russhHashes, null, 4));
         const outputPath = path.resolve(__dirname, "src", "ZSshConstants.ts");
         fs.writeFileSync(outputPath, output);
     } catch (e) {
