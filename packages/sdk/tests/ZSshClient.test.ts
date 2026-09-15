@@ -535,7 +535,8 @@ describe("ZSshClient", () => {
             (client as any).mSshClient = {
                 exec: function (_command: string, callback: ClientCallback) {
                     callback(undefined, sshStream as any);
-                    sshStream.stderr.emit("data", "FSUM7351 not found");
+                    const marker = (ZSshClient as any).EXIT_CODE_MARKER;
+                    sshStream.stderr.emit("data", `sh: zo: not found\n${marker}127\n`);
                     return this;
                 },
             };
