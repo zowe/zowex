@@ -65,9 +65,11 @@ public:
    * @brief The mock request processing logic.
    *
    * @param data The request payload.
+   * @param heartbeat_callback Unused by this mock; accepted for signature compatibility.
    */
-  void process_request(const std::string &data)
+  void process_request(const std::string &data, std::function<void()> heartbeat_callback = nullptr)
   {
+    (void)heartbeat_callback;
     {
       std::lock_guard<std::mutex> lock(mtx);
       last_processed_request = data;
@@ -113,6 +115,15 @@ public:
     timeout_error_count++;
     TestLog("RpcServer: Timeout error sent to client for request");
     (void)request_data; // Suppress unused parameter warning
+  }
+
+  /**
+   * @brief Mock implementation of set_heartbeat_callback.
+   * No-op; heartbeat behavior for streaming operations isn't exercised by this test.
+   */
+  static void set_heartbeat_callback(std::function<void()> callback)
+  {
+    (void)callback;
   }
 
   /**
