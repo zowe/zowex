@@ -13,12 +13,12 @@ export class SessionContext implements Disposable {
     private sshConn?: NodeSSH;
     private connectPromise?: Promise<NodeSSH>;
 
-    constructor(private session: SshSession) {}
+    constructor(private readonly session: SshSession) {}
 
     public [Symbol.dispose](): void {
-        if (this.sshConn) {
+        if (this.sshConn != null) {
             this.sshConn.dispose();
-        } else if (this.connectPromise) {
+        } else if (this.connectPromise != null) {
             // A connect is still in flight (e.g. dispose ran while concurrent calls were still
             // establishing it). Dispose must stay synchronous, so dispose it once it settles
             // instead of leaking the socket; swallow a failed connect since there's nothing to
