@@ -37,7 +37,7 @@
 //
 // Version 1 was the implicit, unversioned contract before this constant existed. A plug-in that
 // does not export zo_plugin_abi_version() reports as version 0 and is rejected.
-constexpr unsigned int ZO_PLUGIN_ABI_VERSION = 2u;
+constexpr unsigned int ZO_PLUGIN_ABI_VERSION = 3u;
 
 // Plug-ins must expand this once, in the same translation unit as register_plugin().
 #define ZO_PLUGIN_DECLARE_ABI()                   \
@@ -964,6 +964,11 @@ public:
   {
     m_content_len = content_len;
   }
+
+  // Signal that a long-running request (e.g. a streamed file upload/download)
+  // is still making progress. No-op by default; overridden where there's a
+  // liveness mechanism to feed (see MiddlewareContext::update_heartbeat).
+  virtual void update_heartbeat() {}
 
 protected:
   ArgumentMap m_args;
