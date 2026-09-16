@@ -14,10 +14,11 @@ import * as path from "node:path";
 import { promisify } from "node:util";
 import { ImperativeError, type IProfile, Logger } from "@zowe/imperative";
 import { type ISshSession, SshSession } from "@zowe/zos-uss-for-zowe-sdk";
-import { NodeSSH, type Config as NodeSSHConfig } from "node-ssh";
+import type { NodeSSH } from "node-ssh";
 import * as semver from "semver";
 import type { ConnectConfig, SFTPWrapper } from "ssh2";
 import { matchLeRuntimeFailure, PrivateKeyFailurePatterns, SshErrors } from "./SshErrors";
+import { SessionContext } from "./utils";
 import { ZSshClient } from "./ZSshClient";
 import { BUNDLED_SSH_SERVER_VERSION } from "./ZSshConstants";
 
@@ -230,7 +231,7 @@ export class ZSshUtils {
      * @param session Pre-established SSH session
      * @returns object describing the details of any located zo program
      */
-    public static async detectServerOnPath(session: SshSession): Promise<IServerOnPathDetails> {
+    public static async detectServerOnPath(session: SshSession | SessionContext): Promise<IServerOnPathDetails> {
         Logger.getAppLogger().debug(`[ZSshUtils] enter detectServerOnPath()`);
         return ZSshUtils.withSsh(session, async (ssh) => {
             const details: IServerOnPathDetails = {
@@ -324,7 +325,7 @@ export class ZSshUtils {
      * @returns A promise resolving to true if the user is denied write access.
      *          If the path does not exist, false will be returned.
      */
-    public static async lacksWriteAccess(session: SshSession, testPath: string): Promise<boolean> {
+    public static async lacksWriteAccess(session: SshSession | SessionContext, testPath: string): Promise<boolean> {
         return ZSshUtils.withSsh(session, async (ssh) => {
             Logger.getAppLogger().info(`[ZSshUtils] Testing lacksWriteAccess to path '%s'`, testPath);
 
@@ -396,7 +397,7 @@ export class ZSshUtils {
      * @returns true if the deployment was completed successfully
      */
     public static async installServer(
-        session: SshSession,
+        session: SshSession | SessionContext,
         serverPath: string,
         options?: ISshCallbacks,
     ): Promise<boolean> {
@@ -595,7 +596,7 @@ export class ZSshUtils {
     }
 
     public static async uninstallServer(
-        session: SshSession,
+        session: SshSession | SessionContext,
         serverPath: string,
         options?: Omit<ISshCallbacks, "onProgress">,
     ): Promise<void> {
@@ -655,25 +656,18 @@ export class ZSshUtils {
     }
 
     private static async sftp<T>(
-        session: SshSession,
+        session: SshSession | SessionContext,
         callback: (sftp: SFTPWrapper, ssh: NodeSSH) => Promise<T>,
     ): Promise<T> {
-        const ssh = new NodeSSH();
-        await ssh.connect(ZSshUtils.buildSshConfig(session) as NodeSSHConfig);
-        try {
-            return await ssh.requestSFTP().then((sftp) => callback(sftp, ssh));
-        } finally {
-            ssh.dispose();
-        }
+        using conn = await SessionContext.acquire(session);
+        return conn.ssh.requestSFTP().then((sftp) => callback(sftp, conn.ssh));
     }
 
-    private static async withSsh<T>(session: SshSession, callback: (ssh: NodeSSH) => Promise<T>): Promise<T> {
-        const ssh = new NodeSSH();
-        await ssh.connect(ZSshUtils.buildSshConfig(session) as NodeSSHConfig);
-        try {
-            return await callback(ssh);
-        } finally {
-            ssh.dispose();
-        }
+    private static async withSsh<T>(
+        session: SshSession | SessionContext,
+        callback: (ssh: NodeSSH) => Promise<T>,
+    ): Promise<T> {
+        using conn = await SessionContext.acquire(session);
+        return callback(conn.ssh);
     }
 }
