@@ -4,7 +4,11 @@ All notable changes to the Client code for "zowex-for-zowe-cli" are documented i
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## `1.0.0` 
+## Recent Changes
+
+- Added `--response-timeout` option to all commands. It defaults to 60 seconds and can be increased for large uploads or downloads over slow connections. [#988](https://github.com/zowe/zowex/issues/988)
+
+## `1.0.0`
 
 - The `zowex` top level command group of this plug-in has been renamed to `zo`. `zowex` and `zssh` will still function as aliases. [#1119](https://github.com/zowe/zowex/pull/1119) 
 - Added the `zssh files list alias` command to the CLI. [#1108](https://github.com/zowe/zowex/pull/1108)

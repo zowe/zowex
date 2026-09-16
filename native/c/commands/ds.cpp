@@ -384,6 +384,11 @@ int handle_data_set_view(InvocationContext &context)
 
   if (has_pipe_path && !pipe_path.empty())
   {
+    read_opts.update_heartbeat_callback = [&context]()
+    {
+      context.update_heartbeat();
+    };
+
     size_t content_len = 0;
     uint32_t etag_val = 0;
     rc = zds_read_streamed(read_opts, pipe_path, &content_len, &etag_val);
@@ -759,7 +764,12 @@ int handle_data_set_write(InvocationContext &context)
     }
     if (!etag_value.empty())
     {
-      strcpy(zds.etag, etag_value.c_str());
+      if (etag_value.size() >= sizeof(zds.etag))
+      {
+        context.error_stream() << "Error: etag exceeds " << sizeof(zds.etag) - 1 << " character length limit" << std::endl;
+        return RTNCD_FAILURE;
+      }
+      memcpy(zds.etag, etag_value.c_str(), etag_value.size() + 1);
     }
   }
 
@@ -788,6 +798,11 @@ int handle_data_set_write(InvocationContext &context)
   if (has_pipe_path && !pipe_path.empty())
   {
     ZDSWriteOpts write_opts{.zds = &zds, .dsname = dsn};
+    write_opts.update_heartbeat_callback = [&context]()
+    {
+      context.update_heartbeat();
+    };
+
     rc = zds_write_streamed(write_opts, pipe_path, &content_len);
     result->set("contentLen", i64(content_len));
   }

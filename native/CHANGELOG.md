@@ -4,6 +4,13 @@ All notable changes to the native code for "zowex" are documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## Recent Changes
+
+- Fixed worker threads timing out in the `zo` RPC server for a long upload or download operation that exceeds the request timeout. [#988](https://github.com/zowe/zowex/issues/988)
+- `c`: Adjusted the size of the `etag` field to improve compatibility with z/OS UNIX files. [#1140](https://github.com/zowe/zowex/pull/1140)
+- `c`: Rejected oversized data set etags before copying them into request storage. [#1140](https://github.com/zowe/zowex/pull/1140)
+- `c`: Rejected oversized USS file etags before copying them into request storage. [#1140](https://github.com/zowe/zowex/pull/1140)
+
 ## `1.0.0`
 
 - **Breaking:** `c`: Renamed the `ZOWEX_NUM_WORKERS` environmental variable to `ZO_NUM_WORKERS`. [#1119](https://github.com/zowe/zowex/pull/1119)

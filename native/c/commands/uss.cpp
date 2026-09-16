@@ -257,6 +257,10 @@ int handle_uss_view(InvocationContext &context)
     {
       context.set_content_len(size);
     };
+    zusf.update_heartbeat_callback = [&context]()
+    {
+      context.update_heartbeat();
+    };
 
     size_t content_len = 0;
     rc = zusf_read_from_uss_file_streamed(&zusf, uss_file, pipe_path, &content_len);
@@ -343,7 +347,12 @@ int handle_uss_write(InvocationContext &context)
     std::string etag_value = context.get<std::string>("etag", "");
     if (!etag_value.empty())
     {
-      strcpy(zusf.etag, etag_value.c_str());
+      if (etag_value.size() >= sizeof(zusf.etag))
+      {
+        context.error_stream() << "Error: etag exceeds " << sizeof(zusf.etag) - 1 << " character length limit" << std::endl;
+        return RTNCD_FAILURE;
+      }
+      memcpy(zusf.etag, etag_value.c_str(), etag_value.size() + 1);
     }
   }
 
@@ -354,6 +363,11 @@ int handle_uss_write(InvocationContext &context)
 
   if (has_pipe_path && !pipe_path.empty())
   {
+    zusf.update_heartbeat_callback = [&context]()
+    {
+      context.update_heartbeat();
+    };
+
     rc = zusf_write_to_uss_file_streamed(&zusf, file, pipe_path, &content_len);
     result->set("contentLen", i64(content_len));
   }
