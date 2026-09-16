@@ -34,20 +34,23 @@ export const RUSSH_BINARY_SHA256: Record<string, string> = {{russhHashes}};
         }
 
         const russhDir = path.resolve(__dirname, "..", "..", "node_modules", "russh");
-        const russhBinaries = fs.readdirSync(russhDir).filter((file) => /^russh\..+\.node$/.test(file));
+        const russhBinaries = fs
+            .readdirSync(russhDir)
+            .filter((file) => file.endsWith(".node"))
+            .sort();
         if (russhBinaries.length === 0) {
             throw new Error("No russh .node binaries found in node_modules/russh");
         }
         const russhHashes: Record<string, string> = {};
         for (const file of russhBinaries) {
-            const triple = file.slice("russh.".length, -".node".length);
+            const triple = file.match(/^russh\.(.+)\.node$/)[1];
             const fileBuffer = fs.readFileSync(path.join(russhDir, file));
             russhHashes[triple] = crypto.createHash("sha256").update(fileBuffer).digest("hex");
         }
 
         const output = constantsClassTemplate
             .replace("{{version}}", versionValue)
-            .replace("{{russhHashes}}", JSON.stringify(russhHashes, null, 4));
+            .replace("{{russhHashes}}", JSON.stringify(russhHashes, null, 4).replace(/"(\n\s*\})/g, '",$1'));
         const outputPath = path.resolve(__dirname, "src", "ZSshConstants.ts");
         fs.writeFileSync(outputPath, output);
     } catch (e) {

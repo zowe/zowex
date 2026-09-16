@@ -18,5 +18,5 @@ export const RUSSH_BINARY_SHA256: Record<string, string> = {
     "linux-arm64-gnu": "356fb63bc99144f8e0b47eb9aa3c0c8a087d71683539a14f66472f5b45011d89",
     "linux-x64-gnu": "728cc3ccfa62311e3184e7652637aff801b312effcd304ba7b1ff07ecf03a329",
     "win32-arm64-msvc": "9aaf931845dde6a3e8268c98624b8bd5997b15265af77304391824bb472051d4",
-    "win32-x64-msvc": "19a98bdf257553dd6594f079fede633d32a171eb6b187683d8047e90eae2a1fa"
+    "win32-x64-msvc": "19a98bdf257553dd6594f079fede633d32a171eb6b187683d8047e90eae2a1fa",
 };

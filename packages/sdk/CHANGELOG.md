@@ -4,6 +4,10 @@ All notable changes to the Client code for "@zowe/zowex-for-zowe-sdk" are docume
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## Recent Changes
+
+- Exported the `ZSshConstants` module so that extenders can access its constants. [#1142](https://github.com/zowe/zowex/pull/1142)
+
 ## `1.0.0`
 
 - **Breaking** The `zowex` program bundled in `server.pax.Z` is now renamed to `zo`. [#1119](https://github.com/zowe/zowex/pull/1119)
