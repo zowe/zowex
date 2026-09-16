@@ -39,7 +39,7 @@ Do this at the very start of every session, before the first `zx`/`$zx` call —
 
 **Local prereqs (bash):** `ssh`, `sftp`, `jq`, `base64`, bash ≥3.2, and `curl` or `wget`. Run `.agents/skills/zo-ssh/zx check` to verify. (`jq` is the only one not stock on macOS — if it's missing, ask the user to install it via their package manager, e.g. Homebrew on macOS, before continuing.)
 **Local prereqs (Windows):** `ssh` + `sftp` (the Windows OpenSSH Client feature) and Windows PowerShell 5.1 or newer. No `jq`/`base64`/`curl` needed — `zx.ps1` does JSON, base64, and downloads in-process. Run `.agents\skills\zo-ssh\zx.ps1 check` to verify.
-**Remote prereqs:** SSH login + a writable USS directory. The `zowex` binary is self-contained.
+**Remote prereqs:** SSH login + a writable USS directory. The `zo` binary is self-contained.
 **Bundle:** `zx deploy` will auto-download the latest `server.pax.Z` from [github.com/zowe/zowex/releases](https://github.com/zowe/zowex/releases) if it isn't found locally. Default save path is `~/.local/share/zx/server.pax.Z` (`%LOCALAPPDATA%\zx\server.pax.Z` on Windows) — always user-writable, works whether the helper is run directly or via PATH. Downloads automatically without prompting. To pin a specific version or path, set `ZX_PAX` to it. Set `GITHUB_TOKEN` if the API is rate-limited on a shared corporate IP.
 
 ---

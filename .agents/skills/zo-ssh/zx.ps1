@@ -718,7 +718,7 @@ cd "$p" || exit 9
 : > /dev/null
 [ -d "$b" ] || mkdir "$b" || exit 9
 cd "$b"
-if [ -x ./zowex ]; then echo "HAVE $PWD"; else echo "NEED $PWD"; fi
+if [ -x ./zo ]; then echo "HAVE $PWD"; else echo "NEED $PWD"; fi
 '@
   # The remote /bin/sh needs LF-only input even if this file was checked out CRLF.
   $remoteScript = ($remoteScript -replace "`r`n", "`n") + "`n"

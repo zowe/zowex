@@ -468,7 +468,7 @@ You've successfully added a new command to the Zowe Remote SSH stack! Here's wha
 
 For a complete working example that includes all layers (C++ native, SDK, CLI, and VS Code extension), check out the [`examples/add-new-command`](../examples/add-new-command) directory. This includes:
 
-- **C++ command** (`native/c/`) - Example command implementation for zowex
+- **C++ command** (`native/c/`) - Example command implementation for `zo`
 - **C++ server** (`native/c/server/`) - Command registration with the dispatcher
 - **SDK** (`packages/sdk/`) - TypeScript types and client methods
 - **CLI** (`packages/cli/`) - CLI command definition and handler

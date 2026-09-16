@@ -496,7 +496,7 @@ class WatchUtils {
                 // The "exit" and "close" events do not fire reliably for shell sessions on z/OS.
                 //
                 // In the FAILED TESTS section, suite paths are unindented:
-                //   ✗ FAIL zowex > data-set > compress
+                //   ✗ FAIL zo > data-set > compress
                 // Individual tests are indented with 2 spaces:
                 //     ✗ FAIL should compress a data set (392.248ms)
                 const suiteFailPattern = /^[✗-] FAIL\s+(.+)/;

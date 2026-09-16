@@ -21,9 +21,10 @@ permissions:
 
 jobs:
   build:
-    if: ${{ inputs.version }}
+    if: ${{ inputs.version || github.event == 'schedule' }}
     uses: ./.github/workflows/zos-build.yml
     with:
+      debug: ${{ github.event == 'schedule' }}
       version: ${{ inputs.version }}
     secrets: inherit
 

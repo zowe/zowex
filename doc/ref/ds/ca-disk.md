@@ -8,7 +8,7 @@ Because CA Disk processes archive requests on a deferred schedule, the end-to-en
 
 - CA Disk must be installed and active on the target LPAR
 - The `DARCHIVE` TSO command must be available in your STEPLIB or LNKLST
-- `zo` must be deployed and on `PATH` (or set `ZOWEX=/path/to/zo`)
+- `zo` must be deployed and on `PATH` (or set `ZO=/path/to/zo`)
 
 ## Running the Manual Test
 
@@ -23,7 +23,7 @@ A shell script is provided at `native/c/test/test.cadisk.sh`. Run it directly on
 To use a specific `zo` binary:
 
 ```bash
-ZOWEX=/path/to/zo ./test.cadisk.sh
+ZO=/path/to/zo ./test.cadisk.sh
 ```
 
 ## What the Script Does

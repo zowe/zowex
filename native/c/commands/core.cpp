@@ -109,7 +109,7 @@ int interactive_mode(const plugin::InvocationContext &context)
 
 int handle_version(plugin::InvocationContext &context)
 {
-  context.output_stream() << "Zowe Remote SSH CLI (" << program_name_ref() << ")" << std::endl;
+  context.output_stream() << "Zowe Z Open CLI (" << program_name_ref() << ")" << std::endl;
   context.output_stream() << "Version: " << g_version << std::endl;
   context.output_stream() << "Build Date: " << BUILD_DATE << " " << BUILD_TIME << std::endl;
   context.output_stream() << "Copyright Contributors to the Zowe Project." << std::endl;
@@ -226,7 +226,7 @@ int execute_command(int argc, char *argv[])
 
 Command &setup_root_command(char *argv[], bool include_plugin_commands)
 {
-  g_arg_parser = std::make_shared<ArgumentParser>(argv[0], "Zowe Remote SSH CLI");
+  g_arg_parser = std::make_shared<ArgumentParser>(argv[0], "Zowe Z Open CLI");
   g_arg_parser->add_pre_command_hook([](const Command &command, bool is_help_request)
                                      {
     if (!is_help_request && command.is_privileged())

@@ -34,7 +34,7 @@ To verify this:
 
 1. **Find a corrupted member:** Find or create a PDS member with non-ISPF directory user data (e.g., load module entries or custom SCM tags).
 2. **Check ISPF:** Open the data set in **ISPF Option 3.4**. The corrupted member should show blanks, warnings, or question marks (`??/??/??`).
-3. **Check zowex:** List member attributes for the data set via the `zo` CLI:
+3. **Check zo:** List member attributes for the data set via the `zo` CLI:
    ```bash
    zo ds list-members "MY.CORRUPTED.PDS" --attributes
    ```

@@ -228,7 +228,7 @@ export class ZSshUtils {
     /**
      * Check the user's $PATH for our server binary.
      * @param session Pre-established SSH session
-     * @returns object describing the details of any located zowex program
+     * @returns object describing the details of any located zo program
      */
     public static async detectServerOnPath(session: SshSession): Promise<IServerOnPathDetails> {
         Logger.getAppLogger().debug(`[ZSshUtils] enter detectServerOnPath()`);
