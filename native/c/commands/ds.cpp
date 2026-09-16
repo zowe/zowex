@@ -764,7 +764,12 @@ int handle_data_set_write(InvocationContext &context)
     }
     if (!etag_value.empty())
     {
-      strcpy(zds.etag, etag_value.c_str());
+      if (etag_value.size() >= sizeof(zds.etag))
+      {
+        context.error_stream() << "Error: etag exceeds " << sizeof(zds.etag) - 1 << " character length limit" << std::endl;
+        return RTNCD_FAILURE;
+      }
+      memcpy(zds.etag, etag_value.c_str(), etag_value.size() + 1);
     }
   }
 

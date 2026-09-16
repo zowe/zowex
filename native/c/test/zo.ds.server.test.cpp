@@ -550,6 +550,21 @@ void zo_ds_server_tests()
         // Note: Data set may add trailing newline, so we check that data is returned
         // The returned base64 may be "SGVsbG8gV29ybGQhCg==" (with newline) instead of "SGVsbG8gV29ybGQh"
         ExpectWithContext(read_resp, "Should contain our written data").ToContain("SGVsbG8gV29ybGQ");
+      });
+
+      it("should reject an oversized etag via RPC", [&]() -> void {
+        int request_id;
+        std::string request = make_rpc_request(
+            "writeDataset",
+            "{\"dsname\":\"" + ds_name + "\",\"data\":\"\",\"etag\":\"123456789\"}",
+            request_id);
+
+        write_to_server(server, request);
+        const std::string response = read_rpc_response(server);
+
+        Expect(response).ToContain("\"id\":" + std::to_string(request_id));
+        Expect(response).ToContain("etag exceeds 8 character length limit");
+        Expect(response).Not().ToContain("\"success\":true");
       }); });
 
              describe("streaming", [&]() -> void
