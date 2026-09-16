@@ -14,6 +14,7 @@
 
 #include "../extend/plugin.hpp"
 #include "../zjson.hpp"
+#include <functional>
 #include <map>
 #include <memory>
 #include <optional>
@@ -93,7 +94,16 @@ public:
   }
 
   // Set content length and send pending notification if present
-  void set_content_len(size_t content_length);
+  void set_content_len(size_t content_length) override;
+
+  // Set the callback invoked by update_heartbeat(). Passed in by RpcServer::process_request()
+  // for this one request, which got it from the worker thread servicing the request (see
+  // Worker::process_request) - not stored per-thread, since a fresh MiddlewareContext is
+  // constructed for every request.
+  void set_heartbeat_callback(std::function<void()> callback);
+
+  // Invoke the callback set via set_heartbeat_callback(), if any
+  void update_heartbeat() override;
 
   // Store pending notification for delayed sending
   void set_pending_notification(const RpcNotification &notification);
@@ -113,6 +123,7 @@ private:
   std::stringstream m_error_stream;
   std::unique_ptr<RpcNotification> m_pending_notification;
   std::map<std::string, std::string> m_large_data;
+  std::function<void()> m_heartbeat_callback;
 };
 
 #endif
