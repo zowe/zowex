@@ -500,6 +500,7 @@ export class ZSshUtils {
                 }
 
                 Logger.getAppLogger().info(`[ZSshUtils] Step 3/5: Extracting PAX archive in ${remoteDir}`);
+                extractionStarted = true;
                 const result = await ssh.execCommand(`pax -rzf ${ZSshUtils.SERVER_PAX_FILE}`, { cwd: remoteDir });
                 if (await ZSshUtils.routeExpiredPasswordError(result.stderr ?? "", "extract", options)) {
                     return false;
@@ -507,7 +508,6 @@ export class ZSshUtils {
                 if (result.code === 0) {
                     Logger.getAppLogger().info(`[ZSshUtils] Step 3 OK: Extracted server binaries`);
                 } else {
-                    extractionStarted = true;
                     const technical = `pax -rzf RC=${result.code}: ${result.stderr}`;
                     Logger.getAppLogger().error(`[ZSshUtils] Step 3 FAILED: ${technical}`);
                     const paxErr = new ImperativeError({
