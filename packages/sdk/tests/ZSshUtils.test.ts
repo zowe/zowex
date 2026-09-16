@@ -727,6 +727,39 @@ describe("ZSshUtils", () => {
                 passwordErr,
             );
         });
+
+        it("should attempt to delete the server binary if deployment fails after we started the extraction", async () => {
+            const sshMock = {
+                execCommand: vi.fn().mockImplementation((cmd, _opts) => {
+                    if (cmd.indexOf("pax ") >= 0) {
+                        return { code: 8, stderr: "Unable to extract pax.", stdout: "" };
+                    }
+
+                    return { code: 0, stderr: "", stdout: "" };
+                }),
+            };
+            const fastPutMock = vi.fn((_local: string, _remote: string, _opts: any, cb: (err?: Error) => void) => cb());
+            const rmdirMock = vi.fn((_path: string, cb: (err?: Error) => void) => cb());
+            const unlinkMock = vi.fn((_path: string, cb: (err?: Error) => void) => cb());
+            const sftpMock = {
+                fastPut: fastPutMock,
+                unlink: unlinkMock,
+                rmdir: rmdirMock,
+            };
+            setupSftpMocks(sftpMock, sshMock);
+            const expectedDeployDir = "/my/subdir/";
+            vi.spyOn(ZSshUtils, "getAvailableMb").mockResolvedValue({ mb: 9001, stderr: "" });
+
+            vi.spyOn(ZSshUtils, "pathExists")
+                .mockResolvedValueOnce({ exists: false, stderr: "" })
+                .mockResolvedValue({ exists: true, stderr: "" })
+                .mockResolvedValue({ exists: true, stderr: "" }); // post-failure binary exists check
+            const result = await ZSshUtils.installServer(new SshSession(fakeSession), expectedDeployDir, {});
+            expect(result).toBe(false);
+            expect(fastPutMock).toHaveBeenCalled();
+            expect(rmdirMock).toHaveBeenCalledWith(expectedDeployDir, expect.anything());
+            expect(unlinkMock).toHaveBeenCalledTimes(2); // to delete the pax & the binary
+        });
     });
 
     describe("getAvailableMb", () => {

@@ -547,10 +547,12 @@ export class ZSshUtils {
                         await promisify(sftp.unlink.bind(sftp))(remotePaxPath);
                     }
 
-                    const remoteProgramPath = path.posix.join(remoteDir, ZSshUtils.SERVER_PAX_FILE);
+                    const remoteProgramPath = path.posix.join(remoteDir, ZSshClient.BIN_NAME);
 
                     if (extractionStarted && (await ZSshUtils.pathExists(ssh, remoteProgramPath)).exists) {
-                        Logger.getAppLogger().debug(`Deployment failed, but extract `);
+                        Logger.getAppLogger().debug(
+                            `Deployment failed, but extraction was started. Attempting to delete ${ZSshClient.BIN_NAME} prgram at '${remoteProgramPath}' `,
+                        );
                         await promisify(sftp.unlink.bind(sftp))(remoteProgramPath);
                     }
                     if (!initialRemoteDirExistCheck.exists) {
