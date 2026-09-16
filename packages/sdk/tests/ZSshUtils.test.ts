@@ -683,10 +683,11 @@ describe("ZSshUtils", () => {
                 execCommand: vi.fn().mockResolvedValue({ code: 0, stderr: "", stdout: "" }),
             };
             const fastPutMock = vi.fn((_local: string, _remote: string, _opts: any, cb: (err?: Error) => void) => cb());
+            const unlinkMock = vi.fn((_path: string, cb: (err?: Error) => void) => cb());
             const rmdirMock = vi.fn((_path: string, cb: (err?: Error) => void) => cb());
             const sftpMock = {
                 fastPut: fastPutMock,
-                unlink: vi.fn((_path: string, cb: (err?: Error) => void) => cb()),
+                unlink: unlinkMock,
                 rmdir: rmdirMock,
             };
             setupSftpMocks(sftpMock, sshMock);
@@ -704,6 +705,9 @@ describe("ZSshUtils", () => {
             expect(result).toBe(false);
             expect(fastPutMock).not.toHaveBeenCalled();
             expect(rmdirMock).toHaveBeenCalledWith(expectedDeployDir, expect.anything());
+            // we should only attempt to delete the pax, not the binary
+            expect(unlinkMock).toHaveBeenCalledTimes(1);
+            expect(unlinkMock).toHaveBeenCalledWith(`${expectedDeployDir}server.pax.Z`, expect.anything());
         });
 
         it("should NOT attempt post-failure cleanup if a step of the deployment throws a password expired error", async () => {

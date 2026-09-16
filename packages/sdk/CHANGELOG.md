@@ -4,6 +4,10 @@ All notable changes to the Client code for "@zowe/zowex-for-zowe-sdk" are docume
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## Recent Changes
+
+- Enhanced the post-failure cleanup in the `ZSshUtils.installServer` method to delete the `zo` program if the installation process failed while extracting the `server.pax.Z` file. [#1143](https://github.com/zowe/zowex/pull/1143)
+
 ## `1.0.0`
 
 - **Breaking** The `zowex` program bundled in `server.pax.Z` is now renamed to `zo`. [#1119](https://github.com/zowe/zowex/pull/1119)
