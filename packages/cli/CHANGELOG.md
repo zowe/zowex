@@ -4,7 +4,7 @@ All notable changes to the Client code for "zowex-for-zowe-cli" are documented i
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## Recent Changes
+## `1.0.1`
 
 - Added `--response-timeout` option to all commands. It defaults to 60 seconds and can be increased for large uploads or downloads over slow connections. [#988](https://github.com/zowe/zowex/issues/988)
 
