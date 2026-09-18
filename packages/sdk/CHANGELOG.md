@@ -4,6 +4,10 @@ All notable changes to the Client code for "@zowe/zowex-for-zowe-sdk" are docume
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## Recent Changes
+
+- Fixed an error where `zowex` is not found on the PATH if the OMVS shell is Bash. The expected behavior is that the `zowex` binary is automatically deployed. [#1141](https://github.com/zowe/zowex/pull/1141)
+
 ## `1.0.0`
 
 - **Breaking** The `zowex` program bundled in `server.pax.Z` is now renamed to `zo`. [#1119](https://github.com/zowe/zowex/pull/1119)
