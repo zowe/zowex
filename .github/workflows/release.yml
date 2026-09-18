@@ -35,19 +35,19 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
           persist-credentials: false
           ref: ${{ github.ref }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: lts/*
 
       - name: Setup JFrog CLI
-        uses: jfrog/setup-jfrog-cli@v4
+        uses: jfrog/setup-jfrog-cli@5a4fbe1e30dbb570cc62d2513421c4b9bc3c9959 # v4
         env:
           JF_ENV_1: ${{ secrets.JF_ARTIFACTORY_TOKEN }}
 
@@ -86,7 +86,7 @@ jobs:
 
       - name: Run Octorelease
         if: ${{ env.TRAIN == 'Release' }}
-        uses: zowe-actions/octorelease@v1
+        uses: zowe-actions/octorelease@6cf71bdb7ca82117775295e076d63fe7a812f3c8 # v1
         env:
           ALLOW_MAJOR_VERSION: ${{ vars.ALLOW_MAJOR_VERSION }}
           GIT_COMMITTER_NAME: ${{ secrets.ZOWE_ROBOT_USER }}
