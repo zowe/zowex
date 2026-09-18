@@ -330,11 +330,11 @@ export class ZSshClient extends RpcClientApi implements Disposable {
         }).finally(() => clearTimeout(timeoutId));
     }
 
-    // Quotes a remote path for safe use in a shell command, expanding a leading "~" to
-    // "$HOME" first since quoting would otherwise prevent that expansion.
+    // Quotes a remote path for safe use in a shell command, leaving a leading "~" outside
+    // the quotes so the shell still expands it to the user's home directory.
     private static quoteRemotePath(path: string): string {
         const expandHome = path === "~" || path.startsWith("~/");
-        return expandHome ? `"$HOME"${ZSshUtils.quotePath(path.slice(1))}` : ZSshUtils.quotePath(path);
+        return expandHome ? `~${ZSshUtils.quotePath(path.slice(1))}` : ZSshUtils.quotePath(path);
     }
 
     private execAsync(...args: string[]): Promise<ClientChannel> {
@@ -422,7 +422,7 @@ export class ZSshClient extends RpcClientApi implements Disposable {
                     additionalDetails: cleanOutput,
                 });
             }
-            if (data.includes("FOTS1681")) {
+            if (data.includes("FOTS1681") && exitCode === -1) {
                 // non-fatal chdir error, display the error but continue waiting for ready message
                 this.mErrHandler(new Error(errMsg));
                 return;

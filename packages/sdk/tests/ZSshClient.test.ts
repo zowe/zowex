@@ -851,16 +851,16 @@ describe("ZSshClient", () => {
     describe("quoteRemotePath function", () => {
         const quoteRemotePath = (path: string): string => (ZSshClient as any).quoteRemotePath(path);
 
-        it("should expand a lone tilde to $HOME", () => {
-            expect(quoteRemotePath("~")).toBe(`"$HOME"''`);
+        it("should leave a lone tilde unquoted so the shell expands it", () => {
+            expect(quoteRemotePath("~")).toBe(`~''`);
         });
 
-        it("should expand a leading tilde and quote the rest of the path", () => {
-            expect(quoteRemotePath("~/some/path")).toBe('"$HOME"/some/path');
+        it("should leave a leading tilde unquoted and quote the rest of the path", () => {
+            expect(quoteRemotePath("~/some/path")).toBe("~/some/path");
         });
 
-        it("should expand a leading tilde and quote a path containing spaces", () => {
-            expect(quoteRemotePath("~/some path/with spaces")).toBe(`"$HOME"'/some path/with spaces'`);
+        it("should leave a leading tilde unquoted and quote a path containing spaces", () => {
+            expect(quoteRemotePath("~/some path/with spaces")).toBe(`~'/some path/with spaces'`);
         });
 
         it("should not expand a tilde that is not at the start of the path", () => {
