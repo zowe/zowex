@@ -7,6 +7,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## Recent Changes
 
 - Fixed an error where `zowex` is not found on the PATH if the OMVS shell is Bash. The expected behavior is that the `zowex` binary is automatically deployed. [#1141](https://github.com/zowe/zowex/pull/1141)
+- Exported the `ZSshConstants` module so that extenders can access its constants. [#1142](https://github.com/zowe/zowex/pull/1142)
 
 ## `1.0.0`
 
