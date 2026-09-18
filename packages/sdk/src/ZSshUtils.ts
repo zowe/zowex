@@ -108,7 +108,7 @@ export class ZSshUtils {
      * From the MIT-licensed node-shlex.
      * https://github.com/rgov/node-shlex
      */
-    private static quotePath(path: string): string {
+    public static quotePath(path: string): string {
         if (path === "") {
             return "''";
         }

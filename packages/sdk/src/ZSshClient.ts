@@ -35,7 +35,7 @@ export class ZSshClient extends RpcClientApi implements Disposable {
     public static readonly REQUIRED_DEPLOY_SIZE_MB = 20;
     private static readonly DEFAULT_SERVER_STARTUP_TIMEOUT_S = 60;
     private static readonly EXIT_CODE_MARKER = "@@ZOWE_EXIT_CODE@@";
-    private static readonly EXIT_CODE_PATTERN = new RegExp(`${ZSshClient.EXIT_CODE_MARKER}(\\d+)`);
+    private static readonly EXIT_CODE_PATTERN = new RegExp(String.raw`${ZSshClient.EXIT_CODE_MARKER}(\d+)`);
     private mErrHandler: ClientOptions["onError"];
     private mResponseTimeout: number;
     private mServerInfo: { version?: string };
@@ -124,7 +124,7 @@ export class ZSshClient extends RpcClientApi implements Disposable {
                     if (opts.verbose) {
                         serverArgs.push("--verbose");
                     }
-                    client.execAsync(`"${zowexBin.replace(/^~/, "$HOME")}"`, ...serverArgs).then((stream) => {
+                    client.execAsync(ZSshClient.quoteRemotePath(zowexBin), ...serverArgs).then((stream) => {
                         established = true;
                         clearTimeout(serverStartupTimeoutId);
                         resolve(stream);
@@ -330,6 +330,13 @@ export class ZSshClient extends RpcClientApi implements Disposable {
         }).finally(() => clearTimeout(timeoutId));
     }
 
+    // Quotes a remote path for safe use in a shell command, expanding a leading "~" to
+    // "$HOME" first since quoting would otherwise prevent that expansion.
+    private static quoteRemotePath(path: string): string {
+        const expandHome = path === "~" || path.startsWith("~/");
+        return expandHome ? `"$HOME"${ZSshUtils.quotePath(path.slice(1))}` : ZSshUtils.quotePath(path);
+    }
+
     private execAsync(...args: string[]): Promise<ClientChannel> {
         return new Promise((resolve, reject) => {
             const cmd = args.join(" ");
@@ -392,10 +399,10 @@ export class ZSshClient extends RpcClientApi implements Disposable {
     }
 
     private stripExitCode(output: string): [code: number, output: string] {
-        // We print the exit code to stdout, since the exit-status of an exec channel only
+        // We print the exit code to stderr, since the exit-status of an exec channel only
         // arrives via a separate "exit" event, whose timing relative to stdout/stderr data
         // is not guaranteed, so it can't be read synchronously alongside stderr output.
-        const match = output.match(ZSshClient.EXIT_CODE_PATTERN);
+        const match = ZSshClient.EXIT_CODE_PATTERN.exec(output);
         return [match ? Number(match[1]) : -1, output.replace(ZSshClient.EXIT_CODE_PATTERN, "").trimEnd()];
     }
 
@@ -447,8 +454,9 @@ export class ZSshClient extends RpcClientApi implements Disposable {
 
     private buildStartupError(command: string): ImperativeError {
         const [exitCode, cleanOutput] = this.stripExitCode(this.mStartupOutput);
+        const exitCodeSuffix = exitCode !== -1 ? ` (exit code ${exitCode})` : "";
         return new ImperativeError({
-            msg: `Error starting Zowe server: ${command}${exitCode !== -1 ? ` (exit code ${exitCode})` : ""}`,
+            msg: `Error starting Zowe server: ${command}${exitCodeSuffix}`,
             additionalDetails: cleanOutput,
         });
     }

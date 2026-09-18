@@ -398,7 +398,7 @@ describe("ZSshClient", () => {
                 serverPath: "/tmp/zowe-server",
             });
             expect(execAsyncSpy).toHaveBeenCalledTimes(1);
-            expect(execAsyncSpy!.mock.calls[0][0]).toBe('"/tmp/zowe-server/zo"');
+            expect(execAsyncSpy!.mock.calls[0][0]).toBe("/tmp/zowe-server/zo");
         });
 
         it("should respect useNativeSsh option", async () => {
@@ -556,15 +556,16 @@ describe("ZSshClient", () => {
         it("should handle not found error from Zowe server", async () => {
             const sshStream = { stderr: new EventEmitter(), stdout: new EventEmitter() };
             const client: ZSshClient = new (ZSshClient as any)();
-            (client as any).mSshClient = {
-                exec: function (_command: string, callback: ClientCallback) {
-                    callback(undefined, sshStream as any);
-                    const marker = (ZSshClient as any).EXIT_CODE_MARKER;
-                    sshStream.stderr.emit("data", `sh: zo: not found\n${marker}127\n`);
-                    return this;
-                },
-            };
-            await expect((client as any).execAsync()).rejects.toMatchObject({ errorCode: "ENOTFOUND" });
+            const execMock = vi.fn(function (command: string, callback: ClientCallback) {
+                callback(undefined, sshStream as any);
+                expect(command).toBe(`zo server || echo "${(ZSshClient as any).EXIT_CODE_MARKER}$?" >&2`);
+                sshStream.stderr.emit("data", "sh: zo: not found\n");
+                sshStream.stderr.emit("data", `${(ZSshClient as any).EXIT_CODE_MARKER}127\n`);
+                return this;
+            });
+            (client as any).mSshClient = { exec: execMock };
+            await expect((client as any).execAsync("zo", "server")).rejects.toMatchObject({ errorCode: "ENOTFOUND" });
+            expect(execMock).toHaveBeenCalledTimes(1);
         });
 
         it("should handle startup error from Zowe server", async () => {
@@ -844,6 +845,38 @@ describe("ZSshClient", () => {
             expect(logErrorMock.mock.calls[0][0]).toBe(`Error: ${testError.message}`);
             expect(consoleErrorMock).toHaveBeenCalledTimes(1);
             consoleErrorMock.mockRestore();
+        });
+    });
+
+    describe("quoteRemotePath function", () => {
+        const quoteRemotePath = (path: string): string => (ZSshClient as any).quoteRemotePath(path);
+
+        it("should expand a lone tilde to $HOME", () => {
+            expect(quoteRemotePath("~")).toBe(`"$HOME"''`);
+        });
+
+        it("should expand a leading tilde and quote the rest of the path", () => {
+            expect(quoteRemotePath("~/some/path")).toBe('"$HOME"/some/path');
+        });
+
+        it("should expand a leading tilde and quote a path containing spaces", () => {
+            expect(quoteRemotePath("~/some path/with spaces")).toBe(`"$HOME"'/some path/with spaces'`);
+        });
+
+        it("should not expand a tilde that is not at the start of the path", () => {
+            expect(quoteRemotePath("/some/~user/path")).toBe(`'/some/~user/path'`);
+        });
+
+        it("should not expand a tilde used for a named user home directory", () => {
+            expect(quoteRemotePath("~user/path")).toBe(`'~user/path'`);
+        });
+
+        it("should quote an absolute path containing spaces", () => {
+            expect(quoteRemotePath("/u/users/some user/path")).toBe(`'/u/users/some user/path'`);
+        });
+
+        it("should not quote a path that does not require quoting", () => {
+            expect(quoteRemotePath("/u/users/testuser/zowe-server")).toBe("/u/users/testuser/zowe-server");
         });
     });
 
