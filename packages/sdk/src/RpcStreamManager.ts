@@ -73,7 +73,10 @@ export class RpcStreamManager {
         this.mPendingStreamMap.delete(params.id);
 
         const sshStream = await new Promise<ClientChannel>((resolve, reject) => {
-            this.mSshClient.exec(`cat > ${params.pipePath}`, (err, stream) => (err ? reject(err) : resolve(stream)));
+            // Need to use sh built-in version of cat that converts to EBCDIC
+            this.mSshClient.exec(`exec /bin/sh -c 'cat > ${params.pipePath}'`, (err, stream) =>
+                err ? reject(err) : resolve(stream),
+            );
         });
         const progressTransform = new ProgressTransform(callbackInfo, () => readStream.emit("keepAlive"));
 
@@ -95,7 +98,10 @@ export class RpcStreamManager {
         }
 
         const sshStream = await new Promise<ClientChannel>((resolve, reject) => {
-            this.mSshClient.exec(`cat ${params.pipePath}`, (err, stream) => (err ? reject(err) : resolve(stream)));
+            // Need to use sh built-in version of cat that converts to EBCDIC
+            this.mSshClient.exec(`exec /bin/sh -c 'cat ${params.pipePath}'`, (err, stream) =>
+                err ? reject(err) : resolve(stream),
+            );
         });
         const progressTransform = new ProgressTransform(callbackInfo, () => writeStream.emit("keepAlive"));
 
