@@ -93,11 +93,11 @@ jobs:
         id: build-vsix
         if: ${{ matrix.os == 'ubuntu' && contains(github.event.pull_request.labels.*.name, 'build-vsix') }}
         run: |
-          git checkout https://github.com/zowe/zowe-explorer-vscode.git
+          git clone https://github.com/zowe/zowe-explorer-vscode.git
           cd zowe-explorer-vscode
-          pnpm install
+          npm install -g pnpm@11 && pnpm install
           pnpm --filter zowex-for-zowe-explorer link:zowex ../packages/sdk
-          pnpm package
+          pnpm --filter vscode-extension-for-zowe package
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         id: cli-artifact-upload
