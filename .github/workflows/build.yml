@@ -93,7 +93,7 @@ jobs:
         id: build-vsix
         if: ${{ matrix.os == 'ubuntu' && contains(github.event.pull_request.labels.*.name, 'build-vsix') }}
         run: |
-          git clone https://github.com/zowe/zowe-explorer-vscode.git
+          git clone --depth 1 https://github.com/zowe/zowe-explorer-vscode.git
           cd zowe-explorer-vscode
           npm install -g pnpm@11 && pnpm install
           pnpm --filter zowex-for-zowe-explorer link:zowex ../packages/sdk
