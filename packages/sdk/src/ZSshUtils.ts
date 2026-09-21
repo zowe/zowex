@@ -551,7 +551,7 @@ export class ZSshUtils {
 
                     if (extractionStarted && (await ZSshUtils.pathExists(ssh, remoteProgramPath)).exists) {
                         Logger.getAppLogger().debug(
-                            `Deployment failed, but extraction was started. Attempting to delete ${ZSshClient.BIN_NAME} prgram at '${remoteProgramPath}' `,
+                            `Deployment failed, but extraction was started. Attempting to delete ${ZSshClient.BIN_NAME} program at '${remoteProgramPath}' `,
                         );
                         await promisify(sftp.unlink.bind(sftp))(remoteProgramPath);
                     }
