@@ -131,7 +131,7 @@ jobs:
         id: vsce-artifact-upload
         if: ${{ steps.build-vsix.outcome == 'success' }}
         with:
-          name: zowex-vsce
+          name: zowe-explorer-vsix
           path: zowe-explorer-vscode/dist/vscode-extension-for-zowe-*.vsix
 
       - name: Comment on PR
