@@ -92,9 +92,18 @@ jobs:
       - name: Build Zowe Explorer VSIX
         id: build-vsix
         if: ${{ matrix.os == 'ubuntu' && contains(github.event.pull_request.labels.*.name, 'build-vsix') }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          TARGET_REPO: "zowe/zowe-explorer-vscode"
         run: |
+          # Check if there is any cross-reference coming from target repo
+          API_URL="repos/${REPO}/issues/${PR_NUMBER}/timeline"
+          LINKED_PR=$(gh api $API_URL --paginate -q '.[] | select(.event == "cross-referenced" and .source.type == "issue" and .source.issue.pull_request != null) | select(.source.issue.repository.full_name == "'"$TARGET_REPO"'") | .source.issue.number')
           git clone --depth 1 https://github.com/zowe/zowe-explorer-vscode.git
           cd zowe-explorer-vscode
+          [[ -n "$LINKED_PR" ]] && git fetch origin pull/${LINKED_PR}/head && git checkout FETCH_HEAD
           npm install -g pnpm@11 && pnpm install
           pnpm --filter zowex-for-zowe-explorer link:zowex ../packages/sdk
           pnpm --filter vscode-extension-for-zowe package
