@@ -100,7 +100,12 @@ jobs:
         run: |
           # Check if there is any cross-reference coming from target repo
           API_URL="repos/${REPO}/issues/${PR_NUMBER}/timeline"
-          LINKED_PR=$(gh api $API_URL --paginate -q '.[] | select(.event == "cross-referenced" and .source.type == "issue" and .source.issue.pull_request != null) | select(.source.issue.repository.full_name == "'"$TARGET_REPO"'") | .source.issue.number')
+          LINKED_PR=$(gh api $API_URL --paginate -q '
+            .[] | select(.event == "cross-referenced" and .source.type == "issue"
+              and .source.issue.pull_request != null and .source.issue.state == "open")
+            | select(.source.issue.repository.full_name == "'"$TARGET_REPO"'")
+            | .source.issue.number
+          ')
           git clone --depth 1 https://github.com/zowe/zowe-explorer-vscode.git
           cd zowe-explorer-vscode
           [[ -n "$LINKED_PR" ]] && git fetch origin pull/${LINKED_PR}/head && git checkout FETCH_HEAD
