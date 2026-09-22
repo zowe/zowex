@@ -35,3 +35,4 @@ packages/sdk/logs/test.log
 native/java/app/.gradle/*
 native/java/app/build
 *.env
+application.yml
