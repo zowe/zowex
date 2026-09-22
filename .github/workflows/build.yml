@@ -89,6 +89,30 @@ jobs:
       - run: npm run package
         if: ${{ matrix.os == 'ubuntu' }}
 
+      - name: Build Zowe Explorer VSIX
+        id: build-vsix
+        if: ${{ matrix.os == 'ubuntu' && contains(github.event.pull_request.labels.*.name, 'build-vsix') }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          TARGET_REPO: "zowe/zowe-explorer-vscode"
+        run: |
+          # Check if there is any cross-reference coming from target repo
+          API_URL="repos/${REPO}/issues/${PR_NUMBER}/timeline"
+          LINKED_PR=$(gh api $API_URL --paginate -q '
+            .[] | select(.event == "cross-referenced" and .source.type == "issue"
+              and .source.issue.pull_request != null and .source.issue.state == "open")
+            | select(.source.issue.repository.full_name == "'"$TARGET_REPO"'")
+            | .source.issue.number
+          ')
+          git clone --depth 1 https://github.com/zowe/zowe-explorer-vscode.git
+          cd zowe-explorer-vscode
+          [[ -n "$LINKED_PR" ]] && git fetch origin pull/${LINKED_PR}/head && git checkout FETCH_HEAD
+          npm install -g pnpm@11 && pnpm install
+          pnpm --filter zowex-for-zowe-explorer link:zowex ../packages/sdk
+          pnpm --filter vscode-extension-for-zowe package
+
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         id: cli-artifact-upload
         if: ${{ matrix.os == 'ubuntu' }}
@@ -103,6 +127,13 @@ jobs:
           name: zowex-sdk
           path: dist/zowe-zowex-for-zowe-sdk-*.tgz
 
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        id: vsce-artifact-upload
+        if: ${{ steps.build-vsix.outcome == 'success' }}
+        with:
+          name: zowe-explorer-vsix
+          path: zowe-explorer-vscode/dist/vscode-extension-for-zowe-*.vsix
+
       - name: Comment on PR
         if: ${{ github.event_name == 'pull_request' && matrix.os == 'ubuntu' && github.event.pull_request.head.repo.full_name == github.repository }}
         uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v2
@@ -113,3 +144,4 @@ jobs:
             Client artifacts:
              - CLI Plug-in: ${{ steps.cli-artifact-upload.outputs.artifact-url }}
              - SDK: ${{ steps.sdk-artifact-upload.outputs.artifact-url }}
+             ${{ steps.build-vsix.outcome == 'success' && format('- VSCE: {0}', steps.vsce-artifact-upload.outputs.artifact-url) }}
