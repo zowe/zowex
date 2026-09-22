@@ -615,6 +615,21 @@ function Save-RespB64([string]$resp, [string]$dst) {
   [IO.File]::WriteAllBytes($dst, (Decode-B64 $o.result.data))
 }
 
+# ---- Data set member name and path validation ---------------------------------------
+function Get-MemberOutPath([string]$dir, [string]$name) {
+  # z/OS member name: 1-8 chars, first alphabetic or @ # $, rest alphanumeric or @ # $.
+  if ($name -notmatch '^[A-Za-z@#$][A-Za-z0-9@#$]{0,7}$') {
+    Die "server returned an invalid PDS member name: '$name'"
+  }
+  $root = [IO.Path]::GetFullPath($dir)
+  if (-not $root.EndsWith([string][IO.Path]::DirectorySeparatorChar)) { $root += [IO.Path]::DirectorySeparatorChar }
+  $out = [IO.Path]::GetFullPath((Join-Path $dir $name))
+  if (-not $out.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) {
+    Die "server returned a member name that escapes $dir : '$name'"
+  }
+  return $out
+}
+
 # ---- usage -----------------------------------------------------------------
 function Get-Usage {
   $txt = Get-Content -LiteralPath $script:Self -Raw
@@ -851,9 +866,10 @@ if [ -x ./zo ]; then echo "HAVE $PWD"; else echo "NEED $PWD"; fi
         $o = From-Json $lst
         $n = 0
         foreach ($m in @($o.result.items)) {
-          $mbr = $m.name
+          $mbr = [string]$m.name
           if (-not $mbr) { continue }
-          Save-RespB64 (Invoke-Rpc 'readDataset' (New-DsParams "$dsn($mbr)" $binary)) (Join-Path $dstDir $mbr)
+          $target = Get-MemberOutPath $dstDir $mbr
+          Save-RespB64 (Invoke-Rpc 'readDataset' (New-DsParams "$dsn($mbr)" $binary)) $target
           $n++
           Say "zx: $dsn($mbr) -> $(Join-Path $dst $mbr)"
         }

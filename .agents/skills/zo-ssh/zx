@@ -167,6 +167,18 @@ bye
 EOF
 }
 
+# ---- Data set member name and path validation ---------------------------------------
+_mbr_target(){
+  local dir="$1" name="$2" root target
+  # z/OS member name: 1-8 chars, first alphabetic or @ # $, rest alphanumeric or @ # $.
+  local pds_member='^[A-Za-z@#$][A-Za-z0-9@#$]{0,7}$'
+  [[ "$name" =~ $pds_member ]] || die "server returned an invalid PDS member name: '$name'"
+  root=$(cd "$dir" && pwd -P) || die "cannot resolve destination directory: $dir"
+  target="$root/$name"
+  [[ "$(dirname "$target")" == "$root" ]] || die "server returned a member name that escapes $dir : '$name'"
+  printf '%s\n' "$target"
+}
+
 # ---- pretty-printers -------------------------------------------------------
 # Each _pp_* receives the raw JSON on stdin via _out, which has already
 # split off any .error to stderr — so these only see .result-bearing responses.
@@ -388,7 +400,8 @@ ds)
                n=0
                while IFS= read -r m; do
                  [[ -z "$m" ]] && continue
-                 _rpc readDataset "{\"dsname\":$(_j "$dsn($m)")$enc}" | jq -r '.result.data' | base64 -d > "$dst/$m"
+                 tgt=$(_mbr_target "$dst" "$m") || exit 1
+                 _rpc readDataset "{\"dsname\":$(_j "$dsn($m)")$enc}" | jq -r '.result.data' | base64 -d > "$tgt"
                  n=$((n+1)); echo "zx: $dsn($m) -> $dst/$m"
                done <<< "$mbrs"
                echo "zx: $n member(s)"
