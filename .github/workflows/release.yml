@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   build:
-    if: ${{ inputs.version || github.event == 'schedule' }}
+    if: ${{ github.event == 'schedule' || github.ref_protected }}
     uses: ./.github/workflows/zos-build.yml
     with:
       debug: ${{ github.event == 'schedule' }}
@@ -31,7 +31,8 @@ jobs:
   release:
     runs-on: ubuntu-latest
     needs: build
-    if: always() && (needs.build.result == 'success' || needs.build.result == 'skipped')
+    environment:
+      name: ${{ github.event == 'schedule' && '' || 'release' }}
 
     steps:
       - name: Checkout
