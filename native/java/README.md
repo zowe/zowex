@@ -65,7 +65,7 @@ cd app
 
 ```bash
 cd app
-java --enable-native-access=ALL-UNNAMED -Djava.library.path="../bindings/build-out:../secur" -jar build/libs/zowex-java-app.jar --spring.config.additional-location=file:./src/main/resources/application.yml --spring.profiles.active=zos 
+java --enable-native-access=ALL-UNNAMED -Djava.library.path="../bindings/build-out:../secur" -Djava.protocol.handler.pkgs=com.ibm.crypto.provider -jar build/libs/zowex-java-app.jar --spring.config.additional-location=file:./src/main/resources/application.yml --spring.profiles.active=zos 
 ```
 
 The app expects the following to be reachable/configured (see `app/src/main/resources/application.yml`):
@@ -73,7 +73,7 @@ The app expects the following to be reachable/configured (see `app/src/main/reso
 - A TLS keystore at `classpath:config/service-keystore.p12` (PKCS12, referenced by
   `server.ssl.key-store*`). No keystore is checked into the repo — generate one for your
   environment and place it under `app/src/main/resources/config/` before packaging, or override
-  `server.ssl.*` externally.
+  `server.ssl.*` externally. You can also use existing keystore/keyring if it's available.
 - The native libraries described below, loadable at startup.
 - Optionally, a running Zowe API Mediation Layer Discovery service (`eureka.client.serviceUrl.defaultZone`,
   default `https://localhost:10011/eureka/`) for API Gateway registration — set
