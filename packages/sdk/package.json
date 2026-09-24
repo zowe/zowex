@@ -16,6 +16,14 @@
   "keywords": [],
   "author": "Zowe",
   "license": "EPL-2.0",
+  "homepage": "https://github.com/zowe/zowex/tree/main/packages/sdk#README",
+  "bugs": {
+    "url": "https://github.com/zowe/zowex/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zowe/zowex"
+  },
   "description": "Zowe Remote SSH APIs for Zowe SDK",
   "files": [
     "bin",
