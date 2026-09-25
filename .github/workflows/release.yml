@@ -20,8 +20,22 @@ permissions:
   pull-requests: write
 
 jobs:
+  validate-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate version format
+        if: ${{ inputs.version != '' }}
+        run: |
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?(\+[A-Za-z0-9.]+)?$ ]]; then
+            echo "::error::Invalid version '$VERSION' - expected semver format, e.g. 1.0.0 or 1.0.0-rc.1"
+            exit 1
+          fi
+        env:
+          VERSION: ${{ inputs.version }}
+
   build:
     if: ${{ github.event == 'schedule' || github.ref_protected }}
+    needs: validate-version
     uses: ./.github/workflows/zos-build.yml
     with:
       debug: ${{ github.event == 'schedule' }}
@@ -64,18 +78,19 @@ jobs:
 
       - name: Set Environment
         run: |
-          RUN_ID=$([ -z "${{ inputs.version }}" ] && \
+          RUN_ID=$([ -z "$VERSION" ] && \
             gh run list --branch=${{ github.ref }} --workflow=zos-build.yml --limit=1 --json=databaseId --jq='.[0].databaseId' || \
             echo "${{ github.run_id }}")
           DATESTAMP=$(date +"%Y-%m-%d-%H%M%S")
-          NEW_VERSION=$([ -z "${{ inputs.version }}" ] && jq -r '.version' package.json || echo "${{ inputs.version }}")
-          NEW_VERSION_SUFFIX=$([ -z "${{ inputs.version }}" ] && echo "$NEW_VERSION-$DATESTAMP" || echo "$NEW_VERSION")
-          TRAIN=$([ -z "${{ inputs.version }}" ] && echo "Nightly" || echo "Release")
-          echo "RUN_ID=$(echo $RUN_ID)" >> $GITHUB_ENV
-          echo "NEW_VERSION_SUFFIX=$(echo $NEW_VERSION_SUFFIX)" >> $GITHUB_ENV
-          echo "TRAIN=$(echo $TRAIN)" >> $GITHUB_ENV
+          NEW_VERSION=$([ -z "$VERSION" ] && jq -r '.version' package.json || echo "$VERSION")
+          NEW_VERSION_SUFFIX=$([ -z "$VERSION" ] && echo "$NEW_VERSION-$DATESTAMP" || echo "$NEW_VERSION")
+          TRAIN=$([ -z "$VERSION" ] && echo "Nightly" || echo "Release")
+          echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
+          echo "NEW_VERSION_SUFFIX=$NEW_VERSION_SUFFIX" >> $GITHUB_ENV
+          echo "TRAIN=$TRAIN" >> $GITHUB_ENV
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
 
       - name: Download Server
         run: |

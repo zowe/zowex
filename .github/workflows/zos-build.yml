@@ -71,7 +71,9 @@ jobs:
 
       - name: Set Build Version
         if: ${{ inputs.version }}
-        run: npm pkg set version=${{ inputs.version }}
+        run: npm pkg set version="$VERSION"
+        env:
+          VERSION: ${{ inputs.version }}
 
       - name: Build on z/OS
         env:
