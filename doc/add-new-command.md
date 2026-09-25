@@ -472,6 +472,7 @@ You've successfully added a new command to the Zowe Remote SSH stack! Here's wha
 
 - **Separation of concerns**: Library logic is separate from command handling
 - **Return objects**: Always set a return object using `context.set_object()` for programmatic access. It feeds both the JSON-RPC `result` and the CLI's `--json` payload, so a command that sets one is machine-readable from either entry point. See [json-output.md](./json-output.md).
+- **Tabular output**: A command that prints a row per result should build it with `commands::format::ResultTable` (`native/c/commands/result_table.hpp`) rather than writing its own `std::setw` chain. Declare each column with a name via `add_column("name", width)`, then feed each row through `table.row()`; the table renders the padded listing or the `--response-format-csv` record from that one declaration, and collects the `ast::Node` you hand `emit()` into the structured result. The column name is shown as a heading, in either text form, when the command also registers `RESPONSE_FORMAT_HEADER` (`--response-format-header`/`--rfh`) and the caller passes it. `handle_job_list` in `native/c/commands/job.cpp` is the shortest example.
 - **Error handling**: Use proper return codes (`RTNCD_SUCCESS`, `RTNCD_FAILURE`) and error messages
 - **CommandBuilder**: Use the fluent API to map RPC parameters to command arguments
 - **Type safety**: Define TypeScript types to ensure consistency between middleware and SDK
