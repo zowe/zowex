@@ -37,10 +37,10 @@ $env:ZX_STATE = "$env:TEMP\zx-agent-$PID"   # same rule on Windows (default is %
 
 Do this at the very start of every session, before the first `zx`/`$zx` call — deploy included. Never call `zx reset` under a `ZX_STATE` a human or another agent might be using (see §7).
 
-**Local prereqs (bash):** `ssh`, `sftp`, `jq`, `base64`, bash ≥3.2, and `curl` or `wget`. Run `.agents/skills/zo-ssh/zx check` to verify. (`jq` is the only one not stock on macOS — if it's missing, ask the user to install it via their package manager, e.g. Homebrew on macOS, before continuing.)
+**Local prereqs (bash):** `ssh`, `sftp`, `jq`, `base64`, bash ≥3.2, `curl` or `wget`, and `sha256sum`/`shasum`/`openssl` (bundle verification). Run `.agents/skills/zo-ssh/zx check` to verify. (`jq` is the only one not stock on macOS — if it's missing, ask the user to install it via their package manager, e.g. Homebrew on macOS, before continuing.)
 **Local prereqs (Windows):** `ssh` + `sftp` (the Windows OpenSSH Client feature) and Windows PowerShell 5.1 or newer. No `jq`/`base64`/`curl` needed — `zx.ps1` does JSON, base64, and downloads in-process. Run `.agents\skills\zo-ssh\zx.ps1 check` to verify.
 **Remote prereqs:** SSH login + a writable USS directory. The `zo` binary is self-contained.
-**Bundle:** `zx deploy` will auto-download the latest `server.pax.Z` from [github.com/zowe/zowex/releases](https://github.com/zowe/zowex/releases) if it isn't found locally. Default save path is `~/.local/share/zx/server.pax.Z` (`%LOCALAPPDATA%\zx\server.pax.Z` on Windows) — always user-writable, works whether the helper is run directly or via PATH. Downloads automatically without prompting. To pin a specific version or path, set `ZX_PAX` to it. Set `GITHUB_TOKEN` if the API is rate-limited on a shared corporate IP.
+**Bundle:** `zx deploy` auto-downloads the server bundle pinned in [bundle.pin](bundle.pin) (release `tag`, `asset` name, and `sha256`) from [github.com/zowe/zowex/releases](https://github.com/zowe/zowex/releases) if it isn't found locally. Default save path is `~/.local/share/zx/server.pax.Z` (`%LOCALAPPDATA%\zx\server.pax.Z` on Windows) — always user-writable, works whether the helper is run directly or via PATH. **Every deploy checks the bundle's SHA-256 against `bundle.pin`** — whether it was just downloaded, cached from an earlier run, or supplied via `ZX_PAX` — and refuses to upload on a mismatch. To deploy a different release or a local build, update `bundle.pin` (and set `ZX_PAX` for a local file); never skip the check.
 
 ---
 
@@ -77,18 +77,22 @@ zx deploy user@host [/remote/dir]
 ```
 
 If `server.pax.Z` isn't present locally, `zx deploy` will:
-1. Hit the GitHub releases API to find the latest release asset (`*.pax.Z`)
-2. Show you the filename and destination, then download it automatically
+1. Download `https://github.com/zowe/zowex/releases/download/<tag>/<asset>` using the values in [bundle.pin](bundle.pin)
+2. Verify its SHA-256 against the pinned `sha256` — on a mismatch the download is deleted and deploy stops
 3. Continue with the normal sftp → unpax → verify flow
 
-The release asset may carry a version in its name (e.g. `zowex-0.7.0-server.pax.Z`); `zx` saves it as `server.pax.Z` at the `ZX_PAX` path.
+The release asset carries a version in its name (e.g. `zowe-server-1.0.1.pax.Z`); `zx` saves it as `server.pax.Z` at the `ZX_PAX` path. An existing file at that path is re-verified on every deploy, so a stale bundle from an older pin fails with a "sha256 mismatch" — delete it and re-run to fetch the pinned one.
 
-**Manual / pinned-version deploy** — download the `.pax.Z` from [github.com/zowe/zowex/releases](https://github.com/zowe/zowex/releases), then:
+**Different release or local build** — edit `bundle.pin`. For another GitHub release, set `tag`, `asset`, and `sha256` (GitHub lists each asset's `sha256:` digest on the release page; or hash the download yourself). For a local build, set `sha256` to its hash and point `ZX_PAX` at it:
 
 ```bash
-ZX_PAX=/path/to/downloaded.pax.Z
+sha256sum /path/to/server.pax.Z             # macOS: shasum -a 256 ...
+# PowerShell: (Get-FileHash C:\path\to\server.pax.Z -Algorithm SHA256).Hash
+ZX_PAX=/path/to/server.pax.Z
 zx deploy user@host [/remote/dir]
 ```
+
+`zx check` prints the current pin and whether the local bundle matches it.
 
 **Low-level steps** (if you need to do it by hand):
 
@@ -424,9 +428,9 @@ On Windows, `zx.ps1 stop` shuts down the session host **and** reaps its `ssh` ch
 
 ## 8 · Windows notes (`zx.ps1`)
 
-Behavior differences vs. the bash helper — everything else (subcommands, `-j`, `ZX_HOST`/`ZX_BIN`/`ZX_STATE`/`ZX_PAX`/`ZX_TIMEOUT`/`GITHUB_TOKEN`, method coverage, output shapes) is the same.
+Behavior differences vs. the bash helper — everything else (subcommands, `-j`, `ZX_HOST`/`ZX_BIN`/`ZX_STATE`/`ZX_PAX`/`ZX_TIMEOUT`, `bundle.pin`, method coverage, output shapes) is the same.
 
-- **Requires Windows PowerShell 5.1+** (the version that ships with Windows) or PowerShell 7. No `jq`, `base64`, `curl`, or `wget` — JSON, base64, and the release download are done in-process.
+- **Requires Windows PowerShell 5.1+** (the version that ships with Windows) or PowerShell 7. No `jq`, `base64`, `curl`, `wget`, or `sha256sum` — JSON, base64, the release download, and the SHA-256 check are done in-process.
 - **No connection multiplexing.** Windows OpenSSH doesn't implement `ControlMaster`/`ControlPath`, so every one-shot call is a new SSH connection (slower, and one auth per call with passwords). `zx start` is the stand-in: it launches a hidden-ish background PowerShell host that owns one long-lived `zo server -w 1` over ssh and answers one request per **named-pipe** connection. Every grouped command auto-routes through it when it's live, exactly like the bash version. **Use `zx start` for anything more than a couple of calls, and always for a whole-PDS `ds get`/`ds put`.**
   - The host is started with `-NoNewWindow` so it keeps your console: with password auth, ssh's prompt appears in your terminal during `zx start` (which waits up to 60s, or `ZX_TIMEOUT` if larger, for the ready banner). Key auth (`ssh-keygen` + append your public key to the host's `~/.ssh/authorized_keys`) avoids the prompt entirely.
   - The pipe name is derived from `$env:ZX_STATE`, so per-agent/per-host isolation works the same way (§2c) and there's no socket-path length limit (the bash `ControlPath too long` problem doesn't exist here).
