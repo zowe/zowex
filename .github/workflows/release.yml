@@ -64,18 +64,19 @@ jobs:
 
       - name: Set Environment
         run: |
-          RUN_ID=$([ -z "${{ inputs.version }}" ] && \
+          RUN_ID=$([ -z "$VERSION" ] && \
             gh run list --branch=${{ github.ref }} --workflow=zos-build.yml --limit=1 --json=databaseId --jq='.[0].databaseId' || \
             echo "${{ github.run_id }}")
           DATESTAMP=$(date +"%Y-%m-%d-%H%M%S")
-          NEW_VERSION=$([ -z "${{ inputs.version }}" ] && jq -r '.version' package.json || echo "${{ inputs.version }}")
-          NEW_VERSION_SUFFIX=$([ -z "${{ inputs.version }}" ] && echo "$NEW_VERSION-$DATESTAMP" || echo "$NEW_VERSION")
-          TRAIN=$([ -z "${{ inputs.version }}" ] && echo "Nightly" || echo "Release")
-          echo "RUN_ID=$(echo $RUN_ID)" >> $GITHUB_ENV
-          echo "NEW_VERSION_SUFFIX=$(echo $NEW_VERSION_SUFFIX)" >> $GITHUB_ENV
-          echo "TRAIN=$(echo $TRAIN)" >> $GITHUB_ENV
+          NEW_VERSION=$([ -z "$VERSION" ] && jq -r '.version' package.json || echo "$VERSION")
+          NEW_VERSION_SUFFIX=$([ -z "$VERSION" ] && echo "$NEW_VERSION-$DATESTAMP" || echo "$NEW_VERSION")
+          TRAIN=$([ -z "$VERSION" ] && echo "Nightly" || echo "Release")
+          echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
+          echo "NEW_VERSION_SUFFIX=$NEW_VERSION_SUFFIX" >> $GITHUB_ENV
+          echo "TRAIN=$TRAIN" >> $GITHUB_ENV
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
 
       - name: Download Server
         run: |
