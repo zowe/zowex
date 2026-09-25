@@ -35,6 +35,7 @@ Prereqs (local):  ssh + sftp on PATH (Windows OpenSSH client). No jq/base64 need
 Prereqs (remote): SSH login + a writable USS directory. zo is self-contained.
 
 Bundle: $env:ZX_PAX (default %LOCALAPPDATA%\zx\server.pax.Z); auto-downloaded on first deploy.
+        Must match the SHA-256 in bundle.pin (next to this script) or deploy refuses it.
 State:  $env:ZX_STATE (default %TEMP%\zx.%USERNAME%) holds config.json, pid, ssh-pid, ready, err.
 Extra ssh/sftp options: $env:ZX_SSH_OPTS (space-separated, e.g. '-i C:\keys\id_rsa').
 Response timeout: $env:ZX_TIMEOUT seconds (default 60).
@@ -69,6 +70,7 @@ if (-not $script:Pax) {
   if (-not $appData) { $appData = Join-Path $HOME '.local\share' }
   $script:Pax = Join-Path $appData 'zx\server.pax.Z'
 }
+$script:PinFile = Join-Path (Split-Path -Parent $script:Self) 'bundle.pin'
 $script:Timeout = 60
 if ($env:ZX_TIMEOUT -and ($env:ZX_TIMEOUT -match '^\d+$')) { $script:Timeout = [int]$env:ZX_TIMEOUT }
 $script:Utf8  = New-Object System.Text.UTF8Encoding($false)
@@ -212,45 +214,57 @@ function Save-Cfg([string]$h, [string]$b) {
 }
 
 # ---- bundle auto-download --------------------------------------------------
+# bundle.pin (next to this script) pins the release asset and its SHA-256;
+# nothing is deployed unless the bundle matches it.
+function Get-BundlePin {
+  if (-not (Test-Path -LiteralPath $script:PinFile)) { Die "bundle pin not found: $($script:PinFile)" }
+  $pin = @{}
+  foreach ($line in (Get-Content -LiteralPath $script:PinFile)) {
+    if ($line -match '^\s*(tag|asset|sha256)\s*=\s*(\S+)') { $pin[$Matches[1]] = $Matches[2] }
+  }
+  if (-not $pin['tag'] -or -not $pin['asset']) { Die "$($script:PinFile) must set tag= and asset=" }
+  if ($pin['sha256'] -notmatch '^[0-9a-fA-F]{64}$') { Die "$($script:PinFile): sha256= must be 64 hex digits" }
+  $pin['sha256'] = $pin['sha256'].ToLowerInvariant()
+  return $pin
+}
+function Get-FileSha256([string]$path) {
+  $sha = [Security.Cryptography.SHA256]::Create()
+  $fs = [IO.File]::OpenRead((Get-FullPath $path))
+  try { $h = $sha.ComputeHash($fs) } finally { $fs.Dispose(); $sha.Dispose() }
+  return (-join ($h | ForEach-Object { $_.ToString('x2') }))
+}
+function Test-BundleHash([string]$path, [string]$want) {
+  $got = Get-FileSha256 $path
+  if ($got -eq $want) { return $true }
+  Note "sha256 mismatch for $path"
+  Note "  expected $want (pinned in $($script:PinFile))"
+  Note "  actual   $got"
+  return $false
+}
 function Ensure-Bundle {
-  if (Test-Path -LiteralPath $script:Pax) { return }
+  $pin = Get-BundlePin
+  if (Test-Path -LiteralPath $script:Pax) {
+    if (-not (Test-BundleHash $script:Pax $pin.sha256)) {
+      Die "delete it to re-download the pinned bundle, or update sha256= in $($script:PinFile) to deploy this build"
+    }
+    return
+  }
   try {
     [Net.ServicePointManager]::SecurityProtocol =
       [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
   } catch { }
-  $hdr = @{}
-  if ($env:GITHUB_TOKEN) { $hdr['Authorization'] = "token $($env:GITHUB_TOKEN)" }
-  $base = 'https://api.github.com/repos/zowe/zowex/releases'
-  Say 'zx: bundle not found; fetching release info from GitHub...'
-  # /latest 404s on a pre-release-only repo; fall back to the full list.
-  $rel = $null
-  foreach ($u in @("$base/latest", $base)) {
-    try { $rel = Invoke-RestMethod -UseBasicParsing -Uri $u -Headers $hdr -Method Get } catch { $rel = $null }
-    if ($rel) { break }
-  }
-  if (-not $rel) {
-    Note 'GitHub API unreachable or rate-limited'
-    Note 'tip: set GITHUB_TOKEN to authenticate (https://github.com/settings/tokens)'
-    Die 'download manually from https://github.com/zowe/zowex/releases and set ZX_PAX to it'
-  }
-  Say 'zx: API ok'
-  $asset = $null
-  foreach ($r in @($rel)) {
-    foreach ($a in @($r.assets)) {
-      if ($a.name -like '*.pax.Z') { $asset = $a; break }
-    }
-    if ($asset) { break }
-  }
-  if (-not $asset) {
-    Note 'no .pax.Z asset found in release'
-    foreach ($r in @($rel)) { foreach ($a in @($r.assets)) { Note "  $($a.name)" } }
-    Die 'set ZX_PAX to a downloaded file and re-run, or check https://github.com/zowe/zowex/releases'
-  }
-  Say "zx: found $($asset.name) - downloading to $($script:Pax)"
+  $url = "https://github.com/zowe/zowex/releases/download/$($pin.tag)/$($pin.asset)"
+  Say "zx: bundle not found; downloading $($pin.asset) ($($pin.tag)) to $($script:Pax)"
   New-Dir (Split-Path -Parent $script:Pax)
-  # No auth header on the download: browser_download_url redirects to another host.
-  Invoke-WebRequest -UseBasicParsing -Uri $asset.browser_download_url -OutFile $script:Pax
-  Say "zx: saved to $($script:Pax)"
+  $part = "$($script:Pax).part"
+  try { Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $part }
+  catch { Die "download failed: $url - $($_.Exception.Message)" }
+  if (-not (Test-BundleHash $part $pin.sha256)) {
+    Remove-Item -LiteralPath $part -Force -ErrorAction SilentlyContinue
+    Die 'refusing to deploy an unverified bundle'
+  }
+  Move-Item -LiteralPath $part -Destination $script:Pax -Force
+  Say "zx: sha256 verified; saved to $($script:Pax)"
 }
 
 # ---- persistent session (named-pipe host) ---------------------------------
@@ -796,8 +810,15 @@ if [ -x ./zo ]; then echo "HAVE $PWD"; else echo "NEED $PWD"; fi
   Say '  ok   json/base64  (in-process - no jq needed)'
   Say "  PowerShell $($PSVersionTable.PSVersion)"
   if ($PSVersionTable.PSVersion.Major -lt 5) { Say '  MISS PowerShell 5.1 or newer'; $ok = $false }
-  if (Test-Path -LiteralPath $script:Pax) { Say "  ok   bundle  $($script:Pax)" }
-  else { Say "  miss bundle  not found at $($script:Pax) - run 'zx deploy <host>' to auto-download from https://github.com/zowe/zowex/releases, or set ZX_PAX to it" }
+  $pin = Get-BundlePin
+  Say "  ok   pin     $($pin.asset) ($($pin.tag)) sha256 $($pin.sha256)"
+  if (-not (Test-Path -LiteralPath $script:Pax)) {
+    Say "  miss bundle  not found at $($script:Pax) - 'zx deploy <host>' downloads the pinned release, or set ZX_PAX to it"
+  } elseif ((Get-FileSha256 $script:Pax) -eq $pin.sha256) {
+    Say "  ok   bundle  $($script:Pax) (sha256 matches pin)"
+  } else {
+    Say "  BAD  bundle  $($script:Pax) does not match the pinned sha256 - delete it or update bundle.pin"; $ok = $false
+  }
   if (-not $ok) { Die 'missing prerequisites' }
 }
 

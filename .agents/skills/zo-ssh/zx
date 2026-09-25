@@ -29,10 +29,11 @@
 #
 # Global flags (anywhere): -j/--json   emit raw JSON instead of pretty output
 #
-# Prereqs (local):  ssh  sftp  jq  base64  curl-or-wget  — bash 3.2+.  Run 'zx check'.
+# Prereqs (local):  ssh  sftp  jq  base64  curl-or-wget  sha256sum-or-shasum — bash 3.2+.  Run 'zx check'.
 # Prereqs (remote): SSH login + a writable USS directory. zo is self-contained.
 #
 # Bundle: $ZX_PAX (default ~/.local/share/zx/server.pax.Z); auto-downloaded on first deploy.
+#         Must match the SHA-256 in bundle.pin (next to this script) or deploy refuses it.
 # State in $ZX_STATE (default /tmp/zx.$UID): config, in/out/err FIFOs, pid, id.
 # If no persistent session is running, every call does a one-shot ssh.
 
@@ -65,57 +66,56 @@ _load_cfg(){
 _save_cfg(){ mkdir -p "$ZX_STATE"; printf 'ZHOST=%q\nZBIN=%q\n' "$1" "$2" > "$CFG"; }
 
 # ---- bundle auto-download --------------------------------------------------
-# Set GITHUB_TOKEN to avoid rate-limit/auth errors on the GitHub API.
+# bundle.pin (next to the real zx script, not the install symlink) pins the
+# release asset and its SHA-256; nothing is deployed unless the bundle matches it.
+_pin_file(){
+  local s="$0" l
+  while [[ -L "$s" ]]; do l=$(readlink "$s"); case "$l" in /*) s="$l";; *) s="$(dirname "$s")/$l";; esac; done
+  printf '%s/bundle.pin' "$(cd "$(dirname "$s")" && pwd -P)"
+}
+_pin_get(){ sed -n "s/^[[:space:]]*$2[[:space:]]*=[[:space:]]*\([^[:space:]]*\).*/\1/p" "$1" | head -1; }
+# Loads PIN, PIN_TAG, PIN_ASSET, PIN_SHA from bundle.pin.
+_load_pin(){
+  PIN=$(_pin_file)
+  [[ -f "$PIN" ]] || die "bundle pin not found: $PIN"
+  PIN_TAG=$(_pin_get "$PIN" tag); PIN_ASSET=$(_pin_get "$PIN" asset)
+  PIN_SHA=$(_pin_get "$PIN" sha256 | tr '[:upper:]' '[:lower:]')
+  [[ -n "$PIN_TAG" && -n "$PIN_ASSET" ]] || die "$PIN must set tag= and asset="
+  [[ "$PIN_SHA" =~ ^[0-9a-f]{64}$ ]] || die "$PIN: sha256= must be 64 hex digits"
+}
+_sha256(){
+  local h
+  if command -v sha256sum >/dev/null; then h=$(sha256sum "$1")
+  elif command -v shasum >/dev/null; then h=$(shasum -a 256 "$1")
+  elif command -v openssl >/dev/null; then h=$(openssl dgst -sha256 -r "$1")
+  else die "need sha256sum, shasum, or openssl on PATH to verify the bundle"; fi
+  printf '%s' "${h%% *}" | tr '[:upper:]' '[:lower:]'
+}
+_sha_mismatch(){ printf 'zx: sha256 mismatch for %s\nzx:   expected %s (pinned in %s)\nzx:   actual   %s\n' "$1" "$PIN_SHA" "$PIN" "$2" >&2; }
 _ensure_bundle(){
-  [[ -f "$ZX_PAX" ]] && return 0
-  local fetch_cmd=""
-  if command -v curl >/dev/null; then fetch_cmd="curl"
-  elif command -v wget >/dev/null; then fetch_cmd="wget"
-  else die "bundle not found at $ZX_PAX — no curl/wget; download server.pax.Z from https://github.com/zowe/zowex/releases and set ZX_PAX=/path/to/it"
+  local got url part
+  _load_pin
+  if [[ -f "$ZX_PAX" ]]; then
+    got=$(_sha256 "$ZX_PAX")
+    [[ "$got" == "$PIN_SHA" ]] && return 0
+    _sha_mismatch "$ZX_PAX" "$got"
+    die "delete it to re-download the pinned bundle, or update sha256= in $PIN to deploy this build"
   fi
-  _gh(){
-    local u="$1"
-    # No -f: we want the body on 4xx so we can show the real GitHub error
-    if [[ "$fetch_cmd" == "curl" ]]; then
-      if [[ -n "${GITHUB_TOKEN-}" ]]; then curl -sSL -H "Authorization: token $GITHUB_TOKEN" "$u"
-      else curl -sSL "$u"; fi
-    else
-      if [[ -n "${GITHUB_TOKEN-}" ]]; then wget -qO- --header="Authorization: token $GITHUB_TOKEN" "$u"
-      else wget -qO- "$u"; fi
-    fi
-  }
-  local base="https://api.github.com/repos/zowe/zowex/releases"
-  local info="" url name
-  printf 'zx: bundle not found; fetching release info from GitHub...\n'
-  # /latest returns {"message":"Not Found"} for pre-release-only repos; fall back to full list
-  info=$(_gh "$base/latest" 2>/dev/null) || true
-  case "${info-}" in *'"Not Found"'*|'') info=$(_gh "$base" 2>/dev/null) || true ;; esac
-  if [[ -z "$info" ]]; then
-    printf 'zx: GitHub API unreachable — check network\n' >&2
-    die "download manually from https://github.com/zowe/zowex/releases and set ZX_PAX=/path/to/server.pax.Z"
-  fi
-  local ghmsg
-  ghmsg=$(printf '%s' "$info" | grep -o '"message":"[^"]*"' | head -1 | cut -d'"' -f4 || true)
-  if [[ -n "$ghmsg" ]]; then
-    printf 'zx: GitHub API error: %s\n' "$ghmsg" >&2
-    printf 'zx: tip: set GITHUB_TOKEN to authenticate (https://github.com/settings/tokens)\n' >&2
-    die "download manually from https://github.com/zowe/zowex/releases and set ZX_PAX=/path/to/server.pax.Z"
-  fi
-  printf 'zx: API ok\n'
-  url=$(printf '%s' "$info" | grep -o 'https://[^"]*\.pax\.Z' | head -1 || true)
-  name=$(printf '%s' "$url" | grep -o '[^/]*\.pax\.Z' || true)
-  if [[ -z "$url" ]]; then
-    printf 'zx: no .pax.Z asset found in release\n' >&2
-    printf 'zx: available assets:\n' >&2
-    printf '%s' "$info" | grep -o 'https://[^"]*' | grep -v '{' | sed 's/^/  /' >&2 || true
-    die "set ZX_PAX=/path/to/downloaded-file and re-run, or check https://github.com/zowe/zowex/releases"
-  fi
-  printf 'zx: found %s — downloading to %s\n' "$name" "$ZX_PAX"
+  url="https://github.com/zowe/zowex/releases/download/$PIN_TAG/$PIN_ASSET"
+  part="$ZX_PAX.part"
+  printf 'zx: bundle not found; downloading %s (%s) to %s\n' "$PIN_ASSET" "$PIN_TAG" "$ZX_PAX"
   mkdir -p "$(dirname "$ZX_PAX")"
-  printf 'zx: downloading...\n'
-  if [[ "$fetch_cmd" == "curl" ]]; then curl -fL --progress-bar -o "$ZX_PAX" "$url"
-  else wget -O "$ZX_PAX" "$url"; fi
-  printf 'zx: saved to %s\n' "$ZX_PAX"
+  if command -v curl >/dev/null; then curl -fL --progress-bar -o "$part" "$url" || die "download failed: $url"
+  elif command -v wget >/dev/null; then wget -O "$part" "$url" || die "download failed: $url"
+  else die "no curl/wget; download $url and set ZX_PAX=/path/to/it"; fi
+  got=$(_sha256 "$part")
+  if [[ "$got" != "$PIN_SHA" ]]; then
+    rm -f "$part"
+    _sha_mismatch "$url" "$got"
+    die "refusing to deploy an unverified bundle"
+  fi
+  mv -f "$part" "$ZX_PAX"
+  printf 'zx: sha256 verified; saved to %s\n' "$ZX_PAX"
 }
 
 # ---- session ---------------------------------------------------------------
@@ -356,9 +356,17 @@ check)
   if command -v curl >/dev/null; then echo "  ok   curl  ($(command -v curl))"
   elif command -v wget >/dev/null; then echo "  ok   wget  ($(command -v wget))  [curl preferred]"
   else echo "  MISS curl/wget  (needed for auto-download — install curl or wget via your package manager)"; ok=0; fi
+  sha_tool=""
+  for c in sha256sum shasum openssl; do command -v "$c" >/dev/null && { sha_tool=$c; break; }; done
+  if [[ -n "$sha_tool" ]]; then echo "  ok   $sha_tool  ($(command -v "$sha_tool"))  [bundle sha256]"
+  else echo "  MISS sha256sum/shasum/openssl  (needed to verify the bundle)"; ok=0; fi
   echo "  bash ${BASH_VERSION}"
-  if [[ -f "$ZX_PAX" ]]; then echo "  ok   bundle  $ZX_PAX"
-  else echo "  miss bundle  not found at $ZX_PAX — run 'zx deploy <host>' to auto-download from https://github.com/zowe/zowex/releases, or set ZX_PAX=/path/to/server.pax.Z"; fi
+  _load_pin
+  echo "  ok   pin     $PIN_ASSET ($PIN_TAG) sha256 $PIN_SHA"
+  if [[ ! -f "$ZX_PAX" ]]; then echo "  miss bundle  not found at $ZX_PAX — 'zx deploy <host>' downloads the pinned release, or set ZX_PAX=/path/to/server.pax.Z"
+  elif [[ -z "$sha_tool" ]]; then echo "  ??   bundle  $ZX_PAX (cannot verify without a sha256 tool)"
+  elif [[ "$(_sha256 "$ZX_PAX")" == "$PIN_SHA" ]]; then echo "  ok   bundle  $ZX_PAX (sha256 matches pin)"
+  else echo "  BAD  bundle  $ZX_PAX does not match the pinned sha256 — delete it or update bundle.pin"; ok=0; fi
   [[ $ok -eq 1 ]] || die "missing prerequisites"
   ;;
 
