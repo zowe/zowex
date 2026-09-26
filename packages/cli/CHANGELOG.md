@@ -6,6 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## `1.0.1`
 
+- Corrected the `create data-set-member` success message to identify the created member. [#639](https://github.com/zowe/zowex/issues/639)
 - Added `--response-timeout` option to all commands. It defaults to 60 seconds and can be increased for large uploads or downloads over slow connections. [#988](https://github.com/zowe/zowex/issues/988)
 
 ## `1.0.0`
