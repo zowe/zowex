@@ -36,6 +36,24 @@ struct UnregisteredType
   int value;
 };
 
+struct SkipUnregisteredField
+{
+  int id;
+  UnregisteredType ignored;
+};
+
+struct SkipSerializationOnly
+{
+  int id;
+  UnregisteredType ignored;
+};
+
+struct UnskippedUnregisteredField
+{
+  int id;
+  UnregisteredType ignored;
+};
+
 struct TestOptional
 {
   std::optional<int> opt_int;
@@ -58,6 +76,13 @@ struct DatabaseConfig
 
 // Register minimal test types for API testing
 ZJSON_DERIVE(SimpleStruct, id, name);
+ZJSON_SERIALIZABLE(SkipUnregisteredField,
+                   ZJSON_FIELD(SkipUnregisteredField, id),
+                   ZJSON_FIELD(SkipUnregisteredField, ignored).skip());
+ZJSON_SERIALIZABLE(SkipSerializationOnly,
+                   ZJSON_FIELD(SkipSerializationOnly, id),
+                   ZJSON_FIELD(SkipSerializationOnly, ignored).skip_serializing_field());
+ZJSON_DERIVE(UnskippedUnregisteredField, id, ignored);
 ZJSON_DERIVE(TestOptional, opt_int, opt_string);
 ZJSON_DERIVE(BaseConfig, host, port);
 ZJSON_SERIALIZABLE(DatabaseConfig,
@@ -992,6 +1017,30 @@ void test_value_conversions()
             auto str_result = zjson::to_value(std::string("hello"));
             Expect(str_result.has_value()).ToBe(true);
             Expect(str_result.value().as_string()).ToBe(std::string("hello"));
+        });
+
+        it("should skip an unregistered field in both directions", []() {
+            SkipUnregisteredField original{42, {7}};
+            auto serialized = zjson::to_value(original);
+            Expect(serialized.has_value()).ToBe(true);
+            Expect(serialized.value().as_object().count("ignored")).ToBe(size_t(0));
+
+            auto deserialized = zjson::from_value<SkipUnregisteredField>(serialized.value());
+            Expect(deserialized.has_value()).ToBe(true);
+            Expect(deserialized.value().id).ToBe(42);
+        });
+
+        it("should report an unskipped field without a serializer", []() {
+            UnskippedUnregisteredField original{42, {7}};
+            auto serialized = zjson::to_value(original);
+            Expect(serialized.has_value()).ToBe(false);
+        });
+
+        it("should skip serialization without requiring a field serializer", []() {
+            SkipSerializationOnly original{42, {7}};
+            auto serialized = zjson::to_value(original);
+            Expect(serialized.has_value()).ToBe(true);
+            Expect(serialized.value().as_object().count("ignored")).ToBe(size_t(0));
         });
 
         it("should store integers and doubles separately", []() {

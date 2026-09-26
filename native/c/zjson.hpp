@@ -1245,49 +1245,6 @@ struct Field
 };
 
 /**
- * Serialization registry for custom types
- */
-template <typename T>
-class SerializationRegistry
-{
-public:
-  using SerializeFunc = std::function<Value(const T &)>;
-  using DeserializeFunc = std::function<zstd::expected<T, Error>(const Value &)>;
-
-  static inline void register_serializer(SerializeFunc func)
-  {
-    get_serializer() = func;
-  }
-
-  static inline void register_deserializer(DeserializeFunc func)
-  {
-    get_deserializer() = func;
-  }
-
-  static SerializeFunc &get_serializer()
-  {
-    static SerializeFunc serializer;
-    return serializer;
-  }
-
-  static DeserializeFunc &get_deserializer()
-  {
-    static DeserializeFunc deserializer;
-    return deserializer;
-  }
-
-  static inline bool has_serializer()
-  {
-    return static_cast<bool>(get_serializer());
-  }
-
-  static inline bool has_deserializer()
-  {
-    return static_cast<bool>(get_deserializer());
-  }
-};
-
-/**
  * Main serialization and deserialization functions
  */
 
@@ -1295,21 +1252,10 @@ public:
 template <typename T>
 zstd::expected<std::string, Error> to_string(const T &value)
 {
+  static_assert(Serializable<T>::value, "Type must implement Serializable trait");
   try
   {
-    Value serialized;
-    if constexpr (Serializable<T>::value)
-    {
-      serialized = Serializable<T>::serialize(value);
-    }
-    else
-    {
-      if (!SerializationRegistry<T>::has_serializer())
-      {
-        return zstd::make_unexpected(Error::invalid_type("serializable", "unknown"));
-      }
-      serialized = SerializationRegistry<T>::get_serializer()(value);
-    }
+    Value serialized = Serializable<T>::serialize(value);
     return value_to_json_string(serialized);
   }
   catch (const Error &e)
@@ -1627,20 +1573,10 @@ inline Value json_handle_to_value(JSON_INSTANCE *instance, KEY_HANDLE *key_handl
 template <typename T>
 zstd::expected<T, Error> from_value(const Value &value)
 {
+  static_assert(Deserializable<T>::value, "Type must implement Deserializable trait");
   try
   {
-    if constexpr (Deserializable<T>::value)
-    {
-      return Deserializable<T>::deserialize(value);
-    }
-    else
-    {
-      if (SerializationRegistry<T>::has_deserializer())
-      {
-        return SerializationRegistry<T>::get_deserializer()(value);
-      }
-      return zstd::make_unexpected(Error::invalid_type("deserializable", "unknown"));
-    }
+    return Deserializable<T>::deserialize(value);
   }
   catch (const Error &e)
   {
@@ -1656,20 +1592,10 @@ zstd::expected<T, Error> from_value(const Value &value)
 template <typename T>
 zstd::expected<Value, Error> to_value(const T &obj)
 {
+  static_assert(Serializable<T>::value, "Type must implement Serializable trait");
   try
   {
-    if constexpr (Serializable<T>::value)
-    {
-      return Serializable<T>::serialize(obj);
-    }
-    else
-    {
-      if (SerializationRegistry<T>::has_serializer())
-      {
-        return SerializationRegistry<T>::get_serializer()(obj);
-      }
-      return zstd::make_unexpected(Error::invalid_type("serializable", "unknown"));
-    }
+    return Serializable<T>::serialize(obj);
   }
   catch (const Error &e)
   {
@@ -2265,20 +2191,6 @@ inline Value parse_json_string(const std::string &json_str)
       return result;                                                                                        \
     }                                                                                                       \
   };                                                                                                        \
-  }                                                                                                         \
-  namespace                                                                                                 \
-  {                                                                                                         \
-  struct StructType##_Registrar                                                                             \
-  {                                                                                                         \
-    StructType##_Registrar()                                                                                \
-    {                                                                                                       \
-      zjson::SerializationRegistry<StructType>::register_serializer(                                        \
-          [](const StructType &obj) { return zjson::Serializable<StructType>::serialize(obj); });           \
-      zjson::SerializationRegistry<StructType>::register_deserializer(                                      \
-          [](const zjson::Value &value) { return zjson::Deserializable<StructType>::deserialize(value); }); \
-    }                                                                                                       \
-  };                                                                                                        \
-  static StructType##_Registrar StructType##_registrar_instance;                                            \
   }
 
 // Field serialization/deserialization helper functions
@@ -2323,6 +2235,10 @@ void serialize_field(const T &obj, Value &result, const Field<T, FieldType> &fie
     }
 
     result.add_to_object(field.get_serialized_name(), Serializable<FieldType>::serialize(field_value));
+  }
+  else
+  {
+    throw Error::invalid_data("Field '" + field.get_serialized_name() + "' has no serializer");
   }
 }
 
