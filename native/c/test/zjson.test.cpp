@@ -1329,6 +1329,11 @@ struct StrictValidationStruct
   int id;
 };
 
+struct RenamedStrictStruct
+{
+  std::string user_name;
+};
+
 // Register structs with different rename_all styles
 // Note: Container attributes must be declared before ZJSON_DERIVE to avoid template specialization errors
 ZJSON_RENAME_ALL(CamelCaseStruct, camelCase);
@@ -1357,6 +1362,15 @@ ZJSON_DERIVE(ScreamingKebabCaseStruct, user_name, api_key, max_connections);
 
 ZJSON_DENY_UNKNOWN_FIELDS(StrictValidationStruct);
 ZJSON_DERIVE(StrictValidationStruct, name, id);
+
+ZJSON_RENAME_ALL(RenamedStrictStruct, camelCase);
+ZJSON_DENY_UNKNOWN_FIELDS(RenamedStrictStruct);
+ZJSON_DERIVE(RenamedStrictStruct, user_name);
+
+static_assert(zjson::detail::StructConfig<RenamedStrictStruct>::rename_all_case == zjson::attributes::RenameAll::camelCase);
+static_assert(zjson::detail::StructConfig<RenamedStrictStruct>::deny_unknown_fields);
+static_assert(zjson::detail::StructConfig<SimpleStruct>::rename_all_case == zjson::attributes::RenameAll::none);
+static_assert(!zjson::detail::StructConfig<SimpleStruct>::deny_unknown_fields);
 
 void test_container_attributes()
 {
@@ -1542,6 +1556,21 @@ void test_container_attributes()
             // Should be unknown field error
             auto error = invalid_result.error();
             Expect(error.kind() == zjson::Error::UnknownField).ToBe(true);
+        });
+
+        it("should combine rename_all with deny_unknown_fields", []() {
+            auto serialized = zjson::to_value(RenamedStrictStruct{"test"});
+            Expect(serialized.has_value()).ToBe(true);
+            Expect(serialized.value().as_object().count("userName")).ToBe(size_t(1));
+            Expect(serialized.value().as_object().count("user_name")).ToBe(size_t(0));
+
+            auto valid_result = zjson::from_str<RenamedStrictStruct>(R"({"userName":"test"})");
+            Expect(valid_result.has_value()).ToBe(true);
+            Expect(valid_result.value().user_name).ToBe(std::string("test"));
+
+            auto invalid_result = zjson::from_str<RenamedStrictStruct>(R"({"userName":"test","extra":1})");
+            Expect(invalid_result.has_value()).ToBe(false);
+            Expect(invalid_result.error().kind() == zjson::Error::UnknownField).ToBe(true);
         });
 
         it("should allow unknown fields by default (when ZJSON_DENY_UNKNOWN_FIELDS not used)", []() {

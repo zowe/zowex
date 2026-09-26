@@ -215,21 +215,27 @@ struct RenameAll
 };
 } // namespace attributes
 
-// Forward declare detail namespace and StructConfig
+// Compile-time container attributes
 namespace detail
 {
 template <typename T>
-struct StructConfig
+struct RenameAllConfig
 {
-  static attributes::RenameAll::CaseStyle rename_all_case;
-  static bool deny_unknown_fields;
+  static constexpr attributes::RenameAll::CaseStyle value = attributes::RenameAll::none;
 };
 
 template <typename T>
-attributes::RenameAll::CaseStyle StructConfig<T>::rename_all_case = attributes::RenameAll::none;
+struct DenyUnknownFieldsConfig
+{
+  static constexpr bool value = false;
+};
 
 template <typename T>
-bool StructConfig<T>::deny_unknown_fields = false;
+struct StructConfig
+{
+  static constexpr attributes::RenameAll::CaseStyle rename_all_case = RenameAllConfig<T>::value;
+  static constexpr bool deny_unknown_fields = DenyUnknownFieldsConfig<T>::value;
+};
 
 template <typename T>
 struct is_optional : std::false_type
@@ -1239,8 +1245,14 @@ struct Field
     {
       return rename_to;
     }
-    // Apply struct-level rename_all transformation if no explicit rename
-    return attributes::RenameAll::transform_name(name, detail::StructConfig<T>::rename_all_case);
+    if constexpr (detail::StructConfig<T>::rename_all_case == attributes::RenameAll::none)
+    {
+      return name;
+    }
+    else
+    {
+      return attributes::RenameAll::transform_name(name, detail::StructConfig<T>::rename_all_case);
+    }
   }
 };
 
@@ -2180,7 +2192,7 @@ inline Value parse_json_string(const std::string &json_str)
       {                                                                                                     \
         return zstd::make_unexpected(Error::invalid_data("Failed to deserialize fields"));                  \
       }                                                                                                     \
-      if (zjson::detail::StructConfig<StructType>::deny_unknown_fields)                                     \
+      if constexpr (zjson::detail::StructConfig<StructType>::deny_unknown_fields)                           \
       {                                                                                                     \
         auto validation_result = detail::validate_no_unknown_fields<StructType>(obj, __VA_ARGS__);          \
         if (!validation_result.has_value())                                                                 \
@@ -2354,24 +2366,30 @@ using detail::serialize_fields;
 
 // Container attribute macros
 
-#define ZJSON_RENAME_ALL(StructType, case_style)                                                                                \
-  namespace zjson                                                                                                               \
-  {                                                                                                                             \
-  namespace detail                                                                                                              \
-  {                                                                                                                             \
-  template <>                                                                                                                   \
-  zjson::attributes::RenameAll::CaseStyle StructConfig<StructType>::rename_all_case = zjson::attributes::RenameAll::case_style; \
-  }                                                                                                                             \
+#define ZJSON_RENAME_ALL(StructType, case_style)                   \
+  namespace zjson                                                  \
+  {                                                                \
+  namespace detail                                                 \
+  {                                                                \
+  template <>                                                      \
+  struct RenameAllConfig<StructType>                               \
+  {                                                                \
+    static constexpr auto value = attributes::RenameAll::case_style; \
+  };                                                               \
+  }                                                                \
   }
 
-#define ZJSON_DENY_UNKNOWN_FIELDS(StructType)                \
-  namespace zjson                                            \
-  {                                                          \
-  namespace detail                                           \
-  {                                                          \
-  template <>                                                \
-  bool StructConfig<StructType>::deny_unknown_fields = true; \
-  }                                                          \
+#define ZJSON_DENY_UNKNOWN_FIELDS(StructType)        \
+  namespace zjson                                    \
+  {                                                  \
+  namespace detail                                   \
+  {                                                  \
+  template <>                                        \
+  struct DenyUnknownFieldsConfig<StructType>         \
+  {                                                  \
+    static constexpr bool value = true;              \
+  };                                                 \
+  }                                                  \
   }
 
 // Field attribute macros
