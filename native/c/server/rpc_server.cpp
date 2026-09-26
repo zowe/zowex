@@ -15,6 +15,15 @@
 #include "logger.hpp"
 #include <iostream>
 
+ZJSON_DERIVE(RpcNotification, jsonrpc, method, params);
+ZJSON_DERIVE(RpcRequest, jsonrpc, method, params, id);
+ZJSON_DERIVE(ErrorDetails, code, message, data);
+ZJSON_SERIALIZABLE(RpcResponse,
+                   ZJSON_FIELD(RpcResponse, jsonrpc),
+                   ZJSON_FIELD(RpcResponse, result).skip_serializing_if_none(),
+                   ZJSON_FIELD(RpcResponse, error).skip_serializing_if_none(),
+                   ZJSON_FIELD(RpcResponse, id));
+
 using std::string;
 
 // Process error output to extract message and data
@@ -600,12 +609,12 @@ validator::ValidationResult RpcServer::validate_json_with_schema(const string &m
   }
 
   const CommandBuilder &builder = it->second;
-  auto validator = is_request ? builder.get_request_validator() : builder.get_response_validator();
+  const auto &schema = is_request ? builder.get_request_schema() : builder.get_response_schema();
 
-  if (!validator)
+  if (!schema)
   {
     return validator::ValidationResult::success();
   }
 
-  return validator(data);
+  return validator::validate_schema(data, schema->fields, schema->field_count, is_request);
 }
