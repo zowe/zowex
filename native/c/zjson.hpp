@@ -15,7 +15,6 @@
 #include <string>
 #include <vector>
 #include <map>
-#include <set>
 #include <functional>
 #include <stdexcept>
 #include <sstream>
@@ -2385,94 +2384,26 @@ bool deserialize_field(T &obj, const ObjectMap &object, const Field<T, FieldType
   }
 }
 
-// Variadic template helpers for field processing
-template <typename T>
-void serialize_fields_impl(const T &obj, Value &result)
+template <typename T, typename... Fields>
+void serialize_fields(const T &obj, Value &result, const Fields &...fields)
 {
-  // Base case - do nothing
-}
-
-template <typename T, typename Field, typename... Fields>
-void serialize_fields_impl(const T &obj, Value &result, Field field, Fields... fields)
-{
-  serialize_field(obj, result, field);
-  serialize_fields_impl(obj, result, fields...);
+  (serialize_field(obj, result, fields), ...);
 }
 
 template <typename T, typename... Fields>
-void serialize_fields(const T &obj, Value &result, Fields... fields)
+bool deserialize_fields(T &obj, const ObjectMap &object, const Fields &...fields)
 {
-  serialize_fields_impl(obj, result, fields...);
-}
-
-template <typename T>
-bool deserialize_fields_impl(T &, const ObjectMap &)
-{
-  return true;
-}
-
-template <typename T, typename Field, typename... Fields>
-bool deserialize_fields_impl(T &obj, const ObjectMap &object, Field field, Fields... fields)
-{
-  if (!deserialize_field(obj, object, field))
-  {
-    return false;
-  }
-  return deserialize_fields_impl(obj, object, fields...);
-}
-
-template <typename T, typename... Fields>
-bool deserialize_fields(T &obj, const ObjectMap &object, Fields... fields)
-{
-  return deserialize_fields_impl(obj, object, fields...);
-}
-
-// Helper to collect field names, including flattened struct fields
-template <typename Field>
-void collect_field_names_impl(std::set<std::string> &names, Field field)
-{
-  if (!field.flatten_field)
-  {
-    names.insert(field.get_serialized_name());
-  }
-}
-
-template <typename Field, typename... Fields>
-void collect_field_names_impl(std::set<std::string> &names, Field field, Fields... fields)
-{
-  if (!field.flatten_field)
-  {
-    names.insert(field.get_serialized_name());
-  }
-  collect_field_names_impl(names, fields...);
+  return (deserialize_field(obj, object, fields) && ...);
 }
 
 template <typename... Fields>
-void collect_field_names(std::set<std::string> &names, Fields... fields)
+bool has_flattened_field(const Fields &...fields)
 {
-  collect_field_names_impl(names, fields...);
-}
-
-template <typename Field>
-bool has_flattened_field_impl(Field field)
-{
-  return field.flatten_field;
-}
-
-template <typename Field, typename... Fields>
-bool has_flattened_field_impl(Field field, Fields... fields)
-{
-  return field.flatten_field || has_flattened_field_impl(fields...);
-}
-
-template <typename... Fields>
-bool has_flattened_field(Fields... fields)
-{
-  return has_flattened_field_impl(fields...);
+  return (fields.flatten_field || ...);
 }
 
 template <typename T, typename... Fields>
-zstd::expected<bool, Error> validate_no_unknown_fields(const ObjectMap &object, Fields... fields)
+zstd::expected<bool, Error> validate_no_unknown_fields(const ObjectMap &object, const Fields &...fields)
 {
   // Check if any field is flattened - if so, we cannot reliably validate unknown fields
   if (has_flattened_field(fields...))
@@ -2482,14 +2413,11 @@ zstd::expected<bool, Error> validate_no_unknown_fields(const ObjectMap &object, 
     return true;
   }
 
-  // Collect all expected field names
-  std::set<std::string> expected_fields;
-  collect_field_names(expected_fields, fields...);
-
   // Check for unknown fields
-  for (const auto &[key, val] : object)
+  for (const auto &entry : object)
   {
-    if (expected_fields.find(key) == expected_fields.end())
+    const auto &key = entry.first;
+    if (!((key == fields.get_serialized_name()) || ...))
     {
       return zstd::make_unexpected(Error::unknown_field(key));
     }
