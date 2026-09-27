@@ -4,6 +4,10 @@ All notable changes to the native code for "zowex" are documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## Recent Changes
+
+- Reduced the size of the `zo` binary by over 40% (10MB -> 6MB) by optimizing the codebase. [#1166](https://github.com/zowe/zowex/pull/1166)
+
 ## `1.0.1`
 
 - Fixed worker threads timing out in the `zo` RPC server for a long upload or download operation that exceeds the request timeout. [#988](https://github.com/zowe/zowex/issues/988)
