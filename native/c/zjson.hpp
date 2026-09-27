@@ -20,19 +20,15 @@
 #include <sstream>
 #include <iomanip>
 #include <cctype>
-#include <cstring>
-#include <cstdio>
+#include <cstdlib>
 #include <cmath>
 #include <limits>
 #include <optional>
 #include <variant>
-#include <string_view>
-#include <memory>
 #include <type_traits>
 #include "zjsonm.h"
 #include "zjsontype.h"
 #include "zstd.hpp"
-#include "zlogger.hpp"
 #include <hwtjic.h> // ensure to include /usr/include
 
 /*
@@ -93,6 +89,7 @@ template <typename T>
 struct Serializable;
 template <typename T>
 struct Deserializable;
+inline std::string value_to_json_string(const Value &value);
 
 // Key/value representation for a JSON object.
 //
@@ -325,15 +322,6 @@ public:
  */
 class Value
 {
-  // Forward declare friend functions and classes
-  friend std::string value_to_json_string(const Value &value);
-  friend Value parse_json_string(const std::string &json_str);
-  friend Value json_handle_to_value(JSON_INSTANCE *instance, KEY_HANDLE *key_handle, int depth);
-
-  // Friend template specializations for vector serialization
-  template <typename T>
-  friend struct Serializable;
-
 public:
   // Public methods for creating Values to avoid private member access
   static Value create_object()
@@ -401,22 +389,6 @@ private:
   ValueVariant data_;
 
   // Helper methods for variant access
-  inline bool &get_bool()
-  {
-    return std::get<bool>(data_);
-  }
-  inline long long &get_long_long()
-  {
-    return std::get<long long>(data_);
-  }
-  inline double &get_double()
-  {
-    return std::get<double>(data_);
-  }
-  inline std::string &get_string()
-  {
-    return std::get<std::string>(data_);
-  }
   inline std::vector<Value> &get_array()
   {
     return std::get<std::vector<Value>>(data_);
