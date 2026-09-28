@@ -54,6 +54,14 @@ const std::string &get_version()
   return g_version;
 }
 
+void disable_json_output()
+{
+  if (g_arg_parser)
+  {
+    g_arg_parser->disable_json_output();
+  }
+}
+
 void set_plugin_manager(plugin::PluginManager *manager)
 {
   g_plugin_manager = manager;
@@ -249,6 +257,11 @@ Command &setup_root_command(char *argv[], bool include_plugin_commands)
                                make_aliases("--version", "-v"),
                                "display version information", ArgType_Flag, false,
                                ArgValue(false));
+  // The root handler prints help or enters the REPL, which owns stdout for its
+  // lifetime and frames each result with [rc] plus an EOT byte. Neither is a
+  // result worth wrapping -- but --json still has to parse here so that
+  // `zowex --json ds list` reaches the subcommand.
+  root_command.disable_json_capture();
   root_command.set_handler(handle_command);
 
   // Core commands
