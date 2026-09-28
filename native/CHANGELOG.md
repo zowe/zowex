@@ -12,6 +12,9 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 - `c`: Fixed `zowex uss list` only returning structured results when `--response-format-csv` was also passed. [#1128](https://github.com/zowe/zowex/pull/1128)
 - `c`: Fixed `plugin::Io::is_redirecting_error()` and `is_redirecting_input()` reporting the state of the output stream instead of their own. [#1128](https://github.com/zowe/zowex/pull/1128)
 - `c`: Fixed a plug-in that registers an argument conflicting with an existing name or alias aborting `zowex` for every command instead of being rejected with a logged diagnostic. [#1128](https://github.com/zowe/zowex/pull/1128)
+- `python`: Added `package_precompiled.py` tool to package precompiled binary assets (equivalent to Python wheels) into `zbind_bin_dist.tar.gz` for instant compiler-free installation.
+- `python`: Added `package_zbind.py` tool to package a clean, self-contained source-based distribution bundle (`zbind_src_dist.tar.gz`) containing all necessary headers, sources, and objects to build the bindings on any z/OS host without SWIG.
+- `python`: Fixed compilation of Python bindings on z/OS by passing required Language Environment feature macros `_EXT` and `_OPEN_SYS_FILE_EXT` to the compiler in `setup.py`.
 
 ## `1.0.1`
 
