@@ -144,4 +144,4 @@ jobs:
             Client artifacts:
              - CLI Plug-in: ${{ steps.cli-artifact-upload.outputs.artifact-url }}
              - SDK: ${{ steps.sdk-artifact-upload.outputs.artifact-url }}
-             ${{ steps.build-vsix.outcome == 'success' && format('- VSCE: {0}', steps.vsce-artifact-upload.outputs.artifact-url) }}
+             ${{ steps.build-vsix.outcome == 'success' && format('- VSCE: {0}', steps.vsce-artifact-upload.outputs.artifact-url) || '' }}
