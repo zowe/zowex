@@ -125,6 +125,6 @@
 | Operation            | z/OSMF | FTP | Backend | Middleware | SDK | CLI | VSCE | Python |
 | -------------------- | ------ | --- | ------- | ---------- | --- | --- | ---- | ------ |
 | Read system log      | ✅     | ❌  | ✅      | ✅         | ✅  | ❌  | ➖   | ❌     |
-| Get server status    | ✅     | ❌  | ✅      | ❌         | ✅  | ❌  | ❌   | ❌     |
+| Get server status    | ✅     | ❌  | ✅      | ✅         | ✅  | ❌  | ❌   | ❌     |
 | Change user password | ✅     | ❌  | ❌      | ❌         | ❌  | ➖  | ➖   | ❌     |
 | Issue SSH command    | ✅     | ❌  | ✅      | ✅         | ✅  | ❌  | ❌   | ❌     |
