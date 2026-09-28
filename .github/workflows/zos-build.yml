@@ -117,12 +117,12 @@ jobs:
           node -e '
             const childProcess = require("child_process");
             const fs = require("fs");
-            const paxSize = (pax) => parseInt(childProcess.execSync(`zcat ${pax} | pax -v | awk '{sum += $5} END {print sum}'`));
+            const paxSize = (pax) => parseInt(childProcess.execSync(`zcat ${pax} | pax -v | awk ''{sum += $5} END {print sum}''`));
             const pr = paxSize("dist/server.pax.Z");
             const main = fs.existsSync("/tmp/main/server.pax.Z") ? paxSize("/tmp/main/server.pax.Z") : 0;
             const pct = main ? ((pr - main) / main * 100).toFixed(2) : 0;
             const change = !main ? "" : !Number(pct) ? " (no change)" : ` (${pct > 0 ? "+" : ""}${pct}% from main)`;
-            console.log(`line=- Extracted Size: ${(pr / 1048576).toFixed(2)} MB${change}`);
+            console.log(`line=- Extracted size: ${(pr / 1048576).toFixed(2)} MB${change}`);
           ' >> "$GITHUB_OUTPUT"
 
       - name: Comment on PR
