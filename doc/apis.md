@@ -19,23 +19,23 @@
 | _Write data set_         | ✅              | ✅  | 🚧 <sup>1</sup> | ✅         | ✅  | ✅  | ✅   | ✅     |
 | _Write data set member_  | ✅              | ✅  | 🚧 <sup>1</sup> | ✅         | ✅  | ✅  | ✅   | ✅     |
 | _Create data set_        | ✅              | ✅  | ✅              | ✅         | ✅  | ✅  | ✅   | ✅     |
-| _Create data set member_ | ✅              | ✅  | 🚧 <sup>2</sup> | ✅         | ✅  | ✅  | ✅   | ✅     |
+| _Create data set member_ | ✅              | ✅  | ✅              | ✅         | ✅  | ✅  | ✅   | ✅     |
 | _Delete data set_        | ✅              | ✅  | ✅              | ✅         | ✅  | ✅  | ✅   | ✅     |
 | _Delete data set member_ | ✅              | ✅  | ✅              | ✅         | ✅  | ✅  | ✅   | ✅     |
-| Recall data set          | 🚧 <sup>3</sup> | ❌  | ✅              | ✅         | ✅  | ✅  | ✅   | ❌     |
+| Recall data set          | 🚧 <sup>2</sup> | ❌  | ✅              | ✅         | ✅  | ✅  | ✅   | ❌     |
 | Migrate data set         | ✅              | ❌  | ❌              | ❌         | ❌  | ❌  | ❌   | ❌     |
 | Delete migrated data set | ✅              | ❌  | ❌              | ❌         | ❌  | ❌  | ❌   | ❌     |
 | Rename data set          | ✅              | ✅  | ✅              | ✅         | ✅  | ✅  | ✅   | ❌     |
 | Rename data set member   | ✅              | ✅  | ✅              | ✅         | ✅  | ✅  | ✅   | ❌     |
-| Copy data set            | ✅              | ❌  | ✅              | ❌         | ❌  | ❌  | ❌   | ❌     |
+| Copy data set            | ✅              | ❌  | ✅              | ✅         | ✅  | ✅  | ✅   | ❌     |
 | Compress data set        | ➖              | ❌  | ✅              | ❌         | ❌  | ❌  | ❌   | ❌     |
-| Search data sets         | 🚧 <sup>4</sup> | ❌  | 🚧 <sup>4</sup> | ❌         | ✅  | ❌  | ❌   | ❌     |
-| Invoke AMS (VSAM)        | ✅              | ❌  | ❌              | ❌         | ❌  | ❌  | ➖   | ❌     |
+| Search data sets         | 🚧 <sup>3</sup> | ❌  | 🚧 <sup>3</sup> | ✅         | ✅  | ❌  | ✅   | ❌     |
+| Invoke AMS (VSAM)        | ✅              | ❌  | 🚧 <sup>4</sup> | ❌         | ❌  | ❌  | ➖   | ❌     |
 
 1. RECFM=U (undefined record format) data sets are read-only; write attempts return an error.
-2. If the member already exists, this operation causes member contents to be overwritten.
-3. Does not support some migration utilities like CA Disk.
-4. Limited options compared to ISPF `srchfor`.
+2. Does not support some migration utilities like CA Disk.
+3. Limited options compared to ISPF `srchfor`.
+4. Some `IDCAMS` operations are supported like resolving data set aliases.
 
 ## USS Files
 
@@ -51,7 +51,6 @@
 | _`chmod` file/directory_ | ✅     | ❌  | ✅              | ✅         | ✅  | ✅  | ✅   | ✅     |
 | _`chown` file/directory_ | ✅     | ❌  | ✅              | ✅         | ✅  | ✅  | ✅   | ✅     |
 | _`chtag` USS file_       | ✅     | ❌  | ✅              | ✅         | ✅  | ✅  | ✅   | ✅     |
-| Issue UNIX command       | ✅     | ✅  | ✅              | ❌         | ✅  | ❌  | ❌   | ❌     |
 | Invoke `extattr`         | ✅     | ❌  | ❌              | ❌         | ❌  | ➖  | ➖   | ❌     |
 | Get ACL entries          | ✅     | ❌  | ❌              | ❌         | ❌  | ➖  | ➖   | ❌     |
 | Set ACL entries          | ✅     | ❌  | ❌              | ❌         | ❌  | ➖  | ➖   | ❌     |
@@ -115,15 +114,17 @@
 | Operation       | z/OSMF | FTP | Backend | Middleware | SDK | CLI | VSCE | Python |
 | --------------- | ------ | --- | ------- | ---------- | --- | --- | ---- | ------ |
 | Display symbol  | ❌     | ❌  | ✅      | ❌         | ❌  | ❌  | ➖   | ❌     |
-| List parmlib    | ❌     | ❌  | ✅      | ❌         | ❌  | ❌  | ➖   | ❌     |
-| List proclib    | ❌     | ❌  | ✅      | ❌         | ❌  | ❌  | ➖   | ❌     |
+| List APF libs   | ❌     | ❌  | ✅      | ✅         | ✅  | ❌  | ➖   | ❌     |
+| List linklist   | ❌     | ❌  | ✅      | ✅         | ✅  | ❌  | ➖   | ❌     |
+| List parmlib    | ❌     | ❌  | ✅      | ✅         | ✅  | ❌  | ➖   | ❌     |
+| List proclib    | ❌     | ❌  | ✅      | ✅         | ✅  | ❌  | ➖   | ❌     |
 | List subsystems | ❌     | ❌  | ✅      | ❌         | ❌  | ❌  | ➖   | ❌     |
 
 ## Other
 
 | Operation            | z/OSMF | FTP | Backend | Middleware | SDK | CLI | VSCE | Python |
 | -------------------- | ------ | --- | ------- | ---------- | --- | --- | ---- | ------ |
-| Read system log      | ✅     | ❌  | ❌      | ❌         | ❌  | ❌  | ➖   | ❌     |
-| Get server status    | ✅     | ❌  | ❌      | ❌         | ❌  | ❌  | ❌   | ❌     |
+| Read system log      | ✅     | ❌  | ✅      | ✅         | ✅  | ❌  | ➖   | ❌     |
+| Get server status    | ✅     | ❌  | ✅      | ❌         | ✅  | ❌  | ❌   | ❌     |
 | Change user password | ✅     | ❌  | ❌      | ❌         | ❌  | ➖  | ➖   | ❌     |
-| Issue SSH command    | ❌     | ❌  | ❌      | ❌         | ✅  | ❌  | ❌   | ❌     |
+| Issue SSH command    | ✅     | ❌  | ✅      | ✅         | ✅  | ❌  | ❌   | ❌     |
