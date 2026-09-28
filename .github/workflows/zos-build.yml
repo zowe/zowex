@@ -117,7 +117,7 @@ jobs:
           node -e '
             const childProcess = require("child_process");
             const fs = require("fs");
-            const paxSize = (pax) => parseInt(childProcess.execSync(`zcat ${pax} | tar -tvf - | awk \x27{sum += $5} END {print sum}\x27`));
+            const paxSize = (pax) => parseInt(childProcess.execSync(`zcat ${pax} | tar -tvf - | awk \x27{sum += $3} END {print sum}\x27`));
             const pr = paxSize("dist/server.pax.Z");
             const main = fs.existsSync("/tmp/main/server.pax.Z") ? paxSize("/tmp/main/server.pax.Z") : 0;
             const pct = main ? ((pr - main) / main * 100).toFixed(2) : 0;
