@@ -46,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     environment:
-      name: ${{ github.event_name == 'schedule' && '' || 'release' }}
+      name: ${{ github.event_name == 'schedule' && 'release-nightly' || 'release' }}
 
     steps:
       - name: Checkout
