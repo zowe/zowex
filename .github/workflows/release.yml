@@ -34,7 +34,7 @@ jobs:
           VERSION: ${{ inputs.version }}
 
   build:
-    if: ${{ github.event == 'schedule' || github.ref_protected }}
+    if: ${{ github.ref_protected }}
     needs: validate-version
     uses: ./.github/workflows/zos-build.yml
     with:
