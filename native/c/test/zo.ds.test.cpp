@@ -2127,7 +2127,7 @@ void zo_ds_tests()
                              std::string command = zo_command + " data-set resolve-alias " + alias_name;
                              rc = execute_command_with_output(command, response);
                              ExpectWithContext(rc, response).ToBe(0);
-                             Expect(response).ToContain(target);
+                             Expect(response).ToContain("'" + target + "'");
                            });
 
                         it("should resolve an alias to a PDS",
@@ -2152,7 +2152,7 @@ void zo_ds_tests()
                              std::string command = zo_command + " data-set resolve-alias " + alias_name;
                              rc = execute_command_with_output(command, response);
                              ExpectWithContext(rc, response).ToBe(0);
-                             Expect(response).ToContain(target);
+                             Expect(response).ToContain("'" + target + "'");
                            });
 
                         it("should resolve an alias to a PDSE",
@@ -2177,7 +2177,7 @@ void zo_ds_tests()
                              std::string command = zo_command + " data-set resolve-alias " + alias_name;
                              rc = execute_command_with_output(command, response);
                              ExpectWithContext(rc, response).ToBe(0);
-                             Expect(response).ToContain(target);
+                             Expect(response).ToContain("'" + target + "'");
                            });
                       });
 
