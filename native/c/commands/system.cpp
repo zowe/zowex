@@ -407,6 +407,7 @@ void register_commands(parser::Command &root_command)
 
   // View-syslog subcommand
   auto system_view_syslog_cmd = command_ptr(new Command("view-syslog", "view syslog"));
+  system_view_syslog_cmd->mark_stdout_as_payload();
   system_view_syslog_cmd->set_handler(handle_system_view_syslog);
   system_view_syslog_cmd->add_keyword_arg("time", make_aliases("--time", "-t"), "specify time hh:mm:ss, e.g. -t 10:41:00. Mutually exclusive with --seconds-ago", ArgType_Single, false);
   system_view_syslog_cmd->add_keyword_arg("date", make_aliases("--date", "-d"), "specify date yyyy-mm-dd, e.g. --date 2026-01-20. Mutually exclusive with --seconds-ago", ArgType_Single, false, ArgValue(""), true);
