@@ -9,6 +9,8 @@
  *
  */
 
+#include <algorithm>
+#include <cctype>
 #include <cstdio>
 #ifndef _OPEN_SYS_FILE_EXT
 #define _OPEN_SYS_FILE_EXT 1
@@ -704,8 +706,10 @@ static std::string_view find_alias_target(std::string_view output)
   {
     return {};
   }
-  const auto end = output.find_first_of(" \t\r\n", start);
-  return end == start ? std::string_view{} : output.substr(start, end - start);
+  const auto it = std::find_if(output.begin() + start, output.end(), [](unsigned char c) {
+    return std::isspace(c);
+  });
+  return output.substr(start, it - (output.begin() + start));
 }
 
 int handle_data_set_resolve_alias(InvocationContext &context)

@@ -1431,7 +1431,7 @@ async function clean(connection: Client) {
 
 async function rmdir(connection: Client, sshProfile: IProfile) {
     console.log(
-        await runCommandInShell(connection, `rm -rf "$(realpath ${deployDirs.root})"\n`, {
+        await runCommandInShell(connection, `rm -rf "$(cd ${deployDirs.root} && pwd -P)"\n`, {
             stepName: "Removing deploy directory",
         }),
     );
