@@ -115,13 +115,14 @@ jobs:
           RUN_ID=$(gh run list --workflow=zos-build.yml --branch=main --event=push --status=success --limit=1 --json=databaseId --jq='.[0].databaseId' 2>/dev/null || true)
           [[ -n "$RUN_ID" ]] && gh run download "$RUN_ID" --name zowe-server-release --dir /tmp/main 2>/dev/null || true
           node -e '
+            const childProcess = require("child_process");
             const fs = require("fs");
-            const pr = fs.statSync("dist/server.pax.Z").size;
-            const main = fs.existsSync("/tmp/main/server.pax.Z") ? fs.statSync("/tmp/main/server.pax.Z").size : 0;
-            const diff = pr - main;
-            const pct = diff ? (diff / main * 100).toFixed(2) : 0;
-            const change = !main ? "" : !diff ? " (no change)" : ` (${diff > 0 ? "+" : ""}${pct}% from main)`;
-            console.log(`line=- Size: ${(pr / 1048576).toFixed(2)} MB${change}`);
+            const paxSize = (pax) => parseInt(childProcess.execSync(`zcat ${pax} | pax -v | awk '{sum += $5} END {print sum}'`));
+            const pr = paxSize("dist/server.pax.Z");
+            const main = fs.existsSync("/tmp/main/server.pax.Z") ? paxSize("/tmp/main/server.pax.Z") : 0;
+            const pct = main ? ((pr - main) / main * 100).toFixed(2) : 0;
+            const change = !main ? "" : !Number(pct) ? " (no change)" : ` (${pct > 0 ? "+" : ""}${pct}% from main)`;
+            console.log(`line=- Extracted Size: ${(pr / 1048576).toFixed(2)} MB${change}`);
           ' >> "$GITHUB_OUTPUT"
 
       - name: Comment on PR
