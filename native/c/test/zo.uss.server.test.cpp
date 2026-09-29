@@ -55,7 +55,7 @@ void zo_uss_server_tests()
       it("should properly chmod a file via RPC", [&]() -> void {
         int req_id;
         std::string request = make_rpc_request("chmodFile", "{\"fspath\":\"" + uss_path + "\",\"mode\":\"777\"}", req_id);
-        
+
         write_to_server(server, request);
         std::string response = read_rpc_response(server);
 
@@ -78,15 +78,15 @@ void zo_uss_server_tests()
         execute_command_with_output(zo_command + " uss create-file " + uss_path, response);
       });
 
-      it("should properly chown a file via RPC", [&]() -> void {
+      itif("should properly chown a file via RPC", [&]() -> void {
         // Get current user ID for chown operation
         std::string resp;
         execute_command_with_output("id -u", resp);
         resp.erase(resp.find_last_not_of(" \t\r\n") + 1); // trim whitespace
-        
+
         int req_id;
         std::string request = make_rpc_request("chownFile", "{\"fspath\":\"" + uss_path + "\",\"owner\":\"" + resp + "\"}", req_id);
-        
+
         write_to_server(server, request);
         std::string response = read_rpc_response(server);
 
@@ -96,14 +96,14 @@ void zo_uss_server_tests()
         // Verify ownership was actually set by checking ls -l output
         std::string ls_response;
         execute_command_with_output("ls -l " + uss_path, ls_response);
-        
+
         // ls -l shows the username, so we need to get it via id -un to compare
         std::string username_resp;
         execute_command_with_output("id -un", username_resp);
         username_resp.erase(username_resp.find_last_not_of(" \t\r\n") + 1); // trim whitespace
-        
+
         ExpectWithContext(ls_response, "File should be owned by the user").ToContain(username_resp);
-      }); });
+      }, getuid() == 0); });
 
              describe("chtag", [&]() -> void
                       {
@@ -118,13 +118,13 @@ void zo_uss_server_tests()
       it("should properly chtag a file via RPC", [&]() -> void {
         int req_id;
         std::string request = make_rpc_request("chtagFile", "{\"fspath\":\"" + uss_path + "\",\"tag\":\"IBM-1047\"}", req_id);
-        
+
         write_to_server(server, request);
         std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
         Expect(response).ToContain("\"id\":" + std::to_string(req_id));
-        
+
         // Verify tag was applied using ls -alT (shows encoding tags)
         std::string ls_response;
         execute_command_with_output("ls -alT " + uss_path, ls_response);
@@ -151,13 +151,13 @@ void zo_uss_server_tests()
       it("should properly copy a file via RPC", [&]() -> void {
         int req_id;
         std::string request = make_rpc_request("copyUss", "{\"srcFsPath\":\"" + src_path + "\",\"dstFsPath\":\"" + dest_path + "\"}", req_id);
-        
+
         write_to_server(server, request);
         std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
         Expect(response).ToContain("\"id\":" + std::to_string(req_id));
-        
+
         // Verify destination file exists after copy
         std::string ls_response;
         int rc = execute_command_with_output("ls " + dest_path, ls_response);
@@ -185,13 +185,13 @@ void zo_uss_server_tests()
       it("should properly create a directory via RPC", [&]() -> void {
         int req_id;
         std::string request = make_rpc_request("createFile", "{\"fspath\":\"" + dir_path + "\",\"isDir\":true}", req_id);
-        
+
         write_to_server(server, request);
         std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
         Expect(response).ToContain("\"id\":" + std::to_string(req_id));
-        
+
         // Verify directory was created and has directory permissions
         std::string ls_response;
         int rc = execute_command_with_output("ls -ld " + dir_path, ls_response);
@@ -210,13 +210,13 @@ void zo_uss_server_tests()
       it("should properly create a file via RPC", [&]() -> void {
         int req_id;
         std::string request = make_rpc_request("createFile", "{\"fspath\":\"" + file_path + "\",\"isDir\":false}", req_id);
-        
+
         write_to_server(server, request);
         std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
         Expect(response).ToContain("\"id\":" + std::to_string(req_id));
-        
+
         std::string ls_response;
         int rc = execute_command_with_output("ls -l " + file_path, ls_response);
         Expect(rc).ToBe(0);
@@ -235,13 +235,13 @@ void zo_uss_server_tests()
       it("should properly delete a file via RPC", [&]() -> void {
         int req_id;
         std::string request = make_rpc_request("deleteFile", "{\"fspath\":\"" + file_path + "\"}", req_id);
-        
+
         write_to_server(server, request);
         std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
         Expect(response).ToContain("\"id\":" + std::to_string(req_id));
-        
+
         // Verify file no longer exists (ls should fail)
         std::string ls_response;
         int rc = execute_command_with_output("ls " + file_path, ls_response);
@@ -253,7 +253,7 @@ void zo_uss_server_tests()
                            {
         int req_id;
         std::string request = make_rpc_request("unixCommand", "{\"commandText\":\"echo hello\"}", req_id);
-        
+
         write_to_server(server, request);
         std::string response = read_rpc_response(server);
 
@@ -276,7 +276,7 @@ void zo_uss_server_tests()
       it("should properly list files via RPC", [&]() -> void {
         int req_id;
         std::string request = make_rpc_request("listFiles", "{\"fspath\":\"" + dir_path + "\"}", req_id);
-        
+
         write_to_server(server, request);
         std::string response = read_rpc_response(server);
 
@@ -305,13 +305,13 @@ void zo_uss_server_tests()
       it("should properly move a file via RPC", [&]() -> void {
         int req_id;
         std::string request = make_rpc_request("moveFile", "{\"source\":\"" + src_path + "\",\"target\":\"" + dest_path + "\"}", req_id);
-        
+
         write_to_server(server, request);
         std::string response = read_rpc_response(server);
 
         Expect(response).ToContain("\"success\":true");
         Expect(response).ToContain("\"id\":" + std::to_string(req_id));
-        
+
         // Verify move: source should not exist, destination should exist
         std::string ls_response;
         int rc1 = execute_command_with_output("ls " + src_path, ls_response);
@@ -342,17 +342,17 @@ void zo_uss_server_tests()
         // Write operation: base64 encoded "Hello World!" is "SGVsbG8gV29ybGQh"
         int write_id;
         std::string write_req = make_rpc_request("writeFile", "{\"fspath\":\"" + file_path + "\",\"data\":\"SGVsbG8gV29ybGQh\"}", write_id);
-        
+
         write_to_server(server, write_req);
         std::string write_resp = read_rpc_response(server);
 
         Expect(write_resp).ToContain("\"success\":true");
         Expect(write_resp).ToContain("\"id\":" + std::to_string(write_id));
-        
+
         // Read operation: verify we get back the same base64 content
         int read_id;
         std::string read_req = make_rpc_request("readFile", "{\"fspath\":\"" + file_path + "\"}", read_id);
-        
+
         write_to_server(server, read_req);
         std::string read_resp = read_rpc_response(server);
 
