@@ -266,43 +266,36 @@ export class ZSshUtils {
                 });
                 return foundMsg;
             };
-            await ssh.withShell(
-                (shellChannel) => {
-                    return new Promise((resolve, reject) => {
-                        shellChannel.on("error", reject);
-                        shellChannel.on("exit", () => {
-                            Logger.getAppLogger().debug(
-                                `[ZSshUtils] detectServerOnPath(): SSH shell exited. Checking shell stdout...`,
-                            );
+            await ssh.withShell((shellChannel) => {
+                return new Promise((resolve, reject) => {
+                    shellChannel.on("error", reject);
+                    shellChannel.on("exit", () => {
+                        Logger.getAppLogger().debug(
+                            `[ZSshUtils] detectServerOnPath(): SSH shell exited. Checking shell stdout...`,
+                        );
 
-                            if (shellChannel.stdout.readableLength > 0) {
-                                commandVOutput += shellChannel.stdout.read().toString();
-                                Logger.getAppLogger().debug(`[ZSshUtils] Final output: '${commandVOutput}'..`);
-                            }
-                            resolve();
-                        });
-                        shellChannel.on("data", (output: string | Buffer) => {
-                            commandVOutput += output.toString();
-                            Logger.getAppLogger().debug(`[ZSshUtils] Received command -v output: '${output}'..`);
-                            if (
-                                shellChannel.closed ||
-                                shellChannel.stdout.readableEnded ||
-                                findBinInOutput() ||
-                                findNotFoundMessageInOutput()
-                            ) {
-                                resolve();
-                            }
-                        });
-                        shellChannel.write(`(command -v ${ZSshClient.BIN_NAME} || echo ${notFoundMessage}) && exit\n`);
-                        shellChannel.end();
+                        if (shellChannel.stdout.readableLength > 0) {
+                            commandVOutput += shellChannel.stdout.read().toString();
+                            Logger.getAppLogger().debug(`[ZSshUtils] Final output: '${commandVOutput}'..`);
+                        }
+                        resolve();
                     });
-                },
-                {
-                    term: "dumb",
-                    cols: 120,
-                    rows: 40,
-                },
-            );
+                    shellChannel.on("data", (output: string | Buffer) => {
+                        commandVOutput += output.toString();
+                        Logger.getAppLogger().debug(`[ZSshUtils] Received command -v output: '${output}'..`);
+                        if (
+                            shellChannel.closed ||
+                            shellChannel.stdout.readableEnded ||
+                            findBinInOutput() ||
+                            findNotFoundMessageInOutput()
+                        ) {
+                            resolve();
+                        }
+                    });
+                    shellChannel.write(`(command -v ${ZSshClient.BIN_NAME} || echo ${notFoundMessage}) && exit\n`);
+                    shellChannel.end();
+                });
+            });
             Logger.getAppLogger().debug(
                 `[ZSshUtils] Returned from shell executing 'command -v ${ZSshClient.BIN_NAME}'`,
             );
