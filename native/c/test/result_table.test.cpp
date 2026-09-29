@@ -35,8 +35,7 @@ class TableFixture
 public:
   explicit TableFixture(bool csv, bool header = false)
       : m_args(make_args(csv, header)),
-        m_context_args("test", m_args, std::vector<std::string>(), nullptr, &m_out, nullptr),
-        m_context(m_context_args),
+        m_context_args("test", m_args, std::vector<std::string>(), nullptr, &m_out, nullptr), m_context(m_context_args),
         table(m_context)
   {
   }
@@ -74,10 +73,11 @@ public:
 void result_table_tests()
 {
   describe("result table tests", []() -> void
-           {
+  {
     describe("human-readable table", []() -> void
-             {
-      it("pads a single column to its declared width", []() {
+    {
+      it("pads a single column to its declared width", []()
+      {
         TableFixture fixture(false);
         fixture.table.add_column("dsname", 44);
         fixture.table.row().add("SYS1.PARMLIB").emit();
@@ -85,21 +85,21 @@ void result_table_tests()
         Expect(fixture.output()).ToBe(std::string("SYS1.PARMLIB") + std::string(32, ' ') + "\n");
       });
 
-      it("separates columns with a single space and leaves the last unpadded", []() {
+      it("separates columns with a single space and leaves the last unpadded", []()
+      {
         TableFixture fixture(false);
-        fixture.table.add_column("ddname", 9).add_column("dsname").add_column("id", 4).add_column("stepname").add_column("procstep");
-        fixture.table.row()
-            .add("JESMSGLG")
-            .add("JES2.DDNAME")
-            .add(2)
-            .add("STEP1")
-            .add("")
-            .emit();
+        fixture.table.add_column("ddname", 9)
+            .add_column("dsname")
+            .add_column("id", 4)
+            .add_column("stepname")
+            .add_column("procstep");
+        fixture.table.row().add("JESMSGLG").add("JES2.DDNAME").add(2).add("STEP1").add("").emit();
 
         Expect(fixture.output()).ToBe(std::string("JESMSGLG  JES2.DDNAME 2    STEP1 \n"));
       });
 
-      it("prints only the cells a short row supplies", []() {
+      it("prints only the cells a short row supplies", []()
+      {
         // A PDS member without valid statistics: the name alone, padded, with
         // no empty attribute columns trailing it.
         TableFixture fixture(false);
@@ -109,7 +109,8 @@ void result_table_tests()
         Expect(fixture.output()).ToBe(std::string("MEMBER1") + std::string(5, ' ') + "\n");
       });
 
-      it("does not truncate a cell wider than its column", []() {
+      it("does not truncate a cell wider than its column", []()
+      {
         TableFixture fixture(false);
         fixture.table.add_column("id", 4).add_column("name");
         fixture.table.row().add("LONGVALUE").add("tail").emit();
@@ -117,7 +118,8 @@ void result_table_tests()
         Expect(fixture.output()).ToBe(std::string("LONGVALUE tail\n"));
       });
 
-      it("prints the column names as a header line when asked", []() {
+      it("prints the column names as a header line when asked", []()
+      {
         TableFixture fixture(false, true);
         fixture.table.add_column("ddname", 9).add_column("id", 4).add_column("stepname");
         fixture.table.row().add("JESMSGLG").add(2).add("STEP1").emit();
@@ -125,7 +127,8 @@ void result_table_tests()
         Expect(fixture.output()).ToBe(std::string("ddname    id   stepname\nJESMSGLG  2    STEP1\n"));
       });
 
-      it("prints the header once, ahead of every row", []() {
+      it("prints the header once, ahead of every row", []()
+      {
         TableFixture fixture(false, true);
         fixture.table.add_column("name");
         fixture.table.row().add("ONE").emit();
@@ -134,18 +137,20 @@ void result_table_tests()
         Expect(fixture.output()).ToBe(std::string("name\nONE\nTWO\n"));
       });
 
-      it("omits the header line when not asked for", []() {
+      it("omits the header line when not asked for", []()
+      {
         TableFixture fixture(false, false);
         fixture.table.add_column("name");
         fixture.table.row().add("ONE").emit();
 
         Expect(fixture.output()).ToBe(std::string("ONE\n"));
       });
-             });
+    });
 
     describe("CSV output", []() -> void
-             {
-      it("joins the cells of a row with commas", []() {
+    {
+      it("joins the cells of a row with commas", []()
+      {
         TableFixture fixture(true);
         fixture.table.add_column("dsname", 44);
         fixture.table.row().add("SYS1.PARMLIB").emit();
@@ -153,19 +158,25 @@ void result_table_tests()
         Expect(fixture.output()).ToBe(std::string("SYS1.PARMLIB\n"));
       });
 
-      it("gives every row the same field count", []() {
+      it("gives every row the same field count", []()
+      {
         // Regression test: job list-files reused one field vector across the
         // whole loop without clearing it, so the second record carried the
         // first record's fields ahead of its own.
         TableFixture fixture(true);
-        fixture.table.add_column("ddname", 9).add_column("dsname").add_column("id", 4).add_column("stepname").add_column("procstep");
+        fixture.table.add_column("ddname", 9)
+            .add_column("dsname")
+            .add_column("id", 4)
+            .add_column("stepname")
+            .add_column("procstep");
         fixture.table.row().add("A").add("B").add(1).add("C").add("D").emit();
         fixture.table.row().add("E").add("F").add(2).add("G").add("H").emit();
 
         Expect(fixture.output()).ToBe(std::string("A,B,1,C,D\nE,F,2,G,H\n"));
       });
 
-      it("pads a short row out to the declared column count", []() {
+      it("pads a short row out to the declared column count", []()
+      {
         TableFixture fixture(true);
         fixture.table.add_column("member", 12).add_column("vers", 4).add_column("mod", 4);
         fixture.table.row().add("MEMBER1").emit();
@@ -173,7 +184,8 @@ void result_table_tests()
         Expect(fixture.output()).ToBe(std::string("MEMBER1,,\n"));
       });
 
-      it("trims padding the control blocks leave on a field", []() {
+      it("trims padding the control blocks leave on a field", []()
+      {
         TableFixture fixture(true);
         fixture.table.add_column("jobid").add_column("owner");
         fixture.table.row().add("JOB00042  ").add("  IBMUSER").emit();
@@ -181,18 +193,20 @@ void result_table_tests()
         Expect(fixture.output()).ToBe(std::string("JOB00042,IBMUSER\n"));
       });
 
-      it("prints the column names as a header record when asked", []() {
+      it("prints the column names as a header record when asked", []()
+      {
         TableFixture fixture(true, true);
         fixture.table.add_column("jobid").add_column("owner");
         fixture.table.row().add("JOB00042").add("IBMUSER").emit();
 
         Expect(fixture.output()).ToBe(std::string("jobid,owner\nJOB00042,IBMUSER\n"));
       });
-             });
+    });
 
     describe("cell helpers", []() -> void
-             {
-      it("renders the unset sentinel as a blank cell", []() {
+    {
+      it("renders the unset sentinel as a blank cell", []()
+      {
         TableFixture fixture(true);
         fixture.table.add_column("lrecl").add_column("blksize").add_column("primary");
         fixture.table.row().add_or_blank(-1).add_or_blank(0).add_or_blank(80).emit();
@@ -200,7 +214,8 @@ void result_table_tests()
         Expect(fixture.output()).ToBe(std::string(",0,80\n"));
       });
 
-      it("honours a caller-supplied sentinel", []() {
+      it("honours a caller-supplied sentinel", []()
+      {
         TableFixture fixture(true);
         fixture.table.add_column("a").add_column("b");
         fixture.table.row().add_or_blank(0, 0).add_or_blank(-1, 0).emit();
@@ -208,18 +223,20 @@ void result_table_tests()
         Expect(fixture.output()).ToBe(std::string(",-1\n"));
       });
 
-      it("renders a flag with the command's own wording", []() {
+      it("renders a flag with the command's own wording", []()
+      {
         TableFixture fixture(true);
         fixture.table.add_column("migrated").add_column("sclm");
         fixture.table.row().add_flag(true, "YES", "NO").add_flag(false, "Y", "N").emit();
 
         Expect(fixture.output()).ToBe(std::string("YES,N\n"));
       });
-             });
+    });
 
     describe("structured result", []() -> void
-             {
-      it("collects the emitted objects under the items key", []() {
+    {
+      it("collects the emitted objects under the items key", []()
+      {
         TableFixture fixture(false);
         fixture.table.add_column("name");
 
@@ -242,7 +259,8 @@ void result_table_tests()
         Expect(result->get("returnedRows") == nullptr).ToBe(true);
       });
 
-      it("reports the row count when asked", []() {
+      it("reports the row count when asked", []()
+      {
         TableFixture fixture(false);
         fixture.table.add_column("name");
         fixture.table.row().add("ONE").emit(ast::obj());
@@ -254,7 +272,8 @@ void result_table_tests()
         Expect(count->as_integer()).ToBe(static_cast<long long>(1));
       });
 
-      it("omits a row that carries no object", []() {
+      it("omits a row that carries no object", []()
+      {
         // job view-status renders one line but builds its own result object.
         TableFixture fixture(false);
         fixture.table.add_column("jobid");
@@ -265,5 +284,6 @@ void result_table_tests()
         Expect(items->as_array().empty()).ToBe(true);
         Expect(fixture.output()).ToBe(std::string("ONLY\n"));
       });
-             }); });
+    });
+  });
 }

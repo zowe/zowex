@@ -174,7 +174,8 @@ int next_rpc_id()
 std::string make_rpc_request(const std::string &method, const std::string &params, int &id)
 {
   id = next_rpc_id();
-  return "{\"jsonrpc\":\"2.0\",\"method\":\"" + method + "\",\"params\":" + params + ",\"id\":" + std::to_string(id) + "}\n";
+  return "{\"jsonrpc\":\"2.0\",\"method\":\"" + method + "\",\"params\":" + params + ",\"id\":" + std::to_string(id) +
+         "}\n";
 }
 
 std::string make_rpc_request(const std::string &method, const std::string &params)
@@ -189,137 +190,137 @@ const std::string zo_server_command = zo_dir + "/zo server";
 void zo_server_tests()
 {
 
-  describe("zowex server tests",
-           []() -> void
-           {
-             it("should print ready message on startup",
-                []() -> void
-                {
-                  ServerHandle server = start_server(zo_server_command);
-                  std::string response = read_line_from_server(server);
-                  stop_server(server);
+  describe("zowex server tests", []() -> void
+  {
+    it("should print ready message on startup", []() -> void
+    {
+      ServerHandle server = start_server(zo_server_command);
+      std::string response = read_line_from_server(server);
+      stop_server(server);
 
-                  Expect(response).ToContain("\"message\":\"zo server is ready to accept input\"");
-                  Expect(response).ToContain("\"status\":\"ready\"");
-                });
-             it("should print ready message with version",
-                []() -> void
-                {
-                  ServerHandle server = start_server(zo_server_command);
-                  std::string response = read_line_from_server(server);
-                  stop_server(server);
+      Expect(response).ToContain("\"message\":\"zo server is ready to accept input\"");
+      Expect(response).ToContain("\"status\":\"ready\"");
+    });
+    it("should print ready message with version", []() -> void
+    {
+      ServerHandle server = start_server(zo_server_command);
+      std::string response = read_line_from_server(server);
+      stop_server(server);
 
-                  static const std::regex re(R"("version"\s*:\s*\"([^"]*)\")");
-                  std::smatch m;
+      static const std::regex re(R"("version"\s*:\s*\"([^"]*)\")");
+      std::smatch m;
 
-                  Expect(std::regex_search(response, m, re)).ToBe(true);
-                  const std::string version = m[1].str();
+      Expect(std::regex_search(response, m, re)).ToBe(true);
+      const std::string version = m[1].str();
 
-                  Expect(version.length()).ToBeGreaterThanOrEqualTo(5); // X.X.X at minimum
-                  Expect(response).ToContain("\"message\":\"zo server is ready to accept input\"");
-                  Expect(response).ToContain("\"status\":\"ready\"");
-                });
-             it("should return error message for invalid JSON input",
-                []() -> void
-                {
-                  ServerHandle server = start_server(zo_server_command, true);
-                  write_to_server(server, "invalid\n");
-                  std::string response = read_line_from_server(server);
-                  stop_server(server);
+      Expect(version.length()).ToBeGreaterThanOrEqualTo(5); // X.X.X at minimum
+      Expect(response).ToContain("\"message\":\"zo server is ready to accept input\"");
+      Expect(response).ToContain("\"status\":\"ready\"");
+    });
+    it("should return error message for invalid JSON input", []() -> void
+    {
+      ServerHandle server = start_server(zo_server_command, true);
+      write_to_server(server, "invalid\n");
+      std::string response = read_line_from_server(server);
+      stop_server(server);
 
-                  Expect(response).ToContain("\"code\":-32700");
-                  Expect(response).ToContain("\"message\":\"Failed to parse command request\"");
-                });
-             it("should execute unixCommand and return output",
-                []() -> void
-                {
-                  ServerHandle server = start_server(zo_server_command, true);
-                  write_to_server(server, "{\"jsonrpc\":\"2.0\",\"method\":\"unixCommand\",\"params\":{\"commandText\":\"whoami\"},\"id\":1}\n");
-                  std::string response = read_line_from_server(server);
-                  stop_server(server);
+      Expect(response).ToContain("\"code\":-32700");
+      Expect(response).ToContain("\"message\":\"Failed to parse command request\"");
+    });
+    it("should execute unixCommand and return output", []() -> void
+    {
+      ServerHandle server = start_server(zo_server_command, true);
+      write_to_server(
+          server,
+          "{\"jsonrpc\":\"2.0\",\"method\":\"unixCommand\",\"params\":{\"commandText\":\"whoami\"},\"id\":1}\n");
+      std::string response = read_line_from_server(server);
+      stop_server(server);
 
-                  Expect(response).ToContain("\"success\":true");
-                  Expect(response).ToContain("\"data\":");
-                });
+      Expect(response).ToContain("\"success\":true");
+      Expect(response).ToContain("\"data\":");
+    });
 
-             it("should execute getInfo and return output",
-                []() -> void
-                {
-                  ServerHandle server = start_server(zo_server_command, true);
-                  write_to_server(server, "{\"jsonrpc\":\"2.0\",\"method\":\"getInfo\",\"params\":{},\"id\":1}\n");
-                  std::string response = read_line_from_server(server);
-                  stop_server(server);
+    it("should execute getInfo and return output", []() -> void
+    {
+      ServerHandle server = start_server(zo_server_command, true);
+      write_to_server(server, "{\"jsonrpc\":\"2.0\",\"method\":\"getInfo\",\"params\":{},\"id\":1}\n");
+      std::string response = read_line_from_server(server);
+      stop_server(server);
 
-                  Expect(response).ToContain("\"success\":true");
+      Expect(response).ToContain("\"success\":true");
 
-                  // Version information
-                  static const std::regex rev(R"("version"\s*:\s*\"([^"]*)\")");
-                  std::smatch mv;
+      // Version information
+      static const std::regex rev(R"("version"\s*:\s*\"([^"]*)\")");
+      std::smatch mv;
 
-                  Expect(std::regex_search(response, mv, rev)).ToBe(true);
-                  const std::string version = mv[1].str();
+      Expect(std::regex_search(response, mv, rev)).ToBe(true);
+      const std::string version = mv[1].str();
 
-                  Expect(version.length()).ToBeGreaterThanOrEqualTo(5); // X.X.X at minimum
+      Expect(version.length()).ToBeGreaterThanOrEqualTo(5); // X.X.X at minimum
 
-                  // Build date information
-                  static const std::regex red(R"("buildDate"\s*:\s*\"([^"]*)\")");
-                  std::smatch md;
+      // Build date information
+      static const std::regex red(R"("buildDate"\s*:\s*\"([^"]*)\")");
+      std::smatch md;
 
-                  Expect(std::regex_search(response, md, red)).ToBe(true);
-                  const std::string buildDate = md[1].str();
+      Expect(std::regex_search(response, md, red)).ToBe(true);
+      const std::string buildDate = md[1].str();
 
-                  Expect(buildDate.length()).ToBeGreaterThanOrEqualTo(11); // MMM DD YYYY at minimum
-                });
+      Expect(buildDate.length()).ToBeGreaterThanOrEqualTo(11); // MMM DD YYYY at minimum
+    });
 
-             it("should execute consoleCommand via zoa and return output",
-                []() -> void
-                {
-                  ServerHandle server = start_server(zo_server_command, true);
-                  write_to_server(server, "{\"jsonrpc\":\"2.0\",\"method\":\"consoleCommand\",\"params\":{\"commandText\":\"D T\"},\"id\":1}\n");
-                  std::string response = read_line_from_server(server);
-                  stop_server(server);
+    it("should execute consoleCommand via zoa and return output", []() -> void
+    {
+      ServerHandle server = start_server(zo_server_command, true);
+      write_to_server(
+          server,
+          "{\"jsonrpc\":\"2.0\",\"method\":\"consoleCommand\",\"params\":{\"commandText\":\"D T\"},\"id\":1}\n");
+      std::string response = read_line_from_server(server);
+      stop_server(server);
 
-                  Expect(response).ToContain("\"success\":true");
-                  Expect(response).ToContain("IEE136I");
-                });
+      Expect(response).ToContain("\"success\":true");
+      Expect(response).ToContain("IEE136I");
+    });
 
-             it("should return an error when zoa cannot be found",
-                []() -> void
-                {
-                  ServerHandle server = start_server("ZOA_PATH=/nonexistent/zoa " + zo_server_command, true);
-                  write_to_server(server, "{\"jsonrpc\":\"2.0\",\"method\":\"consoleCommand\",\"params\":{\"commandText\":\"D T\"},\"id\":1}\n");
-                  std::string response = read_line_from_server(server);
-                  stop_server(server);
+    it("should return an error when zoa cannot be found", []() -> void
+    {
+      ServerHandle server = start_server("ZOA_PATH=/nonexistent/zoa " + zo_server_command, true);
+      write_to_server(
+          server,
+          "{\"jsonrpc\":\"2.0\",\"method\":\"consoleCommand\",\"params\":{\"commandText\":\"D T\"},\"id\":1}\n");
+      std::string response = read_line_from_server(server);
+      stop_server(server);
 
-                  Expect(response).Not().ToContain("\"success\":true");
-                  Expect(response).ToContain("zoa");
-                });
+      Expect(response).Not().ToContain("\"success\":true");
+      Expect(response).ToContain("zoa");
+    });
 
-             it("should preserve stderr detail in RPC error responses",
-                []() -> void
-                {
-                  ServerHandle server = start_server(zo_server_command, true);
-                  write_to_server(server, "{\"jsonrpc\":\"2.0\",\"method\":\"unixCommand\",\"params\":{\"commandText\":\"echo ONLY_STDERR >&2; exit 7\"},\"id\":1}\n");
-                  std::string response = read_line_from_server(server);
-                  stop_server(server);
+    it("should preserve stderr detail in RPC error responses", []() -> void
+    {
+      ServerHandle server = start_server(zo_server_command, true);
+      write_to_server(
+          server,
+          "{\"jsonrpc\":\"2.0\",\"method\":\"unixCommand\",\"params\":{\"commandText\":\"echo ONLY_STDERR >&2; exit 7\"},\"id\":1}\n");
+      std::string response = read_line_from_server(server);
+      stop_server(server);
 
-                  Expect(response).Not().ToContain("\"success\":true");
-                  Expect(response).ToContain("\"details\"");
-                  Expect(response).ToContain("ONLY_STDERR");
-                });
+      Expect(response).Not().ToContain("\"success\":true");
+      Expect(response).ToContain("\"details\"");
+      Expect(response).ToContain("ONLY_STDERR");
+    });
 
-             it("should surface stderr from a successful unixCommand",
-                []() -> void
-                {
-                  ServerHandle server = start_server(zo_server_command, true);
-                  write_to_server(server, "{\"jsonrpc\":\"2.0\",\"method\":\"unixCommand\",\"params\":{\"commandText\":\"echo THIS_IS_STDOUT; echo THIS_IS_STDERR >&2\"},\"id\":1}\n");
-                  std::string response = read_line_from_server(server);
-                  stop_server(server);
+    it("should surface stderr from a successful unixCommand", []() -> void
+    {
+      ServerHandle server = start_server(zo_server_command, true);
+      write_to_server(
+          server,
+          "{\"jsonrpc\":\"2.0\",\"method\":\"unixCommand\",\"params\":{\"commandText\":\"echo THIS_IS_STDOUT; echo THIS_IS_STDERR >&2\"},\"id\":1}\n");
+      std::string response = read_line_from_server(server);
+      stop_server(server);
 
-                  Expect(response).ToContain("\"success\":true");
-                  Expect(response).ToContain("THIS_IS_STDOUT");
-                  Expect(response).ToContain("\"stderr\"");
-                  Expect(response).ToContain("THIS_IS_STDERR");
-                });
-           });
+      Expect(response).ToContain("\"success\":true");
+      Expect(response).ToContain("THIS_IS_STDOUT");
+      Expect(response).ToContain("\"stderr\"");
+      Expect(response).ToContain("THIS_IS_STDERR");
+    });
+  });
 }
