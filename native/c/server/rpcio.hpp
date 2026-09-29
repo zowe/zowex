@@ -41,13 +41,11 @@ struct RpcNotification
   std::string method;
   std::optional<zjson::Value> params;
 };
-ZJSON_DERIVE(RpcNotification, jsonrpc, method, params);
 
 struct RpcRequest : RpcNotification
 {
   int id;
 };
-ZJSON_DERIVE(RpcRequest, jsonrpc, method, params, id);
 
 struct ErrorDetails
 {
@@ -55,7 +53,6 @@ struct ErrorDetails
   std::string message;
   std::optional<zjson::Value> data;
 };
-ZJSON_DERIVE(ErrorDetails, code, message, data);
 
 struct RpcResponse
 {
@@ -64,11 +61,6 @@ struct RpcResponse
   std::optional<ErrorDetails> error;
   std::optional<int> id;
 };
-ZJSON_SERIALIZABLE(RpcResponse,
-                   ZJSON_FIELD(RpcResponse, jsonrpc),
-                   ZJSON_FIELD(RpcResponse, result).skip_serializing_if_none(),
-                   ZJSON_FIELD(RpcResponse, error).skip_serializing_if_none(),
-                   ZJSON_FIELD(RpcResponse, id));
 
 static constexpr size_t LARGE_DATA_THRESHOLD = 16 * 1024 * 1024; // 16MB
 

@@ -109,7 +109,7 @@ export class ZSshUtils {
      * From the MIT-licensed node-shlex.
      * https://github.com/rgov/node-shlex
      */
-    private static quotePath(path: string): string {
+    public static quotePath(path: string): string {
         if (path === "") {
             return "''";
         }
@@ -409,6 +409,7 @@ export class ZSshUtils {
         );
         const localDir = ZSshUtils.getBinDir(__dirname);
         const remoteDir = serverPath.replace(/^~/, ".");
+        let extractionStarted = false;
 
         return ZSshUtils.sftp(session, async (sftp, ssh) => {
             Logger.getAppLogger().info(`[ZSshUtils] Step 1/5: Creating remote directory ${remoteDir}`);
@@ -503,6 +504,7 @@ export class ZSshUtils {
                 }
 
                 Logger.getAppLogger().info(`[ZSshUtils] Step 3/5: Extracting PAX archive in ${remoteDir}`);
+                extractionStarted = true;
                 const result = await ssh.execCommand(`pax -rzf ${ZSshUtils.SERVER_PAX_FILE}`, { cwd: remoteDir });
                 if (await ZSshUtils.routeExpiredPasswordError(result.stderr ?? "", "extract", options)) {
                     return false;
@@ -549,6 +551,14 @@ export class ZSshUtils {
                         await promisify(sftp.unlink.bind(sftp))(remotePaxPath);
                     }
 
+                    const remoteProgramPath = path.posix.join(remoteDir, ZSshClient.BIN_NAME);
+
+                    if (extractionStarted && (await ZSshUtils.pathExists(ssh, remoteProgramPath)).exists) {
+                        Logger.getAppLogger().debug(
+                            `Deployment failed, but extraction was started. Attempting to delete ${ZSshClient.BIN_NAME} program at '${remoteProgramPath}' `,
+                        );
+                        await promisify(sftp.unlink.bind(sftp))(remoteProgramPath);
+                    }
                     if (!initialRemoteDirExistCheck.exists) {
                         Logger.getAppLogger().debug(
                             `Post-failure cleanup: deleting remote dir ${remoteDir} which we created`,

@@ -86,7 +86,7 @@ std::string read_data_set(std::string dsn, std::string codepage)
   }
 
   a2e_inplace(dsn);
-  ZDSReadOpts read_opts{ .zds = &zds, .dsname = dsn };
+  ZDSReadOpts read_opts{.zds = &zds, .dsname = dsn};
   std::string response;
   int rc = zds_read(read_opts, response);
 
@@ -120,7 +120,7 @@ std::string write_data_set(std::string dsn, std::string data, std::string codepa
 
   a2e_inplace(dsn);
   a2e_inplace(data);
-  int rc = zds_write_to_dsn(&zds, dsn, data);
+  int rc = zds_write({.zds = &zds, .dsname = dsn}, data);
 
   if (rc != 0)
   {
@@ -162,7 +162,7 @@ void create_member(std::string dsn)
   a2e_inplace(dsn);
   std::string empty_data = "";
   a2e_inplace(empty_data);
-  int rc = zds_write_to_dsn(&zds, dsn, empty_data);
+  int rc = zds_write({.zds = &zds, .dsname = dsn}, empty_data);
 
   if (rc != 0)
   {

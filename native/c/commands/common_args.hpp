@@ -114,6 +114,15 @@ const ArgTemplate RESPONSE_FORMAT_BYTES = {
     ArgValue(false),
     make_aliases()};
 
+const ArgTemplate RESPONSE_FORMAT_HEADER = {
+    "response-format-header",
+    make_aliases("--response-format-header", "--rfh"),
+    "includes a header row of column names in table and CSV output",
+    ArgType_Flag,
+    false,
+    ArgValue(false),
+    make_aliases()};
+
 const ArgTemplate ETAG = {
     "etag",
     make_aliases("--etag"),

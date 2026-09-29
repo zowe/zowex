@@ -36,6 +36,24 @@ struct UnregisteredType
   int value;
 };
 
+struct SkipUnregisteredField
+{
+  int id;
+  UnregisteredType ignored;
+};
+
+struct SkipSerializationOnly
+{
+  int id;
+  UnregisteredType ignored;
+};
+
+struct UnskippedUnregisteredField
+{
+  int id;
+  UnregisteredType ignored;
+};
+
 struct TestOptional
 {
   std::optional<int> opt_int;
@@ -58,6 +76,13 @@ struct DatabaseConfig
 
 // Register minimal test types for API testing
 ZJSON_DERIVE(SimpleStruct, id, name);
+ZJSON_SERIALIZABLE(SkipUnregisteredField,
+                   ZJSON_FIELD(SkipUnregisteredField, id),
+                   ZJSON_FIELD(SkipUnregisteredField, ignored).skip());
+ZJSON_SERIALIZABLE(SkipSerializationOnly,
+                   ZJSON_FIELD(SkipSerializationOnly, id),
+                   ZJSON_FIELD(SkipSerializationOnly, ignored).skip_serializing_field());
+ZJSON_DERIVE(UnskippedUnregisteredField, id, ignored);
 ZJSON_DERIVE(TestOptional, opt_int, opt_string);
 ZJSON_DERIVE(BaseConfig, host, port);
 ZJSON_SERIALIZABLE(DatabaseConfig,
@@ -994,6 +1019,30 @@ void test_value_conversions()
             Expect(str_result.value().as_string()).ToBe(std::string("hello"));
         });
 
+        it("should skip an unregistered field in both directions", []() {
+            SkipUnregisteredField original{42, {7}};
+            auto serialized = zjson::to_value(original);
+            Expect(serialized.has_value()).ToBe(true);
+            Expect(serialized.value().as_object().count("ignored")).ToBe(size_t(0));
+
+            auto deserialized = zjson::from_value<SkipUnregisteredField>(serialized.value());
+            Expect(deserialized.has_value()).ToBe(true);
+            Expect(deserialized.value().id).ToBe(42);
+        });
+
+        it("should report an unskipped field without a serializer", []() {
+            UnskippedUnregisteredField original{42, {7}};
+            auto serialized = zjson::to_value(original);
+            Expect(serialized.has_value()).ToBe(false);
+        });
+
+        it("should skip serialization without requiring a field serializer", []() {
+            SkipSerializationOnly original{42, {7}};
+            auto serialized = zjson::to_value(original);
+            Expect(serialized.has_value()).ToBe(true);
+            Expect(serialized.value().as_object().count("ignored")).ToBe(size_t(0));
+        });
+
         it("should store integers and doubles separately", []() {
             // Integers stored as i64 (long long)
             zjson::Value int_val(42);
@@ -1280,6 +1329,11 @@ struct StrictValidationStruct
   int id;
 };
 
+struct RenamedStrictStruct
+{
+  std::string user_name;
+};
+
 // Register structs with different rename_all styles
 // Note: Container attributes must be declared before ZJSON_DERIVE to avoid template specialization errors
 ZJSON_RENAME_ALL(CamelCaseStruct, camelCase);
@@ -1308,6 +1362,15 @@ ZJSON_DERIVE(ScreamingKebabCaseStruct, user_name, api_key, max_connections);
 
 ZJSON_DENY_UNKNOWN_FIELDS(StrictValidationStruct);
 ZJSON_DERIVE(StrictValidationStruct, name, id);
+
+ZJSON_RENAME_ALL(RenamedStrictStruct, camelCase);
+ZJSON_DENY_UNKNOWN_FIELDS(RenamedStrictStruct);
+ZJSON_DERIVE(RenamedStrictStruct, user_name);
+
+static_assert(zjson::detail::StructConfig<RenamedStrictStruct>::rename_all_case == zjson::attributes::RenameAll::camelCase);
+static_assert(zjson::detail::StructConfig<RenamedStrictStruct>::deny_unknown_fields);
+static_assert(zjson::detail::StructConfig<SimpleStruct>::rename_all_case == zjson::attributes::RenameAll::none);
+static_assert(!zjson::detail::StructConfig<SimpleStruct>::deny_unknown_fields);
 
 void test_container_attributes()
 {
@@ -1493,6 +1556,21 @@ void test_container_attributes()
             // Should be unknown field error
             auto error = invalid_result.error();
             Expect(error.kind() == zjson::Error::UnknownField).ToBe(true);
+        });
+
+        it("should combine rename_all with deny_unknown_fields", []() {
+            auto serialized = zjson::to_value(RenamedStrictStruct{"test"});
+            Expect(serialized.has_value()).ToBe(true);
+            Expect(serialized.value().as_object().count("userName")).ToBe(size_t(1));
+            Expect(serialized.value().as_object().count("user_name")).ToBe(size_t(0));
+
+            auto valid_result = zjson::from_str<RenamedStrictStruct>(R"({"userName":"test"})");
+            Expect(valid_result.has_value()).ToBe(true);
+            Expect(valid_result.value().user_name).ToBe(std::string("test"));
+
+            auto invalid_result = zjson::from_str<RenamedStrictStruct>(R"({"userName":"test","extra":1})");
+            Expect(invalid_result.has_value()).ToBe(false);
+            Expect(invalid_result.error().kind() == zjson::Error::UnknownField).ToBe(true);
         });
 
         it("should allow unknown fields by default (when ZJSON_DENY_UNKNOWN_FIELDS not used)", []() {

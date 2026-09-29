@@ -6,7 +6,14 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- Fixed an error when issuing streamed RPC requests to a `zowex` server running in Bash shell. [#1155](https://github.com/zowe/zowex/pull/1155)
 - Added `SessionContext` class that caches SSH connections so they can be reused across utility methods. [#1144](https://github.com/zowe/zowex/pull/1144)
+
+## `1.0.1`
+
+- Enhanced the post-failure cleanup in the `ZSshUtils.installServer` method to delete the `zo` program if the installation process failed while extracting the `server.pax.Z` file. [#1143](https://github.com/zowe/zowex/pull/1143)
+- Fixed an error where `zowex` is not found on the PATH if the OMVS shell is Bash. The expected behavior is that the `zowex` binary is automatically deployed. [#1141](https://github.com/zowe/zowex/pull/1141)
+- Exported the `ZSshConstants` module so that extenders can access its constants. [#1142](https://github.com/zowe/zowex/pull/1142)
 
 ## `1.0.0`
 
