@@ -29,47 +29,54 @@ void zo_cert_server_tests()
 {
   ServerHandle server;
   describe("certificate server tests", [&]() -> void
-           {
-    beforeAll([&]() -> void {
+  {
+    beforeAll([&]() -> void
+    {
       server = start_server(zo_server_command, true);
     });
 
-    afterAll([&]() -> void {
+    afterAll([&]() -> void
+    {
       stop_server(server);
     });
 
-    describe("request validation (no authority required)", [&]() -> void {
-      it("rejects createKeyring without the required keyring field", [&]() -> void {
+    describe("request validation (no authority required)", [&]() -> void
+    {
+      it("rejects createKeyring without the required keyring field", [&]() -> void
+      {
         write_to_server(server, make_rpc_request("createKeyring", "{\"owner\":\"TESTUSER\"}"));
         std::string response = read_rpc_response(server);
         Expect(response).ToContain("Request validation failed");
         Expect(response).Not().ToContain("\"success\":true");
       });
 
-      it("rejects deleteCertificate without the required label field", [&]() -> void {
-        write_to_server(server, make_rpc_request("deleteCertificate",
-                                                 "{\"owner\":\"TESTUSER\",\"keyring\":\"RING01\"}"));
+      it("rejects deleteCertificate without the required label field", [&]() -> void
+      {
+        write_to_server(server,
+                        make_rpc_request("deleteCertificate", "{\"owner\":\"TESTUSER\",\"keyring\":\"RING01\"}"));
         std::string response = read_rpc_response(server);
         Expect(response).ToContain("Request validation failed");
       });
 
-      it("rejects trustCertificate without the required status field", [&]() -> void {
-        write_to_server(server, make_rpc_request("trustCertificate",
-                                                 "{\"owner\":\"TESTUSER\",\"label\":\"LBL\"}"));
+      it("rejects trustCertificate without the required status field", [&]() -> void
+      {
+        write_to_server(server, make_rpc_request("trustCertificate", "{\"owner\":\"TESTUSER\",\"label\":\"LBL\"}"));
         std::string response = read_rpc_response(server);
         Expect(response).ToContain("Request validation failed");
       });
 
-      it("accepts unknown request fields for forward compatibility", [&]() -> void {
+      it("accepts unknown request fields for forward compatibility", [&]() -> void
+      {
         // Validation must not reject the extra field; execution may still fail
         // on authority, so only assert the failure is NOT a validation error.
-        write_to_server(server, make_rpc_request("listRings",
-                                                 "{\"owner\":\"" + get_user() + "\",\"futureField\":true}"));
+        write_to_server(server,
+                        make_rpc_request("listRings", "{\"owner\":\"" + get_user() + "\",\"futureField\":true}"));
         std::string response = read_rpc_response(server);
         Expect(response).Not().ToContain("Request validation failed");
       });
 
-      it("rejects exportCertificate p12 without a password at the handler level", [&]() -> void {
+      it("rejects exportCertificate p12 without a password at the handler level", [&]() -> void
+      {
         // The request schema allows an omitted password (pem exports don't need
         // one), so this is caught by handle_cert_export, not schema validation.
         write_to_server(server, make_rpc_request("exportCertificate",
@@ -82,7 +89,8 @@ void zo_cert_server_tests()
       });
     });
 
-    describe("read-only methods (gated on ESM authority)", [&]() -> void {
+    describe("read-only methods (gated on ESM authority)", [&]() -> void
+    {
       // Probe with the CLI, matching each RPC's underlying service so the gate
       // tracks AUTHORITY, not data: GetRingInfo (list-rings) fails for a user
       // who simply has no rings even with full authority, while the
@@ -93,10 +101,11 @@ void zo_cert_server_tests()
       const bool can_read_rings =
           execute_command_with_output(zo_command + " system keyring list-rings " + user, probe_out) == 0;
       const bool can_read_certs =
-          execute_command_with_output(
-              zo_command + " system keyring list " + user + " '*' --max-entries 1", probe_out) == 0;
+          execute_command_with_output(zo_command + " system keyring list " + user + " '*' --max-entries 1",
+                                      probe_out) == 0;
 
-      it("listRings responds with the documented shape", [&]() -> void {
+      it("listRings responds with the documented shape", [&]() -> void
+      {
         write_to_server(server, make_rpc_request("listRings", "{\"owner\":\"" + user + "\"}"));
         std::string response = read_rpc_response(server);
         if (can_read_rings)
@@ -112,7 +121,8 @@ void zo_cert_server_tests()
         }
       });
 
-      it("listCertificates on the virtual ring maps camelCase params", [&]() -> void {
+      it("listCertificates on the virtual ring maps camelCase params", [&]() -> void
+      {
         // maxEntries/labelOnly arrive camelCase and must reach the handler as
         // max-entries/label-only via the dispatcher's key conversion.
         write_to_server(server, make_rpc_request("listCertificates",
@@ -130,9 +140,9 @@ void zo_cert_server_tests()
         }
       });
 
-      it("countRing returns a numeric count for the virtual ring", [&]() -> void {
-        write_to_server(server, make_rpc_request("countRing",
-                                                 "{\"owner\":\"" + user + "\",\"keyring\":\"*\"}"));
+      it("countRing returns a numeric count for the virtual ring", [&]() -> void
+      {
+        write_to_server(server, make_rpc_request("countRing", "{\"owner\":\"" + user + "\",\"keyring\":\"*\"}"));
         std::string response = read_rpc_response(server);
         if (can_read_certs)
         {
@@ -146,18 +156,22 @@ void zo_cert_server_tests()
       });
     });
 
-    describe("structured error payload (no authority required)", [&]() -> void {
-      it("deleteCertificate surfaces safReturns in the JSON-RPC error data", [&]() -> void {
+    describe("structured error payload (no authority required)", [&]() -> void
+    {
+      it("deleteCertificate surfaces safReturns in the JSON-RPC error data", [&]() -> void
+      {
         // R_datalib rejects a nonexistent owner/ring/label combination for any
         // caller, regardless of the caller's own ESM authority, so this SAF
         // failure -- and the structured error object the handler attaches via
         // set_error_object()/report_error() -- is guaranteed without a gate.
-        write_to_server(server, make_rpc_request("deleteCertificate",
-                                                 "{\"owner\":\"ZZNOSUCH\",\"keyring\":\"NORING\",\"label\":\"NOLABEL\"}"));
+        write_to_server(server,
+                        make_rpc_request("deleteCertificate",
+                                         "{\"owner\":\"ZZNOSUCH\",\"keyring\":\"NORING\",\"label\":\"NOLABEL\"}"));
         std::string response = read_rpc_response(server);
         Expect(response).ToContain("\"error\"");
         Expect(response).ToContain("\"safReturns\"");
         Expect(response).Not().ToContain("\"success\":true");
       });
-    }); });
+    });
+  });
 }

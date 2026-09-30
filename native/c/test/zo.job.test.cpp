@@ -65,22 +65,19 @@ void zo_job_tests()
     _files.clear();
   };
 
-  describe("job",
-           [&]() -> void
-           {
-             TEST_OPTIONS long_test_opts = {false, 60};
+  describe("job", [&]() -> void
+  {
+    TEST_OPTIONS long_test_opts = {false, 60};
 
-             afterAll(
-                 [&]() -> void
-                 {
-                   _cleanup_jobs();
-                   _cleanup_ds();
-                   _cleanup_files();
-                 },
-                 long_test_opts);
+    afterAll([&]() -> void
+    {
+      _cleanup_jobs();
+      _cleanup_ds();
+      _cleanup_files();
+    }, long_test_opts);
 
-             zo_job_list_tests(_jobs, _ds, _files);
-             zo_job_submit_tests(_jobs, _ds, _files);
-             zo_job_manage_tests(_jobs, _ds, _files);
-           });
+    zo_job_list_tests(_jobs, _ds, _files);
+    zo_job_submit_tests(_jobs, _ds, _files);
+    zo_job_manage_tests(_jobs, _ds, _files);
+  });
 }

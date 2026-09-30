@@ -17,55 +17,56 @@ using namespace ztst;
 void zo_tso_tests()
 {
   describe("tso issue command tests", [&]() -> void
-           {
-        it("should display help", []() -> void
-        {
-            std::string response;
-            std::string command = zo_command + " tso";
-            int rc = execute_command_with_output(command, response);
+  {
+    it("should display help", []() -> void
+    {
+      std::string response;
+      std::string command = zo_command + " tso";
+      int rc = execute_command_with_output(command, response);
 
-            ExpectWithContext(rc, response).ToBe(0);
-            Expect(response).ToContain("issue");
-        });
+      ExpectWithContext(rc, response).ToBe(0);
+      Expect(response).ToContain("issue");
+    });
 
-        it("should successfully issue a simple TSO command", []() -> void
-        {
-            std::string response;
-            std::string command = zo_command + " tso issue time";
-            int rc = execute_command_with_output(command, response);
+    it("should successfully issue a simple TSO command", []() -> void
+    {
+      std::string response;
+      std::string command = zo_command + " tso issue time";
+      int rc = execute_command_with_output(command, response);
 
-            ExpectWithContext(rc, response).ToBe(0);
-            Expect(response).ToContain("TIME");
-        });
+      ExpectWithContext(rc, response).ToBe(0);
+      Expect(response).ToContain("TIME");
+    });
 
-        it("should successfully issue a TSO command with special characters in the command", []() -> void
-        {
-            std::string response;
-            std::string command = zo_command + " tso issue \"time (&$\"";
-            int rc = execute_command_with_output(command, response);
+    it("should successfully issue a TSO command with special characters in the command", []() -> void
+    {
+      std::string response;
+      std::string command = zo_command + " tso issue \"time (&$\"";
+      int rc = execute_command_with_output(command, response);
 
-            ExpectWithContext(rc, response).ToBe(0);
-            Expect(response).ToContain("TIME");
-        });
+      ExpectWithContext(rc, response).ToBe(0);
+      Expect(response).ToContain("TIME");
+    });
 
-        it("should successfully issue a TSO command with special characters in the command", []() -> void
-        {
-            std::string response;
-            std::string command = zo_command + " tso issue \"time (&$\"";
-            int rc = execute_command_with_output(command, response);
+    it("should successfully issue a TSO command with special characters in the command", []() -> void
+    {
+      std::string response;
+      std::string command = zo_command + " tso issue \"time (&$\"";
+      int rc = execute_command_with_output(command, response);
 
-            ExpectWithContext(rc, response).ToBe(0);
-            Expect(response).ToContain("TIME");
-        });
+      ExpectWithContext(rc, response).ToBe(0);
+      Expect(response).ToContain("TIME");
+    });
 
-        it("should error when the TSO command itself is invalid", []() -> void
-        {
-            std::string response;
-            std::string command = zo_command + " tso issue \"invalidCommand\"";
+    it("should error when the TSO command itself is invalid", []() -> void
+    {
+      std::string response;
+      std::string command = zo_command + " tso issue \"invalidCommand\"";
 
-            int rc = execute_command_with_output(command, response);
+      int rc = execute_command_with_output(command, response);
 
-            ExpectWithContext(rc, response).Not().ToBe(0);
-            Expect(response).ToContain("Error running command");
-        }); });
+      ExpectWithContext(rc, response).Not().ToBe(0);
+      Expect(response).ToContain("Error running command");
+    });
+  });
 }
