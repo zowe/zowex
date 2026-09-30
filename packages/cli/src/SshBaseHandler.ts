@@ -38,7 +38,7 @@ export abstract class SshBaseHandler implements ICommandHandler {
                     const passwordSession = this.createPasswordSession(session, password);
 
                     // Retry the connection with password
-                    await this._processCommandWithClient(commandParameters, passwordSession);
+                    await this._processCommandWithClient(commandParameters, passwordSession, false);
                 } else {
                     throw error; // Re-throw if user cancelled password prompt
                 }
@@ -109,11 +109,15 @@ export abstract class SshBaseHandler implements ICommandHandler {
         client: ZSshClient,
     ): Promise<CommandResponse>;
 
-    private async _processCommandWithClient(commandParameters: IHandlerParameters, session: SshSession): Promise<void> {
+    private async _processCommandWithClient(
+        commandParameters: IHandlerParameters,
+        session: SshSession,
+        useIdentityAgent = true,
+    ): Promise<void> {
         try {
             using client = await ZSshClient.create(session, {
                 serverPath: commandParameters.arguments.serverPath,
-                identityAgent: commandParameters.arguments.identityAgent,
+                identityAgent: useIdentityAgent ? commandParameters.arguments.identityAgent : undefined,
                 numWorkers: 1,
             });
 
