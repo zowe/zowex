@@ -87,6 +87,15 @@ const ArgTemplate ENCODING = {
     ArgValue(),
     make_aliases(), false, true};
 
+const ArgTemplate ENCODING_INPUT = {
+    "encoding",
+    make_aliases("--encoding", "--ec"),
+    "convert input contents to given encoding",
+    ArgType_Single,
+    false,
+    ArgValue(),
+    make_aliases(), false, true};
+
 const ArgTemplate LOCAL_ENCODING = {
     "local-encoding",
     make_aliases("--local-encoding", "--lec"),

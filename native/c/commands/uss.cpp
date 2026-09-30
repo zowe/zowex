@@ -623,7 +623,7 @@ void register_commands(parser::Command &root_command)
   // Write subcommand
   auto uss_write_cmd = command_ptr(new Command("write", "write to a USS file"));
   uss_write_cmd->add_positional_arg(FILE_PATH);
-  uss_write_cmd->add_keyword_arg(ENCODING);
+  uss_write_cmd->add_keyword_arg(ENCODING_INPUT);
   uss_write_cmd->add_keyword_arg(LOCAL_ENCODING);
   uss_write_cmd->add_keyword_arg(ETAG);
   uss_write_cmd->add_keyword_arg(ETAG_ONLY);

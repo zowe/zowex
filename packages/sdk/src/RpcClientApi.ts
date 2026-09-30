@@ -25,6 +25,16 @@ import type {
 } from "./doc/rpc";
 import type { ProgressCallback } from "./doc/types";
 
+export type RpcParams<ReqT extends CommandRequest> = Omit<ReqT, "command">;
+
+export type RpcArgs<ReqT extends CommandRequest> = Record<string, never> extends RpcParams<ReqT>
+    ? [request?: RpcParams<ReqT>]
+    : [request: RpcParams<ReqT>];
+
+export type RpcArgsWithProgress<ReqT extends CommandRequest> = Record<string, never> extends RpcParams<ReqT>
+    ? [request?: RpcParams<ReqT>, progressCallback?: ProgressCallback]
+    : [request: RpcParams<ReqT>, progressCallback?: ProgressCallback];
+
 export abstract class RpcClientApi implements IRpcClient {
     public abstract request<ReqT extends CommandRequest, RespT extends CommandResponse>(
         request: ReqT,
@@ -138,11 +148,11 @@ export abstract class RpcClientApi implements IRpcClient {
     };
 
     private rpc<ReqT extends CommandRequest, RespT extends CommandResponse>(command: ReqT["command"]) {
-        return (request: Omit<ReqT, "command">): Promise<RespT> => this.request({ command, ...request });
+        return (...[request]: RpcArgs<ReqT>): Promise<RespT> => this.request({ command, ...request } as ReqT);
     }
 
     private rpcWithProgress<ReqT extends CommandRequest, RespT extends CommandResponse>(command: ReqT["command"]) {
-        return (request: Omit<ReqT, "command">, progressCallback?: ProgressCallback): Promise<RespT> =>
-            this.request({ command, ...request }, progressCallback);
+        return (...[request, progressCallback]: RpcArgsWithProgress<ReqT>): Promise<RespT> =>
+            this.request({ command, ...request } as ReqT, progressCallback);
     }
 }

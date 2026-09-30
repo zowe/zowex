@@ -32,7 +32,7 @@ describe("RpcClientApi", () => {
     });
 
     it("should route core commands correctly", async () => {
-        await client.core.getInfo({});
+        await client.core.getInfo();
         expect(client.request).toHaveBeenCalledWith({
             command: "getInfo",
         });
@@ -153,7 +153,7 @@ describe("RpcClientApi", () => {
             jobid: "JOB00001",
         });
 
-        await client.jobs.listJobs({});
+        await client.jobs.listJobs();
         expect(client.request).toHaveBeenCalledWith({
             command: "listJobs",
         });
@@ -200,7 +200,7 @@ describe("RpcClientApi", () => {
     });
 
     it("should route system commands correctly", async () => {
-        await client.system.viewSyslog({});
+        await client.system.viewSyslog();
         expect(client.request).toHaveBeenCalledWith({
             command: "viewSyslog",
         });
