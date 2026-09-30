@@ -859,7 +859,7 @@ void register_commands(parser::Command &root_command)
   job_submit_jcl_cmd->add_keyword_arg("wait", make_aliases("--wait"), "wait for job status", ArgType_Single, false);
   job_submit_jcl_cmd->add_keyword_arg("only-jobid", make_aliases("--only-jobid", "--oj"), "show only job id on success", ArgType_Flag, false, ArgValue(false));
   job_submit_jcl_cmd->add_keyword_arg("only-correlator", make_aliases("--only-correlator", "--oc"), "show only job correlator on success", ArgType_Flag, false, ArgValue(false));
-  job_submit_jcl_cmd->add_keyword_arg(ENCODING);
+  job_submit_jcl_cmd->add_keyword_arg(ENCODING_INPUT);
   job_submit_jcl_cmd->add_keyword_arg(LOCAL_ENCODING);
   job_submit_jcl_cmd->set_handler(handle_job_submit_jcl);
   job_group->add_command(job_submit_jcl_cmd);
