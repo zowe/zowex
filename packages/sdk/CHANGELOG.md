@@ -7,7 +7,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## Recent Changes
 
 - Fixed an error when issuing streamed RPC requests to a `zowex` server running in Bash shell. [#1155](https://github.com/zowe/zowex/pull/1155)
-- Updated the type signature of the `RpcClientApi.request` method so that params object is optional when none of the request properties are required. [#1174](https://github.com/zowe/zowex/pull/1174)
+- Updated RPC command method signatures so that the parameters object is optional when none of the request properties are required. [#1174](https://github.com/zowe/zowex/pull/1174)
 
 ## `1.0.1`
 
