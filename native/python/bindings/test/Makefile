@@ -52,12 +52,7 @@ test-zusf: $(TEST_ZUSF_UTF8)
 
 # Combines the per-suite JUnit reports into a single file so CI only needs to retrieve/publish one report
 merge-results:
-	@$(PY_ENV)/bin/python -c "\
-	import sys, os, xml.etree.ElementTree as ET; \
-	root = ET.Element('testsuites'); \
-	[root.append(s) for f in sys.argv[2:] if os.path.exists(f) for s in ET.parse(f).getroot()]; \
-	ET.ElementTree(root).write(sys.argv[1], xml_declaration=True, encoding='UTF-8')" \
-	$(JUNIT_ALL) $(JUNIT_ZDS) $(JUNIT_ZJB) $(JUNIT_ZUSF)
+	@$(PY_ENV)/bin/python -c "import sys, os, xml.etree.ElementTree as ET; root = ET.Element('testsuites'); [root.append(s) for f in sys.argv[2:] if os.path.exists(f) for s in ET.parse(f).getroot()]; ET.ElementTree(root).write(sys.argv[1], xml_declaration=True, encoding='UTF-8')" $(JUNIT_ALL) $(JUNIT_ZDS) $(JUNIT_ZJB) $(JUNIT_ZUSF)
 
 # Utility targets
 setup:
