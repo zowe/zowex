@@ -147,21 +147,25 @@ describe("SessionContext", () => {
             const unhandled = vi.fn();
             process.once("unhandledRejection", unhandled);
 
-            const gate = new DeferredPromise<void>();
-            vi.spyOn(NodeSSH.prototype, "connect").mockImplementation(() => gate.promise as any);
-            const disposeSpy = vi.spyOn(NodeSSH.prototype, "dispose").mockImplementation(() => {});
-            const ctx = new SessionContext(new SshSession(fakeSession));
+            try {
+                const gate = new DeferredPromise<void>();
+                vi.spyOn(NodeSSH.prototype, "connect").mockImplementation(() => gate.promise as any);
+                const disposeSpy = vi.spyOn(NodeSSH.prototype, "dispose").mockImplementation(() => {});
+                const ctx = new SessionContext(new SshSession(fakeSession));
 
-            const acquiring = ctx.getSsh().catch(() => undefined);
-            expect(() => ctx[Symbol.dispose]()).not.toThrow();
+                const acquiring = ctx.getSsh().catch(() => undefined);
+                expect(() => ctx[Symbol.dispose]()).not.toThrow();
 
-            gate.reject(new Error("connection refused"));
-            await acquiring;
-            // Give the unhandledRejection event a chance to fire before asserting it didn't.
-            await new Promise((r) => setImmediate(r));
+                gate.reject(new Error("connection refused"));
+                await acquiring;
+                // Give the unhandledRejection event a chance to fire before asserting it didn't.
+                await new Promise((r) => setImmediate(r));
 
-            expect(disposeSpy).toHaveBeenCalledTimes(1);
-            expect(unhandled).not.toHaveBeenCalled();
+                expect(disposeSpy).toHaveBeenCalledTimes(1);
+                expect(unhandled).not.toHaveBeenCalled();
+            } finally {
+                process.removeListener("unhandledRejection", unhandled);
+            }
         });
     });
 
