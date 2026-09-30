@@ -29,52 +29,50 @@ The following script loads an SSH profile from your Zowe team configuration (`zo
 import { ProfileInfo } from "@zowe/imperative";
 import { SshSession, ZSshClient } from "@zowe/zowex-for-zowe-sdk";
 
-(async () => {
+async function loadSshProfile(profName?: string): Promise<IProfArgAttrs[]> {
   const profInfo = new ProfileInfo("zowe");
   await profInfo.readProfilesFromDisk();
-  const sshProfAttrs = profInfo.getDefaultProfile("ssh");
-  const sshMergedArgs = profInfo.mergeArgsForProfile(sshProfAttrs, {
-    getSecureVals: true,
-  });
-  const session = new SshSession(
-    ProfileInfo.initSessCfg(sshMergedArgs.knownArgs),
-  );
-  const serverPathArg = sshMergedArgs.knownArgs.find(
-    (arg) => arg.argName === "serverPath",
-  );
-  using client = await ZSshClient.create(session, {
-    serverPath: serverPathArg?.argValue as string,
-  });
+  const sshProfAttrs = profName
+    ? profInfo.getAllProfiles("ssh").find((p) => p.profName === profName)
+    : profInfo.getDefaultProfile("ssh");
+  const sshMergedArgs = profInfo.mergeArgsForProfile(sshProfAttrs, { getSecureVals: true });
+  return sshMergedArgs.knownArgs;
+}
+
+async function runForEachUser(action: string, users: string[], cb: (user: string) => Promise<any>) {
+  for (const user of users) {
+    console.time(`${action}-${user}`);
+    console.dir(await cb(user));
+    console.timeEnd(`${action}-${user}`);
+  }
+}
+
+(async () => {
+  const sshProfArgs = await loadSshProfile();
+  const session = new SshSession(ProfileInfo.initSessCfg(sshProfArgs));
+  const serverPathArg = sshProfArgs.find((arg) => arg.argName === "serverPath");
+  using client = await ZSshClient.create(session, { serverPath: serverPathArg?.argValue as string });
   console.log("ready:", await client.core.getInfo());
-  const testUsers =
-    process.argv.length > 2
-      ? process.argv.slice(2)
-      : [session.ISshSession.user];
-  for (const user of testUsers) {
-    console.time(`listDatasets:${user}`);
-    const response = await client.ds.listDatasets({ pattern: `${user}.**` });
-    console.timeEnd(`listDatasets:${user}`);
-    console.dir(response.items.map((item) => item.name));
-  }
-  for (const user of testUsers) {
-    console.time(`listFiles:${user}`);
-    const response = await client.uss.listFiles({ fspath: `/u/users/${user}` });
-    console.timeEnd(`listFiles:${user}`);
-    console.dir(response.items.map((item) => item.name));
-  }
-  for (const user of testUsers) {
-    console.time(`listJobs:${user}`);
-    const response = await client.jobs.listJobs({ owner: user });
-    console.timeEnd(`listJobs:${user}`);
-    console.dir(response.items.map((item) => item.id));
-  }
+  const testUsers = process.argv.length > 2 ? process.argv.slice(2) : [session.ISshSession.user];
+  await runForEachUser("listDatasets", testUsers, async (user: string) => {
+    const dsResponse = await client.ds.listDatasets({ pattern: `${user}.*` });
+    return dsResponse.items.map((item) => item.name);
+  });
+  await runForEachUser("listFiles", testUsers, async (user: string) => {
+    const ussResponse = await client.uss.listFiles({ fspath: `/u/users/${user}` });
+    return ussResponse.items.map((item) => item.name);
+  });
+  await runForEachUser("listJobs", testUsers, async (user: string) => {
+    const jobsResponse = await client.jobs.listJobs({ owner: user });
+    return jobsResponse.items.map((item) => item.id);
+  });
 })().catch((err) => {
   console.error(err.stack);
   process.exit(1);
 });
 ```
 
-Run the example with `tsx` or `ts-node`:
+Run the example with `tsx` or `ts-node` and optionally pass mainframe user IDs on the command line:
 
 ```bash
 npx tsx sample.ts IBMUSER
