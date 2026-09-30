@@ -672,15 +672,17 @@ export class ZSshUtils {
         session: SshSession | SessionContext,
         callback: (sftp: SFTPWrapper, ssh: NodeSSH) => Promise<T>,
     ): Promise<T> {
-        using conn = await SessionContext.acquire(session);
-        return conn.ssh.requestSFTP().then((sftp) => callback(sftp, conn.ssh));
+        return ZSshUtils.withSsh(session, async (ssh) => callback(await ssh.requestSFTP(), ssh));
     }
 
     private static async withSsh<T>(
         session: SshSession | SessionContext,
         callback: (ssh: NodeSSH) => Promise<T>,
     ): Promise<T> {
-        using conn = await SessionContext.acquire(session);
-        return callback(conn.ssh);
+        if (session instanceof SessionContext) {
+            return callback(await session.getSsh());
+        }
+        using context = new SessionContext(session);
+        return callback(await context.getSsh());
     }
 }

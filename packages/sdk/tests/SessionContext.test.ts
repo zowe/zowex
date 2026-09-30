@@ -22,69 +22,24 @@ describe("SessionContext", () => {
         password: "pass",
     };
 
+    beforeEach(() => {
+        vi.spyOn(NodeSSH.prototype, "isConnected").mockReturnValue(true);
+    });
+
     afterEach(() => {
         vi.restoreAllMocks();
     });
 
-    describe("acquire with a plain SshSession", () => {
-        it("opens a fresh connection", async () => {
-            const connectSpy = vi.spyOn(NodeSSH.prototype, "connect").mockResolvedValue({} as any);
-            const session = new SshSession(fakeSession);
-
-            const handle = await SessionContext.acquire(session);
-
-            expect(connectSpy).toHaveBeenCalledTimes(1);
-            expect(handle.ssh).toBeInstanceOf(NodeSSH);
-        });
-
-        it("disposes the connection when the handle is disposed", async () => {
-            vi.spyOn(NodeSSH.prototype, "connect").mockResolvedValue({} as any);
-            const disposeSpy = vi.spyOn(NodeSSH.prototype, "dispose").mockImplementation(() => {});
-            const session = new SshSession(fakeSession);
-
-            {
-                using handle = await SessionContext.acquire(session);
-                expect(handle.ssh).toBeDefined();
-            }
-
-            expect(disposeSpy).toHaveBeenCalledTimes(1);
-        });
-
-        it("opens a new, independent connection for every call", async () => {
-            const connectSpy = vi.spyOn(NodeSSH.prototype, "connect").mockResolvedValue({} as any);
-            const session = new SshSession(fakeSession);
-
-            const first = await SessionContext.acquire(session);
-            const second = await SessionContext.acquire(session);
-
-            expect(connectSpy).toHaveBeenCalledTimes(2);
-            expect(first.ssh).not.toBe(second.ssh);
-        });
-    });
-
-    describe("acquire with a SessionContext", () => {
+    describe("getSsh", () => {
         it("connects once and reuses the connection across calls", async () => {
             const connectSpy = vi.spyOn(NodeSSH.prototype, "connect").mockResolvedValue({} as any);
             const ctx = new SessionContext(new SshSession(fakeSession));
 
-            const first = await SessionContext.acquire(ctx);
-            const second = await SessionContext.acquire(ctx);
+            const first = await ctx.getSsh();
+            const second = await ctx.getSsh();
 
             expect(connectSpy).toHaveBeenCalledTimes(1);
-            expect(first.ssh).toBe(second.ssh);
-        });
-
-        it("does not dispose the shared connection when the handle is disposed", async () => {
-            vi.spyOn(NodeSSH.prototype, "connect").mockResolvedValue({} as any);
-            const disposeSpy = vi.spyOn(NodeSSH.prototype, "dispose").mockImplementation(() => {});
-            const ctx = new SessionContext(new SshSession(fakeSession));
-
-            {
-                using handle = await SessionContext.acquire(ctx);
-                expect(handle.ssh).toBeDefined();
-            }
-
-            expect(disposeSpy).not.toHaveBeenCalled();
+            expect(first).toBe(second);
         });
 
         it("blocks a second concurrent caller until the shared connect completes", async () => {
@@ -97,10 +52,10 @@ describe("SessionContext", () => {
             const ctx = new SessionContext(new SshSession(fakeSession));
 
             let secondResolved = false;
-            const first = SessionContext.acquire(ctx);
-            const second = SessionContext.acquire(ctx).then((handle) => {
+            const first = ctx.getSsh();
+            const second = ctx.getSsh().then((ssh) => {
                 secondResolved = true;
-                return handle;
+                return ssh;
             });
 
             // Drain pending microtasks without resolving the connect: the second caller must not
@@ -111,11 +66,41 @@ describe("SessionContext", () => {
             expect(connectSpy).toHaveBeenCalledTimes(1);
 
             gate.resolve();
-            const [firstHandle, secondHandle] = await Promise.all([first, second]);
+            const [firstSsh, secondSsh] = await Promise.all([first, second]);
 
             expect(secondResolved).toBe(true);
             expect(connectSpy).toHaveBeenCalledTimes(1);
-            expect(firstHandle.ssh).toBe(secondHandle.ssh);
+            expect(firstSsh).toBe(secondSsh);
+        });
+
+        it("retries after a failed connection", async () => {
+            const connectSpy = vi
+                .spyOn(NodeSSH.prototype, "connect")
+                .mockRejectedValueOnce(new Error("connection refused"))
+                .mockResolvedValue({} as any);
+            const disposeSpy = vi.spyOn(NodeSSH.prototype, "dispose").mockImplementation(() => {});
+            const ctx = new SessionContext(new SshSession(fakeSession));
+
+            await expect(ctx.getSsh()).rejects.toThrow("connection refused");
+            const ssh = await ctx.getSsh();
+
+            expect(connectSpy).toHaveBeenCalledTimes(2);
+            expect(disposeSpy).toHaveBeenCalledTimes(1);
+            expect(ssh).toBeInstanceOf(NodeSSH);
+        });
+
+        it("reconnects after the shared connection closes", async () => {
+            const connectSpy = vi.spyOn(NodeSSH.prototype, "connect").mockResolvedValue({} as any);
+            const disposeSpy = vi.spyOn(NodeSSH.prototype, "dispose").mockImplementation(() => {});
+            const ctx = new SessionContext(new SshSession(fakeSession));
+            const first = await ctx.getSsh();
+            vi.spyOn(NodeSSH.prototype, "isConnected").mockReturnValueOnce(false);
+
+            const second = await ctx.getSsh();
+
+            expect(connectSpy).toHaveBeenCalledTimes(2);
+            expect(disposeSpy).toHaveBeenCalledTimes(1);
+            expect(second).not.toBe(first);
         });
     });
 
@@ -125,7 +110,7 @@ describe("SessionContext", () => {
             const disposeSpy = vi.spyOn(NodeSSH.prototype, "dispose").mockImplementation(() => {});
             const ctx = new SessionContext(new SshSession(fakeSession));
 
-            await SessionContext.acquire(ctx);
+            await ctx.getSsh();
             ctx[Symbol.dispose]();
 
             expect(disposeSpy).toHaveBeenCalledTimes(1);
@@ -145,7 +130,7 @@ describe("SessionContext", () => {
             const disposeSpy = vi.spyOn(NodeSSH.prototype, "dispose").mockImplementation(() => {});
             const ctx = new SessionContext(new SshSession(fakeSession));
 
-            const acquiring = SessionContext.acquire(ctx);
+            const acquiring = ctx.getSsh();
             ctx[Symbol.dispose](); // dispose while the connect is still pending
 
             expect(disposeSpy).not.toHaveBeenCalled();
@@ -158,7 +143,7 @@ describe("SessionContext", () => {
             expect(disposeSpy).toHaveBeenCalledTimes(1);
         });
 
-        it("does not throw or leave an unhandled rejection when the in-flight connect fails", async () => {
+        it("cleans up without an unhandled rejection when the in-flight connect fails", async () => {
             const unhandled = vi.fn();
             process.once("unhandledRejection", unhandled);
 
@@ -167,7 +152,7 @@ describe("SessionContext", () => {
             const disposeSpy = vi.spyOn(NodeSSH.prototype, "dispose").mockImplementation(() => {});
             const ctx = new SessionContext(new SshSession(fakeSession));
 
-            const acquiring = SessionContext.acquire(ctx).catch(() => undefined);
+            const acquiring = ctx.getSsh().catch(() => undefined);
             expect(() => ctx[Symbol.dispose]()).not.toThrow();
 
             gate.reject(new Error("connection refused"));
@@ -175,7 +160,7 @@ describe("SessionContext", () => {
             // Give the unhandledRejection event a chance to fire before asserting it didn't.
             await new Promise((r) => setImmediate(r));
 
-            expect(disposeSpy).not.toHaveBeenCalled();
+            expect(disposeSpy).toHaveBeenCalledTimes(1);
             expect(unhandled).not.toHaveBeenCalled();
         });
     });
