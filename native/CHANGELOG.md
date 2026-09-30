@@ -19,6 +19,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 - `python`: `list_data_sets` accepts `show_attributes` so `dsorg`, `volser`, `recfm` and `migrated` can be populated. [#1121](https://github.com/zowe/zowex/pull/1121)
 - `python`: Fixed `get_job_status` returning unconverted EBCDIC strings and `create_data_set` raising errors with an empty message. [#1121](https://github.com/zowe/zowex/pull/1121)
 - `python`: Fixed `list_jobs_by_owner` failing when no job name prefix is given. [#1121](https://github.com/zowe/zowex/pull/1121)
+- `python`: Fixed the USS bindings (`create_uss_file`, `create_uss_dir`, `move_uss_file_or_dir`, `list_uss_dir`, `chmod_uss_item`, `delete_uss_item`, `chown_uss_item`, `chtag_uss_item`) not converting paths, and `write_uss_file`/`write_uss_file_streamed` not converting etags, between ASCII and EBCDIC. [#1121](https://github.com/zowe/zowex/pull/1121)
 
 ## `1.0.1`
 

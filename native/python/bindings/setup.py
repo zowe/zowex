@@ -27,6 +27,10 @@ class BuildExtMixedCharMode(build_ext):
 
     def build_extension(self, ext):
         compiler = self.compiler
+        if not hasattr(compiler, "_compile"):
+            super().build_extension(ext)
+            return
+
         base_compile = compiler._compile
 
         def _compile(obj, src, src_ext, cc_args, extra_postargs, pp_opts):

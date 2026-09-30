@@ -32,7 +32,9 @@ void set_encoding_opts(ZUSF &ctx, const std::string &codepage)
   ctx.encoding_opts.data_type = codepage == "binary" ? eDataTypeBinary : eDataTypeText;
   std::string encoded = codepage;
   a2e_inplace(encoded);
-  strncpy(ctx.encoding_opts.codepage, encoded.c_str(), sizeof(ctx.encoding_opts.codepage) - 1);
+  size_t max_len = sizeof(ctx.encoding_opts.codepage) - 1;
+  strncpy(ctx.encoding_opts.codepage, encoded.c_str(), max_len);
+  ctx.encoding_opts.codepage[max_len] = '\0';
 }
 
 void set_etag(ZUSF &ctx, const std::string &etag)
@@ -44,7 +46,9 @@ void set_etag(ZUSF &ctx, const std::string &etag)
 
   std::string encoded = etag;
   a2e_inplace(encoded);
-  strncpy(ctx.etag, encoded.c_str(), sizeof(ctx.etag) - 1);
+  size_t max_len = sizeof(ctx.etag) - 1;
+  strncpy(ctx.etag, encoded.c_str(), max_len);
+  ctx.etag[max_len] = '\0';
 }
 
 std::string get_etag(const ZUSF &ctx)

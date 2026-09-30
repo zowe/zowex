@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
     concurrency:
       group: "zos-build"
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -103,7 +103,7 @@ jobs:
         run: npm run z:python:test
 
       - name: Python Test Report
-        uses: dorny/test-reporter@v2
+        uses: dorny/test-reporter@df6247429542221bc30d46a036ee47af1102c451 # v2.7.0
         if: ${{ !cancelled() }}
         with:
           name: Python binding test results
