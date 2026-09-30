@@ -26,6 +26,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: read
   checks: write
   pull-requests: write
 
@@ -107,6 +108,25 @@ jobs:
           name: zowe-server-release
           path: dist/server.pax.Z
 
+      - name: Compare PAX size with main
+        id: compare-pax-size
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RUN_ID=$(gh run list --workflow=zos-build.yml --branch=main --event=push --status=success --limit=1 --json=databaseId --jq='.[0].databaseId' 2>/dev/null || true)
+          [[ -n "$RUN_ID" ]] && gh run download "$RUN_ID" --name zowe-server-release --dir /tmp/main 2>/dev/null || true
+          node -e '
+            const childProcess = require("child_process");
+            const fs = require("fs");
+            const paxSize = (pax) => parseInt(childProcess.execSync(`zcat ${pax} | tar -tvf - | awk \x27{sum += $3} END {print sum}\x27`));
+            const pr = paxSize("dist/server.pax.Z");
+            const main = fs.existsSync("/tmp/main/server.pax.Z") ? paxSize("/tmp/main/server.pax.Z") : 0;
+            const pct = main ? ((pr - main) / main * 100).toFixed(2) : 0;
+            const change = !main ? "" : !Number(pct) ? " (no change)" : ` (${pct > 0 ? "+" : ""}${pct}% from main)`;
+            console.log(`line=- Extracted size: ${(pr / 1048576).toFixed(2)} MB${change}`);
+          ' >> "$GITHUB_OUTPUT"
+
       - name: Comment on PR
         if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
         uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v2
@@ -116,6 +136,7 @@ jobs:
           message: |
             Server artifacts:
              - PAX: ${{ steps.pax-artifact-upload.outputs.artifact-url }}
+               ${{ steps.compare-pax-size.outputs.line }}
 
       - name: Test on z/OS
         run: npm run z:test

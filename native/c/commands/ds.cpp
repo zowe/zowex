@@ -9,8 +9,9 @@
  *
  */
 
+#include <algorithm>
+#include <cctype>
 #include <cstdio>
-#include <regex>
 #ifndef _OPEN_SYS_FILE_EXT
 #define _OPEN_SYS_FILE_EXT 1
 #endif
@@ -640,6 +641,33 @@ int handle_data_set_list_members(InvocationContext &context)
   return (!warn && rc == RTNCD_WARNING) ? RTNCD_SUCCESS : rc;
 }
 
+static std::string_view find_alias_target(std::string_view output)
+{
+  constexpr std::string_view heading = "ASSOCIATIONS";
+  const auto section = output.find(heading);
+  if (section == std::string_view::npos)
+  {
+    return {};
+  }
+
+  constexpr std::string_view marker = "VSAM-";
+  const auto label = output.find(marker, section + heading.size());
+  if (label == std::string_view::npos)
+  {
+    return {};
+  }
+
+  const auto start = output.find_first_not_of('-', label + marker.size());
+  if (start == std::string_view::npos)
+  {
+    return {};
+  }
+  const auto it = std::find_if(output.begin() + start, output.end(), [](unsigned char c) {
+    return std::isspace(c);
+  });
+  return output.substr(start, it - (output.begin() + start));
+}
+
 int handle_data_set_resolve_alias(InvocationContext &context)
 {
   int rc = 0;
@@ -662,12 +690,10 @@ int handle_data_set_resolve_alias(InvocationContext &context)
   // Example output excerpt:
   // ASSOCIATIONS
   //     NONVSAM--CHRIS.PUBLIC.CNTL
-  static const std::regex resolvedDsPattern(R"(ASSOCIATIONS[\s\S]+VSAM-{2,}(\S+))");
-  std::smatch mv{};
-
-  if (std::regex_search(idcamsOutput, mv, resolvedDsPattern))
+  const std::string_view target = find_alias_target(idcamsOutput);
+  if (!target.empty())
   {
-    const std::string targetDsn = mv[1].str();
+    const std::string targetDsn(target);
     context.output_stream() << "Alias '" + aliasDsn + "' resolved to data set '" + targetDsn + "'" << std::endl;
     result->set("targetDsn", str(targetDsn));
   }
