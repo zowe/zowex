@@ -41,7 +41,7 @@ const size_t MAX_PAYLOAD_BYTES = 8u * 1024u * 1024u;
 bool is_json_safe_text(const std::string &text)
 {
   return std::all_of(text.begin(), text.end(), [](char ch)
-                     {
+  {
     if (ch == '\b' || ch == '\f' || ch == '\n' || ch == '\r' || ch == '\t')
     {
       return true;

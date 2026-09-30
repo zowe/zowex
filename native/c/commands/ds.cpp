@@ -1193,7 +1193,7 @@ void register_commands(parser::Command &root_command)
   // Write subcommand
   auto ds_write_cmd = command_ptr(new Command("write", "write to data set"));
   ds_write_cmd->add_positional_arg(DSN);
-  ds_write_cmd->add_keyword_arg(ENCODING);
+  ds_write_cmd->add_keyword_arg(ENCODING_INPUT);
   ds_write_cmd->add_keyword_arg(LOCAL_ENCODING);
   ds_write_cmd->add_keyword_arg(ETAG);
   ds_write_cmd->add_keyword_arg(ETAG_ONLY);
