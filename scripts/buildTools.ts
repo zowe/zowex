@@ -10,6 +10,7 @@
  */
 
 import * as childProcess from "node:child_process";
+import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { PassThrough, pipeline, Readable, Transform, type TransformCallback } from "node:stream";
@@ -40,6 +41,7 @@ const TARBALL = path.resolve(__dirname, "../dist/zbind_bin_dist.tar.gz");
 // Precompiled SWIG binary for z/OS, published to the zowex releases used as a
 // persistent host for dev artifacts (see RELEASE_TAG above).
 const SWIG_RELEASE_URL = "https://github.com/zowe/zowex/releases/download/py-bindings-dev/swig-4.4.1.pax.Z";
+const SWIG_RELEASE_SHA256 = "024ae42af6c1210e6c67b0dd2dc18372a97430eb3e36f6461de9343005d0f96e";
 
 /** Runs `gh` with the given args, returning trimmed stdout. */
 function gh(args: string[]): string {
@@ -47,7 +49,9 @@ function gh(args: string[]): string {
         return childProcess.execFileSync("gh", args, { encoding: "utf-8" }).trim();
     } catch (err) {
         if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-            console.error('Required executable "gh" was not found on PATH. Install the GitHub CLI: https://cli.github.com/');
+            console.error(
+                'Required executable "gh" was not found on PATH. Install the GitHub CLI: https://cli.github.com/',
+            );
             process.exit(1);
         }
         throw err;
@@ -1241,6 +1245,34 @@ async function downloadTarball(url: string, destPath: string) {
     });
 }
 
+/**
+ * Fails unless `filePath` hashes to `expectedSha256`. A mismatching file is deleted so the next run
+ * re-downloads instead of reusing a bad cache entry, and the error is raised before the file is ever
+ * uploaded or executed on z/OS.
+ */
+async function verifySha256(filePath: string, expectedSha256: string) {
+    const expected = expectedSha256.trim().toLowerCase();
+    if (!/^[0-9a-f]{64}$/.test(expected)) {
+        throw new Error(
+            `No valid SHA-256 is pinned for ${path.basename(filePath)} (got "${expectedSha256}"). ` +
+                "Compute it with `curl -sL <url> | shasum -a 256` and update the constant in scripts/buildTools.ts.",
+        );
+    }
+    const hash = crypto.createHash("sha256");
+    for await (const chunk of fs.createReadStream(filePath)) {
+        hash.update(chunk as Buffer);
+    }
+    const actual = hash.digest("hex");
+    if (actual !== expected) {
+        fs.rmSync(filePath, { force: true });
+        throw new Error(
+            `Checksum mismatch for ${path.basename(filePath)}: expected ${expected}, got ${actual}. ` +
+                "Refusing to upload it to z/OS; the local copy has been removed.",
+        );
+    }
+    console.log(`Verified ${path.basename(filePath)} (sha256 ${actual}).`);
+}
+
 async function buildSwig(connection: Client) {
     const cacheDir = path.resolve(__dirname, "./../.cache");
     fs.mkdirSync(cacheDir, { recursive: true });
@@ -1327,6 +1359,9 @@ async function installSwigRelease(connection: Client) {
     const filename = path.basename(SWIG_RELEASE_URL);
     const localPax = path.join(cacheDir, filename);
     await downloadTarball(SWIG_RELEASE_URL, localPax);
+    // Checked after downloadTarball rather than inside it so a previously cached (and possibly
+    // tampered-with) copy is validated too - downloadTarball is a no-op when the file already exists.
+    await verifySha256(localPax, SWIG_RELEASE_SHA256);
 
     await runCommandInShell(connection, `mkdir -p ${deployDirs.pythonSwigDir}\n`, {
         stepName: "Creating remote SWIG directory",
