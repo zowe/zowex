@@ -23,7 +23,7 @@ on:
 
 permissions:
   contents: read
-  checks: write
+  checks: write # Only needed for the test-reporter step below.
 
 jobs:
   build-python:
@@ -102,9 +102,12 @@ jobs:
       - name: Test Python Bindings
         run: npm run z:python:test
 
+      # dorny/test-reporter needs `checks: write`, which GitHub downgrades to read-only for
+      # pull_request runs from forks, so skip it there rather than failing the job on a
+      # permissions error. The JUnit XML is still in the job log.
       - name: Python Test Report
         uses: dorny/test-reporter@df6247429542221bc30d46a036ee47af1102c451 # v2.7.0
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
         with:
           name: Python binding test results
           path: "native/python/bindings/test/pybi_results.xml"
