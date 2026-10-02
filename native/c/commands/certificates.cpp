@@ -11,6 +11,7 @@
 
 #include "certificates.hpp"
 #include "../zkr.hpp"
+#include "../zkrio.hpp"
 #include "../zbase64.h"
 #include "../zds.hpp"
 #include "../ztype.h"
@@ -338,7 +339,7 @@ int handle_cert_export(InvocationContext &context)
     // the file is created (or truncated) owner-read/write only, independent of
     // the process umask.
     std::string err;
-    if (zut_write_file_private(file, data, err) != RTNCD_SUCCESS)
+    if (zkrio_write_file(file, data, err) != RTNCD_SUCCESS)
     {
       context.error_stream() << "Error: could not write output file: " << file << " (" << err << ")" << std::endl;
       return RTNCD_FAILURE;
@@ -351,7 +352,7 @@ int handle_cert_export(InvocationContext &context)
   else if (!dsn.empty())
   {
     std::string err;
-    if (write_cert_dsn(dsn, data, is_p12, err) != RTNCD_SUCCESS)
+    if (zkrio_write_dsn(dsn, data, is_p12, err) != RTNCD_SUCCESS)
     {
       context.error_stream() << "Error: could not write output data set: " << dsn << " (" << err << ")" << std::endl;
       return RTNCD_FAILURE;
@@ -428,7 +429,7 @@ int handle_cert_import(InvocationContext &context)
   if (!dsn.empty())
   {
     std::string err;
-    if (read_cert_dsn(dsn, opts.p12_data, err) != RTNCD_SUCCESS)
+    if (zkrio_read_dsn(dsn, opts.p12_data, err) != RTNCD_SUCCESS)
     {
       context.error_stream() << "Error: could not read source data set: " << dsn << " (" << err << ")" << std::endl;
       return RTNCD_FAILURE;
@@ -873,9 +874,9 @@ void register_commands(parser::Command &parent)
   export_cmd->add_keyword_arg("format", make_aliases("--format", "-F"), "export format: pem (certificate) or p12 (certificate + private key)", ArgType_Single, false, ArgValue(std::string("pem")));
   export_cmd->add_keyword_arg("file", make_aliases("--file", "-f"), "output file path (required for p12; PEM prints to stdout if omitted); mutually exclusive with --dsn", ArgType_Single, false);
   export_cmd->add_keyword_arg("dsn", make_aliases("--dsn"),
-      "output data set (sequential or PDS/E member), created if absent; mutually exclusive with --file. "
-      "Protection is the RACF DATASET profile, not file permissions.",
-      ArgType_Single, false);
+                              "output data set (sequential or PDS/E member), created if absent; mutually exclusive with --file. "
+                              "Protection is the RACF DATASET profile, not file permissions.",
+                              ArgType_Single, false);
   export_cmd->add_keyword_arg("password", make_aliases("--password", "-p"), "PKCS#12 passphrase (required with --format p12)", ArgType_Single, false);
   export_cmd->set_handler(handle_cert_export);
   export_cmd->add_example("Export a certificate as PEM", "zo system cert export USER01 RING02 -l CERT03 -f ./CERT03.pem");
@@ -891,13 +892,13 @@ void register_commands(parser::Command &parent)
   import_cmd->add_keyword_arg("usage", make_aliases("--usage", "-u"), "certificate usage: PERSONAL or CERTAUTH", ArgType_Single, true);
   import_cmd->add_keyword_arg("file", make_aliases("--file", "-f"), "path to the source PKCS#12 file; mutually exclusive with --dsn", ArgType_Single, false);
   import_cmd->add_keyword_arg("dsn", make_aliases("--dsn"),
-      "source PKCS#12 data set (sequential or PDS/E member); mutually exclusive with --file",
-      ArgType_Single, false);
+                              "source PKCS#12 data set (sequential or PDS/E member); mutually exclusive with --file",
+                              ArgType_Single, false);
   import_cmd->add_keyword_arg("password", make_aliases("--password", "-p"), "PKCS#12 passphrase", ArgType_Single, true);
   import_cmd->add_keyword_arg("skip-refresh", make_aliases("--skip-refresh"), "do not automatically REFRESH the DIGTCERT class if the ESM reports it is required (by default the refresh is issued so the change takes effect)", ArgType_Flag, false, ArgValue(false));
   import_cmd->set_handler(handle_cert_import);
-import_cmd->add_example("Import a personal certificate", "zo system cert import USER01 RING02 -l CERT03 -u PERSONAL -f ./file.p12 -p secret");
-import_cmd->add_example("Import a personal certificate from a data set", "zo system cert import USER01 RING02 -l CERT03 -u PERSONAL -p secret --dsn USER01.CERT03.P12");
+  import_cmd->add_example("Import a personal certificate", "zo system cert import USER01 RING02 -l CERT03 -u PERSONAL -f ./file.p12 -p secret");
+  import_cmd->add_example("Import a personal certificate from a data set", "zo system cert import USER01 RING02 -l CERT03 -u PERSONAL -p secret --dsn USER01.CERT03.P12");
   certops_cmd->add_command(import_cmd);
 
   // cert delete <owner> [keyring] --label L [--database]
