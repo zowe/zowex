@@ -14,6 +14,7 @@ import { ImperativeError, Logger } from "@zowe/imperative";
 import { type ISshSession, SshSession } from "@zowe/zos-uss-for-zowe-sdk";
 import { NodeSSH } from "node-ssh";
 import { SshErrors } from "../src/SshErrors";
+import { SessionContext } from "../src/utils";
 import { ZSshUtils } from "../src/ZSshUtils";
 
 vi.mock("../src/ZSshConstants", () => ({
@@ -42,6 +43,31 @@ function setupSftpMocks(
 }
 
 describe("ZSshUtils", () => {
+    it("reuses a connection only while a SessionContext is in scope", async () => {
+        const connectSpy = vi.spyOn(NodeSSH.prototype, "connect").mockResolvedValue({} as any);
+        const execSpy = vi
+            .spyOn(NodeSSH.prototype, "execCommand")
+            .mockResolvedValue({ code: 0, stdout: "", stderr: "" } as any);
+        const disposeSpy = vi.spyOn(NodeSSH.prototype, "dispose").mockImplementation(() => {});
+        vi.spyOn(NodeSSH.prototype, "isConnected").mockReturnValue(true);
+        const session = new SshSession({ hostname: "example.com", user: "admin" });
+
+        await ZSshUtils.lacksWriteAccess(session, "/tmp");
+        await ZSshUtils.lacksWriteAccess(session, "/tmp");
+        expect(connectSpy).toHaveBeenCalledTimes(2);
+        expect(disposeSpy).toHaveBeenCalledTimes(2);
+
+        {
+            using context = new SessionContext(session);
+            await ZSshUtils.lacksWriteAccess(context, "/tmp");
+            await ZSshUtils.lacksWriteAccess(context, "/tmp");
+            expect(connectSpy).toHaveBeenCalledTimes(3);
+            expect(execSpy).toHaveBeenCalledTimes(8);
+            expect(disposeSpy).toHaveBeenCalledTimes(2);
+        }
+        expect(disposeSpy).toHaveBeenCalledTimes(3);
+    });
+
     describe("checkIfOutdated", () => {
         it.each([
             // compared against mocked zo binary version: 1.2.1
