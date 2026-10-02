@@ -28,6 +28,7 @@
     "z:chdsect": "tsx scripts/buildTools.ts build:chdsect",
     "z:clean": "tsx scripts/buildTools.ts clean",
     "z:delete": "tsx scripts/buildTools.ts delete",
+    "z:has:swig": "tsx scripts/buildTools.ts has:swig",
     "z:imports": "tsx scripts/buildTools.ts imports",
     "z:fetch:python": "tsx scripts/fetchPrecompiledFromPr.ts",
     "z:has:swig": "tsx scripts/buildTools.ts has:swig",
@@ -51,7 +52,7 @@
     "packages/*"
   ],
   "devDependencies": {
-    "@biomejs/biome": "^2.1.3",
+    "@biomejs/biome": "^2.5.14",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.13.4",
     "@types/ssh2": "^1.15.4",
