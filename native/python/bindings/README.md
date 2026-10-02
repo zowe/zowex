@@ -236,6 +236,10 @@ binding to convert the content itself.
 > `write_data_set` (anything other than `""` or `"binary"`) converts the content twice and hands back an
 > empty string. Etags have a matching gap: they are converted on the way out but not on the way in, so
 > an etag you pass back in will never match. Stick to the default codepage until both are fixed.
+>
+> Both gaps are tracked in code by `test_read_write_dataset_with_explicit_codepage` and
+> `test_write_dataset_etag_round_trip` in `test/test_zds.py`. They are `strict` xfails, so fixing
+> either one turns its test into an XPASS failure — the reminder to delete the marker and this note.
 
 ## Distribution Types
 
