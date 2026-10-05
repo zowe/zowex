@@ -25,6 +25,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## `1.0.1`
 
+- `c`: Fixed a use-after-free in the `zo` RPC server's worker pool: `get_ready_worker()` returned a raw pointer that a concurrent worker replacement (heartbeat timeout) could free before the dispatcher used it. [#1179](https://github.com/zowe/zowex/pull/1179)
 - Fixed worker threads timing out in the `zo` RPC server for a long upload or download operation that exceeds the request timeout. [#988](https://github.com/zowe/zowex/issues/988)
 - `c`: Adjusted the size of the `etag` field to improve compatibility with z/OS UNIX files. [#1140](https://github.com/zowe/zowex/pull/1140)
 - `c`: Rejected oversized data set etags before copying them into request storage. [#1140](https://github.com/zowe/zowex/pull/1140)
