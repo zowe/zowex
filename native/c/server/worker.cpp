@@ -413,13 +413,15 @@ void WorkerPool::distribute_request_internal(const RequestMetadata &request)
   if (is_shutting_down)
     return;
 
-  // Simple round-robin distribution to ready workers
-  Worker *worker = get_ready_worker();
+  // Simple round-robin distribution to ready workers. Hold a shared_ptr so
+  // a concurrent replace_worker (heartbeat timeout) cannot free the Worker
+  // between validation and add_request.
+  std::shared_ptr<Worker> worker = get_ready_worker();
   if (worker)
     worker->add_request(request);
 }
 
-Worker *WorkerPool::get_ready_worker()
+std::shared_ptr<Worker> WorkerPool::get_ready_worker()
 {
   std::unique_lock<std::mutex> lock(ready_mutex);
   ready_condition.wait(lock, [this]
@@ -443,7 +445,7 @@ Worker *WorkerPool::get_ready_worker()
       // Re-add worker to back of queue to maintain round-robin distribution
       // Workers remain "ready" even while processing (Running state)
       ready_queue.push_back(worker_index);
-      return workers[worker_index].get();
+      return workers[worker_index]; // copy under ready_mutex
     }
     else
     {

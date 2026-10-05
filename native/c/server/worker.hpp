@@ -262,9 +262,11 @@ public:
   /**
    * @brief Get the next available worker from the pool
    *
-   * @return `Worker*` A pointer to the available worker
+   * @return `std::shared_ptr<Worker>` The available worker, or an empty pointer when
+   * shutting down. Returned as a shared_ptr copied under the pool lock so a concurrent
+   * `replace_worker` (heartbeat timeout) cannot free the Worker while the caller uses it.
    */
-  Worker *get_ready_worker();
+  std::shared_ptr<Worker> get_ready_worker();
   /**
    * @brief Marks the given worker ID as ready in the pool
    *
