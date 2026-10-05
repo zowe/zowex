@@ -40,21 +40,20 @@ void create_data_set(std::string dsn, const DS_ATTRIBUTES &attributes)
   int rc = zds_create_dsn(&zds, dsn, attrs_copy, response);
   if (rc != 0)
   {
-    std::string diag(response, response.length());
-    diag.push_back('\0');
-    e2a_inplace(diag);
-    diag.pop_back();
-    throw std::runtime_error(diag);
+    // zds_create_dsn reports failures through `response`; it never touches zds.diag.
+    e2a_inplace(response);
+    throw std::runtime_error(response);
   }
 }
 
-std::vector<ZDSEntry> list_data_sets(std::string dsn)
+std::vector<ZDSEntry> list_data_sets(std::string dsn, bool show_attributes)
 {
   std::vector<ZDSEntry> entries;
   ZDS zds = {0};
 
   a2e_inplace(dsn);
-  int rc = zds_list_data_sets(&zds, dsn, entries);
+  // dsorg, volser, recfm and migrated stay empty unless attributes are requested.
+  int rc = zds_list_data_sets(&zds, dsn, entries, show_attributes);
 
   if (rc != 0)
   {

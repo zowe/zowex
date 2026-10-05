@@ -25,6 +25,7 @@ zowe.schema.json
 native/python/bindings/test/fixtures/env.yml
 test.py
 test-results.xml
+pybi_results.xml
 packages/sdk/logs/imperative.log
 packages/sdk/logs/test.log
 .jscpd-report/jscpd-report.json

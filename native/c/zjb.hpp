@@ -44,6 +44,9 @@ struct ZJobDD
   bool is_asa = false;
 };
 
+// The convenience overloads are hidden from SWIG: C linkage cannot express an overload set, and
+// every symbol crossing the bindings boundary needs it. See the extern "C" block below.
+#ifndef SWIG
 /**
  * @brief Return a list of jobs from an input or default owner
  *
@@ -55,7 +58,6 @@ struct ZJobDD
  */
 int zjb_list_by_owner(ZJB *zjb, const std::string &owner_name, std::vector<ZJob> &jobs);
 
-#ifndef SWIG
 /**
  * @brief Return a list of jobs from an input or default owner
  *
@@ -69,6 +71,13 @@ int zjb_list_by_owner(ZJB *zjb, const std::string &owner_name, std::vector<ZJob>
 int zjb_list_by_owner(ZJB *zjb, const std::string &owner_name, const std::string &prefix_name, std::vector<ZJob> &jobs);
 #endif
 
+// The bindings compile this header EBCDIC and their SWIG wrappers ASCII. libc++ uses a distinct
+// inline namespace per char mode (std::__1 vs std::__1_a), so a mangled name is unresolvable
+// across that boundary -- everything the bindings call needs C linkage.
+#ifdef SWIG
+extern "C"
+{
+#endif
 /**
  * @brief Return a list of jobs from an input or default owner
  *
@@ -82,11 +91,6 @@ int zjb_list_by_owner(ZJB *zjb, const std::string &owner_name, const std::string
  */
 int zjb_list_by_owner(ZJB *zjb, const std::string &owner_name, const std::string &prefix_name, const std::string &status_name, std::vector<ZJob> &jobs);
 
-// Exclude status implementation for SWIG
-#ifdef SWIG
-extern "C"
-{
-#endif
 /**
  * @brief Return a list of proclib for a job
  *

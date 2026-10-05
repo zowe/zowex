@@ -16,7 +16,6 @@ on:
 
 permissions:
   checks: write
-  contents: write
   pull-requests: write
 
 jobs:
@@ -40,6 +39,8 @@ jobs:
     with:
       debug: ${{ github.event_name == 'schedule' }}
       version: ${{ inputs.version }}
+    permissions:
+      actions: read
     secrets: inherit
 
   release:
@@ -47,6 +48,8 @@ jobs:
     needs: build
     environment:
       name: ${{ github.event_name == 'schedule' && 'release-nightly' || 'release' }}
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
