@@ -511,7 +511,6 @@ export abstract class AbstractConfigManager {
         try {
             // Prepare connection configuration
             const connectionConfig = ZSshUtils.buildSshConfig(new SshSession(config), {
-                agent: config.identityAgent,
                 readyTimeout: config.handshakeTimeout || this.getClientSetting("handshakeTimeout") || 30000,
             });
 

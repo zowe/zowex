@@ -17,11 +17,6 @@ import * as sshConfig from "ssh-config";
 
 export interface ISshConfigExt extends ISshSession {
     name?: string;
-    /**
-     * Path to the ssh-agent's UNIX socket (or named pipe on Windows), or `"pageant"` on Windows.
-     * Populated from the `IdentityAgent` directive when migrating a `~/.ssh/config` entry.
-     */
-    identityAgent?: string;
 }
 // biome-ignore lint/complexity/noStaticOnlyClass: Utilities class has static methods
 export class SshConfigUtils {

@@ -35,7 +35,6 @@ export default class ServerInstallHandler implements ICommandHandler {
         let caughtError: Error;
         try {
             const installStatus = await ZSshUtils.installServer(session, serverPath, {
-                identityAgent: params.arguments.identityAgent,
                 onProgress: (progressIncrement) => {
                     task.percentComplete += progressIncrement;
                 },
