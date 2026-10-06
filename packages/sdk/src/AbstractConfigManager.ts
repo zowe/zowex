@@ -179,6 +179,7 @@ export abstract class AbstractConfigManager {
                 if (setExistingProfile || Object.keys(validConfig).length > 0) {
                     if (validConfig.password) {
                         foundProfile.profile.privateKey = foundProfile.profile.keyPassphrase = undefined;
+                        validConfig.identityAgent = validConfig.privateKey = validConfig.keyPassphrase = undefined;
                     }
                     await this.setProfile(validConfig, foundProfile.name);
                 }
@@ -198,10 +199,13 @@ export abstract class AbstractConfigManager {
             return;
         }
 
-        // Attempt connection if private key was provided and it has not been validated
-        if (this.validationResult === undefined && this.selectedProfile.privateKey) {
+        // Try the configured agent and key before discovering keys or prompting for a password.
+        if (
+            this.validationResult === undefined &&
+            (this.selectedProfile.identityAgent || this.selectedProfile.privateKey)
+        ) {
             const statusBar = this.showStatusBar();
-            this.validationResult = await this.validateConfig(this.selectedProfile, false);
+            this.validationResult = await this.validateConfig({ ...this.selectedProfile }, false);
             statusBar?.dispose();
         }
 
@@ -213,14 +217,22 @@ export abstract class AbstractConfigManager {
 
         if (this.validationResult === undefined) {
             const statusBar = this.showStatusBar();
-            // Attempt to validate with given URL/creds
-            this.validationResult = await this.validateConfig(this.selectedProfile);
+            this.validationResult = await this.validateConfig({
+                ...this.selectedProfile,
+                identityAgent: undefined,
+                privateKey: undefined,
+                keyPassphrase: undefined,
+            });
+            if (this.validationResult !== undefined) {
+                this.validationResult.identityAgent =
+                    this.validationResult.privateKey =
+                    this.validationResult.keyPassphrase =
+                        undefined;
+            }
             statusBar?.dispose();
         }
 
-        // If validateConfig returns a string, that string is the correct keyPassphrase
         if (this.validationResult && Object.keys(this.validationResult).length >= 1) {
-            this.selectedProfile.privateKey = this.selectedProfile.keyPassphrase = undefined;
             this.selectedProfile = { ...this.selectedProfile, ...this.validationResult };
         }
         // If no private key, password, or identity agent is on the profile then there is no possible validation combination, thus return
@@ -402,6 +414,10 @@ export abstract class AbstractConfigManager {
 
     private async validateConfig(newConfig: ISshConfigExt, askForPassword = true): Promise<ISshConfigExt | undefined> {
         const configModifications: ISshConfigExt | undefined = {};
+        if (newConfig.identityAgent === "SSH_AUTH_SOCK" && !process.env.SSH_AUTH_SOCK) {
+            newConfig.identityAgent = undefined;
+            configModifications.identityAgent = undefined;
+        }
         try {
             const privateKeyPath = newConfig.privateKey;
 
@@ -414,9 +430,9 @@ export abstract class AbstractConfigManager {
             }
 
             if (
+                !newConfig.identityAgent &&
                 (!privateKeyPath || !readFileSync(path.normalize(privateKeyPath), "utf-8")) &&
-                !newConfig.password &&
-                !newConfig.identityAgent
+                !newConfig.password
             ) {
                 const passwordPrompt = askForPassword && (await this.promptForPassword(newConfig, configModifications));
                 return passwordPrompt ? { ...configModifications, ...passwordPrompt } : undefined;
@@ -425,13 +441,23 @@ export abstract class AbstractConfigManager {
             await this.attemptConnection({ ...newConfig, ...configModifications });
         } catch (err) {
             const errorMessage = `${err}`;
+            if (newConfig.identityAgent && errorMessage.includes("All configured authentication methods failed")) {
+                newConfig.identityAgent = undefined;
+                const result = await this.validateConfig({ ...newConfig, ...configModifications }, askForPassword);
+                return result !== undefined
+                    ? { ...configModifications, identityAgent: undefined, ...result }
+                    : undefined;
+            }
             if (newConfig.privateKey && errorMessage.includes("All configured authentication methods failed")) {
                 if (!(await this.handleInvalidPrivateKey(newConfig))) {
                     return undefined;
                 }
                 newConfig.privateKey = undefined;
+                newConfig.keyPassphrase = undefined;
+                configModifications.privateKey = configModifications.keyPassphrase = undefined;
                 if (newConfig.password) {
-                    return await this.validateConfig(newConfig, askForPassword);
+                    const result = await this.validateConfig({ ...newConfig, ...configModifications }, askForPassword);
+                    return result !== undefined ? { ...configModifications, ...result } : undefined;
                 }
             }
 
@@ -510,9 +536,15 @@ export abstract class AbstractConfigManager {
 
         try {
             // Prepare connection configuration
-            const connectionConfig = ZSshUtils.buildSshConfig(new SshSession(config), {
-                readyTimeout: config.handshakeTimeout || this.getClientSetting("handshakeTimeout") || 30000,
-            });
+            const connectionConfig = ZSshUtils.buildSshConfig(
+                new SshSession({
+                    ...config,
+                    password: config.privateKey ? undefined : config.password,
+                }),
+                {
+                    readyTimeout: config.handshakeTimeout || this.getClientSetting("handshakeTimeout") || 30000,
+                },
+            );
 
             // Attempt connection
             await ssh.connect(connectionConfig as NodeSSHConfig);
@@ -543,13 +575,13 @@ export abstract class AbstractConfigManager {
             if (!testPassword) return undefined;
 
             try {
-                // Omit identityAgent: this attempt is specifically testing the typed password,
-                // and buildSshConfig prefers agent auth over password when both are present.
                 await this.attemptConnection({
                     ...config,
                     ...configModifications,
                     password: testPassword,
                     identityAgent: undefined,
+                    privateKey: undefined,
+                    keyPassphrase: undefined,
                 });
                 return { password: testPassword };
             } catch (error) {
@@ -577,8 +609,6 @@ export abstract class AbstractConfigManager {
                 for (const privateKey of foundPrivateKeys) {
                     const testValidation: ISshConfigExt = { ...this.selectedProfile };
                     testValidation.privateKey = privateKey;
-                    // Omit identityAgent: this attempt is specifically testing a discovered private key,
-                    // and buildSshConfig prefers agent auth over the private key when both are present.
                     testValidation.identityAgent = undefined;
 
                     const result = await this.validateConfig(testValidation, false);
@@ -587,7 +617,7 @@ export abstract class AbstractConfigManager {
 
                     if (result) {
                         this.validationResult = {};
-                        this.selectedProfile = { ...this.selectedProfile, ...result, privateKey };
+                        this.selectedProfile = { ...this.selectedProfile, ...testValidation, ...result, privateKey };
                         return;
                     }
                 }
@@ -609,7 +639,8 @@ export abstract class AbstractConfigManager {
             }
 
             for (const profile of validationAttempts) {
-                const testValidation: ISshConfigExt = profile;
+                if (!profile.privateKey) continue;
+                const testValidation: ISshConfigExt = { ...profile, identityAgent: undefined };
                 const result = await this.validateConfig(testValidation, false);
                 progress(100 / validationAttempts.length);
                 if (result !== undefined) {
@@ -617,6 +648,9 @@ export abstract class AbstractConfigManager {
                     this.selectedProfile = {
                         ...this.selectedProfile,
                         privateKey: testValidation.privateKey,
+                        keyPassphrase: testValidation.keyPassphrase,
+                        identityAgent: undefined,
+                        password: undefined,
                     };
                     if (Object.keys(result).length >= 1) {
                         this.selectedProfile = {

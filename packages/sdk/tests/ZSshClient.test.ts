@@ -408,12 +408,27 @@ describe("ZSshClient", () => {
             expect(createClientMock).toHaveBeenCalledWith(true);
         });
 
-        it("should respect identityAgent option", async () => {
-            setupMockSshClient();
-            await ZSshClient.create(new SshSession(fakeSession), { identityAgent: "/tmp/ssh-agent.sock" });
-            expect(ZSshUtils.buildSshConfig).toHaveBeenCalledWith(
-                expect.anything(),
-                expect.objectContaining({ agent: "/tmp/ssh-agent.sock" }),
+        it("should use the session agent without loading a private key or sending a password", async () => {
+            const { connectSpy } = setupMockSshClient();
+            vi.spyOn(ZSshUtils, "buildSshConfig").mockRestore();
+            const session = ZSshUtils.buildSession({
+                host: "example.com",
+                user: "admin",
+                identityAgent: "/tmp/ssh-agent.sock",
+                privateKey: "/path/to/key",
+                keyPassphrase: "key-passphrase",
+                password: "saved-password",
+            });
+
+            await ZSshClient.create(session);
+
+            expect(connectSpy).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    agent: "/tmp/ssh-agent.sock",
+                    privateKey: undefined,
+                    passphrase: undefined,
+                    password: undefined,
+                }),
             );
         });
     });

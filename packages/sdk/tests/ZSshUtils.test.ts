@@ -867,6 +867,16 @@ describe("ZSshUtils", () => {
         });
     });
     describe("buildSession", () => {
+        it("should preserve identityAgent when building a session from a profile", () => {
+            const session = ZSshUtils.buildSession({
+                host: "example.com",
+                user: "testuser",
+                identityAgent: "SSH_AUTH_SOCK",
+            });
+
+            expect(session.ISshSession.identityAgent).toBe("SSH_AUTH_SOCK");
+        });
+
         it("should build session with password when private key is not provided", () => {
             const profile = {
                 host: "example.com",

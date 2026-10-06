@@ -187,6 +187,7 @@ export class ZSshUtils {
             keyPassphrase: args.privateKey ? args.keyPassphrase : undefined,
             password: args.privateKey ? undefined : args.password,
             handshakeTimeout: args.handshakeTimeout,
+            identityAgent: args.identityAgent,
         };
         return new SshSession(sshSessCfg);
     }
