@@ -366,7 +366,7 @@ export class ZSshUtils {
         }
 
         const statsLine = dfCommand.stdout.substring(dfCommand.stdout.indexOf("\n"));
-        Logger.getAppLogger().info(`[ZSshUtils] getAvailableMB: df -m ${dir} output:\n${dfCommand.stdout} `);
+        Logger.getAppLogger().info(`[ZSshUtils] getAvailableMB: df -m ${dir} output:\n${dfCommand.stdout}`);
         // example output:
         // Mounted on     Filesystem                Avail/Total    Files      Status
         // /u/users       (EXAMPLE.USER.ZFS)        826934/8120160 4294919164 Available
@@ -451,7 +451,7 @@ export class ZSshUtils {
                         !(await options.onInsufficientSpaceWarning(availableMb.mb, ZSshClient.REQUIRED_DEPLOY_SIZE_MB))
                     ) {
                         Logger.getAppLogger().info(
-                            `[ZSshUtils] User declined to deploy to '${remoteDir}' due to lack of available space `,
+                            `[ZSshUtils] User declined to deploy to '${remoteDir}' due to lack of available space`,
                         );
                         return false;
                     } else {
@@ -559,7 +559,7 @@ export class ZSshUtils {
 
                     if (extractionStarted && (await ZSshUtils.pathExists(ssh, remoteProgramPath)).exists) {
                         Logger.getAppLogger().debug(
-                            `Deployment failed, but extraction was started. Attempting to delete ${ZSshClient.BIN_NAME} program at '${remoteProgramPath}' `,
+                            `Deployment failed, but extraction was started. Attempting to delete ${ZSshClient.BIN_NAME} program at '${remoteProgramPath}'`,
                         );
                         await promisify(sftp.unlink.bind(sftp))(remoteProgramPath);
                     }
@@ -571,38 +571,8 @@ export class ZSshUtils {
                     }
                 } catch (failureCleanupErr) {
                     Logger.getAppLogger().error(
-                        `Error was thrown during deployment: ${deployErr.message}. Attempting post-failure cleanup...`,
+                        `Error was thrown during post-failure cleanup: ${failureCleanupErr.message}`,
                     );
-                    if (deployErr instanceof ImperativeError && deployErr.errorCode === "EPASSWD_EXPIRED") {
-                        // we can't clean up if the error is a password expiration, so just re-throw
-                        throw deployErr;
-                    }
-                    try {
-                        const postFailurePaxExistsCheck = await ZSshUtils.pathExists(ssh, remotePaxPath);
-                        if (
-                            await ZSshUtils.routeExpiredPasswordError(
-                                postFailurePaxExistsCheck.stderr ?? "",
-                                "extract",
-                                options,
-                            )
-                        ) {
-                            return false;
-                        }
-                        if (postFailurePaxExistsCheck.exists) {
-                            await promisify(sftp.unlink.bind(sftp))(remotePaxPath);
-                        }
-
-                        if (!initialRemoteDirExistCheck.exists) {
-                            Logger.getAppLogger().debug(
-                                `Post-failure cleanup: deleting remote dir ${remoteDir} which we created`,
-                            );
-                            await promisify(sftp.rmdir.bind(sftp))(remoteDir);
-                        }
-                    } catch (failureCleanupErr) {
-                        Logger.getAppLogger().error(
-                            `Error was thrown during post-failure cleanup: ${failureCleanupErr.message} `,
-                        );
-                    }
 
                     return false;
                 }
