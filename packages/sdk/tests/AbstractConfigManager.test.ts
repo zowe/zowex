@@ -1516,13 +1516,13 @@ describe("AbstractConfigManager", async () => {
                 name: "testProf",
                 hostname: "test.com",
                 user: "user1",
-                identityAgent: "$SSH_AUTH_SOCK",
+                identityAgent: "SSH_AUTH_SOCK",
             };
 
             try {
                 await (testManager as any).attemptConnection(config);
                 expect(connectMock).toHaveBeenCalledWith(expect.objectContaining({ agent: "/tmp/current-agent.sock" }));
-                expect(config.identityAgent).toBe("$SSH_AUTH_SOCK");
+                expect(config.identityAgent).toBe("SSH_AUTH_SOCK");
             } finally {
                 vi.unstubAllEnvs();
             }
@@ -1544,13 +1544,13 @@ describe("AbstractConfigManager", async () => {
                 name: "testProf",
                 hostname: "test.com",
                 user: "user1",
-                identityAgent: "$SSH_AUTH_SOCK",
+                identityAgent: "SSH_AUTH_SOCK",
             };
 
             try {
                 await (testManager as any).attemptConnection(config);
                 expect(connectMock).toHaveBeenCalledWith(expect.objectContaining({ agent: undefined }));
-                expect(config.identityAgent).toBe("$SSH_AUTH_SOCK");
+                expect(config.identityAgent).toBe("SSH_AUTH_SOCK");
             } finally {
                 vi.unstubAllEnvs();
             }
@@ -1791,11 +1791,11 @@ describe("AbstractConfigManager", async () => {
             );
         });
 
-        it("should preserve the SSH_AUTH_SOCK reference when saving the profile", async () => {
+        it("should preserve the SSH_AUTH_SOCK special value when saving the profile", async () => {
             const config = {
                 user: "user1",
                 host: "example.com",
-                identityAgent: "$SSH_AUTH_SOCK",
+                identityAgent: "SSH_AUTH_SOCK",
                 name: "testProfile",
             };
 
@@ -1804,7 +1804,7 @@ describe("AbstractConfigManager", async () => {
             expect(mockConfigApi.profiles.set).toHaveBeenCalledWith(
                 "testProfile",
                 expect.objectContaining({
-                    properties: expect.objectContaining({ identityAgent: "$SSH_AUTH_SOCK" }),
+                    properties: expect.objectContaining({ identityAgent: "SSH_AUTH_SOCK" }),
                     secure: ["user"],
                 }),
             );

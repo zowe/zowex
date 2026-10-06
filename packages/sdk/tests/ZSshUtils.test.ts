@@ -931,6 +931,50 @@ describe("ZSshUtils", () => {
             expect(readFileSyncSpy).toHaveBeenCalledWith("/path/to/key", "utf-8");
         });
 
+        it("should resolve the current SSH_AUTH_SOCK without changing the session", () => {
+            const session = new SshSession({
+                hostname: "example.com",
+                user: "testuser",
+                identityAgent: "SSH_AUTH_SOCK",
+                password: "mypassword",
+                privateKey: "/path/to/key",
+                keyPassphrase: "passphrase",
+            });
+            const readFileSyncSpy = vi.spyOn(fs, "readFileSync");
+            vi.stubEnv("SSH_AUTH_SOCK", "/tmp/first-agent.sock");
+
+            try {
+                const config = ZSshUtils.buildSshConfig(session);
+                expect(config.agent).toBe("/tmp/first-agent.sock");
+                expect(config.password).toBeUndefined();
+                expect(config.privateKey).toBeUndefined();
+                expect(config.passphrase).toBeUndefined();
+                expect(readFileSyncSpy).not.toHaveBeenCalled();
+
+                vi.stubEnv("SSH_AUTH_SOCK", "/tmp/current-agent.sock");
+                expect(ZSshUtils.buildSshConfig(session).agent).toBe("/tmp/current-agent.sock");
+                expect(session.ISshSession.identityAgent).toBe("SSH_AUTH_SOCK");
+            } finally {
+                vi.unstubAllEnvs();
+            }
+        });
+
+        it("should leave the agent undefined when SSH_AUTH_SOCK is unset", () => {
+            const session = new SshSession({
+                hostname: "example.com",
+                user: "testuser",
+                identityAgent: "SSH_AUTH_SOCK",
+            });
+            vi.stubEnv("SSH_AUTH_SOCK", undefined);
+
+            try {
+                expect(ZSshUtils.buildSshConfig(session).agent).toBeUndefined();
+                expect(session.ISshSession.identityAgent).toBe("SSH_AUTH_SOCK");
+            } finally {
+                vi.unstubAllEnvs();
+            }
+        });
+
         it("should merge configProps", () => {
             const session = new SshSession({
                 hostname: "example.com",

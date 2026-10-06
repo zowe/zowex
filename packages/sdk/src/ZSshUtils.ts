@@ -192,7 +192,7 @@ export class ZSshUtils {
     }
 
     public static buildSshConfig(session: SshSession, configProps?: ConnectConfig): ConnectConfig {
-        const useAgent = configProps?.agent != null;
+        const useAgent = session.ISshSession.identityAgent != null;
         return {
             host: session.ISshSession.hostname,
             port: session.ISshSession.port,
@@ -204,6 +204,10 @@ export class ZSshUtils {
                     : undefined,
             passphrase: useAgent ? undefined : session.ISshSession.keyPassphrase,
             readyTimeout: session.ISshSession.handshakeTimeout,
+            agent:
+                session.ISshSession.identityAgent === "SSH_AUTH_SOCK"
+                    ? process.env.SSH_AUTH_SOCK
+                    : session.ISshSession.identityAgent,
             // ssh2 debug messages are extremely verbose so log at TRACE level
             debug: (msg) => Logger.getAppLogger().trace(msg),
             ...configProps,

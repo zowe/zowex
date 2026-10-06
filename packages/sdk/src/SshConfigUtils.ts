@@ -88,7 +88,7 @@ export class SshConfigUtils {
                                     }
                                     session.identityAgent =
                                         value === "SSH_AUTH_SOCK"
-                                            ? "$SSH_AUTH_SOCK"
+                                            ? value
                                             : path.normalize(
                                                   value.startsWith("~") ? path.join(homeDir, value.slice(2)) : value,
                                               );

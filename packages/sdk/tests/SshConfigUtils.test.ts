@@ -264,7 +264,7 @@ Host server
         expect(result[0].identityAgent).toBe(normalize(join("/home/dir", ".ssh", "agent.sock")));
     });
 
-    it("should preserve SSH_AUTH_SOCK as an environment reference when set", async () => {
+    it("should preserve SSH_AUTH_SOCK as a special value when set", async () => {
         mockReadFileSync.mockReturnValue(`
 Host server
     HostName example.com
@@ -274,13 +274,13 @@ Host server
 
         try {
             const result = await SshConfigUtils.migrateSshConfig();
-            expect(result[0].identityAgent).toBe("$SSH_AUTH_SOCK");
+            expect(result[0].identityAgent).toBe("SSH_AUTH_SOCK");
         } finally {
             vi.unstubAllEnvs();
         }
     });
 
-    it("should preserve SSH_AUTH_SOCK as an environment reference when unset", async () => {
+    it("should preserve SSH_AUTH_SOCK as a special value when unset", async () => {
         mockReadFileSync.mockReturnValue(`
 Host server
     HostName example.com
@@ -290,7 +290,7 @@ Host server
 
         try {
             const result = await SshConfigUtils.migrateSshConfig();
-            expect(result[0].identityAgent).toBe("$SSH_AUTH_SOCK");
+            expect(result[0].identityAgent).toBe("SSH_AUTH_SOCK");
         } finally {
             vi.unstubAllEnvs();
         }
