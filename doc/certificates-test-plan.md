@@ -1,7 +1,7 @@
 # Test plan: `system cert` / `system keyring` (certificates command group)
 
 Status: living document, introduced with [PR #1079](https://github.com/zowe/zowex/pull/1079)
-(migration of [`keyring-utilities`](https://github.com/zowe/keyring-utilities) into zowex).
+(migration of [`keyring-utilities`](https://github.com/zowe/keyring-utilities) into `zo`).
 
 Scope: the `zkr` service layer (R_datalib / IRRSDL64 + System SSL GSKCMS), the
 `system cert` / `system keyring` CLI groups, the 14 certificate JSON-RPC methods,
@@ -122,7 +122,7 @@ The C++ tests bypass JSON-RPC dispatch, so schema/validation bugs are
 invisible to them (e.g. a handler emitting a field the response schema
 rejects). Add a python test (the `z:test:python` harness,
 `.github/workflows/zos-py-build.yml` — infrastructure that already runs in CI)
-that starts `zowex server`, invokes the certificate methods, and asserts:
+that starts `zo server`, invokes the certificate methods, and asserts:
 
 - request validation rejects missing required fields (`-32602`-class errors)
 - responses pass their schemas (server-side response validation not tripped)

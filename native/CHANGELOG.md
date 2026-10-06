@@ -6,6 +6,40 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- `c`: Fixed the `--encoding` help text for `zowex data-set write`, `zowex uss write`, and `zowex job submit-jcl`, which described reading contents instead of converting the input. [#649](https://github.com/zowe/zowex/issues/649)
+- `c`: `ResultTable` columns are now named (`add_column("name", width)`), and `data-set list`, `data-set list-members`, `job list`, `job list-files`, and `job view-status` accept a new `--response-format-header`/`--rfh` option that prints those names as a header row in table and CSV output.
+- `c`: Added a `--json` option to `zowex` commands, which prints the command's result to stdout as a single line of JSON (`success`, `exitCode`, `data`, `stderr`) so callers can parse it without starting `zowex server`. [#837](https://github.com/zowe/zowex/issues/837)
+- `c`: Fixed `zowex job list-files --response-format-csv` repeating every preceding record's fields at the start of each row, so only the first row had the documented five fields.
+- `c`: Fixed `zowex uss list` only returning structured results when `--response-format-csv` was also passed. [#1128](https://github.com/zowe/zowex/pull/1128)
+- `c`: Fixed `plugin::Io::is_redirecting_error()` and `is_redirecting_input()` reporting the state of the output stream instead of their own. [#1128](https://github.com/zowe/zowex/pull/1128)
+- `c`: Fixed a plug-in that registers an argument conflicting with an existing name or alias aborting `zowex` for every command instead of being rejected with a logged diagnostic. [#1128](https://github.com/zowe/zowex/pull/1128)
+- `python`: Added `package_precompiled.py` tool to package precompiled binary assets (equivalent to Python wheels) into `zbind_bin_dist.tar.gz` for instant compiler-free installation.
+- `python`: Added `package_zbind.py` tool to package a clean, self-contained source-based distribution bundle (`zbind_src_dist.tar.gz`) containing all necessary headers, sources, and objects to build the bindings on any z/OS host without SWIG.
+- `python`: Fixed compilation of Python bindings on z/OS by passing required Language Environment feature macros `_EXT` and `_OPEN_SYS_FILE_EXT` to the compiler in `setup.py`.
+- Reduced the size of the `zo` binary by over 40% (10MB -> 6MB) by optimizing the codebase. [#1166](https://github.com/zowe/zowex/pull/1166)
+- `python`: Fixed the Python bindings compiling the shared `native/c` sources with `-fzos-le-char-mode=ascii`, which flipped their execution charset to ASCII and broke every data set and job binding. [#1121](https://github.com/zowe/zowex/pull/1121)
+- `python`: `list_data_sets` accepts `show_attributes` so `dsorg`, `volser`, `recfm` and `migrated` can be populated. [#1121](https://github.com/zowe/zowex/pull/1121)
+- `python`: Fixed `get_job_status` returning unconverted EBCDIC strings and `create_data_set` raising errors with an empty message. [#1121](https://github.com/zowe/zowex/pull/1121)
+- `python`: Fixed `list_jobs_by_owner` failing when no job name prefix is given. [#1121](https://github.com/zowe/zowex/pull/1121)
+- `python`: Fixed the USS bindings (`create_uss_file`, `create_uss_dir`, `move_uss_file_or_dir`, `list_uss_dir`, `chmod_uss_item`, `delete_uss_item`, `chown_uss_item`, `chtag_uss_item`) not converting paths, and `write_uss_file`/`write_uss_file_streamed` not converting etags, between ASCII and EBCDIC. [#1121](https://github.com/zowe/zowex/pull/1121)
+
+## `1.0.1`
+
+- Fixed worker threads timing out in the `zo` RPC server for a long upload or download operation that exceeds the request timeout. [#988](https://github.com/zowe/zowex/issues/988)
+- `c`: Adjusted the size of the `etag` field to improve compatibility with z/OS UNIX files. [#1140](https://github.com/zowe/zowex/pull/1140)
+- `c`: Rejected oversized data set etags before copying them into request storage. [#1140](https://github.com/zowe/zowex/pull/1140)
+- `c`: Rejected oversized USS file etags before copying them into request storage. [#1140](https://github.com/zowe/zowex/pull/1140)
+
+## `1.0.0`
+
+- **Breaking:** `c`: Renamed the `ZOWEX_NUM_WORKERS` environmental variable to `ZO_NUM_WORKERS`. [#1119](https://github.com/zowe/zowex/pull/1119)
+- **Breaking:** `c`: Renamed the `ZOWEX_LOG_LEVEL` environmental variable to `ZO_LOG_LEVEL`. [#1119](https://github.com/zowe/zowex/pull/1119)
+- **Breaking:** `c`: Renamed the `ZOWEX_LOGS_DIR` environmental variable to `ZO_LOGS_DIR`. [#1119](https://github.com/zowe/zowex/pull/1119)
+- **Breaking:** `c`: Renamed the `ZOWEAX_PATH` environmental variable to `ZOA_PATH`. [#1119](https://github.com/zowe/zowex/pull/1119)
+- **Breaking:** `c`: Renamed the `ZOWEX_LOGS_DIR` environmental variable to `ZO_LOGS_DIR`. [#1119](https://github.com/zowe/zowex/pull/1119)
+- **Breaking:** `c`: Renamed the `ZOWEX_PLUGINS_DIR` environmental variable to `ZO_PLUGINS_DIR`. [#1119](https://github.com/zowe/zowex/pull/1119)
+- **Breaking:** `c`: Renamed `ZOWEX_PLUGIN_DECLARE_ABI()` macro to `ZO_PLUGIN_DECLARE_ABI()`. [#1119](https://github.com/zowe/zowex/pull/1119)
+- **Breaking:** `c`: Renamed the `zowex` binary to `zo`, and the `zoweax` binary to `zoa`. [#1119](https://github.com/zowe/zowex/pull/1119)
 - `c`: Added JSON-RPC support for listing parmlib data sets. [#1124](https://github.com/zowe/zowex/pull/1124)
 - `c`: Added the `zowex ds resolve-alias <dsn>` command which allows the user to resolve data set aliases. [#1108](https://github.com/zowe/zowex/pull/1108)
 - `c`: Added `zds_idcams` utility function which allows the caller to execute the z/OS IDCAMS program and retrieve its output. [#1108](https://github.com/zowe/zowex/pull/1108)
@@ -315,4 +349,3 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## [Unreleased]
 
 - Initial release
-

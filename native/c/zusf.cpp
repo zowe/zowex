@@ -1491,6 +1491,11 @@ int zusf_read_from_uss_file_streamed(ZUSF *zusf, const std::string &file, const 
 
   while ((bytes_read = fread(&buf[0], 1, chunk_size, fin)) > 0)
   {
+    if (zusf->update_heartbeat_callback)
+    {
+      zusf->update_heartbeat_callback();
+    }
+
     int chunk_len = bytes_read;
     const char *chunk = &buf[0];
 
@@ -1769,6 +1774,11 @@ int zusf_write_to_uss_file_streamed(ZUSF *zusf, const std::string &file, const s
 
   while ((bytes_read = fread(&buf[0], 1, FIFO_CHUNK_SIZE, fin)) > 0)
   {
+    if (zusf->update_heartbeat_callback)
+    {
+      zusf->update_heartbeat_callback();
+    }
+
     temp_encoded = zbase64::decode(&buf[0], bytes_read, &left_over);
     const char *chunk = &temp_encoded[0];
     int chunk_len = temp_encoded.size();

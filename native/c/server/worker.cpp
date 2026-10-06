@@ -253,9 +253,13 @@ WorkerState Worker::get_state() const
 
 void Worker::process_request(const string &data)
 {
-  // Delegate JSON-RPC processing to the RpcServer singleton
+  // Delegate JSON-RPC processing to the RpcServer singleton. The heartbeat callback
+  // lets streaming command handlers (e.g. large file uploads) touch this worker's
+  // heartbeat per chunk, so the supervisor's request-timeout watchdog sees ongoing
+  // progress instead of only the start/end of the request.
   RpcServer &server = RpcServer::get_instance();
-  server.process_request(data);
+  server.process_request(data, [this]
+                          { update_heartbeat(); });
 }
 
 void Worker::update_heartbeat()

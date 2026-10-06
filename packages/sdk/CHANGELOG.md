@@ -6,6 +6,19 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- Fixed an error when issuing streamed RPC requests to a `zowex` server running in Bash shell. [#1155](https://github.com/zowe/zowex/pull/1155)
+- Updated RPC command method signatures so that the parameters object is optional when none of the request properties are required. [#1174](https://github.com/zowe/zowex/pull/1174)
+- Added `SessionContext` class to cache SSH connections so they can be reused across utility methods. [#1144](https://github.com/zowe/zowex/pull/1144)
+
+## `1.0.1`
+
+- Enhanced the post-failure cleanup in the `ZSshUtils.installServer` method to delete the `zo` program if the installation process failed while extracting the `server.pax.Z` file. [#1143](https://github.com/zowe/zowex/pull/1143)
+- Fixed an error where `zowex` is not found on the PATH if the OMVS shell is Bash. The expected behavior is that the `zowex` binary is automatically deployed. [#1141](https://github.com/zowe/zowex/pull/1141)
+- Exported the `ZSshConstants` module so that extenders can access its constants. [#1142](https://github.com/zowe/zowex/pull/1142)
+
+## `1.0.0`
+
+- **Breaking** The `zowex` program bundled in `server.pax.Z` is now renamed to `zo`. [#1119](https://github.com/zowe/zowex/pull/1119)
 - Added JSON-RPC support for listing parmlib data sets. [#1124](https://github.com/zowe/zowex/pull/1124)
 - Added support for the `resolveDsAlias` RPC command which allows the caller to resolve data set aliases. [#1108](https://github.com/zowe/zowex/pull/1108)
 - Added support for SSH agents (`IdentityAgent` in SSH config) as an authentication method. [#342](https://github.com/zowe/zowex/issues/342)

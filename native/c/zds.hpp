@@ -12,6 +12,7 @@
 #ifndef ZDS_HPP
 #define ZDS_HPP
 
+#include <functional>
 #include <vector>
 #include <string>
 #include "zdstype.h"
@@ -157,6 +158,12 @@ struct ZDSReadOpts
   std::string ddname;
   std::string dsname;
   bool is_asa = false;
+
+  // Invoked per chunk while streaming to signal that the request is still making
+  // progress (e.g. to feed a caller's request-timeout watchdog). Lives here rather
+  // than on ZDS because zdstype.h is also parsed by the Metal C compiler, which
+  // cannot see std::function (see zam.c/zdsm.c).
+  std::function<void()> update_heartbeat_callback;
 };
 
 /**
@@ -167,6 +174,9 @@ struct ZDSWriteOpts
   ZDS *zds = nullptr;
   std::string ddname;
   std::string dsname;
+
+  // Invoked per chunk while streaming; see ZDSReadOpts::update_heartbeat_callback
+  std::function<void()> update_heartbeat_callback;
 };
 
 /**

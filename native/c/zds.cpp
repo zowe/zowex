@@ -207,8 +207,8 @@ static int zds_get_type_info(const std::string &dsn, ZDSTypeInfo &info)
   return RTNCD_SUCCESS;
 }
 
-static int zds_write_sequential_streamed(ZDS *zds, const std::string &dsn, const std::string &pipe, size_t *content_len, const DscbAttributes &attrs);
-static int zds_write_member_bpam_streamed(ZDS *zds, const std::string &dsn, const std::string &pipe, size_t *content_len);
+static int zds_write_sequential_streamed(ZDS *zds, const std::string &dsn, const std::string &pipe, size_t *content_len, const DscbAttributes &attrs, const std::function<void()> &update_heartbeat);
+static int zds_write_member_bpam_streamed(ZDS *zds, const std::string &dsn, const std::string &pipe, size_t *content_len, const std::function<void()> &update_heartbeat);
 
 /**
  * Allocates a DD with a system-assigned name using bpxwdyn's RTDDN feature.
@@ -1923,7 +1923,7 @@ int zds_write_streamed(const ZDSWriteOpts &opts, const std::string &pipe, size_t
   {
     const std::string target = zds_resolve_write_target(opts);
     const DscbAttributes empty_attrs{};
-    return zds_write_sequential_streamed(zds, target, pipe, content_len, empty_attrs);
+    return zds_write_sequential_streamed(zds, target, pipe, content_len, empty_attrs, opts.update_heartbeat_callback);
   }
 
   // DSN writes: full validation and logic from zds_write_to_dsn_streamed
@@ -1955,13 +1955,13 @@ int zds_write_streamed(const ZDSWriteOpts &opts, const std::string &pipe, size_t
   // Use BPAM path for PDS/PDSE members, sequential for others
   if (is_member)
   {
-    rc = zds_write_member_bpam_streamed(zds, dsn, pipe, content_len);
+    rc = zds_write_member_bpam_streamed(zds, dsn, pipe, content_len, opts.update_heartbeat_callback);
     // Clear ddname after BPAM close since the DD was freed
     memset(zds->ddname, 0, sizeof(zds->ddname));
   }
   else
   {
-    rc = zds_write_sequential_streamed(zds, zds_resolve_write_target(opts), pipe, content_len, attrs);
+    rc = zds_write_sequential_streamed(zds, zds_resolve_write_target(opts), pipe, content_len, attrs, opts.update_heartbeat_callback);
   }
 
   if (rc == RTNCD_FAILURE)
@@ -3808,6 +3808,11 @@ int zds_read_streamed(const ZDSReadOpts &opts, const std::string &pipe, size_t *
 
     while ((bytes_read = fread(&buf[0], 1, lrecl, fin)) > 0)
     {
+      if (opts.update_heartbeat_callback)
+      {
+        opts.update_heartbeat_callback();
+      }
+
       // Add newline before each record (except the first)
       std::string record_data;
       if (!first_record)
@@ -3888,6 +3893,11 @@ int zds_read_streamed(const ZDSReadOpts &opts, const std::string &pipe, size_t *
 
     while ((bytes_read = fread(&buf[0], 1, chunk_size, fin)) > 0)
     {
+      if (opts.update_heartbeat_callback)
+      {
+        opts.update_heartbeat_callback();
+      }
+
       int chunk_len = bytes_read;
       const char *chunk = &buf[0];
 
@@ -3959,7 +3969,7 @@ int zds_read_streamed(const ZDSReadOpts &opts, const std::string &pipe, size_t *
 /**
  * Internal function to write to a sequential data set in streaming mode using fopen/fwrite
  */
-static int zds_write_sequential_streamed(ZDS *zds, const std::string &dsn, const std::string &pipe, size_t *content_len, const DscbAttributes &attrs)
+static int zds_write_sequential_streamed(ZDS *zds, const std::string &dsn, const std::string &pipe, size_t *content_len, const DscbAttributes &attrs, const std::function<void()> &update_heartbeat)
 {
   std::string dsname = dsn;
 
@@ -4024,6 +4034,11 @@ static int zds_write_sequential_streamed(ZDS *zds, const std::string &dsn, const
     // Write chunks directly - the C runtime handles ASA and record boundaries in text mode
     while ((bytes_read = fread(&buf[0], 1, FIFO_CHUNK_SIZE, fin)) > 0)
     {
+      if (update_heartbeat)
+      {
+        update_heartbeat();
+      }
+
       temp_encoded = zbase64::decode(&buf[0], bytes_read, &left_over);
       const char *chunk = &temp_encoded[0];
       int chunk_len = temp_encoded.size();
@@ -4123,7 +4138,7 @@ static int zds_write_sequential_streamed(ZDS *zds, const std::string &dsn, const
 /**
  * Internal function to write to a PDS/PDSE member in streaming mode using BPAM (updates ISPF stats)
  */
-static int zds_write_member_bpam_streamed(ZDS *zds, const std::string &dsn, const std::string &pipe, size_t *content_len)
+static int zds_write_member_bpam_streamed(ZDS *zds, const std::string &dsn, const std::string &pipe, size_t *content_len, const std::function<void()> &update_heartbeat)
 {
   int rc = 0;
   IO_CTRL *ioc = nullptr;
@@ -4194,6 +4209,11 @@ static int zds_write_member_bpam_streamed(ZDS *zds, const std::string &dsn, cons
 
   while ((bytes_read = fread(&buf[0], 1, FIFO_CHUNK_SIZE, fin)) > 0)
   {
+    if (update_heartbeat)
+    {
+      update_heartbeat();
+    }
+
     temp_encoded = zbase64::decode(&buf[0], bytes_read, &left_over);
     *content_len += temp_encoded.size();
 

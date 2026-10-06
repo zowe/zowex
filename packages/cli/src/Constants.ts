@@ -22,6 +22,15 @@ export class Constants {
             "user authentication, or 'pageant' to use Pageant on Windows. Takes priority over a private key " +
             "or password configured on the profile.",
         type: "string",
+    };
+
+    public static readonly OPT_RESPONSE_TIMEOUT: ICommandOptionDefinition = {
+        name: "response-timeout",
+        aliases: ["rto"],
+        description:
+            "The maximum number of seconds to wait for a response to a single request before timing out. " +
+            "Increase this for large file uploads/downloads over slow connections. Defaults to 60 seconds.",
+        type: "number",
         required: false,
     };
 
@@ -38,6 +47,7 @@ export class Constants {
      */
     public static readonly ZSSH_EXTRA_OPTIONS: ICommandOptionDefinition[] = [
         Constants.OPT_IDENTITY_AGENT,
+        Constants.OPT_RESPONSE_TIMEOUT,
         Constants.OPT_SERVER_PATH,
     ];
 }

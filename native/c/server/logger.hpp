@@ -147,7 +147,7 @@ private:
     }
 
     // logger file size check: if size > MAX_LOG_FILE_SIZE (100KB), rotate
-    //   try to archive old data, only destroy if archive succeeds 
+    //   try to archive old data, only destroy if archive succeeds
     //   otherwise, if some failure, append to the oversized file to prevent data loss
     // (data preservation wins out over size bounding)
     struct stat st;
@@ -173,7 +173,7 @@ private:
             if (!rotation_stall_warned && static_cast<size_t>(st.st_size) > 2 * MAX_LOG_FILE_SIZE)
             {
               log_file << get_current_timestamp() << " [WARN] Log rotation has been failing repeatedly; "
-                        << "file size (" << st.st_size << " bytes) exceeds twice the configured limit\n";
+                       << "file size (" << st.st_size << " bytes) exceeds twice the configured limit\n";
               log_file.flush();
               rotation_stall_warned = true;
             }
@@ -243,7 +243,7 @@ public:
 
       verbose_logging = verbose;
 
-      // Resolve and create the per-user logs directory (honors ZOWEX_LOGS_DIR)
+      // Resolve and create the per-user logs directory (honors ZO_LOGS_DIR)
       const std::string logs_dir = zlog_util::resolve_logs_dir();
 
       if (!zlog_util::make_dirs(logs_dir))

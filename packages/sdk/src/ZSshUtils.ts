@@ -14,10 +14,11 @@ import * as path from "node:path";
 import { promisify } from "node:util";
 import { ImperativeError, type IProfile, Logger } from "@zowe/imperative";
 import { type ISshSession, SshSession } from "@zowe/zos-uss-for-zowe-sdk";
-import { NodeSSH, type Config as NodeSSHConfig } from "node-ssh";
+import type { NodeSSH, SSHExecCommandResponse } from "node-ssh";
 import * as semver from "semver";
 import type { ConnectConfig, SFTPWrapper } from "ssh2";
 import { matchLeRuntimeFailure, PrivateKeyFailurePatterns, SshErrors } from "./SshErrors";
+import { SessionContext } from "./utils";
 import { ZSshClient } from "./ZSshClient";
 import { BUNDLED_SSH_SERVER_VERSION } from "./ZSshConstants";
 
@@ -114,7 +115,7 @@ export class ZSshUtils {
      * From the MIT-licensed node-shlex.
      * https://github.com/rgov/node-shlex
      */
-    private static quotePath(path: string): string {
+    public static quotePath(path: string): string {
         if (path === "") {
             return "''";
         }
@@ -236,9 +237,9 @@ export class ZSshUtils {
     /**
      * Check the user's $PATH for our server binary.
      * @param session Pre-established SSH session
-     * @returns object describing the details of any located zowex program
+     * @returns object describing the details of any located zo program
      */
-    public static async detectServerOnPath(session: SshSession): Promise<IServerOnPathDetails> {
+    public static async detectServerOnPath(session: SshSession | SessionContext): Promise<IServerOnPathDetails> {
         Logger.getAppLogger().debug(`[ZSshUtils] enter detectServerOnPath()`);
         return ZSshUtils.withSsh(session, async (ssh) => {
             const details: IServerOnPathDetails = {
@@ -332,20 +333,23 @@ export class ZSshUtils {
      * @returns A promise resolving to true if the user is denied write access.
      *          If the path does not exist, false will be returned.
      */
-    public static async lacksWriteAccess(session: SshSession, testPath: string): Promise<boolean> {
+    public static async lacksWriteAccess(session: SshSession | SessionContext, testPath: string): Promise<boolean> {
         return ZSshUtils.withSsh(session, async (ssh) => {
             Logger.getAppLogger().info(`[ZSshUtils] Testing lacksWriteAccess to path '%s'`, testPath);
 
             // See: https://www.man7.org/linux/man-pages/man1/test.1.html
             const pathExistsCheck = await ZSshUtils.pathExists(ssh, testPath);
-            const testWriteCmd = await ssh.execCommand(`test -w ${ZSshUtils.quotePath(testPath)}`);
-            Logger.getAppLogger().debug(
-                `[ZSshUtils] test -w %s, code %d, stdout: '%s', stderr: '%s'`,
-                testPath,
-                testWriteCmd.code,
-                testWriteCmd.stdout,
-                testWriteCmd.stderr,
-            );
+            let testWriteCmd: SSHExecCommandResponse;
+            if (pathExistsCheck.exists) {
+                testWriteCmd = await ssh.execCommand(`test -w ${ZSshUtils.quotePath(testPath)}`);
+                Logger.getAppLogger().debug(
+                    `[ZSshUtils] test -w %s, code %d, stdout: '%s', stderr: '%s'`,
+                    testPath,
+                    testWriteCmd.code,
+                    testWriteCmd.stdout,
+                    testWriteCmd.stderr,
+                );
+            }
 
             return pathExistsCheck.exists && testWriteCmd.code !== 0; // testWriteCmd non-zero: lacks write access
         });
@@ -404,7 +408,7 @@ export class ZSshUtils {
      * @returns true if the deployment was completed successfully
      */
     public static async installServer(
-        session: SshSession,
+        session: SshSession | SessionContext,
         serverPath: string,
         options?: ISshCallbacks,
     ): Promise<boolean> {
@@ -413,6 +417,7 @@ export class ZSshUtils {
         );
         const localDir = ZSshUtils.getBinDir(__dirname);
         const remoteDir = serverPath.replace(/^~/, ".");
+        let extractionStarted = false;
 
         return ZSshUtils.sftp(
             session,
@@ -520,6 +525,7 @@ export class ZSshUtils {
                     }
 
                     Logger.getAppLogger().info(`[ZSshUtils] Step 3/5: Extracting PAX archive in ${remoteDir}`);
+                    extractionStarted = true;
                     const result = await ssh.execCommand(`pax -rzf ${ZSshUtils.SERVER_PAX_FILE}`, { cwd: remoteDir });
                     if (await ZSshUtils.routeExpiredPasswordError(result.stderr ?? "", "extract", options)) {
                         return false;
@@ -539,8 +545,6 @@ export class ZSshUtils {
                             if (!shouldContinue) {
                                 throw paxErr;
                             }
-                        } else {
-                            throw paxErr;
                         }
                     }
                 } catch (deployErr) {
@@ -566,6 +570,14 @@ export class ZSshUtils {
                             await promisify(sftp.unlink.bind(sftp))(remotePaxPath);
                         }
 
+                        const remoteProgramPath = path.posix.join(remoteDir, ZSshClient.BIN_NAME);
+
+                        if (extractionStarted && (await ZSshUtils.pathExists(ssh, remoteProgramPath)).exists) {
+                            Logger.getAppLogger().debug(
+                                `Deployment failed, but extraction was started. Attempting to delete ${ZSshClient.BIN_NAME} program at '${remoteProgramPath}' `,
+                            );
+                            await promisify(sftp.unlink.bind(sftp))(remoteProgramPath);
+                        }
                         if (!initialRemoteDirExistCheck.exists) {
                             Logger.getAppLogger().debug(
                                 `Post-failure cleanup: deleting remote dir ${remoteDir} which we created`,
@@ -574,51 +586,80 @@ export class ZSshUtils {
                         }
                     } catch (failureCleanupErr) {
                         Logger.getAppLogger().error(
-                            `Error was thrown during post-failure cleanup: ${failureCleanupErr.message} `,
+                            `Error was thrown during deployment: ${deployErr.message}. Attempting post-failure cleanup...`,
                         );
+                        if (deployErr instanceof ImperativeError && deployErr.errorCode === "EPASSWD_EXPIRED") {
+                            // we can't clean up if the error is a password expiration, so just re-throw
+                            throw deployErr;
+                        }
+                        try {
+                            const postFailurePaxExistsCheck = await ZSshUtils.pathExists(ssh, remotePaxPath);
+                            if (
+                                await ZSshUtils.routeExpiredPasswordError(
+                                    postFailurePaxExistsCheck.stderr ?? "",
+                                    "extract",
+                                    options,
+                                )
+                            ) {
+                                return false;
+                            }
+                            if (postFailurePaxExistsCheck.exists) {
+                                await promisify(sftp.unlink.bind(sftp))(remotePaxPath);
+                            }
+
+                            if (!initialRemoteDirExistCheck.exists) {
+                                Logger.getAppLogger().debug(
+                                    `Post-failure cleanup: deleting remote dir ${remoteDir} which we created`,
+                                );
+                                await promisify(sftp.rmdir.bind(sftp))(remoteDir);
+                            }
+                        } catch (failureCleanupErr) {
+                            Logger.getAppLogger().error(
+                                `Error was thrown during post-failure cleanup: ${failureCleanupErr.message} `,
+                            );
+                        }
+
+                        return false;
+                    }
+                    Logger.getAppLogger().info(`[ZSshUtils] Step 4/5: Cleaning up ${remotePaxPath}`);
+                    try {
+                        await promisify(sftp.unlink.bind(sftp))(remotePaxPath);
+                    } catch (err) {
+                        const technical = `${err}`;
+                        Logger.getAppLogger().warn(`[ZSshUtils] Step 4 WARNING: cleanup failed: ${technical}`);
+                        const cleanupErr = new ImperativeError({
+                            msg: "Failed to clean up the upload archive on the remote system.",
+                            errorCode: "ECLEANUPFAIL",
+                            additionalDetails: technical,
+                        });
+                        if (options?.onError) {
+                            await options.onError(cleanupErr, "cleanup");
+                        } else {
+                            Logger.getAppLogger().debug("Cleanup error is non-fatal, continuing...");
+                        }
                     }
 
-                    return false;
-                }
-                Logger.getAppLogger().info(`[ZSshUtils] Step 4/5: Cleaning up ${remotePaxPath}`);
-                try {
-                    await promisify(sftp.unlink.bind(sftp))(remotePaxPath);
-                } catch (err) {
-                    const technical = `${err}`;
-                    Logger.getAppLogger().warn(`[ZSshUtils] Step 4 WARNING: cleanup failed: ${technical}`);
-                    const cleanupErr = new ImperativeError({
-                        msg: "Failed to clean up the upload archive on the remote system.",
-                        errorCode: "ECLEANUPFAIL",
-                        additionalDetails: technical,
-                    });
-                    if (options?.onError) {
-                        await options.onError(cleanupErr, "cleanup");
-                    } else {
-                        Logger.getAppLogger().debug("Cleanup error is non-fatal, continuing...");
+                    Logger.getAppLogger().info("[ZSshUtils] Step 5/5: Verifying the server binary runs");
+                    const verifyErr = await ZSshUtils.verifyServerBinary(ssh, remoteDir);
+                    if (verifyErr != null) {
+                        Logger.getAppLogger().error(`[ZSshUtils] Step 5 FAILED: ${verifyErr.additionalDetails}`);
+                        if (options?.onError) {
+                            // The files are in place; only the runtime is unusable. Retrying the install
+                            // cannot help, so treat the callback's answer as "reported, carry on or stop".
+                            return await options.onError(verifyErr, "verify");
+                        }
+                        throw verifyErr;
                     }
-                }
 
-                Logger.getAppLogger().info("[ZSshUtils] Step 5/5: Verifying the server binary runs");
-                const verifyErr = await ZSshUtils.verifyServerBinary(ssh, remoteDir);
-                if (verifyErr != null) {
-                    Logger.getAppLogger().error(`[ZSshUtils] Step 5 FAILED: ${verifyErr.additionalDetails}`);
-                    if (options?.onError) {
-                        // The files are in place; only the runtime is unusable. Retrying the install
-                        // cannot help, so treat the callback's answer as "reported, carry on or stop".
-                        return await options.onError(verifyErr, "verify");
-                    }
-                    throw verifyErr;
-                }
-
-                Logger.getAppLogger().info("[ZSshUtils] installServer completed successfully");
-                return true;
+                    Logger.getAppLogger().info("[ZSshUtils] installServer completed successfully");
+                    return true;
             },
             { agent: options?.identityAgent },
-        );
+        });
     }
 
     public static async uninstallServer(
-        session: SshSession,
+        session: SshSession | SessionContext,
         serverPath: string,
         options?: Omit<ISshCallbacks, "onProgress">,
     ): Promise<void> {
@@ -682,26 +723,21 @@ export class ZSshUtils {
     }
 
     private static async sftp<T>(
-        session: SshSession,
+        session: SshSession | SessionContext,
         callback: (sftp: SFTPWrapper, ssh: NodeSSH) => Promise<T>,
         configProps?: ConnectConfig,
     ): Promise<T> {
-        const ssh = new NodeSSH();
-        await ssh.connect(ZSshUtils.buildSshConfig(session, configProps) as NodeSSHConfig);
-        try {
-            return await ssh.requestSFTP().then((sftp) => callback(sftp, ssh));
-        } finally {
-            ssh.dispose();
-        }
+        return ZSshUtils.withSsh(session, async (ssh) => callback(await ssh.requestSFTP(), ssh));
     }
 
-    private static async withSsh<T>(session: SshSession, callback: (ssh: NodeSSH) => Promise<T>): Promise<T> {
-        const ssh = new NodeSSH();
-        await ssh.connect(ZSshUtils.buildSshConfig(session) as NodeSSHConfig);
-        try {
-            return await callback(ssh);
-        } finally {
-            ssh.dispose();
+    private static async withSsh<T>(
+        session: SshSession | SessionContext,
+        callback: (ssh: NodeSSH) => Promise<T>,
+    ): Promise<T> {
+        if (session instanceof SessionContext) {
+            return callback(await session.getSsh());
         }
+        using context = new SessionContext(session);
+        return callback(await context.getSsh());
     }
 }

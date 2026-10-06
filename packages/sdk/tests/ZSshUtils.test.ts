@@ -14,6 +14,7 @@ import { ImperativeError, Logger } from "@zowe/imperative";
 import { type ISshSession, SshSession } from "@zowe/zos-uss-for-zowe-sdk";
 import { NodeSSH } from "node-ssh";
 import { SshErrors } from "../src/SshErrors";
+import { SessionContext } from "../src/utils";
 import { ZSshUtils } from "../src/ZSshUtils";
 
 vi.mock("../src/ZSshConstants", () => ({
@@ -42,9 +43,34 @@ function setupSftpMocks(
 }
 
 describe("ZSshUtils", () => {
+    it("reuses a connection only while a SessionContext is in scope", async () => {
+        const connectSpy = vi.spyOn(NodeSSH.prototype, "connect").mockResolvedValue({} as any);
+        const execSpy = vi
+            .spyOn(NodeSSH.prototype, "execCommand")
+            .mockResolvedValue({ code: 0, stdout: "", stderr: "" } as any);
+        const disposeSpy = vi.spyOn(NodeSSH.prototype, "dispose").mockImplementation(() => {});
+        vi.spyOn(NodeSSH.prototype, "isConnected").mockReturnValue(true);
+        const session = new SshSession({ hostname: "example.com", user: "admin" });
+
+        await ZSshUtils.lacksWriteAccess(session, "/tmp");
+        await ZSshUtils.lacksWriteAccess(session, "/tmp");
+        expect(connectSpy).toHaveBeenCalledTimes(2);
+        expect(disposeSpy).toHaveBeenCalledTimes(2);
+
+        {
+            using context = new SessionContext(session);
+            await ZSshUtils.lacksWriteAccess(context, "/tmp");
+            await ZSshUtils.lacksWriteAccess(context, "/tmp");
+            expect(connectSpy).toHaveBeenCalledTimes(3);
+            expect(execSpy).toHaveBeenCalledTimes(8);
+            expect(disposeSpy).toHaveBeenCalledTimes(2);
+        }
+        expect(disposeSpy).toHaveBeenCalledTimes(3);
+    });
+
     describe("checkIfOutdated", () => {
         it.each([
-            // compared against mocked zowex binary version: 1.2.1
+            // compared against mocked zo binary version: 1.2.1
             {
                 desc: "versions match exactly- not outdated",
                 remoteVersion: BUNDLED_SSH_SERVER_VERSION,
@@ -153,7 +179,7 @@ describe("ZSshUtils", () => {
             expect(fastPutMock).toHaveBeenCalledTimes(1);
             expect(unlinkMock).toHaveBeenCalledTimes(1);
             // The install is only complete once the binary is confirmed to load on the target
-            expect(sshMock.execCommand).toHaveBeenCalledWith("./zowex --version", { cwd: "./.zowe-server" });
+            expect(sshMock.execCommand).toHaveBeenCalledWith("./zo --version", { cwd: "./.zowe-server" });
         });
 
         describe("installServer binary verification", () => {
@@ -683,10 +709,11 @@ describe("ZSshUtils", () => {
                 execCommand: vi.fn().mockResolvedValue({ code: 0, stderr: "", stdout: "" }),
             };
             const fastPutMock = vi.fn((_local: string, _remote: string, _opts: any, cb: (err?: Error) => void) => cb());
+            const unlinkMock = vi.fn((_path: string, cb: (err?: Error) => void) => cb());
             const rmdirMock = vi.fn((_path: string, cb: (err?: Error) => void) => cb());
             const sftpMock = {
                 fastPut: fastPutMock,
-                unlink: vi.fn((_path: string, cb: (err?: Error) => void) => cb()),
+                unlink: unlinkMock,
                 rmdir: rmdirMock,
             };
             setupSftpMocks(sftpMock, sshMock);
@@ -704,6 +731,9 @@ describe("ZSshUtils", () => {
             expect(result).toBe(false);
             expect(fastPutMock).not.toHaveBeenCalled();
             expect(rmdirMock).toHaveBeenCalledWith(expectedDeployDir, expect.anything());
+            // we should only attempt to delete the pax, not the binary
+            expect(unlinkMock).toHaveBeenCalledTimes(1);
+            expect(unlinkMock).toHaveBeenCalledWith(`${expectedDeployDir}server.pax.Z`, expect.anything());
         });
 
         it("should NOT attempt post-failure cleanup if a step of the deployment throws a password expired error", async () => {
@@ -726,6 +756,39 @@ describe("ZSshUtils", () => {
             await expect(ZSshUtils.installServer(new SshSession(fakeSession), expectedDeployDir, {})).rejects.toThrow(
                 passwordErr,
             );
+        });
+
+        it("should attempt to delete the server binary if deployment fails after we started the extraction", async () => {
+            const sshMock = {
+                execCommand: vi.fn().mockImplementation((cmd, _opts) => {
+                    if (cmd.indexOf("pax ") >= 0) {
+                        return { code: 8, stderr: "Unable to extract pax.", stdout: "" };
+                    }
+
+                    return { code: 0, stderr: "", stdout: "" };
+                }),
+            };
+            const fastPutMock = vi.fn((_local: string, _remote: string, _opts: any, cb: (err?: Error) => void) => cb());
+            const rmdirMock = vi.fn((_path: string, cb: (err?: Error) => void) => cb());
+            const unlinkMock = vi.fn((_path: string, cb: (err?: Error) => void) => cb());
+            const sftpMock = {
+                fastPut: fastPutMock,
+                unlink: unlinkMock,
+                rmdir: rmdirMock,
+            };
+            setupSftpMocks(sftpMock, sshMock);
+            const expectedDeployDir = "/my/subdir/";
+            vi.spyOn(ZSshUtils, "getAvailableMb").mockResolvedValue({ mb: 9001, stderr: "" });
+
+            vi.spyOn(ZSshUtils, "pathExists")
+                .mockResolvedValueOnce({ exists: false, stderr: "" })
+                .mockResolvedValue({ exists: true, stderr: "" })
+                .mockResolvedValue({ exists: true, stderr: "" }); // post-failure binary exists check
+            const result = await ZSshUtils.installServer(new SshSession(fakeSession), expectedDeployDir, {});
+            expect(result).toBe(false);
+            expect(fastPutMock).toHaveBeenCalled();
+            expect(rmdirMock).toHaveBeenCalledWith(expectedDeployDir, expect.anything());
+            expect(unlinkMock).toHaveBeenCalledTimes(2); // to delete the pax & the binary
         });
     });
 
