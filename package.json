@@ -28,7 +28,6 @@
     "z:chdsect": "tsx scripts/buildTools.ts build:chdsect",
     "z:clean": "tsx scripts/buildTools.ts clean",
     "z:delete": "tsx scripts/buildTools.ts delete",
-    "z:has:swig": "tsx scripts/buildTools.ts has:swig",
     "z:imports": "tsx scripts/buildTools.ts imports",
     "z:fetch:python": "tsx scripts/fetchPrecompiledFromPr.ts",
     "z:has:swig": "tsx scripts/buildTools.ts has:swig",

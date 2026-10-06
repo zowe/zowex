@@ -872,7 +872,7 @@ void register_commands(parser::Command &parent)
   export_cmd->add_positional_arg("keyring", "key ring name, or '*' for the owner's virtual key ring", ArgType_Single, true);
   export_cmd->add_keyword_arg("label", make_aliases("--label", "-l"), "certificate label", ArgType_Single, true);
   export_cmd->add_keyword_arg("format", make_aliases("--format", "-F"), "export format: pem (certificate) or p12 (certificate + private key)", ArgType_Single, false, ArgValue(std::string("pem")));
-  export_cmd->add_keyword_arg("file", make_aliases("--file", "-f"), "output file path (required for p12; PEM prints to stdout if omitted); mutually exclusive with --dsn", ArgType_Single, false);
+  export_cmd->add_keyword_arg("file", make_aliases("--file", "-f"), "output file path (p12 requires --file or --dsn; PEM prints to stdout when neither is supplied); mutually exclusive with --dsn", ArgType_Single, false);
   export_cmd->add_keyword_arg("dsn", make_aliases("--dsn"),
                               "output data set (sequential or PDS/E member), created if absent; mutually exclusive with --file. "
                               "Protection is the RACF DATASET profile, not file permissions.",
