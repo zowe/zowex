@@ -950,7 +950,7 @@ describe("ZSshUtils", () => {
                 privateKey: "/path/to/key",
                 keyPassphrase: "passphrase",
             });
-            const readFileSyncSpy = vi.spyOn(fs, "readFileSync");
+            const readFileSyncSpy = vi.spyOn(fs, "readFileSync").mockReturnValue("key-content");
             vi.stubEnv("SSH_AUTH_SOCK", "/tmp/first-agent.sock");
 
             try {
@@ -963,22 +963,33 @@ describe("ZSshUtils", () => {
 
                 vi.stubEnv("SSH_AUTH_SOCK", "/tmp/current-agent.sock");
                 expect(ZSshUtils.buildSshConfig(session).agent).toBe("/tmp/current-agent.sock");
+
+                vi.stubEnv("SSH_AUTH_SOCK", undefined);
+                const fallbackConfig = ZSshUtils.buildSshConfig(session);
+                expect(fallbackConfig.agent).toBeUndefined();
+                expect(fallbackConfig.privateKey).toBe("key-content");
+                expect(fallbackConfig.passphrase).toBe("passphrase");
+                expect(fallbackConfig.password).toBe("mypassword");
+                expect(readFileSyncSpy).toHaveBeenCalledExactlyOnceWith("/path/to/key", "utf-8");
                 expect(session.ISshSession.identityAgent).toBe("SSH_AUTH_SOCK");
             } finally {
                 vi.unstubAllEnvs();
             }
         });
 
-        it("should leave the agent undefined when SSH_AUTH_SOCK is unset", () => {
+        it("should use the configured password when SSH_AUTH_SOCK is unset", () => {
             const session = new SshSession({
                 hostname: "example.com",
                 user: "testuser",
                 identityAgent: "SSH_AUTH_SOCK",
+                password: "mypassword",
             });
             vi.stubEnv("SSH_AUTH_SOCK", undefined);
 
             try {
-                expect(ZSshUtils.buildSshConfig(session).agent).toBeUndefined();
+                const config = ZSshUtils.buildSshConfig(session);
+                expect(config.agent).toBeUndefined();
+                expect(config.password).toBe("mypassword");
                 expect(session.ISshSession.identityAgent).toBe("SSH_AUTH_SOCK");
             } finally {
                 vi.unstubAllEnvs();
