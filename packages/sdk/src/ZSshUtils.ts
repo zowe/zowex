@@ -482,9 +482,7 @@ export class ZSshUtils {
                     `[ZSshUtils] Step 2/5: Uploading ${ZSshUtils.SERVER_PAX_FILE} to ${remotePaxPath}`,
                 );
                 try {
-                    await promisify(sftp.fastPut.bind(sftp))(localPaxPath, remotePaxPath, {
-                        step: progressCallback,
-                    });
+                    await promisify(sftp.fastPut.bind(sftp))(localPaxPath, remotePaxPath, { step: progressCallback });
                 } catch (err) {
                     if (await ZSshUtils.routeExpiredPasswordError(String(err), "upload", options)) {
                         return false;
@@ -573,42 +571,42 @@ export class ZSshUtils {
                     Logger.getAppLogger().error(
                         `Error was thrown during post-failure cleanup: ${failureCleanupErr.message}`,
                     );
-
-                    return false;
-                }
-                Logger.getAppLogger().info(`[ZSshUtils] Step 4/5: Cleaning up ${remotePaxPath}`);
-                try {
-                    await promisify(sftp.unlink.bind(sftp))(remotePaxPath);
-                } catch (err) {
-                    const technical = `${err}`;
-                    Logger.getAppLogger().warn(`[ZSshUtils] Step 4 WARNING: cleanup failed: ${technical}`);
-                    const cleanupErr = new ImperativeError({
-                        msg: "Failed to clean up the upload archive on the remote system.",
-                        errorCode: "ECLEANUPFAIL",
-                        additionalDetails: technical,
-                    });
-                    if (options?.onError) {
-                        await options.onError(cleanupErr, "cleanup");
-                    } else {
-                        Logger.getAppLogger().debug("Cleanup error is non-fatal, continuing...");
-                    }
                 }
 
-                Logger.getAppLogger().info("[ZSshUtils] Step 5/5: Verifying the server binary runs");
-                const verifyErr = await ZSshUtils.verifyServerBinary(ssh, remoteDir);
-                if (verifyErr != null) {
-                    Logger.getAppLogger().error(`[ZSshUtils] Step 5 FAILED: ${verifyErr.additionalDetails}`);
-                    if (options?.onError) {
-                        // The files are in place; only the runtime is unusable. Retrying the install
-                        // cannot help, so treat the callback's answer as "reported, carry on or stop".
-                        return await options.onError(verifyErr, "verify");
-                    }
-                    throw verifyErr;
-                }
-
-                Logger.getAppLogger().info("[ZSshUtils] installServer completed successfully");
-                return true;
+                return false;
             }
+            Logger.getAppLogger().info(`[ZSshUtils] Step 4/5: Cleaning up ${remotePaxPath}`);
+            try {
+                await promisify(sftp.unlink.bind(sftp))(remotePaxPath);
+            } catch (err) {
+                const technical = `${err}`;
+                Logger.getAppLogger().warn(`[ZSshUtils] Step 4 WARNING: cleanup failed: ${technical}`);
+                const cleanupErr = new ImperativeError({
+                    msg: "Failed to clean up the upload archive on the remote system.",
+                    errorCode: "ECLEANUPFAIL",
+                    additionalDetails: technical,
+                });
+                if (options?.onError) {
+                    await options.onError(cleanupErr, "cleanup");
+                } else {
+                    Logger.getAppLogger().debug("Cleanup error is non-fatal, continuing...");
+                }
+            }
+
+            Logger.getAppLogger().info("[ZSshUtils] Step 5/5: Verifying the server binary runs");
+            const verifyErr = await ZSshUtils.verifyServerBinary(ssh, remoteDir);
+            if (verifyErr != null) {
+                Logger.getAppLogger().error(`[ZSshUtils] Step 5 FAILED: ${verifyErr.additionalDetails}`);
+                if (options?.onError) {
+                    // The files are in place; only the runtime is unusable. Retrying the install
+                    // cannot help, so treat the callback's answer as "reported, carry on or stop".
+                    return await options.onError(verifyErr, "verify");
+                }
+                throw verifyErr;
+            }
+
+            Logger.getAppLogger().info("[ZSshUtils] installServer completed successfully");
+            return true;
         });
     }
 
@@ -675,7 +673,6 @@ export class ZSshUtils {
     private static async sftp<T>(
         session: SshSession | SessionContext,
         callback: (sftp: SFTPWrapper, ssh: NodeSSH) => Promise<T>,
-        configProps?: ConnectConfig,
     ): Promise<T> {
         return ZSshUtils.withSsh(session, async (ssh) => callback(await ssh.requestSFTP(), ssh));
     }

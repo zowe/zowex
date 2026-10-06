@@ -83,14 +83,12 @@ export class SshConfigUtils {
                                     break;
                                 case "identityagent":
                                     // "none" explicitly disables the agent; leave session.identityAgent unset.
-                                    // "SSH_AUTH_SOCK" (literal) means use that environment variable's value,
-                                    // matching OpenSSH's own IdentityAgent semantics.
                                     if (value.toLowerCase() === "none") {
                                         break;
                                     }
                                     session.identityAgent =
                                         value === "SSH_AUTH_SOCK"
-                                            ? process.env.SSH_AUTH_SOCK
+                                            ? "$SSH_AUTH_SOCK"
                                             : path.normalize(
                                                   value.startsWith("~") ? path.join(homeDir, value.slice(2)) : value,
                                               );

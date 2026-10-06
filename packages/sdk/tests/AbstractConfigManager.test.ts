@@ -1481,21 +1481,79 @@ describe("AbstractConfigManager", async () => {
             execCommandMock.mockRestore();
         });
 
-        it("should forward identityAgent to the connection configuration", async () => {
+        it("should forward a literal identityAgent socket path", async () => {
             const connectMock = vi.spyOn(NodeSSH.prototype, "connect").mockResolvedValueOnce(undefined);
             const isConnectedMock = vi.spyOn(NodeSSH.prototype, "isConnected").mockReturnValueOnce(true);
             const execCommandMock = vi.spyOn(NodeSSH.prototype, "execCommand").mockImplementation(() => {
                 return { stdout: "" } as any;
             });
 
-            await (testManager as any).attemptConnection({
+            const config = {
                 name: "testProf",
                 hostname: "test.com",
                 user: "user1",
                 identityAgent: "/tmp/ssh-agent.sock",
+            };
+
+            await (testManager as any).attemptConnection(config);
+            expect(connectMock).toHaveBeenCalledWith(expect.objectContaining({ agent: "/tmp/ssh-agent.sock" }));
+            expect(config.identityAgent).toBe("/tmp/ssh-agent.sock");
+
+            connectMock.mockRestore();
+            isConnectedMock.mockRestore();
+            execCommandMock.mockRestore();
+        });
+
+        it("should resolve SSH_AUTH_SOCK for the first connection without changing the profile", async () => {
+            vi.stubEnv("SSH_AUTH_SOCK", "/tmp/current-agent.sock");
+            const connectMock = vi.spyOn(NodeSSH.prototype, "connect").mockResolvedValueOnce(undefined);
+            const isConnectedMock = vi.spyOn(NodeSSH.prototype, "isConnected").mockReturnValueOnce(true);
+            const execCommandMock = vi.spyOn(NodeSSH.prototype, "execCommand").mockImplementation(() => {
+                return { stdout: "" } as any;
             });
 
-            expect(connectMock).toHaveBeenCalledWith(expect.objectContaining({ agent: "/tmp/ssh-agent.sock" }));
+            const config = {
+                name: "testProf",
+                hostname: "test.com",
+                user: "user1",
+                identityAgent: "$SSH_AUTH_SOCK",
+            };
+
+            try {
+                await (testManager as any).attemptConnection(config);
+                expect(connectMock).toHaveBeenCalledWith(expect.objectContaining({ agent: "/tmp/current-agent.sock" }));
+                expect(config.identityAgent).toBe("$SSH_AUTH_SOCK");
+            } finally {
+                vi.unstubAllEnvs();
+            }
+
+            connectMock.mockRestore();
+            isConnectedMock.mockRestore();
+            execCommandMock.mockRestore();
+        });
+
+        it("should leave the connection agent undefined when SSH_AUTH_SOCK is unset", async () => {
+            vi.stubEnv("SSH_AUTH_SOCK", undefined);
+            const connectMock = vi.spyOn(NodeSSH.prototype, "connect").mockResolvedValueOnce(undefined);
+            const isConnectedMock = vi.spyOn(NodeSSH.prototype, "isConnected").mockReturnValueOnce(true);
+            const execCommandMock = vi.spyOn(NodeSSH.prototype, "execCommand").mockImplementation(() => {
+                return { stdout: "" } as any;
+            });
+
+            const config = {
+                name: "testProf",
+                hostname: "test.com",
+                user: "user1",
+                identityAgent: "$SSH_AUTH_SOCK",
+            };
+
+            try {
+                await (testManager as any).attemptConnection(config);
+                expect(connectMock).toHaveBeenCalledWith(expect.objectContaining({ agent: undefined }));
+                expect(config.identityAgent).toBe("$SSH_AUTH_SOCK");
+            } finally {
+                vi.unstubAllEnvs();
+            }
 
             connectMock.mockRestore();
             isConnectedMock.mockRestore();
@@ -1728,6 +1786,25 @@ describe("AbstractConfigManager", async () => {
                 "testProfile",
                 expect.objectContaining({
                     properties: expect.objectContaining({ identityAgent: "/tmp/ssh-agent.sock" }),
+                    secure: ["user"],
+                }),
+            );
+        });
+
+        it("should preserve the SSH_AUTH_SOCK reference when saving the profile", async () => {
+            const config = {
+                user: "user1",
+                host: "example.com",
+                identityAgent: "$SSH_AUTH_SOCK",
+                name: "testProfile",
+            };
+
+            await (testManager as any).setProfile(config);
+
+            expect(mockConfigApi.profiles.set).toHaveBeenCalledWith(
+                "testProfile",
+                expect.objectContaining({
+                    properties: expect.objectContaining({ identityAgent: "$SSH_AUTH_SOCK" }),
                     secure: ["user"],
                 }),
             );
