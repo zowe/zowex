@@ -41,8 +41,6 @@ import {
 import { type ISshConfigExt, SshConfigUtils } from "./SshConfigUtils";
 import { ZSshUtils } from "./ZSshUtils";
 
-type AuthType = "agent" | "privateKey" | "password";
-
 export abstract class AbstractConfigManager {
     public constructor(private mProfilesCache: ProfileInfo) {}
 
@@ -422,7 +420,7 @@ export abstract class AbstractConfigManager {
             });
         }
 
-        const authTypes: AuthType[] = [];
+        const authTypes: ("agent" | "privateKey" | "password")[] = [];
         const agent = newConfig.identityAgent === "SSH_AUTH_SOCK" ? process.env.SSH_AUTH_SOCK : newConfig.identityAgent;
         if (agent) authTypes.push("agent");
         else if (newConfig.identityAgent) configModifications.identityAgent = undefined;
