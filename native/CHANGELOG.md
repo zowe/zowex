@@ -6,6 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- `c`: Corrected PDS directory used-count handling so full 256-byte blocks, including those in `SYS1.PARMLIB`, list successfully and member parsing stays within the active entry bytes. [#1181](https://github.com/zowe/zowex/pull/1181)
 - `c`: Added `--dsn` to `zo system cert import`/`export`, letting a certificate be read from or written to a sequential data set or PDS/E member instead of a USS file. [#1126](https://github.com/zowe/zowex/pull/1126)
 - `c`: Added `zds_write_binary`, a byte-exact data set writer (BPAM for members, binary `fopen` for sequential) with no code-page conversion or line splitting; requires a V-format target. [#1126](https://github.com/zowe/zowex/pull/1126)
 - `c`: Guard against OPEN hanging on a password-protected data set (legacy MVS password protection issues a WTOR with no console to answer it) by failing fast, pre-OPEN, in the BPAM write path. [#1126](https://github.com/zowe/zowex/pull/1126)
