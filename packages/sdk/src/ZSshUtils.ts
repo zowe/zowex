@@ -187,21 +187,28 @@ export class ZSshUtils {
             keyPassphrase: args.privateKey ? args.keyPassphrase : undefined,
             password: args.privateKey ? undefined : args.password,
             handshakeTimeout: args.handshakeTimeout,
+            identityAgent: args.identityAgent,
         };
         return new SshSession(sshSessCfg);
     }
 
     public static buildSshConfig(session: SshSession, configProps?: ConnectConfig): ConnectConfig {
+        const resolvedAgent =
+            session.ISshSession.identityAgent === "SSH_AUTH_SOCK"
+                ? process.env.SSH_AUTH_SOCK
+                : session.ISshSession.identityAgent;
         return {
             host: session.ISshSession.hostname,
             port: session.ISshSession.port,
             username: session.ISshSession.user,
-            password: session.ISshSession.password,
-            privateKey: session.ISshSession.privateKey
-                ? fs.readFileSync(session.ISshSession.privateKey, "utf-8")
-                : undefined,
-            passphrase: session.ISshSession.keyPassphrase,
+            password: resolvedAgent ? undefined : session.ISshSession.password,
+            privateKey:
+                !resolvedAgent && session.ISshSession.privateKey
+                    ? fs.readFileSync(session.ISshSession.privateKey, "utf-8")
+                    : undefined,
+            passphrase: resolvedAgent ? undefined : session.ISshSession.keyPassphrase,
             readyTimeout: session.ISshSession.handshakeTimeout,
+            agent: resolvedAgent,
             // ssh2 debug messages are extremely verbose so log at TRACE level
             debug: (msg) => Logger.getAppLogger().trace(msg),
             ...configProps,
@@ -364,7 +371,7 @@ export class ZSshUtils {
         }
 
         const statsLine = dfCommand.stdout.substring(dfCommand.stdout.indexOf("\n"));
-        Logger.getAppLogger().info(`[ZSshUtils] getAvailableMB: df -m ${dir} output:\n${dfCommand.stdout} `);
+        Logger.getAppLogger().info(`[ZSshUtils] getAvailableMB: df -m ${dir} output:\n${dfCommand.stdout}`);
         // example output:
         // Mounted on     Filesystem                Avail/Total    Files      Status
         // /u/users       (EXAMPLE.USER.ZFS)        826934/8120160 4294919164 Available
@@ -449,7 +456,7 @@ export class ZSshUtils {
                         !(await options.onInsufficientSpaceWarning(availableMb.mb, ZSshClient.REQUIRED_DEPLOY_SIZE_MB))
                     ) {
                         Logger.getAppLogger().info(
-                            `[ZSshUtils] User declined to deploy to '${remoteDir}' due to lack of available space `,
+                            `[ZSshUtils] User declined to deploy to '${remoteDir}' due to lack of available space`,
                         );
                         return false;
                     } else {
@@ -555,7 +562,7 @@ export class ZSshUtils {
 
                     if (extractionStarted && (await ZSshUtils.pathExists(ssh, remoteProgramPath)).exists) {
                         Logger.getAppLogger().debug(
-                            `Deployment failed, but extraction was started. Attempting to delete ${ZSshClient.BIN_NAME} program at '${remoteProgramPath}' `,
+                            `Deployment failed, but extraction was started. Attempting to delete ${ZSshClient.BIN_NAME} program at '${remoteProgramPath}'`,
                         );
                         await promisify(sftp.unlink.bind(sftp))(remoteProgramPath);
                     }
@@ -567,7 +574,7 @@ export class ZSshUtils {
                     }
                 } catch (failureCleanupErr) {
                     Logger.getAppLogger().error(
-                        `Error was thrown during post-failure cleanup: ${failureCleanupErr.message} `,
+                        `Error was thrown during post-failure cleanup: ${failureCleanupErr.message}`,
                     );
                 }
 

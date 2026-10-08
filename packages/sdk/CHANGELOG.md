@@ -9,6 +9,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 - Fixed an error when issuing streamed RPC requests to a `zowex` server running in Bash shell. [#1155](https://github.com/zowe/zowex/pull/1155)
 - Updated RPC command method signatures so that the parameters object is optional when none of the request properties are required. [#1174](https://github.com/zowe/zowex/pull/1174)
 - Added `SessionContext` class to cache SSH connections so they can be reused across utility methods. [#1144](https://github.com/zowe/zowex/pull/1144)
+- Added support for SSH agents (`IdentityAgent` in SSH config) as an authentication method. [#342](https://github.com/zowe/zowex/issues/342)
 
 ## `1.0.1`
 

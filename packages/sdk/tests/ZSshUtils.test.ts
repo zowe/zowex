@@ -867,6 +867,16 @@ describe("ZSshUtils", () => {
         });
     });
     describe("buildSession", () => {
+        it("should preserve identityAgent when building a session from a profile", () => {
+            const session = ZSshUtils.buildSession({
+                host: "example.com",
+                user: "testuser",
+                identityAgent: "SSH_AUTH_SOCK",
+            });
+
+            expect(session.ISshSession.identityAgent).toBe("SSH_AUTH_SOCK");
+        });
+
         it("should build session with password when private key is not provided", () => {
             const profile = {
                 host: "example.com",
@@ -929,6 +939,61 @@ describe("ZSshUtils", () => {
             expect(config.privateKey).toBe("key-content");
             expect(config.passphrase).toBe("passphrase");
             expect(readFileSyncSpy).toHaveBeenCalledWith("/path/to/key", "utf-8");
+        });
+
+        it("should resolve the current SSH_AUTH_SOCK without changing the session", () => {
+            const session = new SshSession({
+                hostname: "example.com",
+                user: "testuser",
+                identityAgent: "SSH_AUTH_SOCK",
+                password: "mypassword",
+                privateKey: "/path/to/key",
+                keyPassphrase: "passphrase",
+            });
+            const readFileSyncSpy = vi.spyOn(fs, "readFileSync").mockReturnValue("key-content");
+            vi.stubEnv("SSH_AUTH_SOCK", "/tmp/first-agent.sock");
+
+            try {
+                const config = ZSshUtils.buildSshConfig(session);
+                expect(config.agent).toBe("/tmp/first-agent.sock");
+                expect(config.password).toBeUndefined();
+                expect(config.privateKey).toBeUndefined();
+                expect(config.passphrase).toBeUndefined();
+                expect(readFileSyncSpy).not.toHaveBeenCalled();
+
+                vi.stubEnv("SSH_AUTH_SOCK", "/tmp/current-agent.sock");
+                expect(ZSshUtils.buildSshConfig(session).agent).toBe("/tmp/current-agent.sock");
+
+                vi.stubEnv("SSH_AUTH_SOCK", undefined);
+                const fallbackConfig = ZSshUtils.buildSshConfig(session);
+                expect(fallbackConfig.agent).toBeUndefined();
+                expect(fallbackConfig.privateKey).toBe("key-content");
+                expect(fallbackConfig.passphrase).toBe("passphrase");
+                expect(fallbackConfig.password).toBe("mypassword");
+                expect(readFileSyncSpy).toHaveBeenCalledExactlyOnceWith("/path/to/key", "utf-8");
+                expect(session.ISshSession.identityAgent).toBe("SSH_AUTH_SOCK");
+            } finally {
+                vi.unstubAllEnvs();
+            }
+        });
+
+        it("should use the configured password when SSH_AUTH_SOCK is unset", () => {
+            const session = new SshSession({
+                hostname: "example.com",
+                user: "testuser",
+                identityAgent: "SSH_AUTH_SOCK",
+                password: "mypassword",
+            });
+            vi.stubEnv("SSH_AUTH_SOCK", undefined);
+
+            try {
+                const config = ZSshUtils.buildSshConfig(session);
+                expect(config.agent).toBeUndefined();
+                expect(config.password).toBe("mypassword");
+                expect(session.ISshSession.identityAgent).toBe("SSH_AUTH_SOCK");
+            } finally {
+                vi.unstubAllEnvs();
+            }
         });
 
         it("should merge configProps", () => {
