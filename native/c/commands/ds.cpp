@@ -331,7 +331,7 @@ int handle_data_set_create_member(InvocationContext &context)
       context.error_stream() << "  Details: " << zds.diag.e_msg << std::endl;
       return RTNCD_FAILURE;
     }
-    context.output_stream() << "Data set and/or member created: '" << dsn << "'" << std::endl;
+    context.output_stream() << "Member created: '" << dsn << "'" << std::endl;
   }
   else
   {

@@ -464,7 +464,7 @@ void zo_ds_tests()
         std::string command = zo_command + " data-set create-member '" + ds + "(TEST)'";
         int rc = execute_command_with_output(command, response);
         ExpectWithContext(rc, response).ToBe(0);
-        Expect(response).ToContain("Data set and/or member created");
+        Expect(response).ToContain("Member created: '" + ds + "(TEST)'");
       });
       it("should not overwrite existing members", [&]() -> void
       {
@@ -473,7 +473,7 @@ void zo_ds_tests()
         std::string command = zo_command + " data-set create-member " + ds;
         int rc = execute_command_with_output(command, response);
         ExpectWithContext(rc, response).ToBe(0);
-        Expect(response).ToContain("Data set and/or member created");
+        Expect(response).ToContain("Member created");
 
         // Write "test" data
         command = "echo test | " + zo_command + " data-set write " + ds;
@@ -506,7 +506,7 @@ void zo_ds_tests()
         std::string command = zo_command + " data-set create-member " + ds;
         int rc = execute_command_with_output(command, response);
         ExpectWithContext(rc, response).ToBe(0);
-        Expect(response).ToContain("Data set and/or member created");
+        Expect(response).ToContain("Member created");
 
         // Write "test" data
         command = "echo test | " + zo_command + " data-set write " + ds;
@@ -524,7 +524,7 @@ void zo_ds_tests()
         command = zo_command + " data-set create-member " + ds + " --overwrite";
         rc = execute_command_with_output(command, response);
         ExpectWithContext(rc, response).ToBe(0);
-        Expect(response).ToContain("Data set and/or member created");
+        Expect(response).ToContain("Member created");
 
         // Read to confirm data was overwritten
         command = zo_command + " data-set view " + ds;
@@ -1342,7 +1342,7 @@ void zo_ds_tests()
         std::string command = zo_command + " data-set create-member '" + ds + "(TEST)'";
         int rc = execute_command_with_output(command, response);
         ExpectWithContext(rc, response).ToBe(0);
-        Expect(response).ToContain("Data set and/or member created");
+        Expect(response).ToContain("Member created");
 
         std::string random_string = get_random_string(80, false);
         command = "echo " + random_string + " | " + zo_command + " data-set write '" + ds + "(TEST)'";
@@ -1460,7 +1460,7 @@ void zo_ds_tests()
         std::string command = zo_command + " data-set create-member '" + ds + "(TEST)'";
         int rc = execute_command_with_output(command, response);
         ExpectWithContext(rc, response).ToBe(0);
-        Expect(response).ToContain("Data set and/or member created");
+        Expect(response).ToContain("Member created");
 
         std::string random_string = get_random_string(80, false);
         std::string random_string1 = get_random_string(80, false);
@@ -1638,7 +1638,7 @@ void zo_ds_tests()
           std::string command = zo_command + " data-set create-member '" + ds + "(PDS1)'";
           int rc = execute_command_with_output(command, response);
           ExpectWithContext(rc, response).ToBe(0);
-          Expect(response).ToContain("Data set and/or member created");
+          Expect(response).ToContain("Member created");
 
           std::string payload = "PDSDATA";
           command = "echo " + payload + " | " + zo_command + " data-set write '" + ds + "(PDS1)'";
@@ -1660,7 +1660,7 @@ void zo_ds_tests()
           std::string command = zo_command + " data-set create-member '" + ds + "(MEM1)'";
           int rc = execute_command_with_output(command, response);
           ExpectWithContext(rc, response).ToBe(0);
-          Expect(response).ToContain("Data set and/or member created");
+          Expect(response).ToContain("Member created");
 
           std::string payload = "MEMBERDATA";
           command = "echo " + payload + " | " + zo_command + " data-set write '" + ds + "(MEM1)'";
@@ -1683,7 +1683,7 @@ void zo_ds_tests()
           std::string command = zo_command + " data-set create-member '" + ds + "(MEM2)'";
           int rc = execute_command_with_output(command, response);
           ExpectWithContext(rc, response).ToBe(0);
-          Expect(response).ToContain("Data set and/or member created");
+          Expect(response).ToContain("Member created");
 
           std::string command_payload =
               "printf 'LINEA\\nLINEB\\n' | " + zo_command + " data-set write '" + ds + "(MEM2)'";
@@ -1707,7 +1707,7 @@ void zo_ds_tests()
           std::string command = zo_command + " data-set create-member '" + ds + "(MEM3)'";
           int rc = execute_command_with_output(command, response);
           ExpectWithContext(rc, response).ToBe(0);
-          Expect(response).ToContain("Data set and/or member created");
+          Expect(response).ToContain("Member created");
 
           std::string command_payload = "echo FIRSTDATA | " + zo_command + " data-set write '" + ds + "(MEM3)'";
           rc = execute_command_with_output(command_payload, response);
@@ -1735,7 +1735,7 @@ void zo_ds_tests()
           std::string command = zo_command + " data-set create-member '" + ds + "(MEM4)'";
           int rc = execute_command_with_output(command, response);
           ExpectWithContext(rc, response).ToBe(0);
-          Expect(response).ToContain("Data set and/or member created");
+          Expect(response).ToContain("Member created");
 
           std::string long_line = "ABCDEFGHIJKLMNOPQRST";
           command = "echo " + long_line + " | " + zo_command + " data-set write '" + ds + "(MEM4)'";
@@ -1757,7 +1757,7 @@ void zo_ds_tests()
           std::string command = zo_command + " data-set create-member '" + ds + "(ASA2)'";
           int rc = execute_command_with_output(command, response);
           ExpectWithContext(rc, response).ToBe(0);
-          Expect(response).ToContain("Data set and/or member created");
+          Expect(response).ToContain("Member created");
 
           command = "printf 'AAA\\nBBB\\n' | " + zo_command + " data-set write '" + ds +
                     "(ASA2)' --local-encoding IBM-1047 --encoding IBM-1047";
@@ -1877,7 +1877,7 @@ void zo_ds_tests()
           std::string command = zo_command + " data-set create-member '" + ds + "(ASA3)'";
           int rc = execute_command_with_output(command, response);
           ExpectWithContext(rc, response).ToBe(0);
-          Expect(response).ToContain("Data set and/or member created");
+          Expect(response).ToContain("Member created");
 
           const std::string pipe_path = "/tmp/zowex_ds_pipe_" + get_random_string(10);
           mkfifo(pipe_path.c_str(), 0777);
