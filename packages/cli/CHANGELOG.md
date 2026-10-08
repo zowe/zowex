@@ -6,6 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## Recent Changes
 
+- Corrected the `create data-set-member` success message to say `Member` instead of `Dataset`. [#639](https://github.com/zowe/zowex/issues/639)
 - Added support for SSH agents (`IdentityAgent` in SSH config) with the `--agent` option. [#342](https://github.com/zowe/zowex/issues/342)
 
 ## `1.0.1`
