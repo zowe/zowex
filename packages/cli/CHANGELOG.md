@@ -4,7 +4,7 @@ All notable changes to the Client code for "zowex-for-zowe-cli" are documented i
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## Recent Changes
+## `1.0.2`
 
 - Corrected the `create data-set-member` success message to say `Member` instead of `Dataset`. [#639](https://github.com/zowe/zowex/issues/639)
 
