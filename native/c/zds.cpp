@@ -1900,6 +1900,69 @@ int zds_write(const ZDSWriteOpts &opts, const std::string &data)
   return rc;
 }
 
+int zds_write_binary(const ZDSWriteOpts &opts, const std::string &data)
+{
+  const int vrc = zds_validate_write_opts(opts, "zds_write_binary");
+  if (vrc != RTNCD_SUCCESS)
+  {
+    return vrc;
+  }
+
+  ZDS *zds = opts.zds;
+  const std::string &dsn = opts.dsname;
+
+  int rc = validate_dataset_exists(dsn, zds->diag);
+  if (rc != RTNCD_SUCCESS)
+  {
+    return rc;
+  }
+
+  const DscbAttributes attrs = zds_get_dscb_attributes(dsn);
+  if (attrs.recfm.find(ZDS_RECFM_V) == std::string::npos)
+  {
+    // Fixed-format records are blank-padded on write (handle_fixed_record), which
+    // would silently change the byte count of a binary blob like a PKCS#12 bundle.
+    ZDIAG_SET_MSG(&zds->diag, "Writing raw bytes to RECFM=%s data sets is not supported; the target must be "
+                              "V-format",
+                  attrs.recfm.c_str());
+    zds->diag.detail_rc = ZDS_RTNCD_UNSUPPORTED_RECFM;
+    return RTNCD_FAILURE;
+  }
+  if (attrs.lrecl <= 4)
+  {
+    ZDIAG_SET_MSG(&zds->diag, "LRECL(%d) is too small to hold a V-format record descriptor word", attrs.lrecl);
+    return RTNCD_FAILURE;
+  }
+
+  zut_prepare_encoding("binary", &zds->encoding_opts);
+
+  if (zds_has_member(dsn))
+  {
+    const size_t chunk = static_cast<size_t>(attrs.lrecl - 4);
+    IO_CTRL *ioc = nullptr;
+    rc = zds_open_output_bpam(zds, dsn, ioc);
+    if (rc != RTNCD_SUCCESS)
+    {
+      return rc;
+    }
+    for (size_t off = 0; off < data.size(); off += chunk)
+    {
+      std::string rec = data.substr(off, chunk);
+      rc = zds_write_output_bpam(zds, ioc, rec);
+      if (rc != RTNCD_SUCCESS)
+      {
+        break;
+      }
+    }
+    // Close unconditionally even after a write failure, or the ENQ/RESERVE leaks.
+    const int close_rc = zds_close_output_bpam(zds, ioc);
+    memset(zds->ddname, 0, sizeof(zds->ddname)); // DD was freed
+    return rc != RTNCD_SUCCESS ? rc : close_rc;
+  }
+
+  return zds_write_sequential(zds, zds_resolve_write_target(opts), data, attrs);
+}
+
 int zds_write_streamed(const ZDSWriteOpts &opts, const std::string &pipe, size_t *content_len)
 {
   const int vrc = zds_validate_write_opts(opts, "zds_write_streamed");
