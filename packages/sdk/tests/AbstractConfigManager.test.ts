@@ -1106,21 +1106,18 @@ describe("AbstractConfigManager", async () => {
             expect(config).toStrictEqual(originalConfig);
         });
 
-        it("should skip an unset SSH_AUTH_SOCK and use the configured key", async () => {
+        it("should preserve SSH_AUTH_SOCK when unset and use the configured key", async () => {
             vi.stubEnv("SSH_AUTH_SOCK", undefined);
             const attemptSpy = vi.spyOn(testManager as any, "attemptConnection").mockResolvedValue(undefined);
+            const config = {
+                user: "user1",
+                hostname: "host",
+                identityAgent: "SSH_AUTH_SOCK",
+                privateKey: "/path/to/key",
+            };
             try {
-                expect(
-                    await (testManager as any).validateConfig(
-                        {
-                            user: "user1",
-                            hostname: "host",
-                            identityAgent: "SSH_AUTH_SOCK",
-                            privateKey: "/path/to/key",
-                        },
-                        false,
-                    ),
-                ).toStrictEqual({ identityAgent: undefined });
+                expect(await (testManager as any).validateConfig(config, false)).toStrictEqual({});
+                expect(config.identityAgent).toBe("SSH_AUTH_SOCK");
                 expect(attemptSpy).toHaveBeenCalledExactlyOnceWith(
                     expect.objectContaining({
                         identityAgent: undefined,

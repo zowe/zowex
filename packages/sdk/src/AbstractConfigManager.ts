@@ -23,6 +23,7 @@ import {
     type IProfile,
     type IProfileLoaded,
     type IProfileTypeConfiguration,
+    Logger,
     type ProfileInfo,
 } from "@zowe/imperative";
 import { type ISshSession, SshSession } from "@zowe/zos-uss-for-zowe-sdk";
@@ -423,7 +424,6 @@ export abstract class AbstractConfigManager {
         const authTypes: ("agent" | "privateKey" | "password")[] = [];
         const agent = newConfig.identityAgent === "SSH_AUTH_SOCK" ? process.env.SSH_AUTH_SOCK : newConfig.identityAgent;
         if (agent) authTypes.push("agent");
-        else if (newConfig.identityAgent) configModifications.identityAgent = undefined;
         if (newConfig.privateKey) authTypes.push("privateKey");
         if (newConfig.password || askForPassword) authTypes.push("password");
 
@@ -445,6 +445,7 @@ export abstract class AbstractConfigManager {
                 await this.attemptConnection(authConfig);
                 return configModifications;
             } catch (err) {
+                Logger.getAppLogger().warn(`[AbstractConfigManager] SSH ${authType} authentication attempt failed.`);
                 const errorMessage = `${err}`;
                 if (errorMessage.includes("Invalid username")) {
                     const user = await this.showInputBox({
@@ -456,6 +457,9 @@ export abstract class AbstractConfigManager {
                         await this.attemptConnection({ ...authConfig, user });
                         return { ...configModifications, user };
                     } catch {
+                        Logger.getAppLogger().debug(
+                            `[AbstractConfigManager] SSH ${authType} authentication retry failed after changing username.`,
+                        );
                         return undefined;
                     }
                 }
@@ -475,6 +479,9 @@ export abstract class AbstractConfigManager {
                             await this.attemptConnection({ ...authConfig, keyPassphrase });
                             return { ...configModifications, privateKey: newConfig.privateKey, keyPassphrase };
                         } catch (error) {
+                            Logger.getAppLogger().debug(
+                                `[AbstractConfigManager] SSH privateKey authentication retry failed (${attempts + 1}/3).`,
+                            );
                             if (!`${error}`.includes("integrity check failed")) break;
                             this.showMessage(
                                 `Passphrase Authentication Failed (${attempts + 1}/3)`,
@@ -563,6 +570,9 @@ export abstract class AbstractConfigManager {
                 });
                 return { password: testPassword };
             } catch (error) {
+                Logger.getAppLogger().debug(
+                    `[AbstractConfigManager] SSH password authentication attempt failed (${attempts + 1}/3).`,
+                );
                 if (`${error}`.includes("FOTS1668")) {
                     this.showMessage("Password Expired on Target System", MESSAGE_TYPE.ERROR);
                     return undefined;
@@ -570,6 +580,7 @@ export abstract class AbstractConfigManager {
                 this.showMessage(`Password Authentication Failed (${attempts + 1}/3)`, MESSAGE_TYPE.ERROR);
             }
         }
+        Logger.getAppLogger().error("[AbstractConfigManager] SSH password authentication failed after 3 attempts.");
         this.showMessage(
             `Authentication failed. Please check your password or ensure your account is not locked out.`,
             MESSAGE_TYPE.ERROR,

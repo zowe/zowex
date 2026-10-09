@@ -10,7 +10,7 @@
  */
 
 import { type ICommandHandler, type IHandlerParameters, TextUtils } from "@zowe/imperative";
-import { SshSession } from "@zowe/zos-uss-for-zowe-sdk";
+import { type ISshSession, SshSession } from "@zowe/zos-uss-for-zowe-sdk";
 import {
     type ClientOptions,
     type CommandResponse,
@@ -93,14 +93,15 @@ export abstract class SshBaseHandler implements ICommandHandler {
     }
 
     /**
-     * Creates a new session with password authentication, disabling private key
+     * Creates a new session with password authentication, disabling private key and agent
      */
     private createPasswordSession(originalSession: SshSession, password: string): SshSession {
-        const newSessionConfig = {
+        const newSessionConfig: ISshSession = {
             ...originalSession.ISshSession,
             password,
             privateKey: undefined as string | undefined,
             keyPassphrase: undefined as string | undefined,
+            identityAgent: undefined as string | undefined,
         };
         return new SshSession(newSessionConfig);
     }
